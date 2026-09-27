@@ -1,0 +1,33 @@
+#+TITLE: poslib
+
+Emacs library for a personal OS in Org files. Package: =pos=.
+
+- =lisp/pos.el= :: sweep, lint, refile, dedupe.
+- =lisp/pos-capture.el= :: capture to an intray.
+- =test/= :: ERT tests.
+
+* Install
+
+- Clone; load with =-L poslib/lisp=.
+- Or =package-vc=:
+
+#+begin_src emacs-lisp
+(package-vc-install
+ '(pos :url "URL" :lisp-dir "lisp" :main-file "pos.el"))
+#+end_src
+
+- =:main-file= is relative to =:lisp-dir=.
+
+* Configure
+
+- =pos-config.el= at the repository root; =pos-load-config= loads it.
+- Sets =pos-pillars=, =pos-prose-directories=, =pos-refile-rules=.
+- Example: =test/pos-config.el=.
+
+* Check
+
+- =make check=: byte-compile (warnings are errors), checkdoc, tests.
+
+* Licence
+
+GPL-3.0-or-later. See =LICENSE=.
