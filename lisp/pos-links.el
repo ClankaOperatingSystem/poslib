@@ -163,15 +163,23 @@ FROM must be at OFFSET."
                               (pos-cid-file path))
                   (unless (equal rel item) (concat "/" (substring rel (1+ (length item)))))))))))
 
-(defun pos-links-resolve (target)
+(defun pos-links-within-scope-p (archive scope)
+  "Return non-nil if ARCHIVE is SCOPE's own, or a scope's within it."
+  (string-prefix-p (file-name-as-directory (file-truename scope))
+                   (file-name-as-directory (file-truename archive))))
+
+(defun pos-links-resolve (target &optional scope)
   "Return how a link to TARGET, an absolute path outside the item, resolves.
-\(cid . LINK) for archived material, (rumour . TARGET) for anything else
-that exists; refuse a broken link."
-  (cond
-   ((not (or (file-exists-p target) (file-symlink-p target)))
-    (pos-ledger--refuse 'broken "Broken link: %s" target))
-   ((pos-links--archive-of target) (cons 'cid (pos-links--sealed target)))
-   (t (cons 'rumour target))))
+\(cid . LINK) for material archived in SCOPE or a scope within it,
+\(rumour . TARGET) for anything else that exists, a container's archive
+included; refuse a broken link.  Without SCOPE, any archive is cited."
+  (let ((archive (pos-links--archive-of target)))
+    (cond
+     ((not (or (file-exists-p target) (file-symlink-p target)))
+      (pos-ledger--refuse 'broken "Broken link: %s" target))
+     ((and archive (or (null scope) (pos-links-within-scope-p archive scope)))
+      (cons 'cid (pos-links--sealed target)))
+     (t (cons 'rumour target)))))
 
 (provide 'pos-links)
 ;;; pos-links.el ends here

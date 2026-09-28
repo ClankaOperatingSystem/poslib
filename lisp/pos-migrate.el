@@ -311,7 +311,7 @@ today's, dates rumours; LEDGER-ID names a ledger that has none."
                 ((or (file-exists-p abs) (file-symlink-p abs))
                  (let ((other (pos-links--archive-of abs)))
                    (cond
-                    ((and other (not inside))
+                    ((and other (not inside) (pos-links-within-scope-p other scope))
                      (unless (pos-migrate--converted-p other)
                        (pos-ledger--refuse 'order "Migrate %s first: %s links to it" other rel))
                      (list rel link "cid" (concat (pos-links--sealed abs) suffix)))

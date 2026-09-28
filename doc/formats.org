@@ -234,12 +234,15 @@ move, and resolves:
   CID, taken once that file's own links are rewritten (=cid=); links among
   an item's files that form a loop are refused (=loop=); anything else
   within the item is refused (=unresolved=);
-- to a path in an archive: =ipfs://= and the CID of the sealed item holding
-  it, else of the collection holding it, else of the enrolled file itself,
-  then =/= and the path within it if it is not the whole (=cid=); a path
-  never sealed is refused (=unsealed=);
-- to anything else that exists, canon or another scope: a rumour record,
-  sealed first as an item of its own, whose CID the link cites (=rumour=);
+- to a path in the archive of the item's scope, or of a scope within it:
+  =ipfs://= and the CID of the sealed item holding it, else of the
+  collection holding it, else of the enrolled file itself, then =/= and
+  the path within it if it is not the whole (=cid=); a path never sealed
+  is refused (=unsealed=);
+- to anything else that exists, canon, another scope, or a container's
+  archive, since a scope does not depend on its container: a rumour
+  record, sealed first as an item of its own, whose CID the link cites
+  (=rumour=);
 - to nothing: refused (=broken=).
 
 A link's text is replaced whole: in Org the raw link, as
@@ -325,7 +328,8 @@ archive:
 - =rumours=: at =rumours/DATE-HASH.org=, as for sealing, the text saying
   that migrating the archive found links to the path;
 - =links=: every link, as for sealing, from where it was written, with its
-  edit: =cid=, =internal=, =rumour=, =broken=, annotated, or =later=, a
+  resolution; a scope within this one must be migrated first, and a
+  container's archive is cited by rumour. Each link has its edit: =cid=, =internal=, =rumour=, =broken=, annotated, or =later=, a
   link from an earlier item to a later one where items' links loop,
   annotated =[[later:PATH][TEXT]]= in Org and =TEXT [later record: PATH]= in
   Markdown; an item's date is one its path begins with, else its first
