@@ -1,0 +1,24 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "What is already archived is not sealed again.",
+ "tree": [
+  {
+   "path": "scope/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/.archive-integrity/00000001-fe95aadfa7a3685de7fbe9ab01f719bf742a1fdc48d0ba93c6a73a4dd869161f.json",
+   "text": "{\"add\":{\"a.md\":{\"mode\":292,\"sha256\":\"8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8\",\"size\":5}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/b.md",
+   "text": "beta"
+  }
+ ],
+ "source": "scope/archives/b.md",
+ "destination": "scope/archives/c.md",
+ "error": "source"
+}

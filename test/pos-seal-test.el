@@ -1,0 +1,139 @@
+;;; pos-seal-test.el --- Tests for pos-seal.el  -*- lexical-binding: t -*-
+
+;; Copyright (C) 2026 Chris Gough
+
+;; Author: Chris Gough
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; Run: make test.  The seal fixtures in fixtures/ledger/ are shared
+;; with pyposlib, which must seal the same bytes.
+
+;;; Code:
+
+(require 'ert)
+(require 'pos-seal)
+(require 'pos-ledger-test
+         (expand-file-name "pos-ledger-test"
+                           (file-name-directory (or load-file-name
+                                                    buffer-file-name))))
+
+(defun pos-seal-test-relative-plan (plan dir)
+  "Return PLAN with its absolute paths made relative to DIR."
+  (let ((root (file-name-as-directory (file-truename dir))))
+    (mapcar (lambda (pair)
+              (if (memq (car pair) '(source destination archive ledger))
+                  (cons (car pair) (file-relative-name (cdr pair) root))
+                pair))
+            plan)))
+
+(defun pos-seal-test-run (fixture dir)
+  "Seal FIXTURE, built in DIR; return what happened, relative to DIR.
+An alist of plan, event and report, or of error."
+  (let-alist fixture
+    (condition-case err
+        (let* ((plan (pos-seal-plan (expand-file-name .source dir)
+                                    (expand-file-name .destination dir) .ledger_id))
+               (result (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan))))
+               (scope (file-name-directory (alist-get 'archive plan))))
+          `((plan . ,(pos-seal-test-relative-plan plan dir))
+            (event . ((name . ,(file-name-nondirectory (car result)))
+                      (encoded . ,(decode-coding-string (pos-ledger--read (car result))
+                                                        'utf-8))))
+            (report . ,(pos-ledger-test-relative (pos-ledger-check scope) dir))))
+      (pos-ledger-refused `((error . ,(symbol-name (cadr err))))))))
+
+(ert-deftest pos-seal/every-shared-fixture-seals-the-same-bytes ()
+  "Plan, event and the report after it, or the refusal, as fixtures/ledger/."
+  (dolist (named (pos-fixtures "ledger"))
+    (let-alist (cdr named)
+      (when (equal .kind "seal")
+        (ert-info ((car named))
+          (pos-fixture-with (cdr named) dir
+            (let ((got (pos-seal-test-run (cdr named) dir)))
+              (if .error
+                  (should (equal .error (alist-get 'error got)))
+                (pos-ledger-test-same .plan (alist-get 'plan got))
+                (pos-ledger-test-same .event (alist-get 'event got))
+                (pos-ledger-test-same .report (alist-get 'report got))))))))))
+
+(defmacro pos-seal-test-with-scope (&rest body)
+  "Evaluate BODY with `scope' a temporary scope holding archives/ and an item."
+  (declare (indent 0))
+  `(let* ((dir (make-temp-file "pos-seal" t))
+          (scope (expand-file-name "scope" dir)))
+     (unwind-protect
+         (progn
+           (make-directory (expand-file-name "archives" scope) t)
+           (pos-fixture-write (expand-file-name "trial/result.md" scope) "result")
+           ,@body)
+       (pos-fixture-writable dir)
+       (delete-directory dir t))))
+
+(defun pos-seal-test-plan (scope)
+  "Return the plan to seal SCOPE's trial into its archive."
+  (pos-seal-plan (expand-file-name "trial" scope)
+                 (expand-file-name "archives/trial" scope)))
+
+(ert-deftest pos-seal/sealing-removes-write-bits ()
+  "The sealed files and the ledger event are read-only; CIDs do not change."
+  (pos-seal-test-with-scope
+    (let* ((plan (pos-seal-test-plan scope))
+           (event (car (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))))
+           (file (expand-file-name "archives/trial/result.md" scope)))
+      (should (zerop (logand (file-modes file) #o222)))
+      (should (zerop (logand (file-modes event) #o222)))
+      (should (equal (pos-cid-file file)
+                     (alist-get 'cid (cdr (assoc "trial/result.md" (alist-get 'add plan)))))))))
+
+(ert-deftest pos-seal/a-plan-is-applied-only-as-reviewed ()
+  "A plan whose hash differs from the one reviewed is refused, as is a
+plan whose item changed after review; nothing moves."
+  (pos-seal-test-with-scope
+    (let ((plan (pos-seal-test-plan scope)))
+      (should-error (pos-seal-apply plan (make-string 64 ?0)) :type 'pos-ledger-refused)
+      (pos-fixture-write (expand-file-name "trial/result.md" scope) "changed")
+      (should-error (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))
+                    :type 'pos-ledger-refused)
+      (should (file-exists-p (expand-file-name "trial/result.md" scope)))
+      (should-not (file-exists-p (expand-file-name "archives/trial" scope))))))
+
+(ert-deftest pos-seal/an-interrupted-seal-resumes ()
+  "After the move but before the event, the same plan finishes the work;
+applied twice, it adds nothing."
+  (pos-seal-test-with-scope
+    (let* ((plan (pos-seal-test-plan scope))
+           (hash (pos-ledger--sha (pos-ledger-json plan))))
+      (make-directory (expand-file-name "archives" scope) t)
+      (rename-file (expand-file-name "trial" scope) (expand-file-name "archives/trial" scope))
+      (let ((first (pos-seal-apply plan hash)))
+        (should (equal first (pos-seal-apply plan hash))))
+      (should (equal 1 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
+
+(ert-deftest pos-seal/a-new-record-is-staged-then-sealed ()
+  "New bytes are staged beside the archive, then sealed like any item."
+  (pos-seal-test-with-scope
+    (let* ((plan (pos-seal-stage "handover\n" (expand-file-name "archives/journal/h.md" scope)))
+           (staged (alist-get 'source plan)))
+      (should (string-prefix-p (file-truename (expand-file-name "_seal/" scope)) staged))
+      (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))
+      (should-not (file-exists-p staged))
+      (should (equal "handover\n" (pos-ledger--read (expand-file-name "archives/journal/h.md"
+                                                                        scope)))))))
+
+(provide 'pos-seal-test)
+;;; pos-seal-test.el ends here
