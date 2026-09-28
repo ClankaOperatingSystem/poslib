@@ -1,0 +1,103 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "date": "2026-09-28",
+ "description": "A child scope's record linking into its container's archive cites a rumour, not a CID: a scope does not depend on its container.",
+ "source": "scope/projects/child/note.org",
+ "destination": "scope/projects/child/archives/note.org",
+ "tree": [
+  {
+   "path": "scope/archive-integrity/checkpoints/eb5b929f629c1b3fe738ef1847d49f9cb0a2cbb0990d65a8ab561e9d9be89f69.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000001-85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54.json",
+   "text": "{\"add\":{\"trial/README.org\":{\"cid\":\"bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy\",\"mode\":292,\"sha256\":\"b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae\",\"size\":47},\"trial/sub/x.txt\":{\"cid\":\"bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4\",\"mode\":292,\"sha256\":\"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7\",\"size\":4}},\"collections\":[\"trial\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/trial/README.org",
+   "text": "#+TITLE: Trial\n#+COLLECTION: t\n\nWhat it holds.\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/trial/empty",
+   "directory": true
+  },
+  {
+   "path": "scope/archives/trial/sub/x.txt",
+   "text": "data",
+   "mode": 292
+  },
+  {
+   "path": "scope/projects/child/note.org",
+   "text": "#+TITLE: Note\n\nSee [[file:../../archives/trial/sub/x.txt][the data]].\n"
+  },
+  {
+   "path": "scope/projects/child/archives",
+   "directory": true
+  }
+ ],
+ "event": {
+  "encoded": "{\"add\":{\"note.org\":{\"cid\":\"bafkreiears6p3hhhvixgzhhtziz5ldilo3sgpt6wpa4ii5yx5cm5doqoey\",\"mode\":292,\"sha256\":\"808cbcfd9ce7aa2e6c9cf3ca33d58d0b76e467cfd67838847717e899d1ba0e26\",\"size\":101}},\"collections\":[],\"item\":\"note.org\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"dd471d28b74104ea7bb9b7fb8f22ee49c03fe435c212d49a5302fd6191edd5f6\",\"root\":\"bafybeiccshqgjtjiol7xjgrsgu6algwo7kz6eivnkpaeby5ievjly4j77a\",\"schema\":2}\n",
+  "name": "00000002-ed7176a57ee1d05ebc56bff4c96078ea35649319106b686ffd4bab68e2f877a9.json"
+ },
+ "plan": {
+  "add": {
+   "note.org": {
+    "cid": "bafkreiears6p3hhhvixgzhhtziz5ldilo3sgpt6wpa4ii5yx5cm5doqoey",
+    "mode": 292,
+    "sha256": "808cbcfd9ce7aa2e6c9cf3ca33d58d0b76e467cfd67838847717e899d1ba0e26",
+    "size": 101
+   }
+  },
+  "archive": "scope/projects/child/archives",
+  "collections": [],
+  "destination": "scope/projects/child/archives/note.org",
+  "inventory_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+  "ledger": "scope/projects/child/archive-integrity/ledger",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "links": [
+   {
+    "file": "note.org",
+    "from": "file:../../archives/trial/sub/x.txt",
+    "kind": "rumour",
+    "offset": 21,
+    "to": "ipfs://bafkreigno4i4fkvvs23kwktxtfgsnaxivh7o4ib6scds53fyfhpwuini3u"
+   }
+  ],
+  "number": 1,
+  "operation": "seal",
+  "originals": {
+   "note.org": "f4664a22c8c64d503712bd8daf4864c9966bfb8a792c6b6a379c1111e9a5c5b7"
+  },
+  "previous": null,
+  "rumours": [
+   {
+    "cid": "bafkreigno4i4fkvvs23kwktxtfgsnaxivh7o4ib6scds53fyfhpwuini3u",
+    "destination": "rumours/2026-09-28-b065102da8b6.org",
+    "text": "#+TITLE: Rumour of ../../archives/trial/sub/x.txt\n#+DATE: 2026-09-28\n\nOn 2026-09-28, sealing =note.org= found a link to =../../archives/trial/sub/x.txt=, outside the archive. It was then a file of 4 bytes, SHA-256 =3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7=.\n"
+   }
+  ],
+  "schema": 2,
+  "source": "scope/projects/child/note.org"
+ },
+ "report": [
+  {
+   "archive": "scope/projects/child/archives",
+   "changed": [],
+   "checkpoint_writable": [],
+   "events": 2,
+   "files": 2,
+   "head": "ed7176a57ee1d05ebc56bff4c96078ea35649319106b686ffd4bab68e2f877a9",
+   "hidden": [],
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeiccshqgjtjiol7xjgrsgu6algwo7kz6eivnkpaeby5ievjly4j77a",
+   "root": "bafybeiccshqgjtjiol7xjgrsgu6algwo7kz6eivnkpaeby5ievjly4j77a",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}

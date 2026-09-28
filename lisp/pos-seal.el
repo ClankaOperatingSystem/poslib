@@ -156,7 +156,7 @@ the rumours."
                      (list offset text "internal" text))
                     ((assoc target files) (list offset text "cid" :file target suffix))
                     (t (pos-ledger--refuse 'unresolved "Link within the item to %s" abs))))
-               (pcase (pos-links-resolve abs)
+               (pcase (pos-links-resolve abs scope)
                  (`(cid . ,to) (list offset text "cid" (concat to suffix)))
                  (`(rumour . ,target)
                   (let ((rumour (pos-seal--rumour target scope rel date)))
