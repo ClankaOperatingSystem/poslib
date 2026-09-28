@@ -99,31 +99,19 @@ PATH is relative to the archive, from REL for SOURCE."
 ;;;; Links
 
 (defun pos-seal--title (file)
-  "Return FILE's title, from an Org #+TITLE or a Markdown heading, or nil."
-  (when (file-regular-p file)
-    (with-temp-buffer
-      (insert (decode-coding-string (pos-ledger--read file) 'utf-8))
-      (goto-char (point-min))
-      (when (re-search-forward (if (string-suffix-p ".md" file) "^# +\\(.+\\)$"
-                                 "^#\\+TITLE: *\\(.+\\)$")
-                               nil t)
-        (string-trim (match-string 1))))))
+  "Return FILE's title, as `pos-links--title'."
+  (pos-links--title file))
 
 (defun pos-seal--rumour (target scope item date)
   "Return the rumour of TARGET, outside the archive of SCOPE, found sealing ITEM.
 As (DESTINATION . TEXT), DESTINATION within the archive, dated DATE."
   (let* ((path (file-relative-name target scope))
-         (title (pos-seal--title target))
          (text (concat
                 "#+TITLE: Rumour of " path "\n"
                 "#+DATE: " date "\n\n"
                 "On " date ", sealing =" item "= found a link to =" path
                 "=, outside the archive. It was then "
-                (if (file-directory-p target) "a directory"
-                  (let ((bytes (pos-ledger--read target)))
-                    (format "a file of %d bytes, SHA-256 =%s=%s" (length bytes)
-                            (pos-ledger--sha bytes)
-                            (if title (format ", titled \"%s\"" title) ""))))
+                (pos-links-description target scope)
                 ".\n")))
     (cons (format "rumours/%s-%s.org" date (substring (secure-hash 'sha256 path) 0 12))
           text)))

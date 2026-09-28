@@ -174,5 +174,23 @@ applied twice, it adds nothing."
         (advice-remove 'insert-file-contents 'pos-seal-test-watch))
       (should-not read))))
 
+(ert-deftest pos-seal/a-rumour-reads-nothing-outside-the-garden ()
+  "A link out of the garden's repository gets a rumour naming where it
+pointed; the target is not read."
+  (pos-seal-test-with-scope
+    (let ((outside (expand-file-name "../elsewhere.md" scope)) read)
+      (make-directory (expand-file-name ".git" scope))
+      (pos-fixture-write outside "# Somewhere else\n")
+      (pos-fixture-write (expand-file-name "trial/r.md" scope) "See [there](../../elsewhere.md).\n")
+      (advice-add 'insert-file-contents-literally :before
+                  (lambda (file &rest _) (when (equal (expand-file-name file) outside)
+                                           (setq read t)))
+                  '((name . pos-seal-test-watch)))
+      (let ((plan (unwind-protect (pos-seal-test-plan scope)
+                    (advice-remove 'insert-file-contents-literally 'pos-seal-test-watch))))
+        (should-not read)
+        (should (string-match-p "outside the garden, and was not read"
+                                (alist-get 'text (aref (alist-get 'rumours plan) 0))))))))
+
 (provide 'pos-seal-test)
 ;;; pos-seal-test.el ends here

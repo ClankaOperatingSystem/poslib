@@ -264,7 +264,9 @@ plan's; one rumour serves every link to its target. Its text is:
 On DATE, sealing =ITEM= found a link to =PATH=, outside the archive. It was then DESCRIPTION.
 #+end_example
 
-DESCRIPTION is =a directory=, or =a file of N bytes, SHA-256 =HEX== with
+DESCRIPTION is =outside the garden, and was not read= for a target beyond
+the garden's repository, which is never read; else =a directory=, or =a
+file of N bytes, SHA-256 =HEX== with
 =, titled "TITLE"= if the file has an Org =#+TITLE= or a Markdown =#=
 heading. A rumour already sealed, word for word, is cited, not sealed
 again; one differing at its destination is refused (=destination=).
