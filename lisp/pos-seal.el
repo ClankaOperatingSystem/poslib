@@ -140,10 +140,17 @@ the rumours."
          (in-archive (lambda (abs) (if (equal abs source) rel
                                      (concat rel "/" (substring abs (length base))))))
          rumours plans)
-    ;; Each file: its links, as (OFFSET TEXT KIND . TO-OR-TARGET).
+    ;; Each file: its links, as (OFFSET TEXT KIND . TO-OR-TARGET).  A
+    ;; capsule's are left as written.
     (dolist (pair files)
       (let ((file (cdr pair)) resolved)
-        (dolist (link (pos-links-in-file file))
+        (dolist (link (unless (seq-some (lambda (c)
+                                          (and (pos-ledger--within-p (car pair) c)
+                                               (pos-ledger-capsule-p
+                                                (if (equal c rel) source
+                                                  (concat base (substring c (1+ (length rel))))))))
+                                        collections)
+                        (pos-links-in-file file)))
           (pcase-let* ((`(,offset ,text ,path ,suffix) link)
                        (abs (expand-file-name path (file-name-directory file))))
             (push

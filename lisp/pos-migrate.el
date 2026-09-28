@@ -112,20 +112,26 @@ folder beside its archive; other hidden entries are prefixed dot."
 (defun pos-migrate--candidates (stage exclude)
   "Return the directories in STAGE that are collections, less EXCLUDE.
 Receipts, capsules, trial and study runs, and retired scopes."
-  (sort
-   (seq-filter
-    (lambda (rel)
-      (let ((path (expand-file-name rel stage))
-            (parent (file-name-nondirectory
-                     (directory-file-name (or (file-name-directory rel) "")))))
-        (and (file-directory-p path) (not (member rel exclude))
-             (or (and (file-regular-p (expand-file-name "manifest.json" path))
-                      (file-directory-p (expand-file-name "source" path)))
-                 (equal parent "capsules")
-                 (member parent '("trials" "studies" "pipeline-trials"))
-                 (file-directory-p (expand-file-name "archives" path))))))
-    (pos-migrate--walk stage))
-   #'string<))
+  (let ((found
+         (seq-filter
+          (lambda (rel)
+            (let ((path (expand-file-name rel stage))
+                  (parent (file-name-nondirectory
+                           (directory-file-name (or (file-name-directory rel) "")))))
+              (and (file-directory-p path) (not (member rel exclude))
+                   (or (and (file-regular-p (expand-file-name "manifest.json" path))
+                            (file-directory-p (expand-file-name "source" path)))
+                       (pos-ledger-capsule-p path)
+                       (equal parent "capsules")
+                       (member parent '("trials" "studies" "pipeline-trials"))
+                       (file-directory-p (expand-file-name "archives" path))))))
+          (pos-migrate--walk stage))))
+    ;; A collection holds all within it: none is declared inside another.
+    (sort (seq-remove (lambda (c) (seq-some (lambda (o) (and (not (equal o c))
+                                                             (pos-ledger--within-p c o)))
+                                            found))
+                      found)
+          #'string<)))
 
 (defun pos-migrate--declare (stage collection)
   "Declare COLLECTION in STAGE; return (README . KIND), KIND new or line."
@@ -213,6 +219,13 @@ TARGET's path is given from ROOT, the archive's scope."
   (let ((entries (car (pos-ledger-history archive))))
     (and entries (seq-every-p (lambda (e) (assq 'cid (cdr e))) entries))))
 
+(defun pos-migrate--in-capsule-p (rel collections stage)
+  "Return non-nil if REL lies in one of COLLECTIONS in STAGE that is a capsule.
+A capsule's links are left as written."
+  (seq-some (lambda (c) (and (pos-ledger--within-p rel c)
+                             (pos-ledger-capsule-p (expand-file-name c stage))))
+            collections))
+
 (defun pos-migrate--item-of (rel collections)
   "Return the item holding REL: its outermost of COLLECTIONS, else REL."
   (or (seq-find (lambda (c) (pos-ledger--within-p rel c)) collections) rel))
@@ -252,7 +265,11 @@ declared.  Return (DISCARD REMOVE RENAMES COLLECTIONS DECLARATIONS)."
         (if (assoc rel known) (push rel remove) (push rel discard))))
     (let* ((renames (pos-migrate--hidden-renames stage))
            (collections (pos-migrate--candidates stage exclude))
-           (declarations (mapcar (lambda (c) (pos-migrate--declare stage c)) collections)))
+           ;; A capsule declares itself by its manifest, and is kept byte for byte.
+           (declarations (mapcar (lambda (c) (pos-migrate--declare stage c))
+                                 (seq-remove (lambda (c) (pos-ledger-capsule-p
+                                                          (expand-file-name c stage)))
+                                             collections))))
       (list (sort discard #'string<) (sort (append missing remove) #'string<)
             renames collections declarations))))
 
@@ -281,7 +298,8 @@ today's, dates rumours; LEDGER-ID names a ledger that has none."
                                     (pos-migrate--walk stage)))
                  (links nil) (deps nil) (rumours nil))
       ;; Resolve every link from where it was written, in the archive as it is.
-      (dolist (rel files)
+      (dolist (rel (seq-remove (lambda (rel) (pos-migrate--in-capsule-p rel collections stage))
+                               files))
         (let* ((original (pos-migrate--back rel renames))
                (written (file-name-directory (expand-file-name original archive))))
           (dolist (link (pos-links-in-file (expand-file-name rel stage)))
