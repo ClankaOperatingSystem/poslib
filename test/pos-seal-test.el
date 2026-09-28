@@ -96,7 +96,7 @@ An alist of plan, event and report, or of error."
            (event (car (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))))
            (file (expand-file-name "archives/trial/result.md" scope)))
       (should (zerop (logand (file-modes file) #o222)))
-      (should (zerop (logand (file-modes event) #o222)))
+      (should (equal #o444 (logand (file-modes event) #o777)))
       (should (equal (pos-cid-file file)
                      (alist-get 'cid (cdr (assoc "trial/result.md" (alist-get 'add plan)))))))))
 
