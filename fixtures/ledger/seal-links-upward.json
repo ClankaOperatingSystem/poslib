@@ -40,8 +40,8 @@
   }
  ],
  "event": {
-  "encoded": "{\"add\":{\"note.org\":{\"cid\":\"bafkreiears6p3hhhvixgzhhtziz5ldilo3sgpt6wpa4ii5yx5cm5doqoey\",\"mode\":292,\"sha256\":\"808cbcfd9ce7aa2e6c9cf3ca33d58d0b76e467cfd67838847717e899d1ba0e26\",\"size\":101}},\"collections\":[],\"item\":\"note.org\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"dd471d28b74104ea7bb9b7fb8f22ee49c03fe435c212d49a5302fd6191edd5f6\",\"root\":\"bafybeiccshqgjtjiol7xjgrsgu6algwo7kz6eivnkpaeby5ievjly4j77a\",\"schema\":2}\n",
-  "name": "00000002-ed7176a57ee1d05ebc56bff4c96078ea35649319106b686ffd4bab68e2f877a9.json"
+  "encoded": "{\"add\":{\"note.org\":{\"cid\":\"bafkreiears6p3hhhvixgzhhtziz5ldilo3sgpt6wpa4ii5yx5cm5doqoey\",\"mode\":292,\"sha256\":\"808cbcfd9ce7aa2e6c9cf3ca33d58d0b76e467cfd67838847717e899d1ba0e26\",\"size\":101}},\"collections\":[],\"item\":\"note.org\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"f398603275035e1ec56381daefdde09fa1c185439e90049ca01a233f9894c5bb\",\"root\":\"bafybeieyyukfupk4bknnpsfxszoan74y6a2b43lopjymeoeu2mpmrilfni\",\"schema\":2}\n",
+  "name": "00000002-8eb11e5b18a8d45d8d22a372878310583f48b3f14e38e0b3c6b2d93000e6cabd.json"
  },
  "plan": {
   "add": {
@@ -76,7 +76,7 @@
   "rumours": [
    {
     "cid": "bafkreigno4i4fkvvs23kwktxtfgsnaxivh7o4ib6scds53fyfhpwuini3u",
-    "destination": "rumours/2026-09-28-b065102da8b6.org",
+    "destination": "rumours/2026-09-28-cd7711c2aab5.org",
     "text": "#+TITLE: Rumour of ../../archives/trial/sub/x.txt\n#+DATE: 2026-09-28\n\nOn 2026-09-28, sealing =note.org= found a link to =../../archives/trial/sub/x.txt=, outside the archive. It was then a file of 4 bytes, SHA-256 =3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7=.\n"
    }
   ],
@@ -90,12 +90,12 @@
    "checkpoint_writable": [],
    "events": 2,
    "files": 2,
-   "head": "ed7176a57ee1d05ebc56bff4c96078ea35649319106b686ffd4bab68e2f877a9",
+   "head": "8eb11e5b18a8d45d8d22a372878310583f48b3f14e38e0b3c6b2d93000e6cabd",
    "hidden": [],
    "missing": [],
    "new": [],
-   "recorded_root": "bafybeiccshqgjtjiol7xjgrsgu6algwo7kz6eivnkpaeby5ievjly4j77a",
-   "root": "bafybeiccshqgjtjiol7xjgrsgu6algwo7kz6eivnkpaeby5ievjly4j77a",
+   "recorded_root": "bafybeieyyukfupk4bknnpsfxszoan74y6a2b43lopjymeoeu2mpmrilfni",
+   "root": "bafybeieyyukfupk4bknnpsfxszoan74y6a2b43lopjymeoeu2mpmrilfni",
    "undeclared": [],
    "writable": []
   }

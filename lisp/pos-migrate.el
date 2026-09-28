@@ -204,8 +204,8 @@ EDGES is an alist of node and the nodes it points to."
   "Return (DESTINATION . TEXT), the rumour of TARGET, dated DATE.
 TARGET's path is given from ROOT, the archive's scope."
   (let ((path (file-relative-name target root)))
-    (cons (format "rumours/%s-%s.org" date (substring (secure-hash 'sha256 path) 0 12))
-          (concat "#+TITLE: Rumour of " path "\n#+DATE: " date "\n\n"
+    (pos-seal-rumour
+     date (concat "#+TITLE: Rumour of " path "\n#+DATE: " date "\n\n"
                   "On " date ", migrating its archive found links to =" path
                   "=, which content identity cannot cite. It was then "
                   (pos-links-description target root) ".\n"))))

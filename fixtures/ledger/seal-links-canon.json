@@ -40,8 +40,8 @@
   }
  ],
  "event": {
-  "encoded": "{\"add\":{\"journal/note.org\":{\"cid\":\"bafkreia4mgqawvwpe4iyj7rw2axm4ddvh3z5b7qbgyk2jzynmcs7uxt5da\",\"mode\":292,\"sha256\":\"1c61a00b56cf271184fe36d02ece0c753ef3d0fe013615a4e70d60a5fa5e7d18\",\"size\":190}},\"collections\":[],\"item\":\"journal/note.org\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"3bfa115272c658dea10992f986b67d776f8edc0bff1a9db849c07b838154fb4a\",\"root\":\"bafybeia5vis3fe5pscpjkagnx53gpvrsl6fn4q72m7m2kjezpr2iqhdgwa\",\"schema\":2}\n",
-  "name": "00000003-07605564e728c5ba70347b7e210b7c907f3b038517c8f3ddd3130e3e6c8c0655.json"
+  "encoded": "{\"add\":{\"journal/note.org\":{\"cid\":\"bafkreia4mgqawvwpe4iyj7rw2axm4ddvh3z5b7qbgyk2jzynmcs7uxt5da\",\"mode\":292,\"sha256\":\"1c61a00b56cf271184fe36d02ece0c753ef3d0fe013615a4e70d60a5fa5e7d18\",\"size\":190}},\"collections\":[],\"item\":\"journal/note.org\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"c2bbd946f77c6aeb8becda326c39ed37a462c6de86f62e293e84c2937c450595\",\"root\":\"bafybeigr4v4gqljqhviny2hi3dg77g3mufwrx6ni2kgqsyn7nhwy5kto24\",\"schema\":2}\n",
+  "name": "00000003-31f73395458b4730d5e01cc2db6798cb54cd005e043ebafccb07e08620cbd61e.json"
  },
  "plan": {
   "add": {
@@ -83,7 +83,7 @@
   "rumours": [
    {
     "cid": "bafkreicwp65vtw46bf6oj6wose4xb6kpnnyvnmrjkaolk53nispxsee7ku",
-    "destination": "rumours/2026-09-28-8b790e7811e5.org",
+    "destination": "rumours/2026-09-28-567fbb59db9e.org",
     "text": "#+TITLE: Rumour of plan.org\n#+DATE: 2026-09-28\n\nOn 2026-09-28, sealing =journal/note.org= found a link to =plan.org=, outside the archive. It was then a file of 31 bytes, SHA-256 =97b8d65be9178d4e7b92526a7cb11f98756d4394e9a4a6d852133f450a060bdc=, titled \"The plan\".\n"
    }
   ],
@@ -97,12 +97,12 @@
    "checkpoint_writable": [],
    "events": 3,
    "files": 4,
-   "head": "07605564e728c5ba70347b7e210b7c907f3b038517c8f3ddd3130e3e6c8c0655",
+   "head": "31f73395458b4730d5e01cc2db6798cb54cd005e043ebafccb07e08620cbd61e",
    "hidden": [],
    "missing": [],
    "new": [],
-   "recorded_root": "bafybeia5vis3fe5pscpjkagnx53gpvrsl6fn4q72m7m2kjezpr2iqhdgwa",
-   "root": "bafybeia5vis3fe5pscpjkagnx53gpvrsl6fn4q72m7m2kjezpr2iqhdgwa",
+   "recorded_root": "bafybeigr4v4gqljqhviny2hi3dg77g3mufwrx6ni2kgqsyn7nhwy5kto24",
+   "root": "bafybeigr4v4gqljqhviny2hi3dg77g3mufwrx6ni2kgqsyn7nhwy5kto24",
    "undeclared": [],
    "writable": []
   }
