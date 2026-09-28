@@ -1,0 +1,65 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "In an archive whose ledger is still inside it, a schema 2 event is appended there, after the schema 1 events.",
+ "tree": [
+  {
+   "path": "scope/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/.archive-integrity/00000001-fe95aadfa7a3685de7fbe9ab01f719bf742a1fdc48d0ba93c6a73a4dd869161f.json",
+   "text": "{\"add\":{\"a.md\":{\"mode\":292,\"sha256\":\"8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8\",\"size\":5}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/note.md",
+   "text": "a note"
+  }
+ ],
+ "source": "scope/note.md",
+ "destination": "scope/archives/journal/note.md",
+ "event": {
+  "encoded": "{\"add\":{\"journal/note.md\":{\"cid\":\"bafkreihwhy2kanhrtisehdznoszefpewnavl3bb6zrhkmp7p5vaanwdaum\",\"mode\":292,\"sha256\":\"f63e34a034f19a24438f2d74b242bc96682abd843ecc4ea63fefed4006d860a3\",\"size\":6}},\"collections\":[],\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"fe95aadfa7a3685de7fbe9ab01f719bf742a1fdc48d0ba93c6a73a4dd869161f\",\"root\":\"bafybeidjv6fo23snrg7lahzdngkj3pchkstuvcaeniqmwgb36dkwzyjxaa\",\"schema\":2}\n",
+  "name": "00000002-cce8d9eb5061ef983a2c1853983fb24eea73e9a3d9f177f6071b1720623bb79c.json"
+ },
+ "plan": {
+  "add": {
+   "journal/note.md": {
+    "cid": "bafkreihwhy2kanhrtisehdznoszefpewnavl3bb6zrhkmp7p5vaanwdaum",
+    "mode": 292,
+    "sha256": "f63e34a034f19a24438f2d74b242bc96682abd843ecc4ea63fefed4006d860a3",
+    "size": 6
+   }
+  },
+  "archive": "scope/archives",
+  "collections": [],
+  "destination": "scope/archives/journal/note.md",
+  "inventory_sha256": "316e14a4096e23b0222532290a58d8f9fc6f4b672f27bc3e8fac3708937e64a2",
+  "ledger": "scope/archives/.archive-integrity",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "number": 2,
+  "operation": "seal",
+  "previous": "fe95aadfa7a3685de7fbe9ab01f719bf742a1fdc48d0ba93c6a73a4dd869161f",
+  "schema": 1,
+  "source": "scope/note.md"
+ },
+ "report": [
+  {
+   "archive": "scope/archives",
+   "changed": [],
+   "checkpoint_writable": [],
+   "events": 2,
+   "files": 2,
+   "head": "cce8d9eb5061ef983a2c1853983fb24eea73e9a3d9f177f6071b1720623bb79c",
+   "hidden": [],
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeidjv6fo23snrg7lahzdngkj3pchkstuvcaeniqmwgb36dkwzyjxaa",
+   "root": "bafybeidjv6fo23snrg7lahzdngkj3pchkstuvcaeniqmwgb36dkwzyjxaa",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}

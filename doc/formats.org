@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 2, in lockstep; the fixtures in =fixtures/= are its
+this document, version 3, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -156,6 +156,65 @@ that no file shows, such as an added directory.
 
 Fixtures: =fixtures/ledger/=: inventories with their first event,
 ledgers valid and refused, in both layouts and schemas, and reports.
+
+* Sealing
+
+Everything enters an archive by sealing, in two steps: a plan, which is
+reviewed, then its application. The reviewer names the plan by the
+SHA-256 of its canonical JSON; application refuses any other.
+
+** Plans
+
+=seal SOURCE DESTINATION= plans to move SOURCE, a file or directory
+outside any archive, to DESTINATION, a path that does not yet exist inside
+an outermost =archives/=. =write-new DESTINATION= first stages new bytes in
+=_seal/= beside the archive, then plans the same way. A plan holds, in
+canonical JSON:
+
+- =schema=: 1; =operation=: =seal=;
+- =source=, =destination=, =archive=, =ledger=: absolute paths, the archive
+  and ledger folder resolved; the ledger folder is the archive's, or for
+  an archive without one, =archive-integrity/ledger/= beside it;
+- =number= and =previous=: the event to be written and the head it
+  follows, =null= for none;
+- =ledger_id=: the ledger's, else one supplied, else a random version 4
+  UUID;
+- =add=: the item's files by path within the archive, each a schema 2
+  entry: =cid=, =mode= less write bits, =sha256=, =size=;
+- =collections=: the directories in the item, itself included, whose
+  =README.org= declares them, sorted;
+- =inventory_sha256=: the SHA-256 of the archive's inventory, in
+  canonical JSON, as planned.
+
+Planning refuses: =source= (missing, or already archived), =destination=
+(not in an archive, existing, or unsafe), =hidden= (a hidden file in the
+item, or a hidden destination), =link= (a symlink or second hard link in
+the item) and =differs= (enrolled evidence in the archive is missing or
+changed). Hidden or unenrolled files already elsewhere in the archive do
+not stop a seal; the check reports them.
+
+** Application
+
+1. The plan's hash must be the one reviewed, else =plan=.
+2. Unless the item has moved already, the archive's inventory and the
+   item's entries must be as planned, else =plan=; then the item moves to
+   its destination in one rename.
+3. The item's entries at the destination must be as planned, else =plan=.
+4. The event, of schema 2, is written: =previous=, =ledger_id=, =add= and
+   =collections= from the plan, and =root=, the archive's CID now. If the
+   ledger's head is already this event, nothing is written; if the head is
+   not the plan's =previous=, the plan is refused (=plan=).
+5. Write bits are removed from the item's files and the event.
+6. A checkpoint of the archive's head, of coverage =archive=, is written
+   beside the archive: in =archive-integrity/checkpoints/= if
+   =archive-integrity/= exists there, else in the legacy folder.
+
+Applying a plan again after an interruption finishes it, and after
+completion changes nothing.
+
+Fixtures: =fixtures/ledger/seal-*=: a tree, a source and destination,
+and the plan, event and report after it, paths relative to the tree; or
+the refusal.
 
 * Fixture trees
 

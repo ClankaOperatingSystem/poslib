@@ -1,0 +1,30 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "An item holding a hidden file is refused.",
+ "tree": [
+  {
+   "path": "scope/archives",
+   "directory": true
+  },
+  {
+   "path": "scope/trial/README.org",
+   "text": "#+TITLE: Trial\n#+COLLECTION: t\n\nWhat it holds.\n"
+  },
+  {
+   "path": "scope/trial/sub/x.txt",
+   "text": "data"
+  },
+  {
+   "path": "scope/trial/empty",
+   "directory": true
+  },
+  {
+   "path": "scope/trial/.DS_Store",
+   "text": "finder"
+  }
+ ],
+ "source": "scope/trial",
+ "destination": "scope/archives/trial",
+ "error": "hidden"
+}

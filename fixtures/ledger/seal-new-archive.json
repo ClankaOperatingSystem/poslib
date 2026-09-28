@@ -1,0 +1,75 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "An item sealed into an archive with no ledger yet: a ledger starts beside it, in archive-integrity/, and the collection the item declares is listed.",
+ "tree": [
+  {
+   "path": "scope/archives",
+   "directory": true
+  },
+  {
+   "path": "scope/trial/README.org",
+   "text": "#+TITLE: Trial\n#+COLLECTION: t\n\nWhat it holds.\n"
+  },
+  {
+   "path": "scope/trial/sub/x.txt",
+   "text": "data"
+  },
+  {
+   "path": "scope/trial/empty",
+   "directory": true
+  }
+ ],
+ "source": "scope/trial",
+ "destination": "scope/archives/trial",
+ "event": {
+  "encoded": "{\"add\":{\"trial/README.org\":{\"cid\":\"bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy\",\"mode\":292,\"sha256\":\"b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae\",\"size\":47},\"trial/sub/x.txt\":{\"cid\":\"bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4\",\"mode\":292,\"sha256\":\"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7\",\"size\":4}},\"collections\":[\"trial\"],\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm\",\"schema\":2}\n",
+  "name": "00000001-4eae2f62667e8706201095e151173f98803b6ea55ca4a5e214743c5462dbc2dc.json"
+ },
+ "plan": {
+  "add": {
+   "trial/README.org": {
+    "cid": "bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy",
+    "mode": 292,
+    "sha256": "b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae",
+    "size": 47
+   },
+   "trial/sub/x.txt": {
+    "cid": "bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4",
+    "mode": 292,
+    "sha256": "3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7",
+    "size": 4
+   }
+  },
+  "archive": "scope/archives",
+  "collections": [
+   "trial"
+  ],
+  "destination": "scope/archives/trial",
+  "inventory_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+  "ledger": "scope/archive-integrity/ledger",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "number": 1,
+  "operation": "seal",
+  "previous": null,
+  "schema": 1,
+  "source": "scope/trial"
+ },
+ "report": [
+  {
+   "archive": "scope/archives",
+   "changed": [],
+   "checkpoint_writable": [],
+   "events": 1,
+   "files": 2,
+   "head": "4eae2f62667e8706201095e151173f98803b6ea55ca4a5e214743c5462dbc2dc",
+   "hidden": [],
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm",
+   "root": "bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}
