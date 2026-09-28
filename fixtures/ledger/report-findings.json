@@ -61,33 +61,41 @@
  "report": [
   {
    "archive": "projects/A/archives",
-   "head": "da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae",
+   "changed": [],
+   "checkpoint_writable": [],
    "events": 1,
    "files": 2,
-   "writable": [],
-   "checkpoint_writable": [],
+   "head": "da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae",
+   "hidden": [],
    "missing": [],
-   "changed": [],
-   "new": []
+   "new": [],
+   "recorded_root": null,
+   "root": "bafybeigbeyjgwlj2hur5zxdmf5x6o7y6ogzlvitkbimep3o4iy4eijpb64",
+   "undeclared": [],
+   "writable": []
   },
   {
    "archive": "projects/B/archives",
-   "head": "18291d954397177cf19d1b5fee4aff209fa05babae41ccd1afea2ef8717a9068",
-   "events": 1,
-   "files": 3,
-   "writable": [
-    "evidence.md",
-    "kept.md",
-    "new.md"
-   ],
-   "checkpoint_writable": [],
-   "missing": [
-    "gone.md"
-   ],
    "changed": [
     "evidence.md"
    ],
+   "checkpoint_writable": [],
+   "events": 1,
+   "files": 3,
+   "head": "18291d954397177cf19d1b5fee4aff209fa05babae41ccd1afea2ef8717a9068",
+   "hidden": [],
+   "missing": [
+    "gone.md"
+   ],
    "new": [
+    "new.md"
+   ],
+   "recorded_root": null,
+   "root": "bafybeicnv2pj4wncabko6slrtm5fiz3misr2oxqhenoesfszcb5qqhptgi",
+   "undeclared": [],
+   "writable": [
+    "evidence.md",
+    "kept.md",
     "new.md"
    ]
   }

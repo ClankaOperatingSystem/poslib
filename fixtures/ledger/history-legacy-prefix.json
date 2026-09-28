@@ -29,8 +29,7 @@
   }
  ],
  "archive": "archives",
- "head": "2162320cab9024b6621fcb6b0c5c64a0f0eee7604c336abc26d2b5548eefd41f",
- "events": 2,
+ "collections": [],
  "entries": {
   "a.md": {
    "mode": 292,
@@ -47,5 +46,8 @@
    "sha256": "be9d587defa1f0c09ef49eb17e206983a5f8f8289e4281860bd0ee5a19592c67",
    "size": 5
   }
- }
+ },
+ "events": 2,
+ "head": "2162320cab9024b6621fcb6b0c5c64a0f0eee7604c336abc26d2b5548eefd41f",
+ "root": null
 }
