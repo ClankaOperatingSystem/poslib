@@ -149,6 +149,22 @@ applied twice, it adds nothing."
       (should (string-match-p "Rumour of notes.org"
                               (alist-get 'text (aref (alist-get 'rumours plan) 0)))))))
 
+(ert-deftest pos-seal/two-items-may-rumour-one-target-on-one-day ()
+  "Each item's rumour of a target names that item, so is its own record;
+a rumour already sealed word for word is cited, not sealed again."
+  (pos-seal-test-with-scope
+    (pos-fixture-write (expand-file-name "notes.org" scope) "#+TITLE: Notes\n")
+    (let ((seal (lambda (name)
+                  (pos-fixture-write (expand-file-name (concat name "/r.md") scope)
+                                     "See [notes](../notes.org).\n")
+                  (let ((plan (pos-seal-plan (expand-file-name name scope)
+                                             (expand-file-name (concat "archives/" name) scope)
+                                             nil "2026-09-28")))
+                    (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))
+                    (alist-get 'destination (aref (alist-get 'rumours plan) 0))))))
+      (should-not (equal (funcall seal "first") (funcall seal "second")))
+      (should (equal 4 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
+
 (ert-deftest pos-seal/a-program-applies-its-own-plan-explicitly ()
   "write-new DESTINATION --apply seals at once; without it, only a plan."
   (pos-seal-test-with-scope
