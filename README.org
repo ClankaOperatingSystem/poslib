@@ -6,6 +6,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-capture.el= :: capture to an intray.
 - =lisp/pos-cid.el= :: IPFS CIDs of files and trees, computed locally.
 - =lisp/pos-ledger.el= :: archive integrity ledgers, read and checked.
+- =lisp/pos-seal.el= :: sealing items into archives: a plan, reviewed, then applied.
+- =lisp/pos-index.el= :: the CID index, ephemera, and Org's =ipfs:= links.
 - =doc/formats.org= :: the formats shared with [[https://github.com/monkeypants/pyposlib][pyposlib]], in lockstep.
 - =fixtures/= :: their examples, run by both.
 - =test/= :: ERT tests.
