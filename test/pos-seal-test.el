@@ -159,5 +159,20 @@ applied twice, it adds nothing."
         (ert-info ((cadr applied)) (should (equal 0 (car applied)))))
       (should (equal "handover\n" (pos-ledger--read target))))))
 
+(ert-deftest pos-seal/reading-links-reads-nothing-else ()
+  "A #+SETUPFILE in an item is not followed while its links are read."
+  (pos-seal-test-with-scope
+    (let ((outside (expand-file-name "../outside.setup" scope)) read)
+      (pos-fixture-write outside "#+TITLE: never read\n")
+      (pos-fixture-write (expand-file-name "trial/r.org" scope)
+                         (concat "#+SETUPFILE: " outside "\n\nText.\n"))
+      (advice-add 'insert-file-contents :before
+                  (lambda (file &rest _) (when (equal (expand-file-name file) outside)
+                                           (setq read t)))
+                  '((name . pos-seal-test-watch)))
+      (unwind-protect (pos-seal-test-plan scope)
+        (advice-remove 'insert-file-contents 'pos-seal-test-watch))
+      (should-not read))))
+
 (provide 'pos-seal-test)
 ;;; pos-seal-test.el ends here
