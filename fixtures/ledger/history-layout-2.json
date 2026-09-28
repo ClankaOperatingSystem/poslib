@@ -1,7 +1,6 @@
 {
  "kind": "history",
- "description": "A ledger beside its archive, in archive-integrity/ledger/: a schema 1 event, then a schema 2 event recording each entry's CID, the archive's root CID and the collections sealed.",
- "archive": "archives",
+ "description": "A ledger beside its archive, in archive-integrity/ledger/: a schema 1 event, then schema 2 events, each naming the item it sealed and recording each entry's CID, the archive's root CID and the collections sealed.",
  "tree": [
   {
    "path": "archive-integrity/ledger/00000001-519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2.json",
@@ -9,8 +8,13 @@
    "mode": 292
   },
   {
-   "path": "archive-integrity/ledger/00000002-bdca10111fd87cedbe0d03209ad429e30ba86854d65ad8f6f28fa61e632e58c4.json",
-   "text": "{\"add\":{\"coll/README.org\":{\"cid\":\"bafkreiffsj3hqssbyibhey22sceyknio4e5yt3rbmasearcroeomwoa6x4\",\"mode\":292,\"sha256\":\"a59276784a41c20272635a908985350ee13b89ee216024404451711ccb381ebf\",\"size\":54},\"coll/x.md\":{\"cid\":\"bafkreibnoelefnzgwbcacyt4vh52ymxvzbjq7mmqhtcnwarfq4lzegsiqe\",\"mode\":292,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"size\":1},\"lost/README.org\":{\"cid\":\"bafkreia3z3pp2op5jeiptxnmhgxbzphyyoo5ocv4nzbvqiyha52ip3i4hm\",\"mode\":292,\"sha256\":\"1bcedefd39fd4910f9ddac39ae1cbcf8c39dd70abc6e43582307077487ed1c3b\",\"size\":33},\"lost/y.md\":{\"cid\":\"bafkreifb7tsdmocu76eiz72lrz4hlvqayjuchecbfkgppgzx2cyrcsfq7i\",\"mode\":292,\"sha256\":\"a1fce4363854ff888cff4b8e7875d600c2682390412a8cf79b37d0b11148b0fa\",\"size\":1}},\"collections\":[\"coll\",\"lost\"],\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2\",\"root\":\"bafybeicquoah5a2qst7pjnfpaj6zcer3kelbnnkj4p6ymedahr3y2qxghi\",\"schema\":2}\n",
+   "path": "archive-integrity/ledger/00000002-31bc739495c3fbca9bddfaba5d67e133416948f9a4640eb03a86fa0f1f23b26a.json",
+   "text": "{\"add\":{\"coll/README.org\":{\"cid\":\"bafkreiffsj3hqssbyibhey22sceyknio4e5yt3rbmasearcroeomwoa6x4\",\"mode\":292,\"sha256\":\"a59276784a41c20272635a908985350ee13b89ee216024404451711ccb381ebf\",\"size\":54},\"coll/x.md\":{\"cid\":\"bafkreibnoelefnzgwbcacyt4vh52ymxvzbjq7mmqhtcnwarfq4lzegsiqe\",\"mode\":292,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"size\":1}},\"collections\":[\"coll\"],\"item\":\"coll\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2\",\"root\":\"bafybeiax7zliqxpkrczvf3nryhkstbz22aj3ozrdv4tkuw7muqy6zif4hq\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "archive-integrity/ledger/00000003-bd355707f4d3c6ee1d939b3c2414b1955e0a19752f2294a0e050e56be5cac6e6.json",
+   "text": "{\"add\":{\"lost/README.org\":{\"cid\":\"bafkreia3z3pp2op5jeiptxnmhgxbzphyyoo5ocv4nzbvqiyha52ip3i4hm\",\"mode\":292,\"sha256\":\"1bcedefd39fd4910f9ddac39ae1cbcf8c39dd70abc6e43582307077487ed1c3b\",\"size\":33},\"lost/y.md\":{\"cid\":\"bafkreifb7tsdmocu76eiz72lrz4hlvqayjuchecbfkgppgzx2cyrcsfq7i\",\"mode\":292,\"sha256\":\"a1fce4363854ff888cff4b8e7875d600c2682390412a8cf79b37d0b11148b0fa\",\"size\":1}},\"collections\":[\"lost\"],\"item\":\"lost\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"31bc739495c3fbca9bddfaba5d67e133416948f9a4640eb03a86fa0f1f23b26a\",\"root\":\"bafybeicquoah5a2qst7pjnfpaj6zcer3kelbnnkj4p6ymedahr3y2qxghi\",\"schema\":2}\n",
    "mode": 292
   },
   {
@@ -44,6 +48,7 @@
    "mode": 292
   }
  ],
+ "archive": "archives",
  "collections": [
   "coll",
   "lost"
@@ -84,7 +89,11 @@
    "size": 1
   }
  },
- "events": 2,
- "head": "bdca10111fd87cedbe0d03209ad429e30ba86854d65ad8f6f28fa61e632e58c4",
+ "events": 3,
+ "head": "bd355707f4d3c6ee1d939b3c2414b1955e0a19752f2294a0e050e56be5cac6e6",
+ "items": [
+  "coll",
+  "lost"
+ ],
  "root": "bafybeicquoah5a2qst7pjnfpaj6zcer3kelbnnkj4p6ymedahr3y2qxghi"
 }

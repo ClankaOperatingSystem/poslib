@@ -2,16 +2,18 @@
  "kind": "seal",
  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
  "description": "A second item sealed into an archive whose ledger already records CIDs: its earlier entries still match, and the new event follows the first.",
+ "source": "scope/second.md",
+ "destination": "scope/archives/second.md",
  "tree": [
   {
-   "path": "scope/archive-integrity/checkpoints/55d4aa1bf2557ed42aac0a4524a9bf3d411786862bae3f07d6e2508a7c47bd7f.json",
-   "text": "{\"coverage\":\"archive\",\"heads\":[\"4eae2f62667e8706201095e151173f98803b6ea55ca4a5e214743c5462dbc2dc\"],\"schema\":1}\n",
-   "mode": 256
+   "path": "scope/archive-integrity/checkpoints/eb5b929f629c1b3fe738ef1847d49f9cb0a2cbb0990d65a8ab561e9d9be89f69.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\"],\"schema\":1}\n",
+   "mode": 292
   },
   {
-   "path": "scope/archive-integrity/ledger/00000001-4eae2f62667e8706201095e151173f98803b6ea55ca4a5e214743c5462dbc2dc.json",
-   "text": "{\"add\":{\"trial/README.org\":{\"cid\":\"bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy\",\"mode\":292,\"sha256\":\"b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae\",\"size\":47},\"trial/sub/x.txt\":{\"cid\":\"bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4\",\"mode\":292,\"sha256\":\"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7\",\"size\":4}},\"collections\":[\"trial\"],\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm\",\"schema\":2}\n",
-   "mode": 256
+   "path": "scope/archive-integrity/ledger/00000001-85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54.json",
+   "text": "{\"add\":{\"trial/README.org\":{\"cid\":\"bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy\",\"mode\":292,\"sha256\":\"b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae\",\"size\":47},\"trial/sub/x.txt\":{\"cid\":\"bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4\",\"mode\":292,\"sha256\":\"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7\",\"size\":4}},\"collections\":[\"trial\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm\",\"schema\":2}\n",
+   "mode": 292
   },
   {
    "path": "scope/archives/trial/README.org",
@@ -33,11 +35,9 @@
    "mode": 420
   }
  ],
- "source": "scope/second.md",
- "destination": "scope/archives/second.md",
  "event": {
-  "encoded": "{\"add\":{\"second.md\":{\"cid\":\"bafkreihaifhvwnqhxfisanhas7zo2b2fqhg6cj5vmz26xcg6lkc2e75ydy\",\"mode\":292,\"sha256\":\"e0414f5b3607b9512034e097f2ed074581cde127b56675eb88de5a85a27fb81e\",\"size\":11}},\"collections\":[],\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"4eae2f62667e8706201095e151173f98803b6ea55ca4a5e214743c5462dbc2dc\",\"root\":\"bafybeibxwgt442bfjqkqyq6uxiru6k46ks2tsythwlqhqazuiddvnfkscq\",\"schema\":2}\n",
-  "name": "00000002-00a7a35aee382537411a2fb64f25c3b260fd5e15120cdbab2536b38e209f799d.json"
+  "encoded": "{\"add\":{\"second.md\":{\"cid\":\"bafkreihaifhvwnqhxfisanhas7zo2b2fqhg6cj5vmz26xcg6lkc2e75ydy\",\"mode\":292,\"sha256\":\"e0414f5b3607b9512034e097f2ed074581cde127b56675eb88de5a85a27fb81e\",\"size\":11}},\"collections\":[],\"item\":\"second.md\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\",\"root\":\"bafybeibxwgt442bfjqkqyq6uxiru6k46ks2tsythwlqhqazuiddvnfkscq\",\"schema\":2}\n",
+  "name": "00000002-cebac68a5a5b39b48e597d438e6d6d2d2c2483807995710048405138bb3ff608.json"
  },
  "plan": {
   "add": {
@@ -56,7 +56,7 @@
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
   "number": 2,
   "operation": "seal",
-  "previous": "4eae2f62667e8706201095e151173f98803b6ea55ca4a5e214743c5462dbc2dc",
+  "previous": "85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54",
   "schema": 1,
   "source": "scope/second.md"
  },
@@ -67,7 +67,7 @@
    "checkpoint_writable": [],
    "events": 2,
    "files": 3,
-   "head": "00a7a35aee382537411a2fb64f25c3b260fd5e15120cdbab2536b38e209f799d",
+   "head": "cebac68a5a5b39b48e597d438e6d6d2d2c2483807995710048405138bb3ff608",
    "hidden": [],
    "missing": [],
    "new": [],

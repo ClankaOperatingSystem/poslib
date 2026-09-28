@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 3, in lockstep; the fixtures in =fixtures/= are its
+this document, version 4, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -105,6 +105,8 @@ Schema 1:
 Schema 2 has the same, with =ledger_id= required, and:
 
 - each entry in =add= also has =cid=, the file's CID;
+- =item=: the path of the item the event sealed, a file or a directory;
+  every path in =add= and =collections= is the item or lies within it;
 - =root=: the archive's CID after this event;
 - =collections=: the paths of the collections this event seals, sorted,
   each once; possibly none.
@@ -113,7 +115,8 @@ The head is the hash of the last event; the recorded root is the last
 event's =root=, if it is of schema 2. An empty ledger directory is
 refused. Refusals are named: =ledger= (the ledger is not a directory, or
 there are two), =sequence= (name, number or hash), =chain= (keys, schema or
-=previous=), =identity=, =entry= (an entry, =root= or =collections=) and
+=previous=), =identity=, =entry= (an entry, =item=, =root= or
+=collections=) and
 =empty=; =link= refuses a symlink or a second hard link anywhere.
 
 ** Checkpoints
@@ -201,7 +204,8 @@ not stop a seal; the check reports them.
    its destination in one rename.
 3. The item's entries at the destination must be as planned, else =plan=.
 4. The event, of schema 2, is written: =previous=, =ledger_id=, =add= and
-   =collections= from the plan, and =root=, the archive's CID now. If the
+   =collections= from the plan, =item=, the destination's path within the
+   archive, and =root=, the archive's CID now. If the
    ledger's head is already this event, nothing is written; if the head is
    not the plan's =previous=, the plan is refused (=plan=).
 5. Write bits are removed from the item's files; the event, like every

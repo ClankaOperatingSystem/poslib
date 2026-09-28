@@ -1,7 +1,6 @@
 {
  "kind": "history",
  "description": "An archive may have a ledger beside it or a legacy one inside it, not both.",
- "archive": "archives",
  "tree": [
   {
    "path": "archive-integrity/ledger/00000001-519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2.json",
@@ -24,5 +23,6 @@
    "mode": 292
   }
  ],
+ "archive": "archives",
  "error": "ledger"
 }

@@ -1,7 +1,6 @@
 {
  "kind": "history",
  "description": "A schema 2 entry must record its CID.",
- "archive": "archives",
  "tree": [
   {
    "path": "archive-integrity/ledger/00000001-519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2.json",
@@ -9,8 +8,8 @@
    "mode": 292
   },
   {
-   "path": "archive-integrity/ledger/00000002-f83da348619e4041c8a7ff53624b7ee627eca01be20a867732600c5c660b6511.json",
-   "text": "{\"add\":{\"z.md\":{\"mode\":292,\"sha256\":\"594e519ae499312b29433b7dd8a97ff068defcba9755b6d5d00e84c524d67b06\",\"size\":1}},\"collections\":[],\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2\",\"root\":\"bafybeiaoj6xazlo6t2lpfytiydeuu63qwar2ln3ahkycwojfeyn2zmn7jm\",\"schema\":2}\n",
+   "path": "archive-integrity/ledger/00000002-ea717fbd3d87d30b4e5fef8972c383bca9c4d14c9b09d227c322516b2e09782d.json",
+   "text": "{\"add\":{\"z.md\":{\"mode\":292,\"sha256\":\"594e519ae499312b29433b7dd8a97ff068defcba9755b6d5d00e84c524d67b06\",\"size\":1}},\"collections\":[],\"item\":\"z.md\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2\",\"root\":\"bafybeiaoj6xazlo6t2lpfytiydeuu63qwar2ln3ahkycwojfeyn2zmn7jm\",\"schema\":2}\n",
    "mode": 292
   },
   {
@@ -29,5 +28,6 @@
    "mode": 292
   }
  ],
+ "archive": "archives",
  "error": "entry"
 }
