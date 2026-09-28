@@ -531,12 +531,25 @@ Nil if IPFS would shard a directory in it."
                                       parts)))))
               (mapcar #'car inventory)))
 
+(defun pos-ledger-capsule-p (directory)
+  "Return non-nil if DIRECTORY has a capsule's manifest.
+A capsule is a frozen snapshot, kept byte for byte: its manifest.json
+has schema_version 1, entries and an entrypoint."
+  (let ((manifest (expand-file-name "manifest.json" directory)))
+    (and (file-regular-p manifest)
+         (let ((value (ignore-errors (pos-ledger--parse (pos-ledger--read manifest)))))
+           (and (listp value) value
+                (eql 1 (alist-get 'schema_version value))
+                (assq 'entries value) (assq 'entrypoint value))))))
+
 (defun pos-ledger--declared-p (directory)
-  "Return non-nil if the README.org in DIRECTORY has the declaration line."
+  "Return non-nil if DIRECTORY declares itself a collection.
+Its README.org has the declaration line, or it is a capsule."
   (let ((readme (expand-file-name "README.org" directory)))
-    (and (file-regular-p readme)
-         (member (encode-coding-string pos-ledger-declaration 'utf-8 t)
-                 (split-string (pos-ledger--read readme) "\n")))))
+    (or (and (file-regular-p readme)
+             (member (encode-coding-string pos-ledger-declaration 'utf-8)
+                     (split-string (pos-ledger--read readme) "\n")))
+        (pos-ledger-capsule-p directory))))
 
 (defun pos-ledger--undeclared (archive collections)
   "Return those of COLLECTIONS in ARCHIVE that no longer declare themselves."

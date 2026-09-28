@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 6, in lockstep; the fixtures in =fixtures/= are its
+this document, version 7, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -83,7 +83,11 @@ Paths are relative, =/=-separated, with no empty, =.= or =..= component.
 
 A collection is a directory whose =README.org= contains the line
 =#+COLLECTION: t=: those exact bytes, between line feeds or the file's
-ends. The event that seals it lists its path.
+ends; or a capsule, a directory whose =manifest.json= is an object with
+=schema_version= 1, =entries= and =entrypoint=. The event that seals it
+lists its path. A capsule is a frozen snapshot with its own verification,
+kept byte for byte: its links are left as written, broken ones included,
+and no =README.org= is added to it.
 
 ** Events
 
@@ -220,7 +224,8 @@ not stop a seal; the check reports them.
 
 ** Links
 
-Links are sought in the item's files named =*.org=, as Org parses them:
+Links are sought in the item's files, other than a capsule's, named
+=*.org=, as Org parses them:
 links of type =file=, in any form, their search options kept; and named
 =*.md=, as markdown-mode finds them: inline links and images, and
 reference definitions, outside code, their fragments kept, their paths
@@ -321,9 +326,10 @@ archive:
   to its name prefixed =dot=, keeping its bytes;
 - =collections=: the receipts (with =manifest.json= and =source/=),
   capsules (in =capsules/=), runs (in =trials/=, =studies/= or
-  =pipeline-trials/=) and retired scopes (holding =archives/=), less those
-  the reviewer excludes; =declarations=: each declared in its =README.org=,
-  the line added after its leading keywords, or a new =README.org= made,
+  =pipeline-trials/=), retired scopes (holding =archives/=) and capsules,
+  none within another, less those the reviewer excludes;
+  =declarations=: each but a capsule declared in its =README.org=, the
+  line added after its leading keywords, or a new =README.org= made,
   naming the collection's entrance;
 - =rumours=: at =rumours/DATE-HASH.org=, as for sealing, the text saying
   that migrating the archive found links to the path;

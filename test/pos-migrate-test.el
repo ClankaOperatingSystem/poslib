@@ -140,5 +140,29 @@ children migrate before their containers and nothing waits on a cycle."
                        (delete-dups (mapcar (lambda (l) (alist-get 'kind l))
                                             (append (alist-get 'links plan) nil)))))))))
 
+(ert-deftest pos-migrate/a-capsule-is-kept-byte-for-byte ()
+  "A capsule is a collection by its manifest: no README is added and its
+links, broken or not, are left as written, so its own verification holds."
+  (pos-migrate-test-with-legacy
+    (let ((cap (expand-file-name "archives/capsules/snap" scope))
+          (text "# A\n\nSee [what was](../../gone.md).\n"))
+      (pos-migrate--writable archive)
+      (pos-fixture-write (expand-file-name "manifest.json" cap)
+                         "{\"schema_version\":1,\"entrypoint\":\"a.md\",\"entries\":[]}\n")
+      (pos-fixture-write (expand-file-name "a.md" cap) text)
+      (let* ((ledger (expand-file-name pos-ledger-directory archive))
+             (previous (car (last (directory-files ledger t "\\.json\\'"))))
+             (add (seq-filter (lambda (e) (string-prefix-p "capsules/" (car e)))
+                              (pos-ledger-inventory archive)))
+             (event (pos-ledger-event add (pos-ledger--sha (pos-ledger--read previous)) 2
+                                      "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1")))
+        (pos-seal--write-new (expand-file-name (car event) ledger) (cdr event)))
+      (pos-migrate--protect archive)
+      (let ((plan (pos-migrate-test-run scope)))
+        (should (member "capsules/snap" (append (alist-get 'collections plan) nil)))
+        (should-not (file-exists-p (expand-file-name "README.org" cap)))
+        (should (equal text (decode-coding-string (pos-ledger--read (expand-file-name "a.md" cap))
+                                                  'utf-8)))))))
+
 (provide 'pos-migrate-test)
 ;;; pos-migrate-test.el ends here

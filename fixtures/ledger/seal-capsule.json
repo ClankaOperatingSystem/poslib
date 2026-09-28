@@ -1,0 +1,75 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "date": "2026-09-28",
+ "description": "A capsule is a collection by its manifest, and is sealed byte for byte: no README added, its links, broken ones too, left as written.",
+ "source": "scope/cap",
+ "destination": "scope/archives/cap",
+ "tree": [
+  {
+   "path": "scope/archives",
+   "directory": true
+  },
+  {
+   "path": "scope/cap/manifest.json",
+   "text": "{\"schema_version\":1,\"entrypoint\":\"a.md\",\"entries\":[{\"path\":\"a.md\"}]}\n"
+  },
+  {
+   "path": "scope/cap/a.md",
+   "text": "# A\n\nSee [what was](../../gone.md).\n"
+  }
+ ],
+ "event": {
+  "encoded": "{\"add\":{\"cap/a.md\":{\"cid\":\"bafkreidppcz7gedburivo6colirvomg2scpmyce2xgp6sdzhtoogoiu2au\",\"mode\":292,\"sha256\":\"6f78b3f31061a45157784e5a235730da909ecc089ab99fe90f279b9c67229a05\",\"size\":36},\"cap/manifest.json\":{\"cid\":\"bafkreib2w3cty44i4jag7wh2swtbpq26nxvymbjog3lrklgmjksolnkz6i\",\"mode\":292,\"sha256\":\"3ab6c53c7388e2406fd8fa95a617c35e6deb86052e36d7152ccc4aa4e5b559f2\",\"size\":69}},\"collections\":[\"cap\"],\"item\":\"cap\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeia27o3tgfyn2u44huipmhau5x2fndlqk23jneaqjwr6eg3vldl5lm\",\"schema\":2}\n",
+  "name": "00000001-75c1d3a12d59c8c4fa7abc8697f4e789bdbe6d8eabb4c3e6e0a4c493cb9d105b.json"
+ },
+ "plan": {
+  "add": {
+   "cap/a.md": {
+    "cid": "bafkreidppcz7gedburivo6colirvomg2scpmyce2xgp6sdzhtoogoiu2au",
+    "mode": 292,
+    "sha256": "6f78b3f31061a45157784e5a235730da909ecc089ab99fe90f279b9c67229a05",
+    "size": 36
+   },
+   "cap/manifest.json": {
+    "cid": "bafkreib2w3cty44i4jag7wh2swtbpq26nxvymbjog3lrklgmjksolnkz6i",
+    "mode": 292,
+    "sha256": "3ab6c53c7388e2406fd8fa95a617c35e6deb86052e36d7152ccc4aa4e5b559f2",
+    "size": 69
+   }
+  },
+  "archive": "scope/archives",
+  "collections": [
+   "cap"
+  ],
+  "destination": "scope/archives/cap",
+  "inventory_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+  "ledger": "scope/archive-integrity/ledger",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "links": [],
+  "number": 1,
+  "operation": "seal",
+  "originals": {},
+  "previous": null,
+  "rumours": [],
+  "schema": 2,
+  "source": "scope/cap"
+ },
+ "report": [
+  {
+   "archive": "scope/archives",
+   "changed": [],
+   "checkpoint_writable": [],
+   "events": 1,
+   "files": 2,
+   "head": "75c1d3a12d59c8c4fa7abc8697f4e789bdbe6d8eabb4c3e6e0a4c493cb9d105b",
+   "hidden": [],
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeia27o3tgfyn2u44huipmhau5x2fndlqk23jneaqjwr6eg3vldl5lm",
+   "root": "bafybeia27o3tgfyn2u44huipmhau5x2fndlqk23jneaqjwr6eg3vldl5lm",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}
