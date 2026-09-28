@@ -102,19 +102,26 @@ PATH is relative to the archive, from REL for SOURCE."
   "Return FILE's title, as `pos-links--title'."
   (pos-links--title file))
 
+(defun pos-seal-rumour (date text)
+  "Return (DESTINATION . TEXT), the rumour of TEXT dated DATE.
+It is named by its text, so rumours of one target differ in name when
+they differ in word."
+  (cons (format "rumours/%s-%s.org" date
+                (substring (pos-ledger--sha (encode-coding-string text 'utf-8)) 0 12))
+        text))
+
 (defun pos-seal--rumour (target scope item date)
   "Return the rumour of TARGET, outside the archive of SCOPE, found sealing ITEM.
 As (DESTINATION . TEXT), DESTINATION within the archive, dated DATE."
-  (let* ((path (file-relative-name target scope))
-         (text (concat
-                "#+TITLE: Rumour of " path "\n"
-                "#+DATE: " date "\n\n"
-                "On " date ", sealing =" item "= found a link to =" path
-                "=, outside the archive. It was then "
-                (pos-links-description target scope)
-                ".\n")))
-    (cons (format "rumours/%s-%s.org" date (substring (secure-hash 'sha256 path) 0 12))
-          text)))
+  (let ((path (file-relative-name target scope)))
+    (pos-seal-rumour
+     date (concat
+           "#+TITLE: Rumour of " path "\n"
+           "#+DATE: " date "\n\n"
+           "On " date ", sealing =" item "= found a link to =" path
+           "=, outside the archive. It was then "
+           (pos-links-description target scope)
+           ".\n"))))
 
 (defun pos-seal--resolve (source rel archive files collections date &optional written-at)
   "Resolve the links in FILES, the item at SOURCE sealed at REL in ARCHIVE.
