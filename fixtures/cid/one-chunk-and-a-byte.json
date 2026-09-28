@@ -1,0 +1,14 @@
+{
+ "description": "One byte more makes a UnixFS file node over two raw leaves.",
+ "tree": [
+  {
+   "path": "f",
+   "repeat": [
+    0,
+    1048577
+   ]
+  }
+ ],
+ "entry": "f",
+ "cid": "bafybeihd4yzq7n5umhjngdum4r6k2to7egxfkf2jz6thvwzf6djus22cmq"
+}

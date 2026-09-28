@@ -1,0 +1,12 @@
+{
+ "description": "Quote, backslash and control characters: short escapes for \\b \\f \\n \\r \\t, \\u00xx in lower case for the rest; DEL stays raw.",
+ "value": {
+  "add": {
+   "q\"b\\s/": 1,
+   "\b\f\n\r\t": 2,
+   "\u0000\u0001\u001f": 3,
+   "": 4
+  }
+ },
+ "encoded": "{\"add\":{\"\\u0000\\u0001\\u001f\":3,\"\\b\\f\\n\\r\\t\":2,\"q\\\"b\\\\s/\":1,\"\":4}}\n"
+}

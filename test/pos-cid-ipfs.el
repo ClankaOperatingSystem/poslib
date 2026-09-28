@@ -22,14 +22,15 @@
 
 ;; Run: make check-ipfs IPFS=path/to/ipfs.  Offline: a fresh repository
 ;; with the unixfs-v1-2025 profile, and `ipfs add --only-hash', which
-;; stores and announces nothing.  Each fixture's recorded CID, kubo's
-;; and ours must agree.
+;; stores and announces nothing.  For each fixture in fixtures/cid/,
+;; kubo must give its recorded CID and so must we; for one we refuse,
+;; kubo must give the CID the fixture records it giving.
 
 ;;; Code:
 
 (require 'pos-cid)
-(require 'pos-cid-fixtures
-         (expand-file-name "pos-cid-fixtures"
+(require 'pos-fixtures
+         (expand-file-name "pos-fixtures"
                            (file-name-directory (or load-file-name
                                                     buffer-file-name))))
 
@@ -50,17 +51,17 @@
 
 (defun pos-cid-ipfs-add (repo fixture path)
   "Return the CID kubo in REPO gives FIXTURE, built at PATH."
-  (let ((params (nthcdr 3 fixture)))
+  (let-alist fixture
     (apply #'pos-cid-ipfs-run repo "add" "--quieter" "--only-hash"
            (append (when (file-directory-p path) '("--recursive"))
-                   (when (plist-get params :chunk)
-                     (list (format "--chunker=size-%d" (plist-get params :chunk))))
-                   (when (plist-get params :links)
-                     (list (format "--max-file-links=%d" (plist-get params :links))))
+                   (when .params.chunk
+                     (list (format "--chunker=size-%d" .params.chunk)))
+                   (when .params.links
+                     (list (format "--max-file-links=%d" .params.links)))
                    (list path)))))
 
 (defun pos-cid-ipfs-check ()
-  "Compare every fixture with kubo; exit nonzero on any disagreement."
+  "Compare every CID fixture with kubo; exit nonzero on any disagreement."
   (let ((repo (make-temp-file "pos-cid-ipfs" t))
         (failed 0))
     (unwind-protect
@@ -68,17 +69,24 @@
           (delete-directory repo)
           (pos-cid-ipfs-run repo "init" "--profile" "unixfs-v1-2025,test")
           (message "%s" (pos-cid-ipfs-run repo "version"))
-          (dolist (fixture pos-cid-fixtures)
-            (pos-cid-fixture-with fixture path
-              (let ((kubo (pos-cid-ipfs-add repo fixture path))
-                    (ours (if (file-directory-p path)
-                              (pos-cid-directory path)
-                            (pos-cid-file path))))
-                (if (and (equal kubo (nth 1 fixture)) (equal ours kubo))
-                    (message "ok    %s" (car fixture))
-                  (setq failed (1+ failed))
-                  (message "FAIL  %s: recorded %s, kubo %s, ours %s"
-                           (car fixture) (nth 1 fixture) kubo ours))))))
+          (dolist (named (pos-fixtures "cid"))
+            (let-alist (cdr named)
+              (pos-fixture-with (cdr named) dir
+                (let* ((path (expand-file-name .entry dir))
+                       (kubo (pos-cid-ipfs-add repo (cdr named) path))
+                       (ours (let ((pos-cid-chunk-size (or .params.chunk pos-cid-chunk-size))
+                                   (pos-cid-file-max-links
+                                    (or .params.links pos-cid-file-max-links)))
+                               (condition-case nil
+                                   (if (file-directory-p path)
+                                       (pos-cid-directory path)
+                                     (pos-cid-file path))
+                                 (pos-cid-sharding-unsupported "sharding-unsupported")))))
+                  (if (and (equal kubo (or .cid .ipfs)) (equal ours (or .cid .error)))
+                      (message "ok    %s" (car named))
+                    (setq failed (1+ failed))
+                    (message "FAIL  %s: recorded %s, kubo %s, ours %s"
+                             (car named) (or .cid .ipfs) kubo ours)))))))
       (delete-directory repo t))
     (kill-emacs (if (zerop failed) 0 1))))
 

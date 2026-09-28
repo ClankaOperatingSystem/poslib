@@ -1,0 +1,22 @@
+{
+ "kind": "history",
+ "description": "An empty ledger directory needs investigation.",
+ "tree": [
+  {
+   "path": "archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": "archives/.archive-integrity",
+   "directory": true
+  }
+ ],
+ "archive": "archives",
+ "error": "empty"
+}

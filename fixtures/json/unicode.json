@@ -1,0 +1,13 @@
+{
+ "description": "Non-ASCII text is written as UTF-8, never escaped, U+2028 included.",
+ "value": {
+  "add": {
+   "Äpfel/ärger.md": 1,
+   "Äpfel": 2,
+   "日本": 3,
+   "😀": 4,
+   "line sep": 5
+  }
+ },
+ "encoded": "{\"add\":{\"Äpfel\":2,\"line sep\":5,\"Äpfel/ärger.md\":1,\"日本\":3,\"😀\":4}}\n"
+}

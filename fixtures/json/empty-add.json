@@ -1,0 +1,9 @@
+{
+ "description": "An event adding nothing.",
+ "value": {
+  "schema": 1,
+  "previous": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "add": {}
+ },
+ "encoded": "{\"add\":{},\"previous\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"schema\":1}\n"
+}

@@ -1,0 +1,95 @@
+{
+ "kind": "report",
+ "description": "A changed, a missing, a new and a writable file, each reported for its archive.",
+ "tree": [
+  {
+   "path": ".archive-integrity-anchors/f7d8246f4aa02ad1ed5c44034c9bfe6987e62c7225ce5da24685a847e3707b10.json",
+   "text": "{\"coverage\":\"tree\",\"heads\":[\"18291d954397177cf19d1b5fee4aff209fa05babae41ccd1afea2ef8717a9068\",\"da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": ".hidden/archives/y",
+   "text": "ignored",
+   "mode": 420
+  },
+  {
+   "path": "_scratch/archives/x",
+   "text": "ignored",
+   "mode": 420
+  },
+  {
+   "path": "projects/A/archives/.archive-integrity/00000001-da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae.json",
+   "text": "{\"add\":{\"evidence.md\":{\"mode\":292,\"sha256\":\"559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd\",\"size\":1},\"run.sh\":{\"mode\":365,\"sha256\":\"a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf\",\"size\":10}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/A/archives/evidence.md",
+   "text": "A",
+   "mode": 292
+  },
+  {
+   "path": "projects/A/archives/run.sh",
+   "text": "#!/bin/sh\n",
+   "mode": 365
+  },
+  {
+   "path": "projects/B/archives/.archive-integrity/00000001-18291d954397177cf19d1b5fee4aff209fa05babae41ccd1afea2ef8717a9068.json",
+   "text": "{\"add\":{\"evidence.md\":{\"mode\":292,\"sha256\":\"df7e70e5021544f4834bbee64a9e3789febc4be81470df629cad6ddb03320a5c\",\"size\":1},\"gone.md\":{\"mode\":292,\"sha256\":\"283bb9deef02e6843abfb538efa1eca70801bd8a701c3f98191e123496339247\",\"size\":4},\"kept.md\":{\"mode\":292,\"sha256\":\"79f076abdd19a752db7267bfff2f9022161d120dea919fdaca2ffdfc24ca8c96\",\"size\":4}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/B/archives/evidence.md",
+   "text": "tampered",
+   "mode": 420
+  },
+  {
+   "path": "projects/B/archives/kept.md",
+   "text": "kept",
+   "mode": 420
+  },
+  {
+   "path": "projects/B/archives/new.md",
+   "text": "new",
+   "mode": 420
+  },
+  {
+   "path": "projects/B/canon.org",
+   "text": "canon",
+   "mode": 420
+  }
+ ],
+ "report": [
+  {
+   "archive": "projects/A/archives",
+   "head": "da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae",
+   "events": 1,
+   "files": 2,
+   "writable": [],
+   "checkpoint_writable": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  },
+  {
+   "archive": "projects/B/archives",
+   "head": "18291d954397177cf19d1b5fee4aff209fa05babae41ccd1afea2ef8717a9068",
+   "events": 1,
+   "files": 3,
+   "writable": [
+    "evidence.md",
+    "kept.md",
+    "new.md"
+   ],
+   "checkpoint_writable": [],
+   "missing": [
+    "gone.md"
+   ],
+   "changed": [
+    "evidence.md"
+   ],
+   "new": [
+    "new.md"
+   ]
+  }
+ ]
+}

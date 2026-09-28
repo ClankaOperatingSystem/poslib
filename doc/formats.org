@@ -1,0 +1,130 @@
+#+TITLE: Formats
+
+The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
+this document, version 1, in lockstep; the fixtures in =fixtures/= are its
+examples, and both test suites run all of them. Org interpretation is not
+shared: it has one implementation, poslib's.
+
+* Content identifiers
+
+A file's or directory's CID is the one =ipfs add= computes under the
+unixfs-v1-2025 import profile of [[https://specs.ipfs.tech/ipips/ipip-0499/][IPIP-499]]:
+
+- CIDv1, sha2-256, written in multibase base32, lower case (=b...=).
+- A file is cut into 1 MiB chunks, each a raw block. One chunk, including
+  an empty file, is its own CID. More chunks form a balanced DAG of dag-pb
+  UnixFS file nodes of at most 1024 links, levels built from the left.
+- A directory is a dag-pb UnixFS directory node linking its entries in
+  byte order of their names; each link's size is the whole DAG beneath it.
+- Names are hashed as stored, in whatever Unicode normalisation.
+- Hidden entries, those whose names begin with =.=, are left out.
+- Symlinks and other special files are refused.
+- A directory node of more than 262144 bytes, which IPFS would shard, is
+  refused (=sharding-unsupported=) until sharding is implemented.
+
+Fixtures: =fixtures/cid/=. Each gives a tree, the entry to hash, and its
+CID or error. =params= overrides the chunk size and link limit, as
+=--chunker= and =--max-file-links= do. kubo, run offline, is the referee.
+
+* Canonical JSON
+
+Ledger events and checkpoints are JSON written one way, so that equal
+values are equal bytes:
+
+- Values: objects, strings, integers and =null=.
+- Object keys in the byte order of their UTF-8 encoding, which is code
+  point order.
+- No whitespace between tokens; one newline after the value.
+- Strings in UTF-8, unescaped, except: =\"= and =\\=; =\b=, =\f=, =\n=,
+  =\r= and =\t=; other characters below U+0020 as =\u00xx=, lower-case
+  hex. DEL and all non-ASCII characters are written raw.
+- Integers in decimal, without sign unless negative, without exponent.
+
+Fixtures: =fixtures/json/=, each a value and its encoding.
+
+* Archive ledgers
+
+Each outermost =archives/= directory holds its ledger in
+=archives/.archive-integrity/=.
+
+** Discovery
+
+From a root: the root itself if it is named =archives=; otherwise every
+directory named =archives= beneath it, not descending into one found, nor
+into any directory whose name begins with =.= or =_=. A symlinked
+directory met on the way is refused.
+
+** Inventory
+
+Every file beneath the archive, except the ledger directory at its top,
+hidden and underscored files included. Each is a regular file with one
+link, else refused; a symlinked directory is refused. Each entry is:
+
+- =sha256=: lower-case hex of its bytes;
+- =size=: its length;
+- =mode=: its permission bits, the low twelve, with every write bit
+  cleared.
+
+Paths are relative, =/=-separated, with no empty, =.= or =..= component.
+
+** Events
+
+The ledger is a sequence of files named =NNNNNNNN-HASH.json=: an
+eight-digit number counting from 1 without gaps, and the SHA-256 of the
+file's bytes. Each holds one event in canonical JSON:
+
+- =schema=: 1.
+- =previous=: the hash of the preceding event, =null= for the first.
+- =add=: the entries enrolled, by path. A path is enrolled once; no path
+  lies in the ledger directory; no mode has a write bit.
+- =ledger_id=: a UUID in canonical lower-case form, the same in every event
+  that has one. Once present it stays; events before the first that has
+  one may lack it.
+
+The head is the hash of the last event. An empty ledger directory is
+refused. Refusals are named: =ledger= (the ledger is not a directory),
+=sequence= (name, number or hash), =chain= (keys, schema or =previous=),
+=identity=, =entry= and =empty=; =link= refuses a symlink or a second hard
+link anywhere.
+
+** Checkpoints
+
+A checkpoint records ledger heads, to detect a vanished archive or a
+truncated ledger. It lives in =.archive-integrity-anchors/= beside the root
+it covers, named by the SHA-256 of its bytes, holding in canonical JSON:
+
+- =schema=: 1;
+- =heads=: sorted event hashes;
+- =coverage=: =archive= for a root named =archives=, else =tree=.
+
+Every head a checkpoint names must be the hash of some event file under
+the archives found, including ledgers carried inside retired archives;
+otherwise the check refuses (=anchor=).
+
+** Check
+
+For each archive found, in path order compared component by component,
+a report:
+
+- =archive=: its path; =head=, =events= and =files=;
+- =missing=, =changed=, =new=: enrolled paths absent, enrolled paths
+  whose entry differs, and unenrolled paths, each sorted;
+- =writable=: files and ledger events with any write bit, sorted;
+- =checkpoint_writable=: writable checkpoint files, in the first report
+  only.
+
+Fixtures: =fixtures/ledger/=: inventories with their first event,
+ledgers valid and refused, and reports.
+
+* Fixture trees
+
+A fixture's =tree= lists entries by =path=, one of:
+
+- =text=: a file of that string's UTF-8 bytes;
+- =repeat=: =[BYTE, COUNT]=, a file of COUNT copies of BYTE;
+- =pattern=: =N=, a file of the bytes =i mod 251= for =i= below N;
+- =series=: =N= with =text=, N files, =path= holding =%04d= for the index;
+- =directory=: true, an empty directory;
+- =symlink=: a target; =hardlink=: another entry's path.
+
+=mode= sets a file's permission bits, default =0644=.

@@ -1,0 +1,74 @@
+{
+ "kind": "inventory",
+ "description": "Every file under the archive, hidden and underscored included, with its SHA-256, size and mode less write bits; the first event that enrols them.",
+ "tree": [
+  {
+   "path": "archives/a.md",
+   "text": "alpha",
+   "mode": 420
+  },
+  {
+   "path": "archives/run.sh",
+   "text": "#!/bin/sh\n",
+   "mode": 493
+  },
+  {
+   "path": "archives/.hidden",
+   "text": "kept",
+   "mode": 292
+  },
+  {
+   "path": "archives/_scratch/x",
+   "text": "kept too",
+   "mode": 384
+  },
+  {
+   "path": "archives/deep/Äpfel.org",
+   "text": "ä",
+   "mode": 416
+  },
+  {
+   "path": "archives/empty",
+   "text": "",
+   "mode": 420
+  }
+ ],
+ "archive": "archives",
+ "inventory": {
+  ".hidden": {
+   "sha256": "79f076abdd19a752db7267bfff2f9022161d120dea919fdaca2ffdfc24ca8c96",
+   "size": 4,
+   "mode": 292
+  },
+  "_scratch/x": {
+   "sha256": "b15d9498fefa2574233038a3ec5c0bbc27e11f5d87aebbf0e3bd0970cd070ee5",
+   "size": 8,
+   "mode": 256
+  },
+  "a.md": {
+   "sha256": "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+   "size": 5,
+   "mode": 292
+  },
+  "deep/Äpfel.org": {
+   "sha256": "33e6d73fee82904c8d7afb78de1154d1e8dc2a0edb08120e63df5b9385c2d9cc",
+   "size": 2,
+   "mode": 288
+  },
+  "empty": {
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "size": 0,
+   "mode": 292
+  },
+  "run.sh": {
+   "sha256": "a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf",
+   "size": 10,
+   "mode": 365
+  }
+ },
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "event": {
+  "name": "00000001-89fbca74a67771fdb6e2b64447aecc6c6c2be1ae9bb29a805b557ab498ed7703.json",
+  "encoded": "{\"add\":{\".hidden\":{\"mode\":292,\"sha256\":\"79f076abdd19a752db7267bfff2f9022161d120dea919fdaca2ffdfc24ca8c96\",\"size\":4},\"_scratch/x\":{\"mode\":256,\"sha256\":\"b15d9498fefa2574233038a3ec5c0bbc27e11f5d87aebbf0e3bd0970cd070ee5\",\"size\":8},\"a.md\":{\"mode\":292,\"sha256\":\"8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8\",\"size\":5},\"deep/Äpfel.org\":{\"mode\":288,\"sha256\":\"33e6d73fee82904c8d7afb78de1154d1e8dc2a0edb08120e63df5b9385c2d9cc\",\"size\":2},\"empty\":{\"mode\":292,\"sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\"size\":0},\"run.sh\":{\"mode\":365,\"sha256\":\"a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf\",\"size\":10}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n"
+ }
+}

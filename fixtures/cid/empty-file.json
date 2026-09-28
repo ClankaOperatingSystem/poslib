@@ -1,0 +1,11 @@
+{
+ "description": "An empty file is one empty raw block.",
+ "tree": [
+  {
+   "path": "f",
+   "text": ""
+  }
+ ],
+ "entry": "f",
+ "cid": "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
+}

@@ -1,0 +1,51 @@
+{
+ "kind": "history",
+ "description": "An event without a ledger_id may precede the first that has one.",
+ "tree": [
+  {
+   "path": "archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": "archives/c.md",
+   "text": "gamma",
+   "mode": 292
+  },
+  {
+   "path": "archives/.archive-integrity/00000001-2878fd44f020e7c8f181ff75f082f1b2a0a232eec8317c74089579de3e8fb6c2.json",
+   "text": "{\"add\":{\"a.md\":{\"mode\":292,\"sha256\":\"8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8\",\"size\":5},\"b.md\":{\"mode\":292,\"sha256\":\"f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753\",\"size\":4}},\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "archives/.archive-integrity/00000002-2162320cab9024b6621fcb6b0c5c64a0f0eee7604c336abc26d2b5548eefd41f.json",
+   "text": "{\"add\":{\"c.md\":{\"mode\":292,\"sha256\":\"be9d587defa1f0c09ef49eb17e206983a5f8f8289e4281860bd0ee5a19592c67\",\"size\":5}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"2878fd44f020e7c8f181ff75f082f1b2a0a232eec8317c74089579de3e8fb6c2\",\"schema\":1}\n",
+   "mode": 292
+  }
+ ],
+ "archive": "archives",
+ "head": "2162320cab9024b6621fcb6b0c5c64a0f0eee7604c336abc26d2b5548eefd41f",
+ "events": 2,
+ "entries": {
+  "a.md": {
+   "mode": 292,
+   "sha256": "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+   "size": 5
+  },
+  "b.md": {
+   "mode": 292,
+   "sha256": "f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753",
+   "size": 4
+  },
+  "c.md": {
+   "mode": 292,
+   "sha256": "be9d587defa1f0c09ef49eb17e206983a5f8f8289e4281860bd0ee5a19592c67",
+   "size": 5
+  }
+ }
+}

@@ -1,0 +1,51 @@
+{
+ "kind": "history",
+ "description": "Two events, each naming its predecessor by hash; the head is the last event's hash.",
+ "tree": [
+  {
+   "path": "archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": "archives/c.md",
+   "text": "gamma",
+   "mode": 292
+  },
+  {
+   "path": "archives/.archive-integrity/00000001-519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2.json",
+   "text": "{\"add\":{\"a.md\":{\"mode\":292,\"sha256\":\"8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8\",\"size\":5},\"b.md\":{\"mode\":292,\"sha256\":\"f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753\",\"size\":4}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "archives/.archive-integrity/00000002-3d309bccc4a8f681734a9d744dd5b21a9d8c21ce38bb9b14f56646d68a171ad4.json",
+   "text": "{\"add\":{\"c.md\":{\"mode\":292,\"sha256\":\"be9d587defa1f0c09ef49eb17e206983a5f8f8289e4281860bd0ee5a19592c67\",\"size\":5}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2\",\"schema\":1}\n",
+   "mode": 292
+  }
+ ],
+ "archive": "archives",
+ "head": "3d309bccc4a8f681734a9d744dd5b21a9d8c21ce38bb9b14f56646d68a171ad4",
+ "events": 2,
+ "entries": {
+  "a.md": {
+   "mode": 292,
+   "sha256": "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+   "size": 5
+  },
+  "b.md": {
+   "mode": 292,
+   "sha256": "f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753",
+   "size": 4
+  },
+  "c.md": {
+   "mode": 292,
+   "sha256": "be9d587defa1f0c09ef49eb17e206983a5f8f8289e4281860bd0ee5a19592c67",
+   "size": 5
+  }
+ }
+}
