@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 5, in lockstep; the fixtures in =fixtures/= are its
+this document, version 6, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -111,12 +111,26 @@ Schema 2 has the same, with =ledger_id= required, and:
 - =collections=: the paths of the collections this event seals, sorted,
   each once; possibly none.
 
+A conversion event, once in a ledger that holds legacy entries (those
+without =cid=), migrates them all: =schema= 2, =kind= =conversion=,
+=previous=, =ledger_id=, and:
+
+- =remove=: legacy paths no longer enrolled, sorted;
+- =rename=: each legacy path renamed, by its old path, to its new;
+- =convert=: every legacy entry left, by its path after renaming, as a
+  schema 2 entry with =from=, the SHA-256 it was enrolled with;
+- =add=: files enrolled for the first time, as schema 2 entries;
+- =collections=: every collection in the archive, sorted;
+- =root=: the archive's CID after it.
+
 The head is the hash of the last event; the recorded root is the last
 event's =root=, if it is of schema 2. An empty ledger directory is
 refused. Refusals are named: =ledger= (the ledger is not a directory, or
 there are two), =sequence= (name, number or hash), =chain= (keys, schema or
-=previous=), =identity=, =entry= (an entry, =item=, =root= or
-=collections=) and
+=previous=, or a conversion where there is nothing legacy to convert),
+=identity=, =entry= (an entry, =item=, =root= or =collections=, or a
+conversion that leaves a legacy entry unaccounted for, names a wrong
+original or adds over an entry) and
 =empty=; =link= refuses a symlink or a second hard link anywhere.
 
 ** Checkpoints
@@ -285,6 +299,47 @@ plan and its refusals are those of the two-step form.
 Fixtures: =fixtures/ledger/seal-*=: a tree, a source and destination, a
 date for rumours, and the plan, the last event and the report after it,
 paths relative to the tree; or the refusal.
+
+* Migration
+
+The one sanctioned rewrite of archived bytes: an archive whose ledger
+holds legacy entries is rebuilt, in content identity, and its ledger
+closed by a conversion event. Migration is poslib's, as planning links
+is.
+
+A plan, reviewed and applied as a seal's is, describes the rebuilt
+archive:
+
+- =discard= and =remove=: Finder's =.DS_Store=, unenrolled and enrolled;
+  =remove= also holds enrolled paths missing already;
+- =renames=: in order, a legacy ledger folder within the archive to
+  =archive-integrity/ledger/= beside its archive, a legacy checkpoint
+  folder to =archive-integrity/checkpoints/=, and any other hidden entry
+  to its name prefixed =dot=, keeping its bytes;
+- =collections=: the receipts (with =manifest.json= and =source/=),
+  capsules (in =capsules/=), runs (in =trials/=, =studies/= or
+  =pipeline-trials/=) and retired scopes (holding =archives/=), less those
+  the reviewer excludes; =declarations=: each declared in its =README.org=,
+  the line added after its leading keywords, or a new =README.org= made,
+  naming the collection's entrance;
+- =rumours=: at =rumours/DATE-HASH.org=, as for sealing, the text saying
+  that migrating the archive found links to the path;
+- =links=: every link, as for sealing, from where it was written, with its
+  edit: =cid=, =internal=, =rumour=, =broken=, annotated, or =later=, a
+  link from an earlier item to a later one where items' links loop,
+  annotated =[[later:PATH][TEXT]]= in Org and =TEXT [later record: PATH]= in
+  Markdown; an item's date is one its path begins with, else its first
+  commit's;
+- =canon=: each canon file under the plan's root with links to a path the
+  migration moves, its SHA-256 and the edits repairing them;
+- =inventory_sha256= and =final_inventory_sha256=: the archive before and
+  after; =event=: the conversion event's name and text.
+
+Applying the plan rebuilds the archive in =_migrate/= beside it, refusing
+any difference from the plan, keeps the archive as it was there, swaps
+the rebuilt archive in, moves the ledger and checkpoints beside it,
+writes the conversion event, removes write bits, repairs canon and
+checkpoints the head. Applied again, it finds its work done.
 
 * Fixture trees
 

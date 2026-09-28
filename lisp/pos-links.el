@@ -44,8 +44,9 @@
 
 (defun pos-links--org ()
   "Return the file links in the current Org buffer.
-Each is (OFFSET TEXT PATH SUFFIX): TEXT the raw link at byte OFFSET,
-PATH its file, SUFFIX its search option with its :: or empty."
+Each is (OFFSET TEXT PATH SUFFIX OFFSET TEXT): TEXT the raw link at byte
+OFFSET, PATH its file, SUFFIX its search option with its :: or empty;
+the raw link is also the whole that an annotation replaces."
   (let (links)
     (org-element-map (org-element-parse-buffer) 'link
       (lambda (link)
@@ -55,10 +56,11 @@ PATH its file, SUFFIX its search option with its :: or empty."
             (save-excursion
               (goto-char (org-element-property :begin link))
               (when (search-forward raw (org-element-property :end link) t)
-                (push (list (pos-links--byte (match-beginning 0)) raw
-                            (org-element-property :path link)
-                            (if search (concat "::" search) ""))
-                      links)))))))
+                (let ((offset (pos-links--byte (match-beginning 0))))
+                  (push (list offset raw (org-element-property :path link)
+                              (if search (concat "::" search) "")
+                              offset raw)
+                        links))))))))
     (nreverse links)))
 
 (defun pos-links--markdown-path (url)
@@ -71,7 +73,8 @@ PATH its file, SUFFIX its search option with its :: or empty."
               (if hash (substring url hash) ""))))))
 
 (defun pos-links--markdown ()
-  "Return the path links in the current Markdown buffer, as `pos-links--org'."
+  "Return the path links in the current Markdown buffer, as `pos-links--org'.
+The whole of an inline link is all of it; of a reference definition, its URL."
   (syntax-propertize (point-max))
   (let (links)
     (dolist (spec (list (cons markdown-regex-link-inline 6)
@@ -82,14 +85,20 @@ PATH its file, SUFFIX its search option with its :: or empty."
           (unless (or (null beg)
                       (markdown-code-block-at-pos (match-beginning 0))
                       (markdown-inline-code-at-pos-p (match-beginning 0)))
-            (let ((path (pos-links--markdown-path url)))
+            (let ((path (pos-links--markdown-path url))
+                  (inline (eq (car spec) markdown-regex-link-inline)))
               (when path
-                (push (list (pos-links--byte beg) url (car path) (cdr path)) links)))))))
+                (push (list (pos-links--byte beg) url (car path) (cdr path)
+                            (pos-links--byte (if inline (match-beginning 0) beg))
+                            (if inline (match-string-no-properties 0) url)
+                            (and inline (match-string-no-properties 3)))
+                      links)))))))
     (sort links (lambda (a b) (< (car a) (car b))))))
 
 (defun pos-links-in-file (file)
   "Return the path links in FILE, an Org or Markdown file, else nil.
-Each is (OFFSET TEXT PATH SUFFIX), OFFSET in bytes."
+Each is (OFFSET TEXT PATH SUFFIX WHOLE-OFFSET WHOLE DESCRIPTION), offsets
+in bytes: TEXT the target, WHOLE what an annotation replaces."
   (let ((org (string-suffix-p ".org" file)) (md (string-suffix-p ".md" file)))
     (when (or org md)
       (with-temp-buffer
@@ -100,6 +109,19 @@ Each is (OFFSET TEXT PATH SUFFIX), OFFSET in bytes."
           (let ((org-mode-hook nil) (markdown-mode-hook nil))
             (if org (org-mode) (markdown-mode))))
         (if org (pos-links--org) (pos-links--markdown))))))
+
+(defun pos-links-annotate (file link label)
+  "Return the annotation replacing LINK's whole in FILE, marked LABEL.
+LABEL is broken or later.  In Org, the link's type becomes LABEL; in
+Markdown, the link becomes its text and a bracketed note."
+  (pcase-let ((`(,_ ,text ,_ ,_ ,_ ,whole ,description) link))
+    (cond
+     ((string-suffix-p ".org" file)
+      (concat label ":" (if (string-prefix-p "file:" text) (substring text 5) text)))
+     (description
+      (format "%s [%s: %s]" description
+              (if (equal label "broken") "broken link" "later record") text))
+     (t (concat label ":" whole)))))
 
 (defun pos-links-rewrite (bytes rewrites)
   "Return BYTES with each (OFFSET FROM TO) of REWRITES applied.
