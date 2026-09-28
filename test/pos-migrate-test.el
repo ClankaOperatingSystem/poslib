@@ -183,5 +183,20 @@ link: the link cites a rumour of the canon file."
       (should (equal "rumour" (alist-get 'kind link)))
       (should (member "progress.md" (append (alist-get 'remove plan) nil))))))
 
+(ert-deftest pos-migrate/the-reviewer-names-collections-the-shape-misses ()
+  "A directory no rule recognises becomes a collection when included."
+  (pos-migrate-test-with-legacy
+    (let ((plan (pos-migrate-plan archive scope nil "2026-09-28" nil '("old/archives"))))
+      (should-not (member "old/archives" (append (alist-get 'collections plan) nil))))
+    (let ((plan (pos-migrate-plan archive scope nil "2026-09-28" nil '("receipt/source"))))
+      ;; Within a candidate already, it is not declared twice.
+      (should-not (member "receipt/source" (append (alist-get 'collections plan) nil))))
+    (pos-migrate--writable archive)
+    (pos-fixture-write (expand-file-name "archives/2026-03-01-run/log.md" scope) "# Log\n")
+    (delete-directory (expand-file-name pos-ledger-directory archive) t)
+    (pos-migrate-test-enrol archive)
+    (let ((plan (pos-migrate-plan archive scope nil "2026-09-28" nil '("2026-03-01-run"))))
+      (should (member "2026-03-01-run" (append (alist-get 'collections plan) nil))))))
+
 (provide 'pos-migrate-test)
 ;;; pos-migrate-test.el ends here
