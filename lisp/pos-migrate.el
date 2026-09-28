@@ -336,6 +336,15 @@ today's, dates rumours; LEDGER-ID names a ledger that has none."
                     (t (let ((r (pos-migrate--rumour abs scope date)))
                          (unless (assoc (car r) rumours) (push r rumours))
                          (list rel link "rumour" :rumour (car r) suffix))))))
+                ;; Gone from the archive but back in canon at the same relative
+                ;; path, as a withdrawn record is: a rumour of it.
+                ((and inside (file-exists-p (expand-file-name (pos-migrate--rel abs archive)
+                                                              scope)))
+                 (let ((r (pos-migrate--rumour (expand-file-name (pos-migrate--rel abs archive)
+                                                                 scope)
+                                               scope date)))
+                   (unless (assoc (car r) rumours) (push r rumours))
+                   (list rel link "rumour" :rumour (car r) suffix)))
                 (t (list rel link "broken" (pos-links-annotate rel link "broken"))))
                links)))))
       ;; Loops among items: a link from an earlier record to a later one
