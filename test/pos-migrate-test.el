@@ -127,5 +127,18 @@ gets a rumour; a broken link is annotated."
       (should (equal before (pos-ledger-json (vconcat (pos-ledger-check scope)))))
       (should-error (pos-migrate-plan (expand-file-name "archives" scope)) :type 'pos-ledger-refused))))
 
+(ert-deftest pos-migrate/a-link-into-a-containers-archive-cites-a-rumour ()
+  "A child's archive citing its container's archive cites a rumour, so
+children migrate before their containers and nothing waits on a cycle."
+  (pos-migrate-test-with-legacy
+    (let ((child (expand-file-name "projects/child" scope)))
+      (pos-fixture-write (expand-file-name "archives/up.md" child)
+                         "# Up\n\nSee [the plan](../../../archives/2026-01-01-first.md).\n")
+      (pos-migrate-test-enrol (expand-file-name "archives" child))
+      (let ((plan (pos-migrate-plan (expand-file-name "archives" child) scope nil "2026-09-28")))
+        (should (equal '("rumour")
+                       (delete-dups (mapcar (lambda (l) (alist-get 'kind l))
+                                            (append (alist-get 'links plan) nil)))))))))
+
 (provide 'pos-migrate-test)
 ;;; pos-migrate-test.el ends here
