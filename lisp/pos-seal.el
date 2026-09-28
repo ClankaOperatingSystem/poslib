@@ -240,7 +240,13 @@ by default today's, dates any rumours the item's links need."
         (pos-ledger--refuse 'destination "Unsafe destination: %s" rel))
       (when (seq-some (lambda (part) (string-prefix-p "." part)) (split-string rel "/"))
         (pos-ledger--refuse 'hidden "Hidden files are not sealed: %s" rel))
-      (pcase-let* ((`(,known ,head ,events ,files) (pos-ledger-history archive))
+      (pcase-let* ((`(,known ,head ,events ,files ,_ ,collections ,items)
+                    (pos-ledger-history archive))
+                   (_ (let ((within (seq-find (lambda (i) (pos-ledger--within-p rel i))
+                                              (append items collections))))
+                        (when within
+                          (pos-ledger--refuse 'sealed "Destination is within sealed %s: %s"
+                                              within rel))))
                    (actual (pos-ledger-inventory archive))
                    (`(,missing ,changed ,_)
                     (pos-ledger--differences
