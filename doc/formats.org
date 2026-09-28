@@ -204,7 +204,8 @@ not stop a seal; the check reports them.
    =collections= from the plan, and =root=, the archive's CID now. If the
    ledger's head is already this event, nothing is written; if the head is
    not the plan's =previous=, the plan is refused (=plan=).
-5. Write bits are removed from the item's files and the event.
+5. Write bits are removed from the item's files; the event, like every
+   ledger and checkpoint file, has mode =0444=.
 6. A checkpoint of the archive's head, of coverage =archive=, is written
    beside the archive: in =archive-integrity/checkpoints/= if
    =archive-integrity/= exists there, else in the legacy folder.
