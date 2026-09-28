@@ -225,6 +225,52 @@
           ((or (file-exists-p beside) (file-symlink-p beside)) beside)
           (t inside))))
 
+(defun pos-ledger--convert (entries event file)
+  "Return ENTRIES after the conversion EVENT, in the event FILE.
+Refuse unless it removes, renames or converts every legacy entry, each
+from its fingerprint, and adds only new paths."
+  (let* ((legacy (seq-filter (lambda (e) (not (assq 'cid (cdr e)))) entries))
+         (remove (append (alist-get 'remove event) nil))
+         (rename (mapcar (lambda (p) (cons (pos-ledger--key (car p)) (cdr p)))
+                         (alist-get 'rename event)))
+         (convert (mapcar (lambda (p) (cons (pos-ledger--key (car p)) (cdr p)))
+                          (alist-get 'convert event)))
+         (kept (seq-remove (lambda (e) (member (car e) remove)) entries))
+         (moved (mapcar (lambda (e) (cons (or (cdr (assoc (car e) rename)) (car e)) (cdr e)))
+                        kept))
+         (bad (lambda () (pos-ledger--refuse 'entry "Invalid conversion: %s" file))))
+    (unless (and (vectorp (alist-get 'remove event)) (listp (alist-get 'add event))
+                 (listp (alist-get 'rename event)) (listp (alist-get 'convert event))
+                 (seq-every-p (lambda (p) (assoc p legacy)) remove)
+                 (seq-every-p (lambda (p) (and (assoc (car p) legacy) (not (member (car p) remove))
+                                               (stringp (cdr p)) (pos-ledger--safe-p (cdr p))))
+                              rename)
+                 (equal (length (seq-uniq (mapcar #'car moved))) (length moved)))
+      (funcall bad))
+    ;; Every legacy entry left is converted, at its new path, from its fingerprint.
+    (dolist (e moved)
+      (let ((old (cdr e)))
+        (unless (assq 'cid old)
+          (let ((new (cdr (assoc (car e) convert))))
+            (unless (and new (equal (alist-get 'from new) (alist-get 'sha256 old))
+                         (pos-ledger--entry-p (assq-delete-all 'from (copy-sequence new)) 2))
+              (funcall bad))))))
+    (unless (seq-every-p (lambda (c) (let ((e (cdr (assoc (car c) moved))))
+                                       (and e (not (assq 'cid e)))))
+                         convert)
+      (funcall bad))
+    (let ((result (mapcar (lambda (e)
+                            (let ((new (cdr (assoc (car e) convert))))
+                              (if new (cons (car e) (assq-delete-all 'from (copy-sequence new))) e)))
+                          moved)))
+      (dolist (pair (alist-get 'add event))
+        (let ((name (pos-ledger--key (car pair))))
+          (unless (and (pos-ledger--safe-p name) (not (assoc name result))
+                       (pos-ledger--entry-p (cdr pair) 2))
+            (funcall bad))
+          (push (cons name (cdr pair)) result)))
+      result)))
+
 (defun pos-ledger--within-p (path item)
   "Return non-nil if PATH is ITEM or lies within it."
   (or (equal path item) (string-prefix-p (concat item "/") path)))
@@ -244,7 +290,8 @@ last event recorded, if it records one; COLLECTIONS every path sealed
 as a collection, sorted; ITEMS the path of each item a schema 2 event
 sealed, sorted.  No ledger is (nil nil 0 nil nil nil nil)."
   (let ((folder (pos-ledger-folder archive))
-        entries previous files ledger-id (number 0) schema root collections items)
+        entries previous files ledger-id (number 0) schema root collections items
+        converted)
     (cond
      ((not (or (file-exists-p folder) (file-symlink-p folder)))
       (list nil nil 0 nil nil nil nil))
@@ -268,8 +315,15 @@ sealed, sorted.  No ledger is (nil nil 0 nil nil nil nil)."
                                    (member keys '(("add" "previous" "schema")
                                                   ("add" "ledger_id" "previous"
                                                    "schema")))))
-                           (2 (equal keys '("add" "collections" "item" "ledger_id"
-                                            "previous" "root" "schema"))))
+                           (2 (or (equal keys '("add" "collections" "item" "ledger_id"
+                                                "previous" "root" "schema"))
+                                  (and (equal keys '("add" "collections" "convert" "kind"
+                                                     "ledger_id" "previous" "remove"
+                                                     "rename" "root" "schema"))
+                                       (equal (alist-get 'kind event) "conversion")
+                                       (not converted)
+                                       (seq-some (lambda (e) (not (assq 'cid (cdr e))))
+                                                 entries)))))
                          (equal event-previous (or previous :null)))
               (pos-ledger--refuse 'chain "Ledger chain failure: %s" path))
             (setq schema (alist-get 'schema event))
@@ -283,7 +337,10 @@ sealed, sorted.  No ledger is (nil nil 0 nil nil nil nil)."
                (ledger-id
                 (pos-ledger--refuse 'identity "Ledger identity removed"))))
             (setq root (when (eql schema 2) (alist-get 'root event)))
-            (when (eql schema 2)
+            (when (alist-get 'kind event)
+              (setq converted t
+                    entries (pos-ledger--convert entries event path)))
+            (when (and (eql schema 2) (not (alist-get 'kind event)))
               (let ((item (alist-get 'item event)))
                 (unless (and (pos-ledger--cid-p root)
                              (stringp item) (pos-ledger--safe-p item)
@@ -297,7 +354,12 @@ sealed, sorted.  No ledger is (nil nil 0 nil nil nil nil)."
                   (pos-ledger--refuse 'entry "Invalid root, item or collections: %s" path))
                 (push item items))
               (setq collections (append (alist-get 'collections event) collections)))
-            (let ((add (alist-get 'add event)))
+            (when (alist-get 'kind event)
+              (unless (and (pos-ledger--cid-p root)
+                           (pos-ledger--collections-p (alist-get 'collections event)))
+                (pos-ledger--refuse 'entry "Invalid root or collections: %s" path))
+              (setq collections (append (alist-get 'collections event) collections)))
+            (let ((add (unless (alist-get 'kind event) (alist-get 'add event))))
               (unless (listp add)
                 (pos-ledger--refuse 'entry "Invalid ledger additions"))
               (dolist (pair add)
