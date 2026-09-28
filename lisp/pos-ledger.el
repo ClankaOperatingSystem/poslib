@@ -225,6 +225,10 @@
           ((or (file-exists-p beside) (file-symlink-p beside)) beside)
           (t inside))))
 
+(defun pos-ledger--within-p (path item)
+  "Return non-nil if PATH is ITEM or lies within it."
+  (or (equal path item) (string-prefix-p (concat item "/") path)))
+
 (defun pos-ledger--collections-p (value)
   "Return non-nil if VALUE is a sorted vector of distinct safe paths."
   (and (vectorp value)
@@ -233,16 +237,17 @@
               (seq-uniq (sort (append value nil) #'string<)))))
 
 (defun pos-ledger-history (archive)
-  "Return ARCHIVE's ledger as (ENTRIES HEAD EVENTS FILES ROOT COLLECTIONS).
+  "Return ARCHIVE's ledger as (ENTRIES HEAD EVENTS FILES ROOT COLLECTIONS ITEMS).
 ENTRIES is an alist of path and entry; HEAD the last event's hash;
 EVENTS their number; FILES the event files; ROOT the archive CID the
 last event recorded, if it records one; COLLECTIONS every path sealed
-as a collection, sorted.  No ledger is (nil nil 0 nil nil nil)."
+as a collection, sorted; ITEMS the path of each item a schema 2 event
+sealed, sorted.  No ledger is (nil nil 0 nil nil nil nil)."
   (let ((folder (pos-ledger-folder archive))
-        entries previous files ledger-id (number 0) schema root collections)
+        entries previous files ledger-id (number 0) schema root collections items)
     (cond
      ((not (or (file-exists-p folder) (file-symlink-p folder)))
-      (list nil nil 0 nil nil nil))
+      (list nil nil 0 nil nil nil nil))
      ((or (file-symlink-p folder) (not (file-directory-p folder)))
       (pos-ledger--refuse 'ledger "Invalid ledger: %s" folder))
      (t
@@ -263,7 +268,7 @@ as a collection, sorted.  No ledger is (nil nil 0 nil nil nil)."
                                    (member keys '(("add" "previous" "schema")
                                                   ("add" "ledger_id" "previous"
                                                    "schema")))))
-                           (2 (equal keys '("add" "collections" "ledger_id"
+                           (2 (equal keys '("add" "collections" "item" "ledger_id"
                                             "previous" "root" "schema"))))
                          (equal event-previous (or previous :null)))
               (pos-ledger--refuse 'chain "Ledger chain failure: %s" path))
@@ -279,9 +284,18 @@ as a collection, sorted.  No ledger is (nil nil 0 nil nil nil)."
                 (pos-ledger--refuse 'identity "Ledger identity removed"))))
             (setq root (when (eql schema 2) (alist-get 'root event)))
             (when (eql schema 2)
-              (unless (and (pos-ledger--cid-p root)
-                           (pos-ledger--collections-p (alist-get 'collections event)))
-                (pos-ledger--refuse 'entry "Invalid root or collections: %s" path))
+              (let ((item (alist-get 'item event)))
+                (unless (and (pos-ledger--cid-p root)
+                             (stringp item) (pos-ledger--safe-p item)
+                             (pos-ledger--collections-p (alist-get 'collections event))
+                             (seq-every-p (lambda (p) (pos-ledger--within-p p item))
+                                          (alist-get 'collections event))
+                             (seq-every-p (lambda (pair)
+                                            (pos-ledger--within-p
+                                             (pos-ledger--key (car pair)) item))
+                                          (alist-get 'add event)))
+                  (pos-ledger--refuse 'entry "Invalid root, item or collections: %s" path))
+                (push item items))
               (setq collections (append (alist-get 'collections event) collections)))
             (let ((add (alist-get 'add event)))
               (unless (listp add)
@@ -303,7 +317,8 @@ as a collection, sorted.  No ledger is (nil nil 0 nil nil nil)."
         (pos-ledger--refuse 'empty "Empty ledger needs investigation: %s" folder))
       (list (sort entries (lambda (a b) (string< (car a) (car b))))
             previous number (nreverse files) root
-            (seq-uniq (sort collections #'string<)))))))
+            (seq-uniq (sort collections #'string<))
+            (sort items #'string<))))))
 
 (defun pos-ledger-event (add previous number &optional ledger-id)
   "Return (NAME . BYTES), event NUMBER enrolling ADD after PREVIOUS.

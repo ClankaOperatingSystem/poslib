@@ -1,6 +1,6 @@
 {
  "kind": "history",
- "description": "Collections are listed sorted and once.",
+ "description": "Everything a schema 2 event adds lies within the item it names.",
  "tree": [
   {
    "path": "archive-integrity/ledger/00000001-519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2.json",
@@ -8,8 +8,8 @@
    "mode": 292
   },
   {
-   "path": "archive-integrity/ledger/00000002-090abeb5300918be2b06ee9d56b8e118c100a67fa84667fba5fd9a107e737a15.json",
-   "text": "{\"add\":{\"z.md\":{\"cid\":\"bafkreiczjzizvzezgevssqz3pxmks77qndppzouxkw3nluaoqtcsjvt3ay\",\"mode\":292,\"sha256\":\"594e519ae499312b29433b7dd8a97ff068defcba9755b6d5d00e84c524d67b06\",\"size\":1}},\"collections\":[\"z\",\"a\"],\"item\":\"z.md\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2\",\"root\":\"bafybeiaoj6xazlo6t2lpfytiydeuu63qwar2ln3ahkycwojfeyn2zmn7jm\",\"schema\":2}\n",
+   "path": "archive-integrity/ledger/00000002-2753dfb4bce9d205d121cda531547ee2f25646bbb1cc89291b6e93b7b4d61f92.json",
+   "text": "{\"add\":{\"z.md\":{\"cid\":\"bafkreiczjzizvzezgevssqz3pxmks77qndppzouxkw3nluaoqtcsjvt3ay\",\"mode\":292,\"sha256\":\"594e519ae499312b29433b7dd8a97ff068defcba9755b6d5d00e84c524d67b06\",\"size\":1}},\"collections\":[],\"item\":\"other\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2\",\"root\":\"bafybeiaoj6xazlo6t2lpfytiydeuu63qwar2ln3ahkycwojfeyn2zmn7jm\",\"schema\":2}\n",
    "mode": 292
   },
   {

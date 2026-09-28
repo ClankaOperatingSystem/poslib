@@ -226,6 +226,7 @@ Return (EVENT-FILE . ROOT)."
       (let* ((root (pos-cid-directory .archive))
              (bytes (pos-ledger-json
                      `((schema . 2) (previous . ,.previous) (ledger_id . ,.ledger_id)
+                       (item . ,(file-relative-name .destination .archive))
                        (add . ,.add) (root . ,root) (collections . ,.collections))))
              (hash (pos-ledger--sha bytes))
              (file (expand-file-name (format "%08d-%s.json" .number hash) .ledger)))
