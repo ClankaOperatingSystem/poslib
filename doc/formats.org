@@ -336,8 +336,10 @@ archive:
 - =links=: every link, as for sealing, from where it was written, with its
   resolution; a scope within this one must be migrated first, and a
   container's archive is cited by rumour; a link to a path gone from the
-  archive whose counterpart at the same relative path is in canon, as a
-  withdrawn record's is, cites a rumour of it. Each link has its edit: =cid=, =internal=, =rumour=, =broken=, annotated, or =later=, a
+  archive whose counterpart at the same relative path from the scope
+  exists means the counterpart: a withdrawn record's in canon, cited by
+  rumour, or a record's archived since the link was written, cited by
+  CID. Each link has its edit: =cid=, =internal=, =rumour=, =broken=, annotated, or =later=, a
   link from an earlier item to a later one where items' links loop,
   annotated =[[later:PATH][TEXT]]= in Org and =TEXT [later record: PATH]= in
   Markdown; an item's date is one its path begins with, else its first

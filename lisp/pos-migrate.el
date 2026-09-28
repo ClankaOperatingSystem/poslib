@@ -304,7 +304,24 @@ today's, dates rumours; LEDGER-ID names a ledger that has none."
                (written (file-name-directory (expand-file-name original archive))))
           (dolist (link (pos-links-in-file (expand-file-name rel stage)))
             (pcase-let* ((`(,_ ,text ,path ,suffix) link)
-                         (abs (expand-file-name path written))
+                         (written-abs (expand-file-name path written))
+                         ;; A path gone from the archive, whose counterpart at the
+                         ;; same relative path exists, as a withdrawn record's does
+                         ;; in canon, or a record's archived since its link was
+                         ;; written: the counterpart is meant.
+                         (abs (let ((counterpart
+                                     (and (string-prefix-p (file-name-as-directory archive)
+                                                           written-abs)
+                                          (not (file-exists-p written-abs))
+                                          (not (file-exists-p
+                                                (expand-file-name
+                                                 (pos-migrate--through
+                                                  (pos-migrate--rel written-abs archive) renames)
+                                                 stage)))
+                                          (expand-file-name (pos-migrate--rel written-abs archive)
+                                                            scope))))
+                                (if (and counterpart (file-exists-p counterpart))
+                                    counterpart written-abs)))
                          (inside (string-prefix-p (file-name-as-directory archive) abs)))
               (push
                (cond
@@ -336,15 +353,6 @@ today's, dates rumours; LEDGER-ID names a ledger that has none."
                     (t (let ((r (pos-migrate--rumour abs scope date)))
                          (unless (assoc (car r) rumours) (push r rumours))
                          (list rel link "rumour" :rumour (car r) suffix))))))
-                ;; Gone from the archive but back in canon at the same relative
-                ;; path, as a withdrawn record is: a rumour of it.
-                ((and inside (file-exists-p (expand-file-name (pos-migrate--rel abs archive)
-                                                              scope)))
-                 (let ((r (pos-migrate--rumour (expand-file-name (pos-migrate--rel abs archive)
-                                                                 scope)
-                                               scope date)))
-                   (unless (assoc (car r) rumours) (push r rumours))
-                   (list rel link "rumour" :rumour (car r) suffix)))
                 (t (list rel link "broken" (pos-links-annotate rel link "broken"))))
                links)))))
       ;; Loops among items: a link from an earlier record to a later one
