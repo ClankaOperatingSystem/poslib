@@ -159,6 +159,24 @@ applied twice, it adds nothing."
         (ert-info ((cadr applied)) (should (equal 0 (car applied)))))
       (should (equal "handover\n" (pos-ledger--read target))))))
 
+(ert-deftest pos-seal/a-program-seals-an-item-explicitly ()
+  "seal SOURCE DESTINATION --apply moves and seals at once; without it, a plan."
+  (pos-seal-test-with-scope
+    (let* ((source (expand-file-name "trial" scope))
+           (target (expand-file-name "archives/trial" scope))
+           (run (lambda (&rest args)
+                  (apply #'call-process (expand-file-name invocation-name invocation-directory)
+                         nil nil nil "-Q" "--batch"
+                         "-L" (file-name-directory
+                               (expand-file-name (locate-library "markdown-mode")))
+                         "-L" (file-name-directory (expand-file-name (locate-library "pos-seal")))
+                         "-l" "pos-seal" "-f" "pos-seal-batch" "seal" source target args))))
+      (should (equal 0 (funcall run)))
+      (should-not (file-exists-p target))
+      (should (equal 0 (funcall run "--apply")))
+      (should (file-exists-p (expand-file-name "result.md" target)))
+      (should (equal 1 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
+
 (ert-deftest pos-seal/reading-links-reads-nothing-else ()
   "A #+SETUPFILE in an item is not followed while its links are read."
   (pos-seal-test-with-scope

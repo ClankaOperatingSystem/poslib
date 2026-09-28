@@ -458,14 +458,25 @@ Return (EVENT-FILE . ROOT)."
   "Run a seal command from `command-line-args-left'.
 seal SOURCE DESTINATION and write-new DESTINATION, the record on
 standard input, print a plan; apply PLAN HASH applies it.  A program
-writing records itself uses write-new DESTINATION --apply, which
-applies its own plan at once and prints it with the result.  Exit 0
+sealing or writing records itself adds --apply to seal or write-new,
+which applies its own plan at once and prints it with the result.  Exit 0
 done, 2 refused."
   (condition-case err
       (pcase (prog1 command-line-args-left (setq command-line-args-left nil))
-        (`("seal" ,source ,destination)
-         (princ (decode-coding-string (pos-ledger-json (pos-seal-plan source destination))
-                                      'utf-8)))
+        (`("seal" ,source ,destination . ,rest)
+         (unless (member rest '(nil ("--apply")))
+           (message "Usage: seal SOURCE DESTINATION [--apply]")
+           (kill-emacs 2))
+         (let ((plan (pos-seal-plan source destination)))
+           (princ (decode-coding-string
+                   (pos-ledger-json
+                    (if rest
+                        (let* ((hash (pos-ledger--sha (pos-ledger-json plan)))
+                               (result (pos-seal-apply plan hash)))
+                          `((plan . ,plan) (hash . ,hash)
+                            (event . ,(car result)) (root . ,(cdr result))))
+                      plan))
+                   'utf-8))))
         (`("write-new" ,destination . ,rest)
          (unless (member rest '(nil ("--apply")))
            (message "Usage: write-new DESTINATION [--apply]")
@@ -490,7 +501,7 @@ done, 2 refused."
            (princ (decode-coding-string
                    (pos-ledger-json `((event . ,(car result)) (root . ,(cdr result))))
                    'utf-8))))
-        (_ (message "Usage: seal SOURCE DESTINATION | write-new DESTINATION [--apply] | apply PLAN HASH")
+        (_ (message "Usage: seal SOURCE DESTINATION [--apply] | write-new DESTINATION [--apply] | apply PLAN HASH")
            (kill-emacs 2)))
     (pos-ledger-refused
      (message "%s: %s" (nth 1 err) (nth 2 err))
