@@ -201,18 +201,12 @@ EDGES is an alist of node and the nodes it points to."
 (defun pos-migrate--rumour (target root date)
   "Return (DESTINATION . TEXT), the rumour of TARGET, dated DATE.
 TARGET's path is given from ROOT, the archive's scope."
-  (let* ((path (file-relative-name target root))
-         (title (pos-seal--title target)))
+  (let ((path (file-relative-name target root)))
     (cons (format "rumours/%s-%s.org" date (substring (secure-hash 'sha256 path) 0 12))
           (concat "#+TITLE: Rumour of " path "\n#+DATE: " date "\n\n"
                   "On " date ", migrating its archive found links to =" path
                   "=, which content identity cannot cite. It was then "
-                  (if (file-directory-p target) "a directory"
-                    (let ((bytes (pos-ledger--read target)))
-                      (format "a file of %d bytes, SHA-256 =%s=%s" (length bytes)
-                              (pos-ledger--sha bytes)
-                              (if title (format ", titled \"%s\"" title) ""))))
-                  ".\n"))))
+                  (pos-links-description target root) ".\n"))))
 
 (defun pos-migrate--converted-p (archive)
   "Return non-nil if ARCHIVE's ledger records CIDs for every entry."

@@ -163,6 +163,46 @@ FROM must be at OFFSET."
                               (pos-cid-file path))
                   (unless (equal rel item) (concat "/" (substring rel (1+ (length item)))))))))))
 
+(defun pos-links-garden (scope)
+  "Return the root of the garden holding SCOPE.
+Its repository's, else the outermost directory above it with an archive."
+  (file-truename
+   (or (locate-dominating-file scope ".git")
+       (let ((dir (file-name-as-directory (expand-file-name scope))) found)
+         (while dir
+           (when (file-directory-p (expand-file-name "archives" dir)) (setq found dir))
+           (let ((parent (file-name-directory (directory-file-name dir))))
+             (setq dir (unless (equal parent dir) parent))))
+         found)
+       scope)))
+
+(defun pos-links-outside-garden-p (target scope)
+  "Return non-nil if TARGET lies outside the garden holding SCOPE."
+  (not (string-prefix-p (file-name-as-directory (pos-links-garden scope))
+                        (file-truename target))))
+
+(defun pos-links-description (target scope)
+  "Return the description of TARGET a rumour gives, from SCOPE's garden.
+Nothing outside the garden is read: only that it lies there is said."
+  (cond
+   ((pos-links-outside-garden-p target scope) "outside the garden, and was not read")
+   ((file-directory-p target) "a directory")
+   (t (let ((bytes (pos-ledger--read target))
+            (title (pos-links--title target)))
+        (format "a file of %d bytes, SHA-256 =%s=%s" (length bytes) (pos-ledger--sha bytes)
+                (if title (format ", titled \"%s\"" title) ""))))))
+
+(defun pos-links--title (file)
+  "Return FILE's title, from an Org #+TITLE or a Markdown heading, or nil."
+  (when (file-regular-p file)
+    (with-temp-buffer
+      (insert (decode-coding-string (pos-ledger--read file) 'utf-8))
+      (goto-char (point-min))
+      (when (re-search-forward (if (string-suffix-p ".md" file) "^# +\\(.+\\)$"
+                                 "^#\\+TITLE: *\\(.+\\)$")
+                               nil t)
+        (string-trim (match-string 1))))))
+
 (defun pos-links-within-scope-p (archive scope)
   "Return non-nil if ARCHIVE is SCOPE's own, or a scope's within it."
   (string-prefix-p (file-name-as-directory (file-truename scope))
