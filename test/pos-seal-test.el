@@ -47,7 +47,8 @@ An alist of plan, event and report, or of error."
   (let-alist fixture
     (condition-case err
         (let* ((plan (pos-seal-plan (expand-file-name .source dir)
-                                    (expand-file-name .destination dir) .ledger_id))
+                                    (expand-file-name .destination dir) .ledger_id
+                                    (or .date "2026-09-28")))
                (result (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan))))
                (scope (file-name-directory (alist-get 'archive plan))))
           `((plan . ,(pos-seal-test-relative-plan plan dir))
@@ -144,7 +145,10 @@ applied twice, it adds nothing."
                     (insert "handover\n")
                     (list (apply #'call-process-region (point-min) (point-max)
                                  (expand-file-name invocation-name invocation-directory)
-                                 t t nil "-Q" "--batch" "-L"
+                                 t t nil "-Q" "--batch"
+                                 "-L" (file-name-directory
+                                       (expand-file-name (locate-library "markdown-mode")))
+                                 "-L"
                                  (file-name-directory (expand-file-name (locate-library "pos-seal")))
                                  "-l" "pos-seal" "-f" "pos-seal-batch" "write-new" target args)
                           (buffer-string))))))

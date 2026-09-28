@@ -1,0 +1,132 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "date": "2026-09-28",
+ "description": "Links to archived files become ipfs:// links: a file within a sealed directory as the directory's CID plus a path, in Org and in Markdown, their descriptions, search options and fragments kept.",
+ "source": "scope/report",
+ "destination": "scope/archives/report",
+ "tree": [
+  {
+   "path": "scope/archive-integrity/checkpoints/eb5b929f629c1b3fe738ef1847d49f9cb0a2cbb0990d65a8ab561e9d9be89f69.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000001-85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54.json",
+   "text": "{\"add\":{\"trial/README.org\":{\"cid\":\"bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy\",\"mode\":292,\"sha256\":\"b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae\",\"size\":47},\"trial/sub/x.txt\":{\"cid\":\"bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4\",\"mode\":292,\"sha256\":\"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7\",\"size\":4}},\"collections\":[\"trial\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/trial/README.org",
+   "text": "#+TITLE: Trial\n#+COLLECTION: t\n\nWhat it holds.\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/trial/empty",
+   "directory": true
+  },
+  {
+   "path": "scope/archives/trial/sub/x.txt",
+   "text": "data",
+   "mode": 292
+  },
+  {
+   "path": "scope/report/README.org",
+   "text": "#+TITLE: Report\n\nSee [[file:../archives/trial/sub/x.txt][the data]] and [[file:../archives/trial/README.org::*Heading][its heading]].\n"
+  },
+  {
+   "path": "scope/report/notes.md",
+   "text": "# Notes\n\nThe [data](../archives/trial/sub/x.txt#top) and ![a figure](../archives/trial/README.org).\n\n[ref]: ../archives/trial/sub/x.txt\n"
+  }
+ ],
+ "event": {
+  "encoded": "{\"add\":{\"report/README.org\":{\"cid\":\"bafkreicaxnrsdhcz3sa2w53qzoevedxkgomvku2vvncboiznd65rfkjhae\",\"mode\":292,\"sha256\":\"40bb63219c59dc81ab7770cb89520eea3399555355ab4417232d1fbb12a92701\",\"size\":222},\"report/notes.md\":{\"cid\":\"bafkreib6iklkyk4kpqhswvt3scqxd4ggmczyp52buzknsdyczq6lq55pae\",\"mode\":292,\"sha256\":\"3e4296ac2b8a7c0f2b567b90a171f0c660b387f741a654d90f02cc3cb877af01\",\"size\":283}},\"collections\":[],\"item\":\"report\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\",\"root\":\"bafybeiflgxltu4daygovpuicm6wubcgjrrbukfo6p7sovvk4dub7rqwjdu\",\"schema\":2}\n",
+  "name": "00000002-e9448d2d648af17b9b947e4412e38cb395b11208cb4891156b7b7403f0e6f02c.json"
+ },
+ "plan": {
+  "add": {
+   "report/README.org": {
+    "cid": "bafkreicaxnrsdhcz3sa2w53qzoevedxkgomvku2vvncboiznd65rfkjhae",
+    "mode": 292,
+    "sha256": "40bb63219c59dc81ab7770cb89520eea3399555355ab4417232d1fbb12a92701",
+    "size": 222
+   },
+   "report/notes.md": {
+    "cid": "bafkreib6iklkyk4kpqhswvt3scqxd4ggmczyp52buzknsdyczq6lq55pae",
+    "mode": 292,
+    "sha256": "3e4296ac2b8a7c0f2b567b90a171f0c660b387f741a654d90f02cc3cb877af01",
+    "size": 283
+   }
+  },
+  "archive": "scope/archives",
+  "collections": [],
+  "destination": "scope/archives/report",
+  "inventory_sha256": "8286b878ce504dba7d6cc3483da60bcd4b3969b756df0fc33b599015b6a090f8",
+  "ledger": "scope/archive-integrity/ledger",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "links": [
+   {
+    "file": "report/README.org",
+    "from": "file:../archives/trial/sub/x.txt",
+    "kind": "cid",
+    "offset": 23,
+    "to": "ipfs://bafybeiegtiejvml3pj5hg5pqovxlmwwtggpuiwjbe56red26xhiz6jqsoi/sub/x.txt"
+   },
+   {
+    "file": "report/README.org",
+    "from": "file:../archives/trial/README.org::*Heading",
+    "kind": "cid",
+    "offset": 74,
+    "to": "ipfs://bafybeiegtiejvml3pj5hg5pqovxlmwwtggpuiwjbe56red26xhiz6jqsoi/README.org::*Heading"
+   },
+   {
+    "file": "report/notes.md",
+    "from": "../archives/trial/sub/x.txt#top",
+    "kind": "cid",
+    "offset": 20,
+    "to": "ipfs://bafybeiegtiejvml3pj5hg5pqovxlmwwtggpuiwjbe56red26xhiz6jqsoi/sub/x.txt#top"
+   },
+   {
+    "file": "report/notes.md",
+    "from": "../archives/trial/README.org",
+    "kind": "cid",
+    "offset": 69,
+    "to": "ipfs://bafybeiegtiejvml3pj5hg5pqovxlmwwtggpuiwjbe56red26xhiz6jqsoi/README.org"
+   },
+   {
+    "file": "report/notes.md",
+    "from": "../archives/trial/sub/x.txt",
+    "kind": "cid",
+    "offset": 108,
+    "to": "ipfs://bafybeiegtiejvml3pj5hg5pqovxlmwwtggpuiwjbe56red26xhiz6jqsoi/sub/x.txt"
+   }
+  ],
+  "number": 2,
+  "operation": "seal",
+  "originals": {
+   "report/README.org": "fe488cef2a2370938fac2c3e33bc88d889efe4ecd5769add0c018014170fc697",
+   "report/notes.md": "2c366c42101f8c8937af89ddf5b9001c655378cec9bd4c6120fa9299fe2c7351"
+  },
+  "previous": "85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54",
+  "rumours": [],
+  "schema": 2,
+  "source": "scope/report"
+ },
+ "report": [
+  {
+   "archive": "scope/archives",
+   "changed": [],
+   "checkpoint_writable": [],
+   "events": 2,
+   "files": 4,
+   "head": "e9448d2d648af17b9b947e4412e38cb395b11208cb4891156b7b7403f0e6f02c",
+   "hidden": [],
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeiflgxltu4daygovpuicm6wubcgjrrbukfo6p7sovvk4dub7rqwjdu",
+   "root": "bafybeiflgxltu4daygovpuicm6wubcgjrrbukfo6p7sovvk4dub7rqwjdu",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}

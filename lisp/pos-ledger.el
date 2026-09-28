@@ -100,7 +100,7 @@
 
 (defun pos-ledger-json (value)
   "Return the canonical JSON bytes of VALUE, with its final newline."
-  (encode-coding-string (concat (pos-ledger--encode value) "\n") 'utf-8 t))
+  (encode-coding-string (concat (pos-ledger--encode value) "\n") 'utf-8))
 
 (defun pos-ledger--parse (bytes)
   "Return the JSON value in BYTES."

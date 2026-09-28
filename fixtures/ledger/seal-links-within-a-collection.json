@@ -1,0 +1,110 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "date": "2026-09-28",
+ "description": "Within a collection, relative links stay as they are: the collection's CID fixes them.",
+ "source": "scope/study",
+ "destination": "scope/archives/study",
+ "tree": [
+  {
+   "path": "scope/archive-integrity/checkpoints/eb5b929f629c1b3fe738ef1847d49f9cb0a2cbb0990d65a8ab561e9d9be89f69.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000001-85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54.json",
+   "text": "{\"add\":{\"trial/README.org\":{\"cid\":\"bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy\",\"mode\":292,\"sha256\":\"b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae\",\"size\":47},\"trial/sub/x.txt\":{\"cid\":\"bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4\",\"mode\":292,\"sha256\":\"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7\",\"size\":4}},\"collections\":[\"trial\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/trial/README.org",
+   "text": "#+TITLE: Trial\n#+COLLECTION: t\n\nWhat it holds.\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/trial/empty",
+   "directory": true
+  },
+  {
+   "path": "scope/archives/trial/sub/x.txt",
+   "text": "data",
+   "mode": 292
+  },
+  {
+   "path": "scope/study/README.org",
+   "text": "#+TITLE: Study\n#+COLLECTION: t\n\nSee [[file:method.org][the method]].\n"
+  },
+  {
+   "path": "scope/study/method.org",
+   "text": "#+TITLE: Method\n\nBack to [[file:README.org][the study]].\n"
+  }
+ ],
+ "event": {
+  "encoded": "{\"add\":{\"study/README.org\":{\"cid\":\"bafkreiechofz3hz7mxru3sjxtbhatsgyti6xmjomr6t5hqjspuepwpes6e\",\"mode\":292,\"sha256\":\"823b8b9d9f3f65e34dc937984e09c8d89a3d7625cc8fa7d3c1327d08fb3c92f1\",\"size\":69},\"study/method.org\":{\"cid\":\"bafkreigwyhgf7duynasjbbe664lldsrrb22mskodpbupflkgpfaoxukvxm\",\"mode\":292,\"sha256\":\"d6c1cc5f8e98682490849ef716b1ca310eb4c929c37868f2ad467940ebd155bb\",\"size\":57}},\"collections\":[\"study\"],\"item\":\"study\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\",\"root\":\"bafybeigexfvzxhigu3fxwldtf73x7f6iee44owbearb7vdtdlzrxdyebhy\",\"schema\":2}\n",
+  "name": "00000002-b0bdd4cfe51e0d9e49d6ffda4fd52a6e5af297151fc36d9083f00909ea87ba6a.json"
+ },
+ "plan": {
+  "add": {
+   "study/README.org": {
+    "cid": "bafkreiechofz3hz7mxru3sjxtbhatsgyti6xmjomr6t5hqjspuepwpes6e",
+    "mode": 292,
+    "sha256": "823b8b9d9f3f65e34dc937984e09c8d89a3d7625cc8fa7d3c1327d08fb3c92f1",
+    "size": 69
+   },
+   "study/method.org": {
+    "cid": "bafkreigwyhgf7duynasjbbe664lldsrrb22mskodpbupflkgpfaoxukvxm",
+    "mode": 292,
+    "sha256": "d6c1cc5f8e98682490849ef716b1ca310eb4c929c37868f2ad467940ebd155bb",
+    "size": 57
+   }
+  },
+  "archive": "scope/archives",
+  "collections": [
+   "study"
+  ],
+  "destination": "scope/archives/study",
+  "inventory_sha256": "8286b878ce504dba7d6cc3483da60bcd4b3969b756df0fc33b599015b6a090f8",
+  "ledger": "scope/archive-integrity/ledger",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "links": [
+   {
+    "file": "study/README.org",
+    "from": "file:method.org",
+    "kind": "internal",
+    "offset": 38,
+    "to": "file:method.org"
+   },
+   {
+    "file": "study/method.org",
+    "from": "file:README.org",
+    "kind": "internal",
+    "offset": 27,
+    "to": "file:README.org"
+   }
+  ],
+  "number": 2,
+  "operation": "seal",
+  "originals": {},
+  "previous": "85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54",
+  "rumours": [],
+  "schema": 2,
+  "source": "scope/study"
+ },
+ "report": [
+  {
+   "archive": "scope/archives",
+   "changed": [],
+   "checkpoint_writable": [],
+   "events": 2,
+   "files": 4,
+   "head": "b0bdd4cfe51e0d9e49d6ffda4fd52a6e5af297151fc36d9083f00909ea87ba6a",
+   "hidden": [],
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeigexfvzxhigu3fxwldtf73x7f6iee44owbearb7vdtdlzrxdyebhy",
+   "root": "bafybeigexfvzxhigu3fxwldtf73x7f6iee44owbearb7vdtdlzrxdyebhy",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}

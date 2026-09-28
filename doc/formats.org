@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 4, in lockstep; the fixtures in =fixtures/= are its
+this document, version 5, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -174,7 +174,7 @@ an outermost =archives/=. =write-new DESTINATION= first stages new bytes in
 =_seal/= beside the archive, then plans the same way. A plan holds, in
 canonical JSON:
 
-- =schema=: 1; =operation=: =seal=;
+- =schema=: 2; =operation=: =seal=;
 - =source=, =destination=, =archive=, =ledger=: absolute paths, the archive
   and ledger folder resolved; the ledger folder is the archive's, or for
   an archive without one, =archive-integrity/ledger/= beside it;
@@ -183,7 +183,14 @@ canonical JSON:
 - =ledger_id=: the ledger's, else one supplied, else a random version 4
   UUID;
 - =add=: the item's files by path within the archive, each a schema 2
-  entry: =cid=, =mode= less write bits, =sha256=, =size=;
+  entry of its bytes once its links are rewritten: =cid=, =mode= less write
+  bits, =sha256=, =size=;
+- =links=: every path link in the item, sorted by file then offset: =file=,
+  =offset= in bytes, =from= and =to= the link's text before and after, and
+  =kind=, =cid=, =rumour= or =internal=;
+- =originals=: the SHA-256 of each file whose links change, as it is;
+- =rumours=: the rumour records to seal first, sorted by destination:
+  =destination= within the archive, =text= and =cid=;
 - =collections=: the directories in the item, itself included, whose
   =README.org= declares them, sorted;
 - =inventory_sha256=: the SHA-256 of the archive's inventory, in
@@ -192,25 +199,78 @@ canonical JSON:
 Planning refuses: =source= (missing, or already archived), =destination=
 (not in an archive, existing, or unsafe), =hidden= (a hidden file in the
 item, or a hidden destination), =link= (a symlink or second hard link in
-the item) and =differs= (enrolled evidence in the archive is missing or
-changed). Hidden or unenrolled files already elsewhere in the archive do
+the item), =differs= (enrolled evidence in the archive is missing or
+changed), and for links, =broken=, =unsealed=, =unresolved= and =loop=,
+below. Hidden or unenrolled files already elsewhere in the archive do
 not stop a seal; the check reports them.
+
+** Links
+
+Links are sought in the item's files named =*.org=, as Org parses them:
+links of type =file=, in any form, their search options kept; and named
+=*.md=, as markdown-mode finds them: inline links and images, and
+reference definitions, outside code, their fragments kept, their paths
+URL-decoded. A Markdown URL with a scheme is not a path.
+
+Each link's path is taken from the file where it was written, before the
+move, and resolves:
+
+- within the item: in a collection holding both files, the link stays as
+  written (=internal=); to another file of the item, it cites that file's
+  CID, taken once that file's own links are rewritten (=cid=); links among
+  an item's files that form a loop are refused (=loop=); anything else
+  within the item is refused (=unresolved=);
+- to a path in an archive: =ipfs://= and the CID of the sealed item holding
+  it, else of the collection holding it, else of the enrolled file itself,
+  then =/= and the path within it if it is not the whole (=cid=); a path
+  never sealed is refused (=unsealed=);
+- to anything else that exists, canon or another scope: a rumour record,
+  sealed first as an item of its own, whose CID the link cites (=rumour=);
+- to nothing: refused (=broken=).
+
+A link's text is replaced whole: in Org the raw link, as
+=ipfs://CID/PATH::SEARCH=; in Markdown the URL, as =ipfs://CID/PATH#FRAGMENT=.
+
+A rumour lies at =rumours/DATE-HASH.org= in the archive, HASH the first 12
+hex digits of the SHA-256 of its target's path from the scope, DATE the
+plan's; one rumour serves every link to its target. Its text is:
+
+#+begin_example
+,#+TITLE: Rumour of PATH
+,#+DATE: DATE
+
+On DATE, sealing =ITEM= found a link to =PATH=, outside the archive. It was then DESCRIPTION.
+#+end_example
+
+DESCRIPTION is =a directory=, or =a file of N bytes, SHA-256 =HEX== with
+=, titled "TITLE"= if the file has an Org =#+TITLE= or a Markdown =#=
+heading. A rumour already sealed, word for word, is cited, not sealed
+again; one differing at its destination is refused (=destination=).
+
+Planning an item that holds Org or Markdown files is poslib's, since Org
+interpretation is; pyposlib refuses to plan it (=interpretation=), and
+applies any plan.
 
 ** Application
 
 1. The plan's hash must be the one reviewed, else =plan=.
-2. Unless the item has moved already, the archive's inventory and the
-   item's entries must be as planned, else =plan=; then the item moves to
-   its destination in one rename.
-3. The item's entries at the destination must be as planned, else =plan=.
-4. The event, of schema 2, is written: =previous=, =ledger_id=, =add= and
-   =collections= from the plan, =item=, the destination's path within the
-   archive, and =root=, the archive's CID now. If the
-   ledger's head is already this event, nothing is written; if the head is
-   not the plan's =previous=, the plan is refused (=plan=).
-5. Write bits are removed from the item's files; the event, like every
-   ledger and checkpoint file, has mode =0444=.
-6. A checkpoint of the archive's head, of coverage =archive=, is written
+2. The events since the plan's =previous= must seal a prefix of its
+   rumours, then its item, in order, else =plan=; before any, the archive's
+   inventory must be as planned.
+3. Each rumour not yet sealed is published at its destination and sealed:
+   an event whose =item= is the rumour and whose =add= is its entry.
+4. Unless the item has moved already, each file in =originals= is
+   rewritten where it lies, its links replaced at their offsets, unless it
+   has been already; the item's entries must then be as planned, else
+   =plan=; then the item moves to its destination in one rename.
+5. The item's entries at the destination must be as planned, else =plan=.
+6. Unless sealed already, its event, of schema 2, is written: =previous=,
+   the ledger's head; =ledger_id=, =add= and =collections= from the plan;
+   =item=, the destination's path within the archive; and =root=, the
+   archive's CID now.
+7. Write bits are removed from the item's files and the rumours; events,
+   like every ledger and checkpoint file, have mode =0444=.
+8. A checkpoint of the archive's head, of coverage =archive=, is written
    beside the archive: in =archive-integrity/checkpoints/= if
    =archive-integrity/= exists there, else in the legacy folder.
 
@@ -222,9 +282,9 @@ uses =write-new DESTINATION --apply=: it plans, applies that plan at once
 under its own hash, and prints =plan=, =hash=, =event= and =root=. The
 plan and its refusals are those of the two-step form.
 
-Fixtures: =fixtures/ledger/seal-*=: a tree, a source and destination,
-and the plan, event and report after it, paths relative to the tree; or
-the refusal.
+Fixtures: =fixtures/ledger/seal-*=: a tree, a source and destination, a
+date for rumours, and the plan, the last event and the report after it,
+paths relative to the tree; or the refusal.
 
 * Fixture trees
 

@@ -49,10 +49,13 @@
   "inventory_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
   "ledger": "scope/archive-integrity/ledger",
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "links": [],
   "number": 1,
   "operation": "seal",
+  "originals": {},
   "previous": null,
-  "schema": 1,
+  "rumours": [],
+  "schema": 2,
   "source": "scope/trial"
  },
  "report": [

@@ -1,9 +1,10 @@
 {
  "kind": "seal",
  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
- "description": "A second item sealed into an archive whose ledger already records CIDs: its earlier entries still match, and the new event follows the first.",
- "source": "scope/second.md",
- "destination": "scope/archives/second.md",
+ "date": "2026-09-28",
+ "description": "What looks like a link inside code is not a link, in Markdown and in Org.",
+ "source": "scope/note.md",
+ "destination": "scope/archives/note.md",
  "tree": [
   {
    "path": "scope/archive-integrity/checkpoints/eb5b929f629c1b3fe738ef1847d49f9cb0a2cbb0990d65a8ab561e9d9be89f69.json",
@@ -30,27 +31,30 @@
    "mode": 292
   },
   {
-   "path": "scope/second.md",
-   "text": "second item",
-   "mode": 420
+   "path": "scope/note.md",
+   "text": "# Code\n\n```\n[not a link](gone.md)\n```\n\nAnd `[nor](gone.md)` inline.\n"
+  },
+  {
+   "path": "scope/code.org",
+   "text": "#+begin_src org\n[[file:gone.org][not a link]]\n#+end_src\n"
   }
  ],
  "event": {
-  "encoded": "{\"add\":{\"second.md\":{\"cid\":\"bafkreihaifhvwnqhxfisanhas7zo2b2fqhg6cj5vmz26xcg6lkc2e75ydy\",\"mode\":292,\"sha256\":\"e0414f5b3607b9512034e097f2ed074581cde127b56675eb88de5a85a27fb81e\",\"size\":11}},\"collections\":[],\"item\":\"second.md\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\",\"root\":\"bafybeibxwgt442bfjqkqyq6uxiru6k46ks2tsythwlqhqazuiddvnfkscq\",\"schema\":2}\n",
-  "name": "00000002-cebac68a5a5b39b48e597d438e6d6d2d2c2483807995710048405138bb3ff608.json"
+  "encoded": "{\"add\":{\"note.md\":{\"cid\":\"bafkreiekzoy62cvclpq3u6wxvgjiamdhyhtnys5bbcs54iywurtchh5mfi\",\"mode\":292,\"sha256\":\"8acbb1ed0aa25be1ba7ad7a992803067c1e6dc4ba108a5de2316a466239fac2a\",\"size\":68}},\"collections\":[],\"item\":\"note.md\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\",\"root\":\"bafybeicq3qjozw2zvgdv3ez5ozy4ex5eofk4nth2gds3pducyoyuyr2dua\",\"schema\":2}\n",
+  "name": "00000002-326ceebdf3d3930ae9c7676c70333c431215ed4df3b330ff281b3a56a3c1868d.json"
  },
  "plan": {
   "add": {
-   "second.md": {
-    "cid": "bafkreihaifhvwnqhxfisanhas7zo2b2fqhg6cj5vmz26xcg6lkc2e75ydy",
+   "note.md": {
+    "cid": "bafkreiekzoy62cvclpq3u6wxvgjiamdhyhtnys5bbcs54iywurtchh5mfi",
     "mode": 292,
-    "sha256": "e0414f5b3607b9512034e097f2ed074581cde127b56675eb88de5a85a27fb81e",
-    "size": 11
+    "sha256": "8acbb1ed0aa25be1ba7ad7a992803067c1e6dc4ba108a5de2316a466239fac2a",
+    "size": 68
    }
   },
   "archive": "scope/archives",
   "collections": [],
-  "destination": "scope/archives/second.md",
+  "destination": "scope/archives/note.md",
   "inventory_sha256": "8286b878ce504dba7d6cc3483da60bcd4b3969b756df0fc33b599015b6a090f8",
   "ledger": "scope/archive-integrity/ledger",
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
@@ -61,7 +65,7 @@
   "previous": "85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54",
   "rumours": [],
   "schema": 2,
-  "source": "scope/second.md"
+  "source": "scope/note.md"
  },
  "report": [
   {
@@ -70,12 +74,12 @@
    "checkpoint_writable": [],
    "events": 2,
    "files": 3,
-   "head": "cebac68a5a5b39b48e597d438e6d6d2d2c2483807995710048405138bb3ff608",
+   "head": "326ceebdf3d3930ae9c7676c70333c431215ed4df3b330ff281b3a56a3c1868d",
    "hidden": [],
    "missing": [],
    "new": [],
-   "recorded_root": "bafybeibxwgt442bfjqkqyq6uxiru6k46ks2tsythwlqhqazuiddvnfkscq",
-   "root": "bafybeibxwgt442bfjqkqyq6uxiru6k46ks2tsythwlqhqazuiddvnfkscq",
+   "recorded_root": "bafybeicq3qjozw2zvgdv3ez5ozy4ex5eofk4nth2gds3pducyoyuyr2dua",
+   "root": "bafybeicq3qjozw2zvgdv3ez5ozy4ex5eofk4nth2gds3pducyoyuyr2dua",
    "undeclared": [],
    "writable": []
   }

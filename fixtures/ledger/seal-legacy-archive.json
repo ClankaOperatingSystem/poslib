@@ -39,10 +39,13 @@
   "inventory_sha256": "316e14a4096e23b0222532290a58d8f9fc6f4b672f27bc3e8fac3708937e64a2",
   "ledger": "scope/archives/.archive-integrity",
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "links": [],
   "number": 2,
   "operation": "seal",
+  "originals": {},
   "previous": "fe95aadfa7a3685de7fbe9ab01f719bf742a1fdc48d0ba93c6a73a4dd869161f",
-  "schema": 1,
+  "rumours": [],
+  "schema": 2,
   "source": "scope/note.md"
  },
  "report": [
