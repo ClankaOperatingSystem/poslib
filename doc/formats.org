@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 7, in lockstep; the fixtures in =fixtures/= are its
+this document, version 8, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -215,7 +215,8 @@ canonical JSON:
   canonical JSON, as planned.
 
 Planning refuses: =source= (missing, or already archived), =destination=
-(not in an archive, existing, or unsafe), =hidden= (a hidden file in the
+(not in an archive, existing, or unsafe), =sealed= (the destination lies
+within an item or collection already sealed: a sealed item never grows), =hidden= (a hidden file in the
 item, or a hidden destination), =link= (a symlink or second hard link in
 the item), =differs= (enrolled evidence in the archive is missing or
 changed), and for links, =broken=, =unsealed=, =unresolved= and =loop=,
