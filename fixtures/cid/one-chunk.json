@@ -1,0 +1,14 @@
+{
+ "description": "Exactly one 1 MiB chunk is still one raw block.",
+ "tree": [
+  {
+   "path": "f",
+   "repeat": [
+    0,
+    1048576
+   ]
+  }
+ ],
+ "entry": "f",
+ "cid": "bafkreibq4fevl27rgurgnxbp7adh42aqiyd6ouflxhj3gzmcxcxzbh6lla"
+}

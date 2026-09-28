@@ -1,0 +1,17 @@
+{
+ "description": "A block of 262145 bytes is one IPFS shards; it is refused until sharding is implemented.",
+ "tree": [
+  {
+   "path": "t/f%04dxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "series": 1044,
+   "text": "z"
+  },
+  {
+   "path": "t/gyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+   "text": "z"
+  }
+ ],
+ "entry": "t",
+ "error": "sharding-unsupported",
+ "ipfs": "bafybeia7zuz632hsoksxggu3nremwwihzhnn6fdmuehy4zqbwhluojfgye"
+}

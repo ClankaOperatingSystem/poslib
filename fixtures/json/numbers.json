@@ -1,0 +1,12 @@
+{
+ "description": "Integers in plain decimal; null for none.",
+ "value": {
+  "add": {
+   "zero": 0,
+   "big": 9007199254740993,
+   "mode": 292
+  },
+  "previous": null
+ },
+ "encoded": "{\"add\":{\"big\":9007199254740993,\"mode\":292,\"zero\":0},\"previous\":null}\n"
+}

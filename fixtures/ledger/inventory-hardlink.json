@@ -1,0 +1,16 @@
+{
+ "kind": "inventory",
+ "description": "A file with a second hard link is refused.",
+ "tree": [
+  {
+   "path": "archives/a",
+   "text": "a"
+  },
+  {
+   "path": "archives/b",
+   "hardlink": "archives/a"
+  }
+ ],
+ "archive": "archives",
+ "error": "link"
+}

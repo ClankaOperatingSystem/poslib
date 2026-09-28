@@ -1,0 +1,16 @@
+{
+ "kind": "inventory",
+ "description": "A symlink in an archive is refused.",
+ "tree": [
+  {
+   "path": "archives/a",
+   "text": "a"
+  },
+  {
+   "path": "archives/l",
+   "symlink": "a"
+  }
+ ],
+ "archive": "archives",
+ "error": "link"
+}

@@ -1,0 +1,16 @@
+{
+ "description": "A directory block of exactly 262144 bytes is not sharded.",
+ "tree": [
+  {
+   "path": "t/f%04dxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "series": 1044,
+   "text": "z"
+  },
+  {
+   "path": "t/gyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+   "text": "z"
+  }
+ ],
+ "entry": "t",
+ "cid": "bafybeib4htzo5urethxn7whbpfsvdjhpvrsanokpai4uhdesreh3n5sxcu"
+}

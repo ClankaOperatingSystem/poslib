@@ -1,0 +1,11 @@
+{
+ "description": "An empty directory.",
+ "tree": [
+  {
+   "path": "t",
+   "directory": true
+  }
+ ],
+ "entry": "t",
+ "cid": "bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354"
+}

@@ -1,0 +1,11 @@
+{
+ "description": "A composed name is hashed as its NFC bytes.",
+ "tree": [
+  {
+   "path": "t/Äpfel",
+   "text": "3"
+  }
+ ],
+ "entry": "t",
+ "cid": "bafybeihzs3po2lwiatggwgrhfacxzaognui3a7udf5h5r52mkhsdeuyqpm"
+}

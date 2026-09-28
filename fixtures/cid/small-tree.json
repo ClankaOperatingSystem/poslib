@@ -1,0 +1,23 @@
+{
+ "description": "Entries in byte order, a subdirectory, and a hidden file left out.",
+ "tree": [
+  {
+   "path": "t/B",
+   "text": "a"
+  },
+  {
+   "path": "t/a",
+   "text": "b"
+  },
+  {
+   "path": "t/sub/c",
+   "text": "c"
+  },
+  {
+   "path": "t/.hidden",
+   "text": "x"
+  }
+ ],
+ "entry": "t",
+ "cid": "bafybeicoixhc5l34x6xelxadn5wpjho42domvdbpkzljc2pn6vwh4mrw4u"
+}

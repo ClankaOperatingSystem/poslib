@@ -1,0 +1,11 @@
+{
+ "description": "A small file is the raw block of its bytes.",
+ "tree": [
+  {
+   "path": "f",
+   "text": "hello\n"
+  }
+ ],
+ "entry": "f",
+ "cid": "bafkreicysg23kiwv34eg2d7qweipxwosdo2py4ldv42nbauguluen5v6am"
+}

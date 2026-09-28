@@ -1,0 +1,34 @@
+{
+ "description": "Names that sort differently as bytes and as text, and a chunked file nested.",
+ "tree": [
+  {
+   "path": "t/Zed/x",
+   "text": "1"
+  },
+  {
+   "path": "t/ärger/big",
+   "repeat": [
+    0,
+    1048577
+   ]
+  },
+  {
+   "path": "t/zebra",
+   "text": "2"
+  },
+  {
+   "path": "t/Äpfel",
+   "text": "3"
+  },
+  {
+   "path": "t/a-b",
+   "text": "4"
+  },
+  {
+   "path": "t/a_b",
+   "text": "5"
+  }
+ ],
+ "entry": "t",
+ "cid": "bafybeia2rqy4et7dyd7ygfk4ujt6yh6pvo552gjwbwlbpa3ve4sctd4anm"
+}

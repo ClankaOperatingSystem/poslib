@@ -5,6 +5,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos.el= :: sweep, lint, refile, dedupe.
 - =lisp/pos-capture.el= :: capture to an intray.
 - =lisp/pos-cid.el= :: IPFS CIDs of files and trees, computed locally.
+- =doc/formats.org= :: the formats shared with [[https://github.com/monkeypants/pyposlib][pyposlib]], in lockstep.
+- =fixtures/= :: their examples, run by both.
 - =test/= :: ERT tests.
 
 * Install

@@ -1,0 +1,15 @@
+{
+ "description": "With 256-byte chunks and 4 links a node, 18 chunks need three balanced levels.",
+ "params": {
+  "chunk": 256,
+  "links": 4
+ },
+ "tree": [
+  {
+   "path": "f",
+   "pattern": 4357
+  }
+ ],
+ "entry": "f",
+ "cid": "bafybeibelkboygzcmatovx3eerk3vraxcbewm6y2dunddy2tu4mzq6gtcm"
+}

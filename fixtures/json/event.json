@@ -1,0 +1,21 @@
+{
+ "description": "A first ledger event: keys in byte order, no spaces, a final newline.",
+ "value": {
+  "schema": 1,
+  "previous": null,
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "add": {
+   "b.md": {
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "size": 3,
+    "mode": 292
+   },
+   "a.md": {
+    "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "size": 0,
+    "mode": 365
+   }
+  }
+ },
+ "encoded": "{\"add\":{\"a.md\":{\"mode\":365,\"sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"size\":0},\"b.md\":{\"mode\":292,\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"size\":3}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n"
+}
