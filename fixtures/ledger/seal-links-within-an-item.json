@@ -1,0 +1,111 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "date": "2026-09-28",
+ "description": "Within an item that is not a collection, a link to another of its files cites that file's CID, taken after its own links are rewritten.",
+ "source": "scope/pair",
+ "destination": "scope/archives/pair",
+ "tree": [
+  {
+   "path": "scope/archive-integrity/checkpoints/eb5b929f629c1b3fe738ef1847d49f9cb0a2cbb0990d65a8ab561e9d9be89f69.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000001-85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54.json",
+   "text": "{\"add\":{\"trial/README.org\":{\"cid\":\"bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy\",\"mode\":292,\"sha256\":\"b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae\",\"size\":47},\"trial/sub/x.txt\":{\"cid\":\"bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4\",\"mode\":292,\"sha256\":\"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7\",\"size\":4}},\"collections\":[\"trial\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/trial/README.org",
+   "text": "#+TITLE: Trial\n#+COLLECTION: t\n\nWhat it holds.\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/trial/empty",
+   "directory": true
+  },
+  {
+   "path": "scope/archives/trial/sub/x.txt",
+   "text": "data",
+   "mode": 292
+  },
+  {
+   "path": "scope/pair/a.org",
+   "text": "#+TITLE: A\n\nSee [[file:b.md][b]].\n"
+  },
+  {
+   "path": "scope/pair/b.md",
+   "text": "# B\n\nSee [the data](../archives/trial/sub/x.txt).\n"
+  }
+ ],
+ "event": {
+  "encoded": "{\"add\":{\"pair/a.org\":{\"cid\":\"bafkreicyjcwy3wbzqyeqdfdwa7bodz33g344i67mmrubeoq3hbga4os2bi\",\"mode\":292,\"sha256\":\"5848ad8dd839860901947607c2e1e77b36f9c47bec6468123a1b384c0e3a5a0a\",\"size\":91},\"pair/b.md\":{\"cid\":\"bafkreifm4hnyr5nbibcchvhr57f3s4lua2lsdjvyjytvcydua3yblaxowi\",\"mode\":292,\"sha256\":\"ace1db88f5a1404423d4f1efcbb97174069721a6b84e2751607406f01582eeb2\",\"size\":99}},\"collections\":[],\"item\":\"pair\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\",\"root\":\"bafybeiaamc2n4muxtrqfcedk5ttabgajogkmp547qhzxyulymhwrkxuyyi\",\"schema\":2}\n",
+  "name": "00000002-9f90af7d77c7e582ce779cd87c8af3dbab5686f4fb9674e211d6495cc11b1ef6.json"
+ },
+ "plan": {
+  "add": {
+   "pair/a.org": {
+    "cid": "bafkreicyjcwy3wbzqyeqdfdwa7bodz33g344i67mmrubeoq3hbga4os2bi",
+    "mode": 292,
+    "sha256": "5848ad8dd839860901947607c2e1e77b36f9c47bec6468123a1b384c0e3a5a0a",
+    "size": 91
+   },
+   "pair/b.md": {
+    "cid": "bafkreifm4hnyr5nbibcchvhr57f3s4lua2lsdjvyjytvcydua3yblaxowi",
+    "mode": 292,
+    "sha256": "ace1db88f5a1404423d4f1efcbb97174069721a6b84e2751607406f01582eeb2",
+    "size": 99
+   }
+  },
+  "archive": "scope/archives",
+  "collections": [],
+  "destination": "scope/archives/pair",
+  "inventory_sha256": "8286b878ce504dba7d6cc3483da60bcd4b3969b756df0fc33b599015b6a090f8",
+  "ledger": "scope/archive-integrity/ledger",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "links": [
+   {
+    "file": "pair/a.org",
+    "from": "file:b.md",
+    "kind": "cid",
+    "offset": 18,
+    "to": "ipfs://bafkreifm4hnyr5nbibcchvhr57f3s4lua2lsdjvyjytvcydua3yblaxowi"
+   },
+   {
+    "file": "pair/b.md",
+    "from": "../archives/trial/sub/x.txt",
+    "kind": "cid",
+    "offset": 20,
+    "to": "ipfs://bafybeiegtiejvml3pj5hg5pqovxlmwwtggpuiwjbe56red26xhiz6jqsoi/sub/x.txt"
+   }
+  ],
+  "number": 2,
+  "operation": "seal",
+  "originals": {
+   "pair/a.org": "bfcfcda17ee602753948de668b5dd41a772b824b29d10676f30ec0b1d0b1f98c",
+   "pair/b.md": "b782f500685440b7abda1c3bbddf1a1969acc003d9b6dbddfebb29f112a5ee78"
+  },
+  "previous": "85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54",
+  "rumours": [],
+  "schema": 2,
+  "source": "scope/pair"
+ },
+ "report": [
+  {
+   "archive": "scope/archives",
+   "changed": [],
+   "checkpoint_writable": [],
+   "events": 2,
+   "files": 4,
+   "head": "9f90af7d77c7e582ce779cd87c8af3dbab5686f4fb9674e211d6495cc11b1ef6",
+   "hidden": [],
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeiaamc2n4muxtrqfcedk5ttabgajogkmp547qhzxyulymhwrkxuyyi",
+   "root": "bafybeiaamc2n4muxtrqfcedk5ttabgajogkmp547qhzxyulymhwrkxuyyi",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}

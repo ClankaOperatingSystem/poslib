@@ -4,7 +4,7 @@
 
 ;; Author: Chris Gough
 ;; Keywords: outlines, convenience
-;; Package-Requires: ((emacs "29.1"))
+;; Package-Requires: ((emacs "29.1") (markdown-mode "2.6"))
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; This program is free software: you can redistribute it and/or modify
