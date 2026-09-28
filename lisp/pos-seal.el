@@ -116,12 +116,13 @@ As (DESTINATION . TEXT), DESTINATION within the archive, dated DATE."
     (cons (format "rumours/%s-%s.org" date (substring (secure-hash 'sha256 path) 0 12))
           text)))
 
-(defun pos-seal--resolve (source rel archive files collections date)
+(defun pos-seal--resolve (source rel archive files collections date &optional written-at)
   "Resolve the links in FILES, the item at SOURCE sealed at REL in ARCHIVE.
 Return (ADD LINKS ORIGINALS RUMOURS): the entries of the rewritten files,
 every path link with its resolution, the SHA-256 of each file rewritten,
 and the rumours to seal first.  COLLECTIONS are the item's; DATE dates
-the rumours."
+the rumours.  A file's links are read from its directory, or for a file
+item, from WRITTEN-AT if given."
   (let* ((scope (file-name-directory archive))
          (base (file-name-as-directory source))
          (inside (lambda (abs) (or (equal abs source) (string-prefix-p base abs))))
@@ -140,7 +141,9 @@ the rumours."
                                         collections)
                         (pos-links-in-file file)))
           (pcase-let* ((`(,offset ,text ,path ,suffix) link)
-                       (abs (expand-file-name path (file-name-directory file))))
+                       (abs (expand-file-name path (if (and written-at (equal file source))
+                                                       written-at
+                                                     (file-name-directory file)))))
             (push
              (if (funcall inside abs)
                  (let ((target (funcall in-archive abs)))
@@ -216,10 +219,12 @@ the rumours."
 
 ;;;; Plans
 
-(defun pos-seal-plan (source destination &optional ledger-id date)
+(defun pos-seal-plan (source destination &optional ledger-id date as-destination)
   "Return the plan to seal SOURCE at DESTINATION, inside an archive.
 LEDGER-ID names a new ledger; by default one is made at random.  DATE,
-by default today's, dates any rumours the item's links need."
+by default today's, dates any rumours the item's links need.  With
+AS-DESTINATION, a file's links are read as written from DESTINATION, not
+from where it lies."
   (let* ((source (directory-file-name (file-truename (pos-ledger--checked source))))
          (destination (directory-file-name (expand-file-name destination)))
          (archive (pos-seal--outermost-archive destination)))
@@ -258,7 +263,9 @@ by default today's, dates any rumours the item's links need."
           (pcase-let ((`(,add ,links ,originals ,rumours)
                        (pos-seal--resolve source rel archive (pos-seal--files source rel)
                                           collections
-                                          (or date (format-time-string "%Y-%m-%d")))))
+                                          (or date (format-time-string "%Y-%m-%d"))
+                                          (and as-destination
+                                               (file-name-directory destination)))))
             ;; A rumour sealed already, word for word, is cited, not sealed again.
             (setq rumours
                   (vconcat
@@ -283,20 +290,23 @@ by default today's, dates any rumours the item's links need."
 
 (defun pos-seal-stage (bytes destination &optional ledger-id)
   "Stage BYTES, a new record, and return the plan to seal them at DESTINATION.
-They are staged beside the archive, in _seal/, so the move is one rename.
+They are staged beside the archive, in _seal/, so the move is one rename,
+with DESTINATION's extension, by which their links are found; the links
+are read as written from DESTINATION.
 LEDGER-ID names a new ledger, as for `pos-seal-plan'."
   (let* ((archive (or (pos-seal--outermost-archive (expand-file-name destination))
                       (pos-ledger--refuse 'destination "Destination is not in an archive: %s"
                                           destination)))
          (stage (expand-file-name "_seal" (file-name-directory archive))))
     (make-directory stage t)
-    (let ((file (make-temp-file (expand-file-name "new-" stage))))
+    (let ((file (make-temp-file (expand-file-name "new-" stage) nil
+                               (file-name-extension destination t))))
       (let ((coding-system-for-write 'binary))
         (with-temp-file file
           (set-buffer-multibyte nil)
           (insert bytes)))
       (set-file-modes file #o644)
-      (pos-seal-plan file destination ledger-id))))
+      (pos-seal-plan file destination ledger-id nil t))))
 
 ;;;; Application
 

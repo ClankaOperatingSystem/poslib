@@ -136,6 +136,19 @@ applied twice, it adds nothing."
       (should (equal "handover\n" (pos-ledger--read (expand-file-name "archives/journal/h.md"
                                                                         scope)))))))
 
+(ert-deftest pos-seal/a-new-record-s-links-are-resolved ()
+  "A new record's links are found, and read as written from its destination."
+  (pos-seal-test-with-scope
+    (pos-fixture-write (expand-file-name "notes.org" scope) "#+TITLE: Notes\n")
+    (let* ((plan (pos-seal-stage "See [notes](../../notes.org).\n"
+                                 (expand-file-name "archives/journal/h.md" scope)))
+           (links (alist-get 'links plan)))
+      (should (string-suffix-p ".md" (alist-get 'source plan)))
+      (should (equal 1 (length links)))
+      (should (equal "rumour" (alist-get 'kind (aref links 0))))
+      (should (string-match-p "Rumour of notes.org"
+                              (alist-get 'text (aref (alist-get 'rumours plan) 0)))))))
+
 (ert-deftest pos-seal/a-program-applies-its-own-plan-explicitly ()
   "write-new DESTINATION --apply seals at once; without it, only a plan."
   (pos-seal-test-with-scope
