@@ -4,6 +4,7 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 
 - =lisp/pos.el= :: sweep, lint, refile, dedupe.
 - =lisp/pos-capture.el= :: capture to an intray.
+- =lisp/pos-cid.el= :: IPFS CIDs of files and trees, computed locally.
 - =test/= :: ERT tests.
 
 * Install
@@ -27,6 +28,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 * Check
 
 - =make check=: byte-compile (warnings are errors), checkdoc, tests.
+- =make check-ipfs IPFS=path/to/ipfs=: the CID fixtures against kubo,
+  offline, with the unixfs-v1-2025 profile.
 
 * Licence
 
