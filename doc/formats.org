@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 9, in lockstep; the fixtures in =fixtures/= are its
+this document, version 10, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -256,8 +256,9 @@ A link's text is replaced whole: in Org the raw link, as
 =ipfs://CID/PATH::SEARCH=; in Markdown the URL, as =ipfs://CID/PATH#FRAGMENT=.
 
 A rumour lies at =rumours/DATE-HASH.org= in the archive, HASH the first 12
-hex digits of the SHA-256 of its target's path from the scope, DATE the
-plan's; one rumour serves every link to its target. Its text is:
+hex digits of the SHA-256 of its text, DATE the plan's; one rumour serves
+every link to its target from the item, and rumours of one target that
+differ in word differ in name. Its text is:
 
 #+begin_example
 ,#+TITLE: Rumour of PATH
