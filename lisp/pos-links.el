@@ -29,6 +29,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'org-element)
 (require 'markdown-mode)
 (require 'url-util)
@@ -93,8 +94,11 @@ Each is (OFFSET TEXT PATH SUFFIX), OFFSET in bytes."
     (when (or org md)
       (with-temp-buffer
         (insert (decode-coding-string (pos-ledger--read file) 'utf-8))
-        (let ((org-mode-hook nil) (markdown-mode-hook nil))
-          (if org (org-mode) (markdown-mode)))
+        ;; Read this file alone: no #+SETUPFILE, which may name another
+        ;; file or a URL, and no mode hooks.
+        (cl-letf (((symbol-function 'org-file-contents) (lambda (&rest _) "")))
+          (let ((org-mode-hook nil) (markdown-mode-hook nil))
+            (if org (org-mode) (markdown-mode))))
         (if org (pos-links--org) (pos-links--markdown))))))
 
 (defun pos-links-rewrite (bytes rewrites)
