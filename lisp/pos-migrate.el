@@ -109,9 +109,10 @@ folder beside its archive; other hidden entries are prefixed dot."
 
 ;;;; Collections
 
-(defun pos-migrate--candidates (stage exclude)
+(defun pos-migrate--candidates (stage exclude &optional include)
   "Return the directories in STAGE that are collections, less EXCLUDE.
-Receipts, capsules, trial and study runs, and retired scopes."
+Receipts, capsules, trial and study runs, and retired scopes, as their
+shape shows them, and the directories INCLUDE names."
   (let ((found
          (seq-filter
           (lambda (rel)
@@ -119,7 +120,8 @@ Receipts, capsules, trial and study runs, and retired scopes."
                   (parent (file-name-nondirectory
                            (directory-file-name (or (file-name-directory rel) "")))))
               (and (file-directory-p path) (not (member rel exclude))
-                   (or (and (file-regular-p (expand-file-name "manifest.json" path))
+                   (or (member rel include)
+                       (and (file-regular-p (expand-file-name "manifest.json" path))
                             (file-directory-p (expand-file-name "source" path)))
                        (pos-ledger-capsule-p path)
                        (equal parent "capsules")
@@ -244,10 +246,11 @@ A capsule's links are left as written."
     (unless (file-symlink-p file)
       (set-file-modes file (logior (file-modes file) #o200)))))
 
-(defun pos-migrate--prepare (archive stage exclude)
+(defun pos-migrate--prepare (archive stage exclude &optional include)
   "Build STAGE from ARCHIVE, and return what was done there.
-Junk is removed, hidden entries renamed and collections, less EXCLUDE,
-declared.  Return (DISCARD REMOVE RENAMES COLLECTIONS DECLARATIONS)."
+Junk is removed, hidden entries renamed and collections, less EXCLUDE
+and with INCLUDE, declared.  Return (DISCARD REMOVE RENAMES COLLECTIONS
+DECLARATIONS)."
   (pos-migrate--stage archive stage)
   (let* ((known (car (pos-ledger-history archive)))
          (actual (pos-ledger-inventory archive))
@@ -258,7 +261,7 @@ declared.  Return (DISCARD REMOVE RENAMES COLLECTIONS DECLARATIONS)."
         (delete-file (expand-file-name rel stage))
         (if (assoc rel known) (push rel remove) (push rel discard))))
     (let* ((renames (pos-migrate--hidden-renames stage))
-           (collections (pos-migrate--candidates stage exclude))
+           (collections (pos-migrate--candidates stage exclude include))
            ;; A capsule declares itself by its manifest, and is kept byte for byte.
            (declarations (mapcar (lambda (c) (pos-migrate--declare stage c))
                                  (seq-remove (lambda (c) (pos-ledger-capsule-p
@@ -267,10 +270,11 @@ declared.  Return (DISCARD REMOVE RENAMES COLLECTIONS DECLARATIONS)."
       (list (sort discard #'string<) (sort (append missing remove) #'string<)
             renames collections declarations))))
 
-(defun pos-migrate-plan (archive &optional root exclude date ledger-id)
+(defun pos-migrate-plan (archive &optional root exclude date ledger-id include)
   "Return the plan migrating ARCHIVE, its canon links repaired under ROOT.
-EXCLUDE names candidate collections that are not; DATE, by default
-today's, dates rumours; LEDGER-ID names a ledger that has none."
+EXCLUDE names candidate collections that are not, INCLUDE directories
+that are though their shape does not show it; DATE, by default today's,
+dates rumours; LEDGER-ID names a ledger that has none."
   (let* ((archive (file-truename (directory-file-name (expand-file-name archive))))
          (scope (file-name-directory archive))
          (root (file-truename (or root scope)))
@@ -285,7 +289,7 @@ today's, dates rumours; LEDGER-ID names a ledger that has none."
         (pos-ledger--refuse 'differs "Enrolled evidence changed in %s: %S" archive changed)))
     (pcase-let* ((inventory-sha (pos-ledger--sha (pos-ledger-json (pos-ledger-inventory archive))))
                  (`(,discard ,remove ,renames ,collections ,declarations)
-                  (pos-migrate--prepare archive stage exclude))
+                  (pos-migrate--prepare archive stage exclude include))
                  (files (seq-filter (lambda (rel)
                                       (and (string-match-p "\\.\\(org\\|md\\)\\'" rel)
                                            (file-regular-p (expand-file-name rel stage))))
@@ -440,7 +444,7 @@ today's, dates rumours; LEDGER-ID names a ledger that has none."
                                           collections ledger-id)))
           `((schema . 1) (operation . "migrate")
             (archive . ,archive) (stage . ,stage) (root . ,root) (date . ,date)
-            (exclude . ,(vconcat exclude))
+            (exclude . ,(vconcat exclude)) (include . ,(vconcat include))
             (inventory_sha256 . ,inventory-sha)
             (discard . ,(vconcat discard)) (remove . ,(vconcat remove))
             (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r)))) renames)))
@@ -529,7 +533,8 @@ LEDGER-ID names a ledger that has none."
   "Rebuild PLAN's archive in BUILD, as planned; refuse any difference."
   (let-alist plan
     (pcase-let ((`(,discard ,remove ,renames ,collections ,declarations)
-                 (pos-migrate--prepare .archive build (append .exclude nil))))
+                 (pos-migrate--prepare .archive build (append .exclude nil)
+                                       (append .include nil))))
       (unless (equal (pos-ledger-json
                       `((discard . ,(vconcat discard)) (remove . ,(vconcat remove))
                         (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r))))
@@ -631,20 +636,28 @@ interrupted.  Return (EVENT-FILE . ROOT)."
 
 (defun pos-migrate-batch ()
   "Run a migration command from `command-line-args-left'.
-plan ARCHIVE [ROOT [EXCLUDE...]] prints a plan; apply PLAN HASH applies
-it.  Exit 0 done, 2 refused."
+plan ARCHIVE [ROOT [DIR...]] prints a plan, each DIR excluding a
+candidate collection, or with a leading + including one; apply PLAN HASH
+applies it.  Exit 0 done, 2 refused."
   (condition-case err
       (pcase (prog1 command-line-args-left (setq command-line-args-left nil))
         (`("plan" ,archive . ,rest)
-         (princ (decode-coding-string
-                 (pos-ledger-json (pos-migrate-plan archive (car rest) (cdr rest)))
-                 'utf-8)))
+         ;; After ROOT, +DIR includes a collection and DIR excludes one.
+         (let ((names (cdr rest)))
+           (princ (decode-coding-string
+                   (pos-ledger-json
+                    (pos-migrate-plan
+                     archive (car rest)
+                     (seq-remove (lambda (n) (string-prefix-p "+" n)) names) nil nil
+                     (mapcar (lambda (n) (substring n 1))
+                             (seq-filter (lambda (n) (string-prefix-p "+" n)) names))))
+                   'utf-8))))
         (`("apply" ,plan-file ,hash)
          (let ((result (pos-migrate-apply (pos-ledger--parse (pos-ledger--read plan-file)) hash)))
            (princ (decode-coding-string
                    (pos-ledger-json `((event . ,(car result)) (root . ,(cdr result))))
                    'utf-8))))
-        (_ (message "Usage: plan ARCHIVE [ROOT [EXCLUDE...]] | apply PLAN HASH")
+        (_ (message "Usage: plan ARCHIVE [ROOT [DIR... +DIR...]] | apply PLAN HASH")
            (kill-emacs 2)))
     (pos-ledger-refused
      (message "%s: %s" (nth 1 err) (nth 2 err))
