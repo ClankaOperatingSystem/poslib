@@ -1,0 +1,69 @@
+{
+ "kind": "report",
+ "description": "Beside-archive ledger and checkpoints; the recorded root matches the archive's CID; a collection whose README still declares it.",
+ "archive": "archives",
+ "tree": [
+  {
+   "path": "archive-integrity/checkpoints/dcbb72c789f741b7a73f7ff12f9fe12fb75d4032a0f90d48f94bd7570041e84d.json",
+   "text": "{\"coverage\":\"tree\",\"heads\":[\"bdca10111fd87cedbe0d03209ad429e30ba86854d65ad8f6f28fa61e632e58c4\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "archive-integrity/ledger/00000001-519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2.json",
+   "text": "{\"add\":{\"a.md\":{\"mode\":292,\"sha256\":\"8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8\",\"size\":5},\"b.md\":{\"mode\":292,\"sha256\":\"f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753\",\"size\":4}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "archive-integrity/ledger/00000002-bdca10111fd87cedbe0d03209ad429e30ba86854d65ad8f6f28fa61e632e58c4.json",
+   "text": "{\"add\":{\"coll/README.org\":{\"cid\":\"bafkreiffsj3hqssbyibhey22sceyknio4e5yt3rbmasearcroeomwoa6x4\",\"mode\":292,\"sha256\":\"a59276784a41c20272635a908985350ee13b89ee216024404451711ccb381ebf\",\"size\":54},\"coll/x.md\":{\"cid\":\"bafkreibnoelefnzgwbcacyt4vh52ymxvzbjq7mmqhtcnwarfq4lzegsiqe\",\"mode\":292,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"size\":1},\"lost/README.org\":{\"cid\":\"bafkreia3z3pp2op5jeiptxnmhgxbzphyyoo5ocv4nzbvqiyha52ip3i4hm\",\"mode\":292,\"sha256\":\"1bcedefd39fd4910f9ddac39ae1cbcf8c39dd70abc6e43582307077487ed1c3b\",\"size\":33},\"lost/y.md\":{\"cid\":\"bafkreifb7tsdmocu76eiz72lrz4hlvqayjuchecbfkgppgzx2cyrcsfq7i\",\"mode\":292,\"sha256\":\"a1fce4363854ff888cff4b8e7875d600c2682390412a8cf79b37d0b11148b0fa\",\"size\":1}},\"collections\":[\"coll\",\"lost\"],\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2\",\"root\":\"bafybeicquoah5a2qst7pjnfpaj6zcer3kelbnnkj4p6ymedahr3y2qxghi\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": "archives/coll/README.org",
+   "text": "#+TITLE: A collection\n#+COLLECTION: t\n\nWhat it holds.\n",
+   "mode": 292
+  },
+  {
+   "path": "archives/coll/x.md",
+   "text": "x",
+   "mode": 292
+  },
+  {
+   "path": "archives/lost/README.org",
+   "text": "#+TITLE: Another\n#+COLLECTION: t\n",
+   "mode": 292
+  },
+  {
+   "path": "archives/lost/y.md",
+   "text": "y",
+   "mode": 292
+  }
+ ],
+ "report": [
+  {
+   "archive": "archives",
+   "changed": [],
+   "checkpoint_writable": [],
+   "events": 2,
+   "files": 6,
+   "head": "bdca10111fd87cedbe0d03209ad429e30ba86854d65ad8f6f28fa61e632e58c4",
+   "hidden": [],
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeicquoah5a2qst7pjnfpaj6zcer3kelbnnkj4p6ymedahr3y2qxghi",
+   "root": "bafybeicquoah5a2qst7pjnfpaj6zcer3kelbnnkj4p6ymedahr3y2qxghi",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}

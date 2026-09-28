@@ -91,7 +91,9 @@ the first event enrols them all under the ledger's identity."
 ;;;; Ledgers
 
 (ert-deftest pos-ledger/a-ledger-is-a-hash-chain-of-additions ()
-  "Valid ledgers give their entries and head; each fault is refused by kind."
+  "Valid ledgers give their entries, head, recorded root CID and collections;
+each fault is refused by kind.  A ledger lies beside its archive, in
+archive-integrity/ledger/, or in the legacy folder inside it, not both."
   (dolist (named (pos-fixtures "ledger"))
     (let-alist (cdr named)
       (when (equal .kind "history")
@@ -100,16 +102,20 @@ the first event enrols them all under the ledger's identity."
             (let ((archive (expand-file-name .archive dir)))
               (if .error
                   (pos-ledger-test-refused .error (pos-ledger-history archive))
-                (pcase-let ((`(,entries ,head ,events ,_) (pos-ledger-history archive)))
+                (pcase-let ((`(,entries ,head ,events ,_ ,root ,collections)
+                             (pos-ledger-history archive)))
                   (should (equal .head head))
                   (should (equal .events events))
+                  (should (equal .root (or root :null)))
+                  (should (equal .collections (vconcat collections)))
                   (pos-ledger-test-same .entries entries))))))))))
 
 ;;;; Checks
 
 (ert-deftest pos-ledger/a-check-reports-each-archive ()
   "Archives found outside hidden and underscored directories, checkpoints
-honoured, and every changed, missing, new and writable file named."
+honoured, and every changed, missing, new, writable and hidden file named;
+the archive's CID beside the one recorded; collections no longer declared."
   (dolist (named (pos-fixtures "ledger"))
     (let-alist (cdr named)
       (when (equal .kind "report")

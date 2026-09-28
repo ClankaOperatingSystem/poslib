@@ -36,12 +36,19 @@
 ;;; Code:
 
 (require 'subr-x)
+(require 'pos-cid)
+
+(defconst pos-ledger-integrity "archive-integrity"
+  "The folder beside an archive holding its ledger and checkpoints.")
 
 (defconst pos-ledger-directory ".archive-integrity"
-  "The ledger's directory at the top of an archive.")
+  "The legacy ledger's directory, at the top of an archive.")
 
 (defconst pos-ledger-anchors ".archive-integrity-anchors"
-  "The checkpoints' directory beside the root they cover.")
+  "The legacy checkpoints' directory, beside the root they cover.")
+
+(defconst pos-ledger-declaration "#+COLLECTION: t"
+  "The line in a collection's README.org that declares it one.")
 
 (define-error 'pos-ledger-refused "Archive integrity refused")
 
@@ -191,24 +198,51 @@
   "Return non-nil if VALUE is a lower-case hex SHA-256."
   (and (stringp value) (string-match-p "\\`[0-9a-f]\\{64\\}\\'" value)))
 
-(defun pos-ledger--entry-p (entry)
-  "Return non-nil if ENTRY is a well-formed ledger entry."
+(defun pos-ledger--cid-p (value)
+  "Return non-nil if VALUE has the form of a base32 CID."
+  (and (stringp value) (string-match-p "\\`b[a-z2-7]+\\'" value)))
+
+(defun pos-ledger--entry-p (entry schema)
+  "Return non-nil if ENTRY is a well-formed ledger entry of SCHEMA."
   (and (listp entry)
-       (equal (pos-ledger--keys entry) '("mode" "sha256" "size"))
+       (if (eql schema 2)
+           (and (equal (pos-ledger--keys entry) '("cid" "mode" "sha256" "size"))
+                (pos-ledger--cid-p (alist-get 'cid entry)))
+         (equal (pos-ledger--keys entry) '("mode" "sha256" "size")))
        (pos-ledger--hex-p (alist-get 'sha256 entry))
        (natnump (alist-get 'size entry))
        (natnump (alist-get 'mode entry))
        (zerop (logand (alist-get 'mode entry) #o222))))
 
+(defun pos-ledger-folder (archive)
+  "Return ARCHIVE's ledger folder: beside it, else the legacy one inside."
+  (let ((beside (expand-file-name (concat pos-ledger-integrity "/ledger")
+                                  (file-name-directory (directory-file-name archive))))
+        (inside (expand-file-name pos-ledger-directory archive)))
+    (cond ((and (or (file-exists-p beside) (file-symlink-p beside))
+                (or (file-exists-p inside) (file-symlink-p inside)))
+           (pos-ledger--refuse 'ledger "Two ledgers for one archive: %s" archive))
+          ((or (file-exists-p beside) (file-symlink-p beside)) beside)
+          (t inside))))
+
+(defun pos-ledger--collections-p (value)
+  "Return non-nil if VALUE is a sorted vector of distinct safe paths."
+  (and (vectorp value)
+       (seq-every-p (lambda (p) (and (stringp p) (pos-ledger--safe-p p))) value)
+       (equal (append value nil)
+              (seq-uniq (sort (append value nil) #'string<)))))
+
 (defun pos-ledger-history (archive)
-  "Return ARCHIVE's ledger as (ENTRIES HEAD EVENTS FILES).
+  "Return ARCHIVE's ledger as (ENTRIES HEAD EVENTS FILES ROOT COLLECTIONS).
 ENTRIES is an alist of path and entry; HEAD the last event's hash;
-EVENTS their number; FILES the event files.  No ledger is (nil nil 0 nil)."
-  (let ((folder (expand-file-name pos-ledger-directory archive))
-        entries previous files ledger-id (number 0))
+EVENTS their number; FILES the event files; ROOT the archive CID the
+last event recorded, if it records one; COLLECTIONS every path sealed
+as a collection, sorted.  No ledger is (nil nil 0 nil nil nil)."
+  (let ((folder (pos-ledger-folder archive))
+        entries previous files ledger-id (number 0) schema root collections)
     (cond
      ((not (or (file-exists-p folder) (file-symlink-p folder)))
-      (list nil nil 0 nil))
+      (list nil nil 0 nil nil nil))
      ((or (file-symlink-p folder) (not (file-directory-p folder)))
       (pos-ledger--refuse 'ledger "Invalid ledger: %s" folder))
      (t
@@ -224,11 +258,16 @@ EVENTS their number; FILES the event files.  No ledger is (nil nil 0 nil)."
           (let* ((event (pos-ledger--parse bytes))
                  (keys (and (listp event) (pos-ledger--keys event)))
                  (event-previous (alist-get 'previous event)))
-            (unless (and (member keys '(("add" "previous" "schema")
-                                        ("add" "ledger_id" "previous" "schema")))
-                         (eql 1 (alist-get 'schema event))
+            (unless (and (pcase (alist-get 'schema event)
+                           (1 (and (not (eql schema 2))
+                                   (member keys '(("add" "previous" "schema")
+                                                  ("add" "ledger_id" "previous"
+                                                   "schema")))))
+                           (2 (equal keys '("add" "collections" "ledger_id"
+                                            "previous" "root" "schema"))))
                          (equal event-previous (or previous :null)))
               (pos-ledger--refuse 'chain "Ledger chain failure: %s" path))
+            (setq schema (alist-get 'schema event))
             (let ((event-id (alist-get 'ledger_id event)))
               (cond
                (event-id
@@ -238,6 +277,12 @@ EVENTS their number; FILES the event files.  No ledger is (nil nil 0 nil)."
                 (setq ledger-id event-id))
                (ledger-id
                 (pos-ledger--refuse 'identity "Ledger identity removed"))))
+            (setq root (when (eql schema 2) (alist-get 'root event)))
+            (when (eql schema 2)
+              (unless (and (pos-ledger--cid-p root)
+                           (pos-ledger--collections-p (alist-get 'collections event)))
+                (pos-ledger--refuse 'entry "Invalid root or collections: %s" path))
+              (setq collections (append (alist-get 'collections event) collections)))
             (let ((add (alist-get 'add event)))
               (unless (listp add)
                 (pos-ledger--refuse 'entry "Invalid ledger additions"))
@@ -249,7 +294,7 @@ EVENTS their number; FILES the event files.  No ledger is (nil nil 0 nil)."
                             (assoc name entries))
                     (pos-ledger--refuse
                      'entry "Ledger cannot replace an earlier entry or index itself"))
-                  (unless (pos-ledger--entry-p (cdr pair))
+                  (unless (pos-ledger--entry-p (cdr pair) schema)
                     (pos-ledger--refuse 'entry "Invalid ledger entry"))
                   (push (cons name (cdr pair)) entries)))))
           (setq previous (pos-ledger--sha bytes))
@@ -257,7 +302,8 @@ EVENTS their number; FILES the event files.  No ledger is (nil nil 0 nil)."
       (unless files
         (pos-ledger--refuse 'empty "Empty ledger needs investigation: %s" folder))
       (list (sort entries (lambda (a b) (string< (car a) (car b))))
-            previous number (nreverse files))))))
+            previous number (nreverse files) root
+            (seq-uniq (sort collections #'string<)))))))
 
 (defun pos-ledger-event (add previous number &optional ledger-id)
   "Return (NAME . BYTES), event NUMBER enrolling ADD after PREVIOUS.
@@ -308,18 +354,19 @@ The system aliases /tmp and /var are allowed."
                 (walk path))))))
       (sort found #'pos-ledger--path<))))
 
-(defun pos-ledger--anchor-home (root)
-  "Return the checkpoint directory covering ROOT."
-  (let ((root (file-truename (pos-ledger--checked root))))
-    (expand-file-name pos-ledger-anchors
-                      (if (equal (file-name-nondirectory root) "archives")
-                          (file-name-directory root)
-                        root))))
+(defun pos-ledger--anchor-homes (root)
+  "Return the checkpoint directories covering ROOT, legacy and current."
+  (let* ((root (file-truename (pos-ledger--checked root)))
+         (base (if (equal (file-name-nondirectory root) "archives")
+                   (file-name-directory root)
+                 root)))
+    (list (expand-file-name pos-ledger-anchors base)
+          (expand-file-name (concat pos-ledger-integrity "/checkpoints") base))))
 
 (defun pos-ledger--checkpoint-files (root archives)
   "Return the checkpoint files covering ROOT and ARCHIVES."
   (let (files)
-    (dolist (folder (sort (delete-dups (mapcar #'pos-ledger--anchor-home
+    (dolist (folder (sort (delete-dups (mapcan #'pos-ledger--anchor-homes
                                                 (cons root archives)))
                           #'pos-ledger--path<))
       (cond
@@ -330,14 +377,23 @@ The system aliases /tmp and /var are allowed."
                                             (pos-ledger--entries folder)))))))
     files))
 
+(defun pos-ledger--ledger-file-p (file)
+  "Return non-nil if FILE is in a ledger folder, legacy or current."
+  (let* ((parent (directory-file-name (file-name-directory file)))
+         (grandparent (directory-file-name (file-name-directory parent))))
+    (or (equal (file-name-nondirectory parent) pos-ledger-directory)
+        (and (equal (file-name-nondirectory parent) "ledger")
+             (equal (file-name-nondirectory grandparent) pos-ledger-integrity)))))
+
 (defun pos-ledger--ledger-hashes (archive)
-  "Return the hashes of every ledger event file under ARCHIVE, nested ones too."
-  (mapcar (lambda (file) (pos-ledger--regular file) (pos-ledger--sha (pos-ledger--read file)))
-          (seq-filter (lambda (file)
-                        (equal (file-name-nondirectory (directory-file-name
-                                                        (file-name-directory file)))
-                               pos-ledger-directory))
-                      (directory-files-recursively archive "\\.json\\'" nil nil nil))))
+  "Return the hashes of ARCHIVE's ledger events and of every ledger within it."
+  (let ((folder (pos-ledger-folder archive)))
+    (mapcar (lambda (file) (pos-ledger--regular file) (pos-ledger--sha (pos-ledger--read file)))
+            (append
+             (when (file-directory-p folder)
+               (directory-files folder t "\\.json\\'"))
+             (seq-filter #'pos-ledger--ledger-file-p
+                         (directory-files-recursively archive "\\.json\\'" nil nil nil))))))
 
 (defun pos-ledger--check-anchors (root archives)
   "Refuse unless every head a checkpoint for ROOT names is in ARCHIVES."
@@ -371,6 +427,45 @@ The system aliases /tmp and /var are allowed."
 
 ;;;; Check
 
+(defun pos-ledger--cids (archive)
+  "Return the CIDs of ARCHIVE and everything in it, as `pos-cid-tree'.
+Nil if IPFS would shard a directory in it."
+  (condition-case nil
+      (pos-cid-tree archive)
+    (pos-cid-sharding-unsupported nil)))
+
+(defun pos-ledger--with-cids (known actual cids)
+  "Return ACTUAL with a CID from CIDS in each entry KNOWN records one for."
+  (mapcar (lambda (pair)
+            (let ((recorded (cdr (assoc (car pair) known))))
+              (if (and cids (assq 'cid recorded))
+                  (cons (car pair) (cons (cons 'cid (cdr (assoc (car pair) cids)))
+                                         (cdr pair)))
+                pair)))
+          actual))
+
+(defun pos-ledger--hidden (inventory)
+  "Return INVENTORY's hidden paths, other than those in legacy ledger folders."
+  (seq-filter (lambda (path)
+                (let ((parts (split-string path "/")))
+                  (and (seq-some (lambda (p) (string-prefix-p "." p)) parts)
+                       (not (seq-some (lambda (p) (member p (list pos-ledger-directory
+                                                                   pos-ledger-anchors)))
+                                      parts)))))
+              (mapcar #'car inventory)))
+
+(defun pos-ledger--declared-p (directory)
+  "Return non-nil if the README.org in DIRECTORY has the declaration line."
+  (let ((readme (expand-file-name "README.org" directory)))
+    (and (file-regular-p readme)
+         (member (encode-coding-string pos-ledger-declaration 'utf-8 t)
+                 (split-string (pos-ledger--read readme) "\n")))))
+
+(defun pos-ledger--undeclared (archive collections)
+  "Return those of COLLECTIONS in ARCHIVE that no longer declare themselves."
+  (seq-remove (lambda (path) (pos-ledger--declared-p (expand-file-name path archive)))
+              collections))
+
 (defun pos-ledger--differences (known actual)
   "Return the missing, changed and new paths between KNOWN and ACTUAL."
   (let (missing changed new)
@@ -389,8 +484,9 @@ The system aliases /tmp and /var are allowed."
 (defun pos-ledger-check (root)
   "Return the check report on every archive under ROOT.
 A list of alists, one an archive: archive, head, events, files,
-writable, checkpoint_writable, missing, changed and new; the lists
-as vectors, so the report is a JSON value."
+writable, checkpoint_writable, missing, changed, new, root,
+recorded_root, hidden and undeclared; the lists as vectors, so the
+report is a JSON value."
   (let* ((archives (pos-ledger-roots root))
          (_ (pos-ledger--check-anchors root archives))
          (writable-checkpoints
@@ -398,9 +494,12 @@ as vectors, so the report is a JSON value."
                       (pos-ledger--checkpoint-files root archives)))
          reports)
     (dolist (archive archives)
-      (pcase-let* ((`(,known ,head ,events ,files) (pos-ledger-history archive))
+      (pcase-let* ((`(,known ,head ,events ,files ,recorded ,collections)
+                    (pos-ledger-history archive))
                    (actual (pos-ledger-inventory archive))
-                   (`(,missing ,changed ,new) (pos-ledger--differences known actual))
+                   (cids (pos-ledger--cids archive))
+                   (`(,missing ,changed ,new)
+                    (pos-ledger--differences known (pos-ledger--with-cids known actual cids)))
                    (writable
                     (sort (append
                            (seq-filter (lambda (name)
@@ -412,6 +511,10 @@ as vectors, so the report is a JSON value."
                           #'string<)))
         (push `((archive . ,archive) (head . ,(or head :null)) (events . ,events)
                 (files . ,(length actual)) (writable . ,(vconcat writable))
+                (root . ,(or (cdr (assoc "." cids)) :null))
+                (recorded_root . ,(or recorded :null))
+                (hidden . ,(vconcat (pos-ledger--hidden actual)))
+                (undeclared . ,(vconcat (pos-ledger--undeclared archive collections)))
                 (checkpoint_writable . ,(vconcat (unless reports writable-checkpoints)))
                 (missing . ,(vconcat missing)) (changed . ,(vconcat changed))
                 (new . ,(vconcat new)))

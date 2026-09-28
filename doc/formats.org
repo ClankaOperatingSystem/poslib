@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 1, in lockstep; the fixtures in =fixtures/= are its
+this document, version 2, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -44,8 +44,20 @@ Fixtures: =fixtures/json/=, each a value and its encoding.
 
 * Archive ledgers
 
-Each outermost =archives/= directory holds its ledger in
-=archives/.archive-integrity/=.
+Each outermost =archives/= directory has a ledger. A scope keeps its
+ledger and checkpoints beside its archive, in =archive-integrity/=:
+
+- =archive-integrity/ledger/=: the ledger's events;
+- =archive-integrity/checkpoints/=: checkpoints of ledger heads.
+
+The archive itself then holds only archived material. When a scope
+retires into its parent's archive, its =archive-integrity/= goes with it,
+as ordinary content inside the parent's CID.
+
+The legacy layout, read until archives are migrated, keeps the ledger
+inside the archive, in =archives/.archive-integrity/=, and checkpoints in
+=.archive-integrity-anchors/= beside the root. An archive with a ledger in
+both places is refused (=ledger=).
 
 ** Discovery
 
@@ -56,9 +68,9 @@ directory met on the way is refused.
 
 ** Inventory
 
-Every file beneath the archive, except the ledger directory at its top,
-hidden and underscored files included. Each is a regular file with one
-link, else refused; a symlinked directory is refused. Each entry is:
+Every file beneath the archive, except a legacy ledger directory at its
+top, hidden and underscored files included. Each is a regular file with
+one link, else refused; a symlinked directory is refused. Each entry is:
 
 - =sha256=: lower-case hex of its bytes;
 - =size=: its length;
@@ -67,39 +79,57 @@ link, else refused; a symlinked directory is refused. Each entry is:
 
 Paths are relative, =/=-separated, with no empty, =.= or =..= component.
 
+** Collections
+
+A collection is a directory whose =README.org= contains the line
+=#+COLLECTION: t=: those exact bytes, between line feeds or the file's
+ends. The event that seals it lists its path.
+
 ** Events
 
 The ledger is a sequence of files named =NNNNNNNN-HASH.json=: an
 eight-digit number counting from 1 without gaps, and the SHA-256 of the
-file's bytes. Each holds one event in canonical JSON:
+file's bytes. Each holds one event in canonical JSON, of schema 1 or 2.
+Once an event has schema 2, every later one does.
+
+Schema 1:
 
 - =schema=: 1.
 - =previous=: the hash of the preceding event, =null= for the first.
 - =add=: the entries enrolled, by path. A path is enrolled once; no path
-  lies in the ledger directory; no mode has a write bit.
+  lies in a legacy ledger directory; no mode has a write bit.
 - =ledger_id=: a UUID in canonical lower-case form, the same in every event
   that has one. Once present it stays; events before the first that has
   one may lack it.
 
-The head is the hash of the last event. An empty ledger directory is
-refused. Refusals are named: =ledger= (the ledger is not a directory),
-=sequence= (name, number or hash), =chain= (keys, schema or =previous=),
-=identity=, =entry= and =empty=; =link= refuses a symlink or a second hard
-link anywhere.
+Schema 2 has the same, with =ledger_id= required, and:
+
+- each entry in =add= also has =cid=, the file's CID;
+- =root=: the archive's CID after this event;
+- =collections=: the paths of the collections this event seals, sorted,
+  each once; possibly none.
+
+The head is the hash of the last event; the recorded root is the last
+event's =root=, if it is of schema 2. An empty ledger directory is
+refused. Refusals are named: =ledger= (the ledger is not a directory, or
+there are two), =sequence= (name, number or hash), =chain= (keys, schema or
+=previous=), =identity=, =entry= (an entry, =root= or =collections=) and
+=empty=; =link= refuses a symlink or a second hard link anywhere.
 
 ** Checkpoints
 
 A checkpoint records ledger heads, to detect a vanished archive or a
-truncated ledger. It lives in =.archive-integrity-anchors/= beside the root
-it covers, named by the SHA-256 of its bytes, holding in canonical JSON:
+truncated ledger. It lives in =archive-integrity/checkpoints/= beside the
+root it covers, or in the legacy =.archive-integrity-anchors/=, named by
+the SHA-256 of its bytes, holding in canonical JSON:
 
 - =schema=: 1;
 - =heads=: sorted event hashes;
 - =coverage=: =archive= for a root named =archives=, else =tree=.
 
-Every head a checkpoint names must be the hash of some event file under
-the archives found, including ledgers carried inside retired archives;
-otherwise the check refuses (=anchor=).
+Every head a checkpoint names must be the hash of some event file of the
+archives found, or of a ledger within them, legacy or current, as
+retired scopes carry; otherwise the check refuses (=anchor=).
 
 ** Check
 
@@ -108,13 +138,24 @@ a report:
 
 - =archive=: its path; =head=, =events= and =files=;
 - =missing=, =changed=, =new=: enrolled paths absent, enrolled paths
-  whose entry differs, and unenrolled paths, each sorted;
-- =writable=: files and ledger events with any write bit, sorted;
+  whose entry differs, and unenrolled paths, each sorted. A schema 2
+  entry differs if the file's CID does, too;
+- =writable=: files and ledger events with any write bit, sorted, ledger
+  events by their path from the archive (=../archive-integrity/ledger/...=);
 - =checkpoint_writable=: writable checkpoint files, in the first report
-  only.
+  only;
+- =root=: the archive's CID now, or =null= if IPFS would shard a
+  directory in it; =recorded_root=: the recorded root, or =null=;
+- =hidden=: files with a hidden component, other than within legacy
+  ledger and checkpoint directories, sorted; sealing refuses them;
+- =undeclared=: collections the ledger lists whose =README.org= no longer
+  declares them, sorted.
+
+A root differing from the recorded root shows a change since sealing
+that no file shows, such as an added directory.
 
 Fixtures: =fixtures/ledger/=: inventories with their first event,
-ledgers valid and refused, and reports.
+ledgers valid and refused, in both layouts and schemas, and reports.
 
 * Fixture trees
 
