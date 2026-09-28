@@ -135,5 +135,25 @@ applied twice, it adds nothing."
       (should (equal "handover\n" (pos-ledger--read (expand-file-name "archives/journal/h.md"
                                                                         scope)))))))
 
+(ert-deftest pos-seal/a-program-applies-its-own-plan-explicitly ()
+  "write-new DESTINATION --apply seals at once; without it, only a plan."
+  (pos-seal-test-with-scope
+    (let* ((target (expand-file-name "archives/journal/h.md" scope))
+           (run (lambda (&rest args)
+                  (with-temp-buffer
+                    (insert "handover\n")
+                    (list (apply #'call-process-region (point-min) (point-max)
+                                 (expand-file-name invocation-name invocation-directory)
+                                 t t nil "-Q" "--batch" "-L"
+                                 (file-name-directory (expand-file-name (locate-library "pos-seal")))
+                                 "-l" "pos-seal" "-f" "pos-seal-batch" "write-new" target args)
+                          (buffer-string))))))
+      (let ((planned (funcall run)))
+        (ert-info ((cadr planned)) (should (equal 0 (car planned)))))
+      (should-not (file-exists-p target))
+      (let ((applied (funcall run "--apply")))
+        (ert-info ((cadr applied)) (should (equal 0 (car applied)))))
+      (should (equal "handover\n" (pos-ledger--read target))))))
+
 (provide 'pos-seal-test)
 ;;; pos-seal-test.el ends here

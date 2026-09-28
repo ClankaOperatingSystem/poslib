@@ -213,6 +213,11 @@ not stop a seal; the check reports them.
 Applying a plan again after an interruption finishes it, and after
 completion changes nothing.
 
+A program that writes records itself, with no one to review each plan,
+uses =write-new DESTINATION --apply=: it plans, applies that plan at once
+under its own hash, and prints =plan=, =hash=, =event= and =root=. The
+plan and its refusals are those of the two-step form.
+
 Fixtures: =fixtures/ledger/seal-*=: a tree, a source and destination,
 and the plan, event and report after it, paths relative to the tree; or
 the refusal.
