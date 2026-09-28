@@ -122,7 +122,9 @@ LEDGER-ID names a new ledger; by default one is made at random."
         (pos-ledger--refuse 'hidden "Hidden files are not sealed: %s" rel))
       (pcase-let* ((`(,known ,head ,events ,files) (pos-ledger-history archive))
                    (actual (pos-ledger-inventory archive))
-                   (`(,missing ,changed ,_) (pos-ledger--differences known actual)))
+                   (`(,missing ,changed ,_)
+                    (pos-ledger--differences
+                     known (pos-ledger--with-cids known actual (pos-ledger--cids archive)))))
         (when (or missing changed)
           (pos-ledger--refuse 'differs "Existing evidence differs in %s: %S %S"
                               archive missing changed))
