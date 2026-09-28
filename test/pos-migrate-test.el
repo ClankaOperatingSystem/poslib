@@ -164,5 +164,24 @@ links, broken or not, are left as written, so its own verification holds."
         (should (equal text (decode-coding-string (pos-ledger--read (expand-file-name "a.md" cap))
                                                   'utf-8)))))))
 
+(ert-deftest pos-migrate/a-link-to-a-withdrawn-record-cites-a-rumour ()
+  "A record withdrawn to canon, at the same relative path, is not a broken
+link: the link cites a rumour of the canon file."
+  (pos-migrate-test-with-legacy
+    (pos-migrate--writable archive)
+    (pos-fixture-write (expand-file-name "archives/notes.md" scope)
+                       "# Notes\n\nSee [progress](progress.md).\n")
+    (pos-fixture-write (expand-file-name "archives/progress.md" scope) "# Progress\n")
+    (delete-directory (expand-file-name pos-ledger-directory archive) t)
+    (pos-migrate-test-enrol archive)
+    (pos-migrate--writable archive)
+    (rename-file (expand-file-name "archives/progress.md" scope)
+                 (expand-file-name "progress.md" scope))
+    (let* ((plan (pos-migrate-plan archive scope nil "2026-09-28"))
+           (link (seq-find (lambda (l) (equal (alist-get 'file l) "notes.md"))
+                           (alist-get 'links plan))))
+      (should (equal "rumour" (alist-get 'kind link)))
+      (should (member "progress.md" (append (alist-get 'remove plan) nil))))))
+
 (provide 'pos-migrate-test)
 ;;; pos-migrate-test.el ends here
