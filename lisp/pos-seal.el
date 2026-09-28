@@ -163,7 +163,7 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
   (set-file-modes file (logand (pos-ledger--mode file) (lognot #o222)) 'nofollow))
 
 (defun pos-seal--write-new (file bytes)
-  "Publish BYTES at FILE, which must not exist, then protect it."
+  "Publish BYTES at FILE, which must not exist, read-only for all."
   (make-directory (file-name-directory file) t)
   (let ((temp (make-temp-file (expand-file-name "_integrity-" (file-name-directory file)))))
     (unwind-protect
@@ -172,7 +172,7 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
             (with-temp-file temp
               (set-buffer-multibyte nil)
               (insert bytes)))
-          (pos-seal--protect temp)
+          (set-file-modes temp #o444)
           (add-name-to-file temp file))
       (delete-file temp))))
 
