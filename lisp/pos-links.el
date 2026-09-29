@@ -212,11 +212,12 @@ Nothing outside the garden is read: only that it lies there is said."
   "Return how a link to TARGET, an absolute path outside the item, resolves.
 \(cid . LINK) for material archived in SCOPE or a scope within it,
 \(rumour . TARGET) for anything else that exists, a container's archive
-included; refuse a broken link.  Without SCOPE, any archive is cited."
+included, and (broken . TARGET) for nothing.  Without SCOPE, any archive
+is cited."
   (let ((archive (pos-links--archive-of target)))
     (cond
      ((not (or (file-exists-p target) (file-symlink-p target)))
-      (pos-ledger--refuse 'broken "Broken link: %s" target))
+      (cons 'broken target))
      ((and archive (or (null scope) (pos-links-within-scope-p archive scope)))
       (cons 'cid (pos-links--sealed target)))
      (t (cons 'rumour target)))))

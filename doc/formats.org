@@ -209,7 +209,7 @@ canonical JSON:
   bits, =sha256=, =size=;
 - =links=: every path link in the item, sorted by file then offset: =file=,
   =offset= in bytes, =from= and =to= the link's text before and after, and
-  =kind=, =cid=, =rumour= or =internal=;
+  =kind=, =cid=, =rumour=, =internal= or =broken=;
 - =originals=: the SHA-256 of each file whose links change, as it is;
 - =rumours=: the rumour records to seal first, sorted by destination:
   =destination= within the archive, =text= and =cid=;
@@ -223,9 +223,9 @@ Planning refuses: =source= (missing, or already archived), =destination=
 within an item or collection already sealed: a sealed item never grows), =hidden= (a hidden file in the
 item, or a hidden destination), =link= (a symlink or second hard link in
 the item), =differs= (enrolled evidence in the archive is missing or
-changed), and for links, =broken=, =unsealed=, =unresolved= and =loop=,
-below. Hidden or unenrolled files already elsewhere in the archive do
-not stop a seal; the check reports them.
+changed), and for links, =unsealed=, =unresolved= and =loop=, below.
+Hidden or unenrolled files already elsewhere in the archive do not stop a
+seal; the check reports them.
 
 ** Links
 
@@ -253,9 +253,12 @@ move, and resolves:
   archive, since a scope does not depend on its container: a rumour
   record, sealed first as an item of its own, whose CID the link cites
   (=rumour=);
-- to nothing: refused (=broken=).
+- to nothing: kept, annotated as broken (=broken=). The annotation
+  replaces the whole link: in Org the link's type becomes =broken:=, as
+  =[[broken:PATH][TEXT]]=; in Markdown the link becomes =TEXT [broken
+  link: PATH]=.
 
-A link's text is replaced whole: in Org the raw link, as
+A resolved link's target is replaced whole: in Org the raw link, as
 =ipfs://CID/PATH::SEARCH=; in Markdown the URL, as =ipfs://CID/PATH#FRAGMENT=.
 
 A rumour lies at =rumours/DATE-HASH.org= in the archive, HASH the first 12
