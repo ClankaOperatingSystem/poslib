@@ -486,15 +486,112 @@ Return (EVENT-FILE . ROOT)."
         (cons (car (last files))
               (alist-get 'root (pos-ledger--parse (pos-ledger--read (car (last files))))))))))
 
+;;;; Checkpoints and repair
+
+(defun pos-seal-findings-p (report)
+  "Return non-nil if REPORT, from `pos-ledger-check', has any finding."
+  (seq-some (lambda (archive)
+              (let-alist archive
+                (or (eq .head :null)
+                    (seq-some (lambda (list) (> (length list) 0))
+                              (list .changed .missing .new .writable
+                                    .checkpoint_writable .hidden .undeclared))
+                    (and (not (eq .recorded_root :null))
+                         (not (equal .recorded_root .root))))))
+            report))
+
+(defun pos-seal--anchor-home (root)
+  "Return where a new checkpoint for ROOT goes: beside it, else legacy."
+  (let* ((root (file-truename (pos-ledger--checked root)))
+         (base (if (equal (file-name-nondirectory root) "archives")
+                   (file-name-directory root)
+                 root)))
+    (if (file-directory-p (expand-file-name pos-ledger-integrity base))
+        (expand-file-name (concat pos-ledger-integrity "/checkpoints") base)
+      (expand-file-name pos-ledger-anchors base))))
+
+(defun pos-seal-checkpoint (root)
+  "Record the ledger heads of every archive under ROOT; return where.
+Refused unless the check is clean of changed, missing and new files and
+of write bits.  The checkpoint covers an archive if ROOT is one, else
+the tree; one with the same bytes already recorded is kept."
+  (let ((report (pos-ledger-check root)))
+    (when (seq-some (lambda (archive)
+                      (let-alist archive
+                        (seq-some (lambda (list) (> (length list) 0))
+                                  (list .changed .missing .new .writable
+                                        .checkpoint_writable))))
+                    report)
+      (pos-ledger--refuse 'unclean "Enrol new records and restore permissions \
+before checkpointing: %s" root))
+    (let* ((heads (sort (seq-uniq (seq-remove (lambda (h) (eq h :null))
+                                              (mapcar (lambda (a) (alist-get 'head a))
+                                                      report)))
+                        #'string<))
+           (home (pos-seal--anchor-home root)))
+      (when heads
+        (let* ((coverage (if (equal (file-name-nondirectory
+                                     (directory-file-name (file-truename root)))
+                                    "archives")
+                             "archive" "tree"))
+               (bytes (pos-ledger-json `((schema . 1) (heads . ,(vconcat heads))
+                                         (coverage . ,coverage))))
+               (file (expand-file-name (concat (pos-ledger--sha bytes) ".json") home)))
+          (cond ((not (file-exists-p file)) (pos-seal--write-new file bytes))
+                ((not (equal (pos-ledger--read file) bytes))
+                 (pos-ledger--refuse 'checkpoint "Checkpoint conflict: %s" file)))))
+      home)))
+
+(defun pos-seal-repair (root)
+  "Remove write bits from the verified evidence under ROOT.
+Enrolled files, ledger events and checkpoints; never enrols.  Refused if
+any enrolled file changed or is missing.  Return an alist: repaired, the
+files changed, and unregistered, the files the ledgers do not know."
+  (let ((report (pos-ledger-check root)) (count 0))
+    (when (seq-some (lambda (a) (or (> (length (alist-get 'changed a)) 0)
+                                    (> (length (alist-get 'missing a)) 0)))
+                    report)
+      (pos-ledger--refuse 'differs "Evidence changed or is missing; repair refused: %s"
+                          root))
+    (let ((protect (lambda (file)
+                     (when (pos-ledger--writable-p file)
+                       (set-file-modes file (logand (pos-ledger--mode file) (lognot #o222))
+                                       'nofollow)
+                       (setq count (1+ count))))))
+      (dolist (a report)
+        (let ((archive (alist-get 'archive a)))
+          (pcase-let ((`(,known ,_ ,_ ,files) (pos-ledger-history archive)))
+            (dolist (pair known) (funcall protect (expand-file-name (car pair) archive)))
+            (mapc protect files))))
+      (mapc protect (pos-ledger--checkpoint-files root (pos-ledger-roots root))))
+    `((repaired . ,count)
+      (unregistered . ,(apply #'+ (mapcar (lambda (a) (length (alist-get 'new a))) report))))))
+
 ;;;; Command line
 
+(defconst pos-seal-usage
+  "Usage: COMMAND ...  (help prints this; Emacs itself takes --help)
+
+  seal SOURCE DESTINATION [--apply]
+      print the plan to seal SOURCE at DESTINATION, in an archive
+  write-new DESTINATION [--apply]
+      print the plan to seal a new record, read from standard input
+  apply PLAN HASH
+      apply a reviewed plan, named by its hash
+  check ROOT
+      report every archive under ROOT, as JSON
+  checkpoint ROOT
+      record the ledger heads under ROOT, once the check is clean
+  repair ROOT
+      remove write bits from verified evidence; never enrols
+
+--apply applies a program's own plan at once and prints both.
+Exit 0 done or clean, 1 findings, 2 refused.
+"
+  "The command line's usage.")
+
 (defun pos-seal-batch ()
-  "Run a seal command from `command-line-args-left'.
-seal SOURCE DESTINATION and write-new DESTINATION, the record on
-standard input, print a plan; apply PLAN HASH applies it.  A program
-sealing or writing records itself adds --apply to seal or write-new,
-which applies its own plan at once and prints it with the result.  Exit 0
-done, 2 refused."
+  "Run a command from `command-line-args-left', as `pos-seal-usage' says."
   (condition-case err
       (pcase (prog1 command-line-args-left (setq command-line-args-left nil))
         (`("seal" ,source ,destination . ,rest)
@@ -535,7 +632,16 @@ done, 2 refused."
            (princ (decode-coding-string
                    (pos-ledger-json `((event . ,(car result)) (root . ,(cdr result))))
                    'utf-8))))
-        (_ (message "Usage: seal SOURCE DESTINATION [--apply] | write-new DESTINATION [--apply] | apply PLAN HASH")
+        (`("check" ,root)
+         (let ((report (vconcat (pos-ledger-check root))))
+           (princ (decode-coding-string (pos-ledger-json report) 'utf-8))
+           (kill-emacs (if (pos-seal-findings-p report) 1 0))))
+        (`("checkpoint" ,root)
+         (princ (pos-ledger-json `((checkpointed . ,(pos-seal-checkpoint root))))))
+        (`("repair" ,root)
+         (princ (pos-ledger-json (pos-seal-repair root))))
+        (`(,(or "help" "-h" "--help")) (princ pos-seal-usage))
+        (_ (message "%s" pos-seal-usage)
            (kill-emacs 2)))
     (pos-ledger-refused
      (message "%s: %s" (nth 1 err) (nth 2 err))
