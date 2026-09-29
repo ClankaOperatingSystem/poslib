@@ -3,7 +3,7 @@
 
 EMACS ?= emacs
 # Dependencies, from Package-Requires, installed from NonGNU ELPA into _deps/.
-PKGS   = --eval '(progn (require (quote package)) (setq package-user-dir (expand-file-name "_deps") package-archives (quote (("nongnu" . "https://elpa.nongnu.org/nongnu/")))) (package-initialize))'
+PKGS   = --eval '(progn (require (quote package)) (setq package-user-dir (expand-file-name "_deps") package-gnupghome-dir (expand-file-name "_deps/gnupg") package-archives (quote (("nongnu" . "https://elpa.nongnu.org/nongnu/")))) (package-initialize))'
 BATCH  = $(EMACS) -Q --batch $(PKGS) -L lisp
 SRC    = lisp/pos.el lisp/pos-capture.el lisp/pos-cid.el lisp/pos-ledger.el lisp/pos-links.el lisp/pos-seal.el lisp/pos-index.el lisp/pos-migrate.el
 IPFS  ?= ipfs
