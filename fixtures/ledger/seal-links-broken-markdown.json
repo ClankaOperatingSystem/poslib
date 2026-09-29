@@ -2,9 +2,9 @@
  "kind": "seal",
  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
  "date": "2026-09-28",
- "description": "A link to nothing is kept, annotated as broken: in Org its type becomes broken:, and the annotation replaces the whole link.",
- "source": "scope/note.org",
- "destination": "scope/archives/note.org",
+ "description": "A link to nothing is kept, annotated as broken: in Markdown the link becomes its text and a bracketed note.",
+ "source": "scope/note.md",
+ "destination": "scope/archives/note.md",
  "tree": [
   {
    "path": "scope/archive-integrity/checkpoints/eb5b929f629c1b3fe738ef1847d49f9cb0a2cbb0990d65a8ab561e9d9be89f69.json",
@@ -31,47 +31,47 @@
    "mode": 292
   },
   {
-   "path": "scope/note.org",
-   "text": "See [[file:gone.org][what was]].\n"
+   "path": "scope/note.md",
+   "text": "See [what was](gone.md).\n"
   }
  ],
  "event": {
-  "encoded": "{\"add\":{\"note.org\":{\"cid\":\"bafkreibeaj46gcwrpsg665lkdv2gcy6z6uvtw5ivxahsvrw2xvycvz2jwy\",\"mode\":292,\"sha256\":\"240279e30ad17c8def756a1d746163d9f52b3b7515b80f2ac6dabd702ae749b6\",\"size\":35}},\"collections\":[],\"item\":\"note.org\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\",\"root\":\"bafybeihoczd4zem6ousbr75fugdrj6eg7uzho6axvvbzyx45yyeu6pxwjm\",\"schema\":2}\n",
-  "name": "00000002-703e6b7e0693736f98eb2f2da693cf494c421ad390950a7acdeae58114c9e93f.json"
+  "encoded": "{\"add\":{\"note.md\":{\"cid\":\"bafkreif54ozadyirnxhg4s74aglmwykiriwc3kl3hmxpbp7mcvolzmr6zu\",\"mode\":292,\"sha256\":\"bde3b201e1116dce6e4bfc0196cb61488a2c2da97b3b2ef0bfec155cbcb23ecd\",\"size\":37}},\"collections\":[],\"item\":\"note.md\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\",\"root\":\"bafybeigbtmkwnip4jh56xuqlihsvvqqtvis7gft3mxvywkt75bty7b6ify\",\"schema\":2}\n",
+  "name": "00000002-2ae58cf866d1f88e6ee873b36edcbfcb1a9f80df486a2cacc8ba5f8d8bc395fa.json"
  },
  "plan": {
   "add": {
-   "note.org": {
-    "cid": "bafkreibeaj46gcwrpsg665lkdv2gcy6z6uvtw5ivxahsvrw2xvycvz2jwy",
+   "note.md": {
+    "cid": "bafkreif54ozadyirnxhg4s74aglmwykiriwc3kl3hmxpbp7mcvolzmr6zu",
     "mode": 292,
-    "sha256": "240279e30ad17c8def756a1d746163d9f52b3b7515b80f2ac6dabd702ae749b6",
-    "size": 35
+    "sha256": "bde3b201e1116dce6e4bfc0196cb61488a2c2da97b3b2ef0bfec155cbcb23ecd",
+    "size": 37
    }
   },
   "archive": "scope/archives",
   "collections": [],
-  "destination": "scope/archives/note.org",
+  "destination": "scope/archives/note.md",
   "inventory_sha256": "8286b878ce504dba7d6cc3483da60bcd4b3969b756df0fc33b599015b6a090f8",
   "ledger": "scope/archive-integrity/ledger",
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
   "links": [
    {
-    "file": "note.org",
-    "from": "file:gone.org",
+    "file": "note.md",
+    "from": "[what was](gone.md)",
     "kind": "broken",
-    "offset": 6,
-    "to": "broken:gone.org"
+    "offset": 4,
+    "to": "what was [broken link: gone.md]"
    }
   ],
   "number": 2,
   "operation": "seal",
   "originals": {
-   "note.org": "24c2a415ea2a6d7a55d2b39e2b5d8e59998a40978273c96dac9fa79f9d417d3a"
+   "note.md": "390a1daa37ae65766dbb0e4ee183a61fa36396baea2bb680795ae20807bf1e9f"
   },
   "previous": "85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54",
   "rumours": [],
   "schema": 2,
-  "source": "scope/note.org"
+  "source": "scope/note.md"
  },
  "report": [
   {
@@ -80,12 +80,12 @@
    "checkpoint_writable": [],
    "events": 2,
    "files": 3,
-   "head": "703e6b7e0693736f98eb2f2da693cf494c421ad390950a7acdeae58114c9e93f",
+   "head": "2ae58cf866d1f88e6ee873b36edcbfcb1a9f80df486a2cacc8ba5f8d8bc395fa",
    "hidden": [],
    "missing": [],
    "new": [],
-   "recorded_root": "bafybeihoczd4zem6ousbr75fugdrj6eg7uzho6axvvbzyx45yyeu6pxwjm",
-   "root": "bafybeihoczd4zem6ousbr75fugdrj6eg7uzho6axvvbzyx45yyeu6pxwjm",
+   "recorded_root": "bafybeigbtmkwnip4jh56xuqlihsvvqqtvis7gft3mxvywkt75bty7b6ify",
+   "root": "bafybeigbtmkwnip4jh56xuqlihsvvqqtvis7gft3mxvywkt75bty7b6ify",
    "undeclared": [],
    "writable": []
   }

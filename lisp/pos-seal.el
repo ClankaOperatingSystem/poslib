@@ -147,7 +147,7 @@ item, from WRITTEN-AT if given."
                                                   (concat base (substring c (1+ (length rel))))))))
                                         collections)
                         (pos-links-in-file file)))
-          (pcase-let* ((`(,offset ,text ,path ,suffix) link)
+          (pcase-let* ((`(,offset ,text ,path ,suffix ,whole-offset ,whole) link)
                        (abs (expand-file-name path (if (and written-at (equal file source))
                                                        written-at
                                                      (file-name-directory file)))))
@@ -163,6 +163,11 @@ item, from WRITTEN-AT if given."
                     (t (pos-ledger--refuse 'unresolved "Link within the item to %s" abs))))
                (pcase (pos-links-resolve abs scope)
                  (`(cid . ,to) (list offset text "cid" (concat to suffix)))
+                 ;; A link to nothing is kept, annotated as broken: the
+                 ;; annotation replaces the whole link.
+                 (`(broken . ,_)
+                  (list whole-offset whole "broken"
+                        (pos-links-annotate file link "broken")))
                  (`(rumour . ,target)
                   (let ((rumour (pos-seal--rumour target scope rel date)))
                     (unless (assoc (car rumour) rumours) (push rumour rumours))
