@@ -153,6 +153,19 @@ Every head a checkpoint names must be the hash of some event file of the
 archives found, or of a ledger within them, legacy or current, as
 retired scopes carry; otherwise the check refuses (=anchor=).
 
+Checkpointing a root records the distinct heads of the archives found
+under it, once the check reports nothing changed, missing, new or
+writable (else =unclean=). A new checkpoint goes to
+=archive-integrity/checkpoints/= beside the root if =archive-integrity/=
+exists there, else to the legacy folder. A checkpoint of the same bytes
+already there is kept; a different one under the same name refuses
+(=checkpoint=).
+
+Repairing a root removes write bits from the enrolled files, ledger
+events and checkpoints under it, and from nothing else; it enrols
+nothing, and refuses if any enrolled file changed or is missing
+(=differs=).
+
 ** Check
 
 For each archive found, in path order compared component by component,

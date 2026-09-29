@@ -258,5 +258,56 @@ pointed; the target is not read."
         (should (string-match-p "outside the garden, and was not read"
                                 (alist-get 'text (aref (alist-get 'rumours plan) 0))))))))
 
+;;;; Checkpoints and repair
+
+(defun pos-seal-test-sealed (scope)
+  "Seal SCOPE's trial into its archive; return the archive."
+  (let ((plan (pos-seal-test-plan scope)))
+    (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))
+    (file-truename (expand-file-name "archives" scope))))
+
+(ert-deftest pos-seal/a-checkpoint-waits-for-a-clean-check ()
+  "An unregistered file refuses a checkpoint; once it is gone, the tree's
+heads are recorded beside the scope, and recording them again is no
+conflict."
+  (pos-seal-test-with-scope
+    (let ((archive (pos-seal-test-sealed scope)))
+      (pos-fixture-write (expand-file-name "stray.txt" archive) "stray" #o444)
+      (should-error (pos-seal-checkpoint scope) :type 'pos-ledger-refused)
+      (delete-file (expand-file-name "stray.txt" archive))
+      (let* ((home (pos-seal-checkpoint scope))
+             (head (nth 1 (pos-ledger-history archive)))
+             (bytes (pos-ledger-json `((schema . 1) (heads . [,head]) (coverage . "tree"))))
+             (file (expand-file-name (concat (pos-ledger--sha bytes) ".json") home)))
+        (should (equal home (expand-file-name "archive-integrity/checkpoints"
+                                              (file-truename scope))))
+        (should (equal bytes (pos-ledger--read file)))
+        (should (equal home (pos-seal-checkpoint scope)))
+        (should-not (pos-seal-findings-p (pos-ledger-check scope)))))))
+
+(ert-deftest pos-seal/an-archive-s-checkpoint-covers-the-archive ()
+  "Checkpointing an archive records its head with archive coverage, the
+same bytes sealing records, so no second file appears."
+  (pos-seal-test-with-scope
+    (let* ((archive (pos-seal-test-sealed scope))
+           (home (expand-file-name "archive-integrity/checkpoints" (file-truename scope)))
+           (before (directory-files home nil "\\.json\\'")))
+      (should (equal home (pos-seal-checkpoint archive)))
+      (should (equal before (directory-files home nil "\\.json\\'"))))))
+
+(ert-deftest pos-seal/repair-protects-only-verified-evidence ()
+  "Repair removes a write bit restored to a sealed file, and refuses once
+a sealed file's bytes have changed."
+  (pos-seal-test-with-scope
+    (let* ((archive (pos-seal-test-sealed scope))
+           (file (expand-file-name "trial/result.md" archive)))
+      (set-file-modes file #o644)
+      (should (equal '((repaired . 1) (unregistered . 0)) (pos-seal-repair scope)))
+      (should (zerop (logand (file-modes file) #o222)))
+      (set-file-modes file #o644)
+      (pos-fixture-write file "changed" #o644)
+      (should-error (pos-seal-repair scope) :type 'pos-ledger-refused)
+      (should (/= 0 (logand (file-modes file) #o222))))))
+
 (provide 'pos-seal-test)
 ;;; pos-seal-test.el ends here
