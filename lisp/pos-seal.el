@@ -299,7 +299,8 @@ from where it lies."
   "Stage BYTES, a new record, and return the plan to seal them at DESTINATION.
 They are staged beside the archive, in _seal/, so the move is one rename,
 with DESTINATION's extension, by which their links are found; the links
-are read as written from DESTINATION.
+are read as written from DESTINATION.  If planning fails, nothing is
+left staged.
 LEDGER-ID names a new ledger, as for `pos-seal-plan'."
   (let* ((archive (or (pos-seal--outermost-archive (expand-file-name destination))
                       (pos-ledger--refuse 'destination "Destination is not in an archive: %s"
@@ -313,7 +314,12 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
           (set-buffer-multibyte nil)
           (insert bytes)))
       (set-file-modes file #o644)
-      (pos-seal-plan file destination ledger-id nil t))))
+      (condition-case err
+          (pos-seal-plan file destination ledger-id nil t)
+        (error
+         (delete-file file)
+         (when (directory-empty-p stage) (delete-directory stage))
+         (signal (car err) (cdr err)))))))
 
 ;;;; Application
 

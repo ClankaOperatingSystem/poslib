@@ -157,10 +157,13 @@
   (sort (directory-files dir nil directory-files-no-dot-files-regexp) #'string<))
 
 (defun pos-ledger-inventory (archive)
-  "Return ARCHIVE's inventory: an alist of relative path and entry."
+  "Return ARCHIVE's inventory: an alist of relative path and entry.
+An archive not yet made holds nothing."
   (let (result)
     (named-let walk ((dir archive) (rel nil))
-      (dolist (name (pos-ledger--entries dir))
+      (dolist (name (unless (and (null rel) (not (file-exists-p dir))
+                                 (not (file-symlink-p dir)))
+                      (pos-ledger--entries dir)))
         (let ((path (expand-file-name name dir))
               (child (if rel (concat rel "/" name) name)))
           (cond
@@ -506,9 +509,9 @@ The system aliases /tmp and /var are allowed."
 
 (defun pos-ledger--cids (archive)
   "Return the CIDs of ARCHIVE and everything in it, as `pos-cid-tree'.
-Nil if IPFS would shard a directory in it."
+Nil if IPFS would shard a directory in it, or ARCHIVE is not yet made."
   (condition-case nil
-      (pos-cid-tree archive)
+      (and (file-exists-p archive) (pos-cid-tree archive))
     (pos-cid-sharding-unsupported nil)))
 
 (defun pos-ledger--with-cids (known actual cids)
