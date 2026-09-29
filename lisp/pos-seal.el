@@ -501,7 +501,7 @@ Return (EVENT-FILE . ROOT)."
             report))
 
 (defun pos-seal--anchor-home (root)
-  "Return where a new checkpoint for ROOT goes: beside it, else legacy."
+  "Return the directory for ROOT's new checkpoints: beside it, else legacy."
   (let* ((root (file-truename (pos-ledger--checked root)))
          (base (if (equal (file-name-nondirectory root) "archives")
                    (file-name-directory root)
@@ -591,7 +591,7 @@ Exit 0 done or clean, 1 findings, 2 refused.
   "The command line's usage.")
 
 (defun pos-seal-batch ()
-  "Run a command from `command-line-args-left', as `pos-seal-usage' says."
+  "Run a command from `command-line-args-left', as in `pos-seal-usage'."
   (condition-case err
       (pcase (prog1 command-line-args-left (setq command-line-args-left nil))
         (`("seal" ,source ,destination . ,rest)
