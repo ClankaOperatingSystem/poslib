@@ -136,6 +136,25 @@ applied twice, it adds nothing."
       (should (equal "handover\n" (pos-ledger--read (expand-file-name "archives/journal/h.md"
                                                                         scope)))))))
 
+(ert-deftest pos-seal/a-new-record-may-start-an-archive ()
+  "A scope with no archives/ yet has an empty one; sealing makes it."
+  (pos-seal-test-with-scope
+    (delete-directory (expand-file-name "archives" scope))
+    (let ((plan (pos-seal-stage "first\n" (expand-file-name "archives/first.txt" scope))))
+      (should (equal 1 (alist-get 'number plan)))
+      (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))
+      (should (equal "first\n" (pos-ledger--read (expand-file-name "archives/first.txt"
+                                                                      scope))))
+      (should (file-directory-p (expand-file-name "archive-integrity/ledger" scope))))))
+
+(ert-deftest pos-seal/a-refused-new-record-leaves-nothing-staged ()
+  "When planning fails, the staged bytes and an emptied _seal/ go."
+  (pos-seal-test-with-scope
+    (pos-fixture-write (expand-file-name "archives/taken.txt" scope) "taken")
+    (should-error (pos-seal-stage "new\n" (expand-file-name "archives/taken.txt" scope))
+                  :type 'pos-ledger-refused)
+    (should-not (file-exists-p (expand-file-name "_seal" scope)))))
+
 (ert-deftest pos-seal/a-new-record-s-links-are-resolved ()
   "A new record's links are found, and read as written from its destination."
   (pos-seal-test-with-scope

@@ -1,0 +1,58 @@
+{
+ "kind": "seal",
+ "ledger_id": "5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d",
+ "description": "An item sealed into a scope with no archives/ yet: the archive holds nothing until sealing makes it, and a ledger starts beside it.",
+ "tree": [
+  {
+   "path": "scope/note.txt",
+   "text": "first\n"
+  }
+ ],
+ "source": "scope/note.txt",
+ "destination": "scope/archives/note.txt",
+ "event": {
+  "encoded": "{\"add\":{\"note.txt\":{\"cid\":\"bafkreifwiduebmm5g6dgbmzpwunoddlh3tfuvbmwukphxvzmdmvoleupie\",\"mode\":292,\"sha256\":\"b640e840b19d378660b32fb51ae18d67dccb4a8596a29e7bd72c1b2ae5928f41\",\"size\":6}},\"collections\":[],\"item\":\"note.txt\",\"ledger_id\":\"5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d\",\"previous\":null,\"root\":\"bafybeibzm7veymxtopftwljh7bac5vwcal675kcd2eahphwhyvxceiebhi\",\"schema\":2}\n",
+  "name": "00000001-79d9a2c4718fadf7d185edfe424b736f110ae72579df1be54e5df2c4b2dd7c88.json"
+ },
+ "plan": {
+  "add": {
+   "note.txt": {
+    "cid": "bafkreifwiduebmm5g6dgbmzpwunoddlh3tfuvbmwukphxvzmdmvoleupie",
+    "mode": 292,
+    "sha256": "b640e840b19d378660b32fb51ae18d67dccb4a8596a29e7bd72c1b2ae5928f41",
+    "size": 6
+   }
+  },
+  "archive": "scope/archives",
+  "collections": [],
+  "destination": "scope/archives/note.txt",
+  "inventory_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+  "ledger": "scope/archive-integrity/ledger",
+  "ledger_id": "5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d",
+  "links": [],
+  "number": 1,
+  "operation": "seal",
+  "originals": {},
+  "previous": null,
+  "rumours": [],
+  "schema": 2,
+  "source": "scope/note.txt"
+ },
+ "report": [
+  {
+   "archive": "scope/archives",
+   "changed": [],
+   "checkpoint_writable": [],
+   "events": 1,
+   "files": 1,
+   "head": "79d9a2c4718fadf7d185edfe424b736f110ae72579df1be54e5df2c4b2dd7c88",
+   "hidden": [],
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeibzm7veymxtopftwljh7bac5vwcal675kcd2eahphwhyvxceiebhi",
+   "root": "bafybeibzm7veymxtopftwljh7bac5vwcal675kcd2eahphwhyvxceiebhi",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}

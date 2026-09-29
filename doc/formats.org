@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 10, in lockstep; the fixtures in =fixtures/= are its
+this document, version 11, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -78,6 +78,7 @@ one link, else refused; a symlinked directory is refused. Each entry is:
   cleared.
 
 Paths are relative, =/=-separated, with no empty, =.= or =..= component.
+An archive not yet made has an empty inventory.
 
 ** Collections
 
@@ -188,9 +189,11 @@ SHA-256 of its canonical JSON; application refuses any other.
 
 =seal SOURCE DESTINATION= plans to move SOURCE, a file or directory
 outside any archive, to DESTINATION, a path that does not yet exist inside
-an outermost =archives/=. =write-new DESTINATION= first stages new bytes in
-=_seal/= beside the archive, in a file with DESTINATION's extension, then
-plans the same way, reading their links as written from DESTINATION. A plan holds, in
+an outermost =archives/=, which itself need not exist yet. =write-new
+DESTINATION= first stages new bytes in =_seal/= beside the archive, in a
+file with DESTINATION's extension, then plans the same way, reading their
+links as written from DESTINATION; if planning fails, the staged file is
+removed, and =_seal/= with it if left empty. A plan holds, in
 canonical JSON:
 
 - =schema=: 2; =operation=: =seal=;
