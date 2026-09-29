@@ -65,7 +65,14 @@
           (t (encode-coding-string .text 'utf-8 t)))))
 
 (defun pos-fixture-build (fixture dir)
-  "Build FIXTURE's tree in DIR."
+  "Build FIXTURE's tree in DIR.
+Names are written as the fixture spells them: on macOS, Emacs's own
+file-name coding would decompose them."
+  (let ((file-name-coding-system 'utf-8))
+    (pos-fixture--build fixture dir)))
+
+(defun pos-fixture--build (fixture dir)
+  "Build FIXTURE's tree in DIR, with the file-name coding already bound."
   (seq-doseq (entry (alist-get 'tree fixture))
     (let-alist entry
       (let ((path (expand-file-name .path dir)))
