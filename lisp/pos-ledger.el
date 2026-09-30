@@ -26,6 +26,7 @@
 ;; - `pos-ledger-json': canonical JSON bytes of a value.
 ;; - `pos-ledger-inventory': what an archive holds.
 ;; - `pos-ledger-history': what its ledger enrolled.
+;; - `pos-ledger-fold-cids': the archive's CIDs from the ledger alone.
 ;; - `pos-ledger-event': a new event's name and bytes.
 ;; - `pos-ledger-check': the report on every archive under a root.
 ;;
@@ -513,6 +514,19 @@ Nil if IPFS would shard a directory in it, or ARCHIVE is not yet made."
   (condition-case nil
       (and (file-exists-p archive) (pos-cid-tree archive))
     (pos-cid-sharding-unsupported nil)))
+
+(defun pos-ledger-fold-cids (archive)
+  "Return ARCHIVE's CIDs from its ledger alone, as `pos-cid-tree' gives them.
+Every enrolled file's CID as recorded and every directory's derived from
+them, the root as \".\"; nothing is read from the archive itself.  Refuses
+`entry' when an enrolled entry records no CID, as a legacy ledger's do."
+  (pos-cid-inventory
+   (mapcar (lambda (pair)
+             (let ((entry (cdr pair)))
+               (unless (assq 'cid entry)
+                 (pos-ledger--refuse 'entry "No CID enrolled for %s" (car pair)))
+               (list (car pair) (alist-get 'cid entry) (alist-get 'size entry))))
+           (car (pos-ledger-history archive)))))
 
 (defun pos-ledger--with-cids (known actual cids)
   "Return ACTUAL with a CID from CIDS in each entry KNOWN records one for."

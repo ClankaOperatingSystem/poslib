@@ -101,6 +101,21 @@ An alist of plan, event and report, or of error."
       (should (equal (pos-cid-file file)
                      (alist-get 'cid (cdr (assoc "trial/result.md" (alist-get 'add plan)))))))))
 
+(ert-deftest pos-seal/the-ledger-alone-gives-the-archive-s-cids ()
+  "After a seal, the ledger's entries give every CID the archive on disk
+has, root included, without reading the archive."
+  (pos-seal-test-with-scope
+    (let* ((plan (pos-seal-test-plan scope))
+           (root (cdr (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))))
+           (archive (expand-file-name "archives" scope))
+           (by-path (lambda (cids)
+                      (sort (copy-sequence cids)
+                            (lambda (a b) (string< (car a) (car b))))))
+           (folded (pos-ledger-fold-cids archive)))
+      (should (equal (funcall by-path (pos-cid-tree archive))
+                     (funcall by-path folded)))
+      (should (equal root (cdr (assoc "." folded)))))))
+
 (ert-deftest pos-seal/a-plan-is-applied-only-as-reviewed ()
   "A plan whose hash differs from the one reviewed is refused, as is a
 plan whose item changed after review; nothing moves."

@@ -29,12 +29,16 @@
 ;; - `pos-cid-file': CID of a file.
 ;; - `pos-cid-directory': CID of a directory tree.
 ;; - `pos-cid-tree': CID of every file and directory in a tree.
+;; - `pos-cid-inventory': the same from the files' paths, CIDs and
+;;   sizes alone, nothing read: how a ledger gives its archive's root.
+;; - `pos-cid-decode': the bytes of a CID written in base32.
 ;;
 ;; A directory large enough to need HAMT sharding signals
 ;; `pos-cid-sharding-unsupported' rather than return a wrong CID.
 
 ;;; Code:
 
+(require 'seq)
 (require 'subr-x)
 
 (defvar pos-cid-chunk-size 1048576
@@ -97,6 +101,21 @@
       (push (aref pos-cid--base32 (logand (ash bits (- 5 width)) 31)) out))
     (concat (nreverse out))))
 
+(defun pos-cid--unbase32 (text)
+  "Return the bytes TEXT encodes, in unpadded lower-case base32."
+  (let ((bits 0) (width 0) out)
+    (dotimes (i (length text))
+      (let ((value (seq-position pos-cid--base32 (aref text i))))
+        (unless value
+          (error "Not base32: %s" text))
+        (setq bits (logior (ash bits 5) value)
+              width (+ width 5))
+        (when (>= width 8)
+          (setq width (- width 8))
+          (push (logand (ash bits (- width)) 255) out)
+          (setq bits (logand bits (1- (ash 1 width)))))))
+    (apply #'unibyte-string (nreverse out))))
+
 (defun pos-cid--text (cid)
   "Return the binary CID in its multibase base32 form."
   (concat "b" (pos-cid--base32 cid)))
@@ -152,6 +171,19 @@ into file nodes of at most `pos-cid-file-max-links' links."
           (push (pos-cid--file-node (nreverse group)) level)))
       (setq nodes (nreverse level))))
   (car nodes))
+
+(defun pos-cid--file-tsize (size)
+  "Return the bytes of the DAG a file of SIZE bytes makes, from SIZE alone.
+A leaf's size is its chunk's and a node's is its block's plus its
+children's, and a binary CID is 36 bytes whatever it hashes, so no
+content is needed."
+  (let ((cid (make-string 36 0)) (start 0) leaves)
+    (while (progn
+             (let ((n (- (min size (+ start pos-cid-chunk-size)) start)))
+               (push (list cid n n) leaves))
+             (setq start (+ start pos-cid-chunk-size))
+             (< start size)))
+    (nth 1 (pos-cid--balance (nreverse leaves)))))
 
 (defun pos-cid--chunk (file start end)
   "Return bytes START to END of FILE."
@@ -243,6 +275,71 @@ An alist of relative path and CID; the root is \".\"."
     (pos-cid--directory dir ""
                         (lambda (rel node)
                           (push (cons rel (pos-cid--text (car node))) cids)))
+    (nreverse cids)))
+
+(defun pos-cid-decode (text)
+  "Return the binary CID of TEXT, a CID in lower-case multibase base32."
+  (unless (and (> (length text) 1) (eq (aref text 0) ?b))
+    (error "Not a base32 CID: %s" text))
+  (pos-cid--unbase32 (substring text 1)))
+
+(defun pos-cid--inventory-directory (node rel visit)
+  "Return the node of the directory NODE at REL, calling VISIT on each CID.
+NODE maps names to child NODEs, or to (CID TSIZE TEXT) for files; VISIT
+receives a relative path and a CID as text, files as given."
+  (let* ((names (sort (hash-table-keys node)
+                      (lambda (a b)
+                        (string< (encode-coding-string a 'utf-8)
+                                 (encode-coding-string b 'utf-8)))))
+         (links (mapcar
+                 (lambda (name)
+                   (let* ((child (gethash name node))
+                          (path (concat rel (unless (string-empty-p rel) "/") name))
+                          (n (if (hash-table-p child)
+                                 (pos-cid--inventory-directory child path visit)
+                               (funcall visit path (nth 2 child))
+                               child)))
+                     (list (nth 0 n) (encode-coding-string name 'utf-8) (nth 1 n))))
+                 names))
+         (data (pos-cid--varint-field 1 1))
+         (block (pos-cid--pb-node links data)))
+    (when (> (length block) pos-cid-sharding-threshold)
+      (signal 'pos-cid-sharding-unsupported (list rel (length block))))
+    (let ((n (pos-cid--pb links data)))
+      (funcall visit (if (string-empty-p rel) "." rel) (pos-cid--text (car n)))
+      n)))
+
+(defun pos-cid-inventory (entries)
+  "Return the CID of every file and directory over ENTRIES, root included.
+ENTRIES lists a tree's files as (PATH CID SIZE): the relative path, the
+CID as text and the size in bytes.  Directories are derived from the
+paths as `pos-cid-tree' finds them on disk, so an empty directory has no
+place here, and a hidden component is refused since IPFS would leave it
+out.  An alist of relative path and CID, files as given, the root \".\".
+Signals `pos-cid-sharding-unsupported' as `pos-cid-directory' does."
+  (let ((tree (make-hash-table :test #'equal)) cids)
+    (dolist (entry entries)
+      (let* ((path (nth 0 entry))
+             (parts (split-string path "/"))
+             (node tree))
+        (dolist (part parts)
+          (when (or (string-empty-p part) (string-prefix-p "." part))
+            (error "Not a path IPFS would add: %s" path)))
+        (dolist (part (butlast parts))
+          (let ((child (gethash part node)))
+            (unless (or (null child) (hash-table-p child))
+              (error "A file and a directory share a path: %s" path))
+            (setq node (or child
+                           (puthash part (make-hash-table :test #'equal) node)))))
+        (when (gethash (car (last parts)) node)
+          (error "A file and a directory share a path: %s" path))
+        (puthash (car (last parts))
+                 (list (pos-cid-decode (nth 1 entry))
+                       (pos-cid--file-tsize (nth 2 entry))
+                       (nth 1 entry))
+                 node)))
+    (pos-cid--inventory-directory
+     tree "" (lambda (rel cid) (push (cons rel cid) cids)))
     (nreverse cids)))
 
 (provide 'pos-cid)

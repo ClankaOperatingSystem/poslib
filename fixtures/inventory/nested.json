@@ -1,0 +1,39 @@
+{
+ "description": "A two-chunk file, directories three deep, and a hidden file left out.",
+ "tree": [
+  {
+   "path": "t/README.org",
+   "text": "A collection.\n"
+  },
+  {
+   "path": "t/data/big",
+   "repeat": [
+    0,
+    1048577
+   ]
+  },
+  {
+   "path": "t/data/small",
+   "text": "small"
+  },
+  {
+   "path": "t/data/deep/er/leaf.txt",
+   "text": "leaf"
+  },
+  {
+   "path": "t/.hidden",
+   "text": "x"
+  }
+ ],
+ "entry": "t",
+ "cids": {
+  ".": "bafybeifnds5msngspu7x3r7mzdjotom5abynuud74ca54oy5vt6v5ml7dy",
+  "README.org": "bafkreiben2aqkifjkcvw7m36i5qfa4nvqkgq5k4goiterlp6ylzakqew2e",
+  "data": "bafybeiemnbohfwsultmqsz46j4lvyuboto5qris6woxfnrszc7ozcyq7xa",
+  "data/big": "bafybeihd4yzq7n5umhjngdum4r6k2to7egxfkf2jz6thvwzf6djus22cmq",
+  "data/deep": "bafybeihf5jtx6xas4msgugirmlhncajhcsffumjcg42zz3vc2qgnurlppm",
+  "data/deep/er": "bafybeifvpnwo7w56g6ophfsf3ktlw7ew4qrikz4otoabuhknvhn74sissi",
+  "data/deep/er/leaf.txt": "bafkreie7selb6q2dhze2nxtnw2anph3acwps4swjc4tcdijiizbicwcebm",
+  "data/small": "bafkreieb3ohlxo6gtrwgvvfgvkjlo3qmbcxvi7ncg246fso34hmcqwubga"
+ }
+}
