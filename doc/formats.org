@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 11, in lockstep; the fixtures in =fixtures/= are its
+this document, version 12, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -25,6 +25,29 @@ unixfs-v1-2025 import profile of [[https://specs.ipfs.tech/ipips/ipip-0499/][IPI
 Fixtures: =fixtures/cid/=. Each gives a tree, the entry to hash, and its
 CID or error. =params= overrides the chunk size and link limit, as
 =--chunker= and =--max-file-links= do. kubo, run offline, is the referee.
+
+** From an inventory
+
+The CID of every directory in a tree, its root included, follows from
+its files' paths, CIDs and sizes alone, with no bytes read. A file's DAG
+size is a function of its size under the profile, since a leaf's is its
+chunk's, a node's is its block's plus its children's, and a binary CID is
+36 bytes whatever it hashes; and a directory's block is its links, each a
+child's CID, name and DAG size, in byte order of name. So a ledger's
+enrolled entries give the archive's root, and a reader with the ledger
+and not the archive computes the CIDs a reader with the archive does.
+
+Two things a tree on disk can have that an inventory cannot: an empty
+directory, which IPFS hashes and which has no entry, and a hidden entry,
+which IPFS leaves out. An inventory holding a hidden component is
+refused; an empty directory is simply absent, so a tree that has one has
+a root the inventory does not reproduce.
+
+Fixtures: =fixtures/inventory/=. Each gives a tree, the entry to hash,
+and =cids=, the CID of every file and directory under it, the root as
+=.=; =params= as for =fixtures/cid/=. The tree on disk and the inventory
+of its files must both give them, and kubo, run offline, is the referee
+for the root.
 
 * Canonical JSON
 

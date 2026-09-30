@@ -60,6 +60,25 @@
                      (list (format "--max-file-links=%d" .params.links)))
                    (list path)))))
 
+(defun pos-cid-ipfs-check-inventory (repo)
+  "Compare every inventory fixture's root with kubo in REPO; count failures."
+  (let ((failed 0))
+    (dolist (named (pos-fixtures "inventory"))
+      (let-alist (cdr named)
+        (pos-fixture-with (cdr named) dir
+          (let* ((pos-cid-chunk-size (or .params.chunk pos-cid-chunk-size))
+                 (pos-cid-file-max-links (or .params.links pos-cid-file-max-links))
+                 (path (expand-file-name .entry dir))
+                 (recorded (alist-get (intern ".") .cids))
+                 (kubo (pos-cid-ipfs-add repo (cdr named) path))
+                 (ours (pos-cid-directory path)))
+            (if (and (equal kubo recorded) (equal ours recorded))
+                (message "ok    inventory %s" (car named))
+              (setq failed (1+ failed))
+              (message "FAIL  inventory %s: recorded %s, kubo %s, ours %s"
+                       (car named) recorded kubo ours))))))
+    failed))
+
 (defun pos-cid-ipfs-check ()
   "Compare every CID fixture with kubo; exit nonzero on any disagreement."
   (let ((repo (make-temp-file "pos-cid-ipfs" t))
@@ -86,7 +105,8 @@
                       (message "ok    %s" (car named))
                     (setq failed (1+ failed))
                     (message "FAIL  %s: recorded %s, kubo %s, ours %s"
-                             (car named) (or .cid .ipfs) kubo ours)))))))
+                             (car named) (or .cid .ipfs) kubo ours))))))
+          (setq failed (+ failed (pos-cid-ipfs-check-inventory repo))))
       (delete-directory repo t))
     (kill-emacs (if (zerop failed) 0 1))))
 

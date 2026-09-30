@@ -1,0 +1,46 @@
+{
+ "description": "Names that sort differently as bytes and as text, at two levels.",
+ "tree": [
+  {
+   "path": "t/Zed/x",
+   "text": "1"
+  },
+  {
+   "path": "t/ärger/öl",
+   "text": "2"
+  },
+  {
+   "path": "t/ärger/Zug",
+   "text": "3"
+  },
+  {
+   "path": "t/zebra",
+   "text": "4"
+  },
+  {
+   "path": "t/Äpfel",
+   "text": "5"
+  },
+  {
+   "path": "t/a-b",
+   "text": "6"
+  },
+  {
+   "path": "t/a_b",
+   "text": "7"
+  }
+ ],
+ "entry": "t",
+ "cids": {
+  ".": "bafybeihm5osfy6cvcadjvomnel2vv7otfu6axl7o5nlsbcfzn5si343kqe",
+  "Zed": "bafybeih3orox4mepc7efwlx734e23rgt6yys4yufq7dj7abkrda6zb5ewe",
+  "Zed/x": "bafkreidlq2zhh7zu7tqz224aj37vup2xi6w2j2vcf4outqa6klo3pb23jm",
+  "a-b": "bafkreihh63abc53orw342mylkqlu7v3ppubbnnqshb5f77h3qhtpbemwqm",
+  "a_b": "bafkreidzajuzxzbmrkhen653iuaxezix5bvsfrlkdcpxmjng3jeqqgzeke",
+  "zebra": "bafkreiclej3xpvg5d7dby34ij5egihicwtisdu75gkglbc2vgh6kzwv7ri",
+  "Äpfel": "bafkreihpfujh3y33sqv2vudbixsuwddbtipsemt3f2547pwhr5kwjl7dtu",
+  "ärger": "bafybeibsdpvadaegoql6skitozt74oi7t32svvpdkot5dt2jyny7wlfh2i",
+  "ärger/Zug": "bafkreicoa5aikyv63ofwbtqfyhpm7y5nc23semewpxqb6zalpzdstne7zy",
+  "ärger/öl": "bafkreiguonpdujs6c3xoap2zogfzwxidagoapwfwyupzbwr2mzxoye5lgu"
+ }
+}

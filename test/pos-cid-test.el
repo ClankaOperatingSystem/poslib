@@ -160,5 +160,70 @@ different CIDs, each as IPFS computes it."
       (should (equal (pos-cid-file (expand-file-name "sub/c" path))
                      (cdr (assoc "sub/c" tree)))))))
 
+;;;; Inventories
+
+(defun pos-cid-test-entries (dir)
+  "Return the files under DIR as (PATH CID SIZE), hidden ones left out."
+  (let (entries)
+    (dolist (file (directory-files-recursively dir ""))
+      (let ((rel (file-relative-name file dir)))
+        (unless (seq-some (lambda (part) (string-prefix-p "." part))
+                          (split-string rel "/"))
+          (push (list rel (pos-cid-file file)
+                      (file-attribute-size (file-attributes file)))
+                entries))))
+    entries))
+
+(defun pos-cid-test-by-path (cids)
+  "Return the alist CIDS sorted by path."
+  (sort (copy-sequence cids) (lambda (a b) (string< (car a) (car b)))))
+
+(ert-deftest pos-cid/every-inventory-fixture-agrees ()
+  "Every fixture in fixtures/inventory/: the tree on disk and the
+inventory of its files give every CID recorded, as pyposlib must also."
+  (dolist (named (pos-fixtures "inventory"))
+    (ert-info ((car named))
+      (let-alist (cdr named)
+        (pos-fixture-with (cdr named) dir
+          (let* ((pos-cid-chunk-size (or .params.chunk pos-cid-chunk-size))
+                 (pos-cid-file-max-links (or .params.links pos-cid-file-max-links))
+                 (path (expand-file-name .entry dir))
+                 (recorded (pos-cid-test-by-path
+                            (mapcar (lambda (pair)
+                                      (cons (symbol-name (car pair)) (cdr pair)))
+                                    .cids))))
+            (should (equal recorded (pos-cid-test-by-path (pos-cid-tree path))))
+            (should (equal recorded
+                           (pos-cid-test-by-path
+                            (pos-cid-inventory (pos-cid-test-entries path)))))))))))
+
+(ert-deftest pos-cid/a-cid-decodes-to-the-bytes-it-encodes ()
+  (let ((cid (pos-cid--cid pos-cid--raw "hello")))
+    (should (= 36 (length cid)))
+    (should (equal cid (pos-cid-decode (pos-cid--text cid)))))
+  (dolist (bad '("" "b" "QmNotBase32" "bAFKREI"))
+    (should-error (pos-cid-decode bad))))
+
+(ert-deftest pos-cid/a-file-s-dag-size-follows-from-its-size-alone ()
+  "With 256-byte chunks and 4 links a node, sizes across every shape of
+DAG give the size the file's real DAG has."
+  (let ((pos-cid-chunk-size 256)
+        (pos-cid-file-max-links 4)
+        (dir (make-temp-file "pos-cid" t)))
+    (unwind-protect
+        (dolist (size '(0 1 255 256 257 1024 1025 3000 5000))
+          (let ((file (expand-file-name "f" dir)))
+            (pos-fixture-write file (pos-fixture-bytes `((pattern . ,size))))
+            (should (equal (nth 1 (pos-cid--file file))
+                           (pos-cid--file-tsize size)))))
+      (delete-directory dir t))))
+
+(ert-deftest pos-cid/an-inventory-refuses-what-ipfs-would-leave-out ()
+  "A hidden or empty path component, and a file where a directory is."
+  (let ((cid (pos-cid-bytes "x")))
+    (dolist (path '(".hidden" "a/.b/c" "a//b" ""))
+      (should-error (pos-cid-inventory (list (list path cid 1)))))
+    (should-error (pos-cid-inventory (list (list "a" cid 1) (list "a/b" cid 1))))))
+
 (provide 'pos-cid-test)
 ;;; pos-cid-test.el ends here

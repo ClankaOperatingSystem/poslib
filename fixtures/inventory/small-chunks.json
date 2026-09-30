@@ -1,0 +1,34 @@
+{
+ "description": "With 256-byte chunks and 4 links a node: an empty file, a chunk, a chunk and a byte, and a file of three levels.",
+ "params": {
+  "chunk": 256,
+  "links": 4
+ },
+ "tree": [
+  {
+   "path": "t/empty",
+   "text": ""
+  },
+  {
+   "path": "t/one",
+   "pattern": 256
+  },
+  {
+   "path": "t/two",
+   "pattern": 257
+  },
+  {
+   "path": "t/sub/levels",
+   "pattern": 5000
+  }
+ ],
+ "entry": "t",
+ "cids": {
+  ".": "bafybeifgixinkq4syl4uocxvfh3gqpdwu3phteasdbaiwo7vyne6p5a2ny",
+  "empty": "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
+  "one": "bafkreic3ymnsqphpabzcotux25ermvjjktetk6kfg3flmmtedzpka4jxtu",
+  "sub": "bafybeibkavxjirb5a5ycirohlba7brawmageb4ztsyx26odkd5sznkqtsy",
+  "sub/levels": "bafybeiguc3jg67veqqdiijnmxpfxrceentwemvk2x24blevdvkdyg63mse",
+  "two": "bafybeifbdcqqlqep6whxe2kr2styzm43ircdl5lv7mkzxaa2jbfrzxmgma"
+ }
+}
