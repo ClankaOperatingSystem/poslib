@@ -526,7 +526,7 @@ refused."
              (alist-get 'url entry))))))
 
 (defun pos-ledger--kept-here (dir)
-  "Return the archive of the scope DIR, if a keeper keeps it and none is here.
+  "Return the archive of the scope DIR, if kept by a keeper and not here.
 DIR has a ledger beside where its archive would be, and no archives."
   (let ((archive (expand-file-name "archives" dir)))
     (and (not (file-exists-p archive)) (not (file-symlink-p archive))
@@ -536,7 +536,7 @@ DIR has a ledger beside where its archive would be, and no archives."
          archive)))
 
 (defun pos-ledger--kept-entries (archive known)
-  "Return KNOWN, what the ledger of the kept ARCHIVE enrols, as what it holds.
+  "Return KNOWN, the ledger's entries, as the inventory of the kept ARCHIVE.
 Refuse `kept' if ARCHIVE has files on disk: it is not with its keeper yet."
   (when (pos-ledger-inventory archive)
     (pos-ledger--refuse 'kept "Kept by a keeper, and has files on disk: %s" archive))
