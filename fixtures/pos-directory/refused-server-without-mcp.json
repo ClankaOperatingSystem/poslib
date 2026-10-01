@@ -1,0 +1,5 @@
+{
+ "about": "A server lacks its MCP endpoint.",
+ "yaml": "pos: 1\nserver:\n  name: example\n",
+ "refused": "missing-key"
+}

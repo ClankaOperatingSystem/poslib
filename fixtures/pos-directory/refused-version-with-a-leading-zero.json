@@ -1,0 +1,5 @@
+{
+ "about": "The version is digits that are not a number as written.",
+ "yaml": "pos: 01\n",
+ "refused": "wrong-type"
+}

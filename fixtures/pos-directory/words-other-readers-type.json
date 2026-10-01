@@ -1,0 +1,29 @@
+{
+ "about": "A branch whose name a YAML reader could take for a number, a boolean or a date is the text written.",
+ "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    branch: 1.10\n  - path: projects/b\n    remote: git@example.org:b.git\n    branch: no\n  - path: projects/c\n    remote: git@example.org:c.git\n    branch: 2026-10-01\n",
+ "config": {
+  "children": [
+   {
+    "path": "projects/a",
+    "remote": "git@example.org:a.git",
+    "branch": "1.10",
+    "skills-up": false
+   },
+   {
+    "path": "projects/b",
+    "remote": "git@example.org:b.git",
+    "branch": "no",
+    "skills-up": false
+   },
+   {
+    "path": "projects/c",
+    "remote": "git@example.org:c.git",
+    "branch": "2026-10-01",
+    "skills-up": false
+   }
+  ],
+  "worktrees": [],
+  "archives": [],
+  "server": null
+ }
+}

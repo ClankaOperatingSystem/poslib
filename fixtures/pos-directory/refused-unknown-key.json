@@ -1,0 +1,5 @@
+{
+ "about": "A key at the top level that version 1 does not define.",
+ "yaml": "pos: 1\nteam: []\n",
+ "refused": "unknown-key"
+}

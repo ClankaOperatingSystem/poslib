@@ -1,0 +1,5 @@
+{
+ "about": "A child's path leaves the repository.",
+ "yaml": "pos: 1\nchildren:\n  - path: projects/../../elsewhere\n    remote: git@example.org:a.git\n",
+ "refused": "bad-path"
+}

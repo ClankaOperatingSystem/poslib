@@ -43,7 +43,16 @@ The top level is a mapping:
     server      the server this repository is bound to (section 5)
 
 A reader refuses the whole file for a key not written here, at any
-level, and for a version it does not know.
+level, and for a version it does not know. A refusal has a kind:
+
+    not-yaml          the text is not readable as YAML
+    not-a-mapping     the file, or an entry, is not a mapping
+    unknown-version   pos is a number other than 1
+    unknown-key       a key this document does not define
+    missing-key       a required key is absent
+    wrong-type        a value is not of its key's type
+    bad-path          a path this document does not allow
+    bad-value         a value this document does not allow
 
 The file holds no credential. What a person signs in with is theirs and
 stays out of a repository other people share.
@@ -78,7 +87,8 @@ back afterwards.
 The container does not track a child. Its path is written to the
 container's .git/info/exclude before the child is cloned, since staging
 everything in a container records an unexcluded child as an embedded
-repository.
+repository. The line written for a path is the path with a slash
+before it, which anchors it at the repository's root.
 
 What a container keeps to itself about a child sits in a file beside
 it: responsibilities/NAME.org beside responsibilities/NAME/. The file is
@@ -173,6 +183,8 @@ therefore sees none of its containers' skills. Links supply them:
   - A link is a relative symbolic link to the skill's directory. It is
     untracked, with its path in .git/info/exclude of the repository it
     is made in.
+  - Where a repository has skills and no .claude/skills, that link is
+    made the same way, untracked and excluded.
 
 A linked skill calls only what travels with it or is installed: scripts
 within its own directory, which the link carries, and installed
@@ -202,17 +214,43 @@ A plan holds actions:
 
 and findings, which the tool reports and does not act on:
 
-  - a configuration file it refuses
-  - a child whose working tree is on a branch other than the declared
-    one: nothing is planned in it or beneath it
-  - a path already taken: by something that is not a repository, or by
-    a repository cloned from another remote
-  - a repository mounted beneath this one that no entry declares, or
-    whose entry is gone
-  - skills committed beneath .claude/skills
-  - two children's skills of one name
+    config-refused  a configuration file it refuses: nothing is planned
+                    in that repository or beneath it
+    off-branch      a child whose working tree is on a branch other
+                    than the declared one: nothing is planned in it or
+                    beneath it, and links to its skills are left
+    path-taken      a path taken by something that is not a
+                    repository, or that is or passes through a
+                    symbolic link
+    other-remote    a path taken by a repository cloned from another
+                    remote
+    undeclared      a repository mounted beneath this one that no entry
+                    declares, or whose entry is gone
+    claude-skills   a .claude/skills that is not the link
+    name-clash      two children's skills of one name
 
-When the tree is as declared, the plan is empty.
+A plan is a JSON object:
+
+    pos         1
+    actions     an array, in an order they can be done in
+    findings    an array
+
+An action is an object whose do is the action's name. With it:
+
+    clone       path, branch, and remote or of
+    exclude     repository and path, the path relative to the
+                repository
+    link        path and target, the text of the link
+    unlink      path
+
+A finding is an object with finding, its name, path, and where there
+is more to say, detail. Every path is relative to the root of the
+tree but an exclude's, and the root itself is ".".
+
+When the tree is as declared, the plan is empty. What is beneath a
+child that is not yet cloned cannot be told from the disk, so after the
+second step has cloned a child the first is run again, until a plan is
+empty.
 
 The tool keeps these rules:
 
@@ -237,3 +275,9 @@ The tool keeps these rules:
 An implementation is tested in real repositories. A test makes a
 temporary directory, makes new repositories inside it with git init,
 configures them, and tests the tool's behaviour in them.
+
+fixtures/pos-directory/ holds configuration files for both libraries.
+Each fixture is a JSON object: about, what it shows; yaml, the file's
+text; and either config, what a reader makes of it, or refused, the
+kind of refusal. config has children, worktrees and archives, each an
+array with every default filled in, and server, an object or null.

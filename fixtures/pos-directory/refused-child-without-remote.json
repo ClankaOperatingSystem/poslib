@@ -1,0 +1,5 @@
+{
+ "about": "A child lacks its remote.",
+ "yaml": "pos: 1\nchildren:\n  - path: projects/a\n",
+ "refused": "missing-key"
+}

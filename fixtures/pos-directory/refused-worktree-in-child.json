@@ -1,0 +1,5 @@
+{
+ "about": "A worktree's scope is a child, which declares its own.",
+ "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\nworktrees:\n  - path: projects/a/_worktrees/x\n    remote: git@example.org:x.git\n",
+ "refused": "bad-path"
+}

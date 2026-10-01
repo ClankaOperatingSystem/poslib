@@ -1,0 +1,5 @@
+{
+ "about": "A key in a child that version 1 does not define.",
+ "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    pin: abc\n",
+ "refused": "unknown-key"
+}

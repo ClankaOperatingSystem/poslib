@@ -1,0 +1,5 @@
+{
+ "about": "A value left empty is no string.",
+ "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    branch:\n",
+ "refused": "wrong-type"
+}
