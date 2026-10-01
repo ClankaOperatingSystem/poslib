@@ -202,7 +202,10 @@ changes nothing and uses no network. Everything in a plan can be told
 from the disk.
 
 The second step is given a plan and does those things and nothing else.
-It refuses a plan the tree no longer matches.
+It makes the plan afresh first and refuses, as stale-plan and having
+done nothing, a plan the tree no longer gives. If an action cannot be
+done it stops and refuses, as failed, and what it did before stays
+done. It prints the plan that remains.
 
 A plan holds actions:
 

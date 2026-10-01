@@ -21,10 +21,11 @@
 ;;; Commentary:
 
 ;; A repository declares in .pos/config.yaml the repositories mounted
-;; beneath it, as doc/pos-directory.txt specifies.  This is the first of
-;; the two steps that bring a tree to what its .pos files declare: it
-;; makes the plan, changes nothing and uses no network.  The second
-;; step, which does what a plan holds, is not written.
+;; beneath it, as doc/pos-directory.txt specifies.  These are the two
+;; steps that bring a tree to what its .pos files declare.  The first
+;; makes the plan, changes nothing and uses no network.  The second is
+;; given a plan, does what it holds if the tree still gives that plan,
+;; and returns the plan that remains.
 ;;
 ;; A plan holds the children and worktrees to clone, the paths to
 ;; exclude and the skill links to make and remove, with what it found
@@ -33,6 +34,7 @@
 ;;
 ;; - `pos-tree-read-config': a config.yaml's text, checked.
 ;; - `pos-tree-plan': the plan for the tree at a root.
+;; - `pos-tree-apply': do a plan, and return the plan that remains.
 ;; - `pos-tree-batch': the command line.
 
 ;;; Code:
@@ -280,11 +282,15 @@ OUTPUT is what git printed, less its final newline."
   "Return non-nil if the repository at DIR tracks PATH."
   (eq 0 (car (pos-tree--git dir "ls-files" "--error-unmatch" "--" path))))
 
+(defun pos-tree--exclude-file (dir)
+  "Return the info/exclude file of the repository at DIR, or nil."
+  (when-let* ((file (pos-tree--git-line dir "rev-parse" "--git-path" "info/exclude")))
+    (expand-file-name file dir)))
+
 (defun pos-tree--excluded-p (dir path)
   "Return non-nil if the repository at DIR excludes PATH.
 That is, if its info/exclude holds the line this tool writes for PATH."
-  (when-let* ((file (pos-tree--git-line dir "rev-parse" "--git-path" "info/exclude")))
-    (setq file (expand-file-name file dir))
+  (when-let* ((file (pos-tree--exclude-file dir)))
     (and (file-readable-p file)
          (member (concat "/" path)
                  (split-string (with-temp-buffer
@@ -564,6 +570,69 @@ if ROOT is not a repository."
       (actions . ,(vconcat (nreverse pos-tree--actions)))
       (findings . ,(vconcat (nreverse pos-tree--findings))))))
 
+;;;; The second step
+
+(defun pos-tree--run (dir &rest args)
+  "Run git in DIR with ARGS, never prompting; refuse if git fails."
+  (let* ((process-environment (cons "GIT_TERMINAL_PROMPT=0" process-environment))
+         (result (apply #'pos-tree--git dir args)))
+    (unless (eq (car result) 0)
+      (pos-tree--refuse 'failed "git %s: %s" (string-join args " ") (cdr result)))))
+
+(defun pos-tree--do (root action)
+  "Do ACTION, of a plan for the tree at ROOT, a directory name."
+  (let-alist action
+    (pcase .do
+      ("exclude"
+       (let ((file (pos-tree--exclude-file (expand-file-name .repository root))))
+         (make-directory (file-name-directory file) t)
+         (with-temp-buffer
+           (when (file-exists-p file) (insert-file-contents file))
+           (goto-char (point-max))
+           (unless (or (bobp) (eq (char-before) ?\n)) (insert "\n"))
+           (insert "/" .path "\n")
+           (write-region nil nil file nil 'silent))))
+      ("clone"
+       (let ((path (expand-file-name .path root)))
+         (make-directory (file-name-directory path) t)
+         (if .of
+             (let ((of (expand-file-name .of root)))
+               (if (or (pos-tree--git-line of "rev-parse" "--verify" "--quiet"
+                                           (concat "refs/heads/" .branch))
+                       (pos-tree--git-line of "rev-parse" "--verify" "--quiet"
+                                           (concat "refs/remotes/origin/" .branch)))
+                   (pos-tree--run of "worktree" "add" "--quiet" path .branch)
+                 (pos-tree--run of "worktree" "add" "--quiet" "-b" .branch path)))
+           (pos-tree--run root "clone" "--quiet" "--branch" .branch "--"
+                          .remote path))))
+      ("link"
+       (let ((link (expand-file-name .path root)))
+         (when (or (file-symlink-p link) (file-exists-p link))
+           (pos-tree--refuse 'failed "Something is at %s" .path))
+         (make-directory (file-name-directory link) t)
+         (make-symbolic-link .target link)))
+      ("unlink"
+       (let ((link (expand-file-name .path root)))
+         (unless (file-symlink-p link)
+           (pos-tree--refuse 'failed "Not a link: %s" .path))
+         (delete-file link)))
+      (_ (pos-tree--refuse 'failed "Not an action this tool does: %s" .do)))))
+
+(defun pos-tree-apply (root plan)
+  "Do the actions of PLAN in the tree at ROOT, and return the plan that remains.
+PLAN is as `pos-tree-plan' returns it, or as parsed from its JSON.
+Signal `pos-tree-refused' with stale-plan, having done nothing, if the
+tree no longer gives PLAN; and with failed if an action cannot be done,
+in which case what was done before it stays done.  Cloning uses the
+network."
+  (let ((dir (file-name-as-directory (expand-file-name root)))
+        (fresh (pos-tree-plan root)))
+    (unless (equal (pos-ledger-json fresh) (pos-ledger-json plan))
+      (pos-tree--refuse 'stale-plan "The tree no longer gives this plan"))
+    (seq-doseq (action (alist-get 'actions fresh))
+      (pos-tree--do dir action))
+    (pos-tree-plan root)))
+
 ;;;; Command line
 
 (defconst pos-tree-usage
@@ -572,27 +641,41 @@ if ROOT is not a repository."
   plan ROOT
       print what needs to be done for the tree at ROOT to be as its
       .pos files declare, as JSON; change nothing
+  apply ROOT PLAN
+      do what the plan in the file PLAN holds, or - for standard input,
+      if the tree at ROOT still gives it; print the plan that remains
 
 Exit 0 nothing to do, 1 something to do or to report, 2 refused.
 "
   "The command line's usage.")
 
+(defun pos-tree--print (plan)
+  "Print PLAN as JSON and exit: 0 if it holds nothing, 1 if it holds anything."
+  (princ (decode-coding-string (pos-ledger-json plan) 'utf-8))
+  (kill-emacs (if (and (seq-empty-p (alist-get 'actions plan))
+                       (seq-empty-p (alist-get 'findings plan)))
+                  0
+                1)))
+
 (defun pos-tree-batch ()
   "Run a command from `command-line-args-left', as in `pos-tree-usage'."
   (condition-case err
       (pcase (prog1 command-line-args-left (setq command-line-args-left nil))
-        (`("plan" ,root)
-         (let ((plan (pos-tree-plan root)))
-           (princ (decode-coding-string (pos-ledger-json plan) 'utf-8))
-           (kill-emacs (if (and (seq-empty-p (alist-get 'actions plan))
-                                (seq-empty-p (alist-get 'findings plan)))
-                           0
-                         1))))
+        (`("plan" ,root) (pos-tree--print (pos-tree-plan root)))
+        (`("apply" ,root ,file)
+         (pos-tree--print
+          (pos-tree-apply
+           root
+           (pos-ledger--parse
+            (pos-ledger--read (if (equal file "-") "/dev/stdin" file))))))
         (`(,(or "help" "-h" "--help")) (princ pos-tree-usage))
         (_ (message "%s" pos-tree-usage)
            (kill-emacs 2)))
     (pos-tree-refused
      (message "%s: %s" (nth 1 err) (nth 2 err))
+     (kill-emacs 2))
+    (json-error
+     (message "plan: Not a readable plan")
      (kill-emacs 2))))
 
 (provide 'pos-tree)

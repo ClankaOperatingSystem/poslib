@@ -23,9 +23,8 @@
 ;; Run: make test.  The configuration fixtures in
 ;; fixtures/pos-directory/ are for pyposlib too.  The trees are real:
 ;; each test makes repositories with git init in a temporary directory,
-;; as doc/pos-directory.txt asks.  `pos-tree-test-do' stands in for the
-;; tool's second step, which is not written, so that a test can bring a
-;; tree to what its plan asked and plan again.
+;; as doc/pos-directory.txt asks, and a child's remote is a repository
+;; beside the tree.
 
 ;;; Code:
 
@@ -112,39 +111,13 @@ FILES is a plist of path and text.  Return DIR."
              (let-alist finding (format "%s %s" .finding .path)))
            (alist-get 'findings plan))))
 
-(defun pos-tree-test-do (root plan)
-  "Do the actions of PLAN in the tree at ROOT, as the second step would."
-  (seq-doseq (action (alist-get 'actions plan))
-    (let-alist action
-      (pcase .do
-        ("exclude"
-         (let* ((dir (expand-file-name .repository root))
-                (file (expand-file-name
-                       (pos-tree--git-line dir "rev-parse" "--git-path" "info/exclude")
-                       dir)))
-           (make-directory (file-name-directory file) t)
-           (write-region (concat "/" .path "\n") nil file t 'silent)))
-        ("clone"
-         (let ((path (expand-file-name .path root)))
-           (make-directory (file-name-directory path) t)
-           (if .of
-               (pos-tree-test-git (expand-file-name .of root)
-                                  "worktree" "add" "-q" "-b" .branch path)
-             (pos-tree-test-git root "clone" "-q" "-b" .branch .remote path))))
-        ("link"
-         (let ((link (expand-file-name .path root)))
-           (make-directory (file-name-directory link) t)
-           (make-symbolic-link .target link)))
-        ("unlink" (delete-file (expand-file-name .path root)))))))
-
 (defun pos-tree-test-settle (root)
-  "Plan and do in the tree at ROOT until a plan has no action.
+  "Plan and apply in the tree at ROOT until a plan has no action.
 Return that last plan.  Fail if ten rounds do not settle it."
   (let ((plan (pos-tree-plan root)) (rounds 0))
     (while (not (seq-empty-p (alist-get 'actions plan)))
       (when (> (cl-incf rounds) 10) (error "The tree does not settle"))
-      (pos-tree-test-do root plan)
-      (setq plan (pos-tree-plan root)))
+      (setq plan (pos-tree-apply root plan)))
     plan))
 
 (defun pos-tree-test-status (dir)
@@ -354,6 +327,105 @@ to do, and no repository sees a change to commit."
                       "symbolic-ref" "--short" "HEAD")
                      "do-the-thing"))
       (should (equal (pos-tree-test-status root) "")))))
+
+;;;; The second step
+
+(defun pos-tree-test-refusal (root plan)
+  "Return the kind of refusal applying PLAN at ROOT gives, or nil."
+  (condition-case err
+      (progn (pos-tree-apply root plan) nil)
+    (pos-tree-refused (nth 1 err))))
+
+(defun pos-tree-test-exclude (dir)
+  "Return the lines of the info/exclude of the repository at DIR."
+  (let ((file (pos-tree--exclude-file dir)))
+    (and (file-exists-p file)
+         (split-string (with-temp-buffer (insert-file-contents file)
+                                         (buffer-string))
+                       "\n" t))))
+
+(ert-deftest pos-tree/a-plan-the-tree-no-longer-gives-is-refused ()
+  "And nothing of it is done."
+  (pos-tree-test-with dir
+    (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
+                                            "README" "child\n"))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".pos/config.yaml"
+                  (pos-tree-test-config
+                   (pos-tree-test-child "projects/child" child))))
+           (plan (pos-tree-plan root))
+           (before (pos-tree-test-exclude root)))
+      (pos-tree-test-git root "clone" "-q" child
+                         (expand-file-name "projects/child" root))
+      (should (eq (pos-tree-test-refusal root plan) 'stale-plan))
+      (should (equal (pos-tree-test-exclude root) before)))))
+
+(ert-deftest pos-tree/a-plan-as-printed-is-applied ()
+  "A plan read back from its JSON is the plan."
+  (pos-tree-test-with dir
+    (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
+                                            "README" "child\n"))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".pos/config.yaml"
+                  (pos-tree-test-config
+                   (pos-tree-test-child "projects/child" child))))
+           (printed (pos-ledger-json (pos-tree-plan root))))
+      (should (equal (pos-tree-test-summary
+                      (pos-tree-apply root (pos-ledger--parse printed)))
+                     nil))
+      (should (file-exists-p (expand-file-name "projects/child/README" root))))))
+
+(ert-deftest pos-tree/a-clone-that-fails-is-refused-and-what-was-done-stays ()
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".pos/config.yaml"
+                 (pos-tree-test-config
+                  (pos-tree-test-child "projects/child"
+                                       (expand-file-name "origins/absent" dir))))))
+      (should (eq (pos-tree-test-refusal root (pos-tree-plan root)) 'failed))
+      (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                     '("clone projects/child"))))))
+
+(ert-deftest pos-tree/an-exclude-is-added-on-a-line-of-its-own ()
+  "After what the file holds, which may lack its final newline."
+  (pos-tree-test-with dir
+    (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
+                                            "README" "child\n"))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".pos/config.yaml"
+                  (pos-tree-test-config
+                   (pos-tree-test-child "projects/child" child)))))
+      (write-region "*.log" nil (pos-tree--exclude-file root) nil 'silent)
+      (pos-tree-test-settle root)
+      (should (equal (pos-tree-test-exclude root)
+                     '("*.log" "/projects/child")))
+      (pos-tree-test-settle root)
+      (should (equal (length (pos-tree-test-exclude root)) 2)))))
+
+(ert-deftest pos-tree/a-worktree-takes-a-branch-the-child-has ()
+  "A branch of the child's remote is checked out, not made afresh."
+  (pos-tree-test-with dir
+    (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
+                                            "README" "child\n"))
+           (root (progn
+                   (pos-tree-test-git child "switch" "-q" "-c" "feature")
+                   (pos-tree-test-commit child "FEATURE" "on the branch\n")
+                   (pos-tree-test-git child "switch" "-q" "master")
+                   (pos-tree-test-repository
+                    (expand-file-name "root" dir)
+                    ".pos/config.yaml"
+                    (concat (pos-tree-test-config
+                             (pos-tree-test-child "projects/child" child))
+                            "worktrees:\n"
+                            "  - path: _worktrees/feature\n"
+                            "    of: projects/child\n"
+                            "    branch: feature\n")))))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
+      (should (file-exists-p (expand-file-name "_worktrees/feature/FEATURE" root))))))
 
 ;;;; Skills
 

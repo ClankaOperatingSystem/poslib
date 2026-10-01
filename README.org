@@ -11,7 +11,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-remote.el= :: the client's side of an archive kept away from
   its ledger, by a keeper reached at a URL.
 - =lisp/pos-tree.el= :: a tree of repositories as =.pos/= declares it:
-  the plan of what to clone, exclude and link, which changes nothing.
+  the plan of what to clone, exclude and link, which changes nothing,
+  and its application.
 - =doc/formats.org= :: the formats shared with [[https://github.com/monkeypants/pyposlib][pyposlib]], in lockstep.
 - =doc/remote-archive-protocol.txt= :: what passes between a client and
   the keeper of a ledger's archive; =lisp/pos-remote.el= and pyposlib's
