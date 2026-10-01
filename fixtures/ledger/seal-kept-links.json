@@ -1,0 +1,153 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "An item sealed to a keeper cites what the keeper already holds and what lies outside the archive: a link to a path the ledger enrols, where nothing is on disk, becomes its CID from the fold, and a link out of the archive becomes a rumour, sent as an event of its own before the item.",
+ "tree": [
+  {
+   "path": ".git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "projects/a/archive-integrity/checkpoints/7ed999916867a8f6352a609b2b56724cc1c4ef18791c2aa5e4ef307bc71ae64e.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archive-integrity/ledger/00000001-baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq.json",
+   "text": "{\"add\":{\"trial/result.txt\":{\"cid\":\"bafkreihwuikppjp43igcz3uwmc37ykpvmspdy2fk2shcb2kqcn6jrej2na\",\"mode\":292,\"sha256\":\"f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68\",\"size\":6}},\"collections\":[],\"empty\":[],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeibzyhit5f35u5mte5ffc4befyszlijr4h7ynnsdj4ofxr6iv7b4dq\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/report.org",
+   "text": "#+TITLE: A report\n\nIt rests on [[file:archives/trial/result.txt][the result]],\nand mentions [[file:../b/outside.txt][something outside]].\n"
+  },
+  {
+   "path": "projects/b/outside.txt",
+   "text": "not in this archive"
+  }
+ ],
+ "source": "projects/a/report.org",
+ "destination": "projects/a/archives/report.org",
+ "claims": {
+  "plan": "as reviewed",
+  "scope": "projects/a",
+  "tool": "a fixture"
+ },
+ "keeper": {
+  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "token": "tape-token",
+  "exchanges": [
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"erased\":[],\"events\":1,\"head\":\"baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeibzyhit5f35u5mte5ffc4befyszlijr4h7ynnsdj4ofxr6iv7b4dq\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-f631bbc01662d228d0acac560df4c3bf829a8bfbf7646201c3a05f6cf200c990",
+     "body_sha256": "8fc5e03c34b81a11d485f551eddaee744a860f87427df369f91e41771adb11ab"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":2,\"head\":\"baguqeerawvdjxsnw7g7vbydalcapsgsk4gvpvjyn5oemswqxwupba3rxiusa\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeiaviba34wwfmmg4nvnacrloznvjlvea64slskhm74e6olx6c727lu\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-a3b0c3f562839007a1ddff268db0fe9395900de5d9f8b042cf3b90560983d7b1",
+     "body_sha256": "e37370e0715d7e60b053de573ff9f9f2fc590cbac61b2166b6c21c90f55ed1e8"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":3,\"head\":\"baguqeera6yskd7guq72vphrvkjeaqkywswe3dif3w4nnlseuxfvwvjivtuoq\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeiaprbcwfckwqlb4jttaqmp6o6pptedvdrsjtuybfskse7ihtrr6uy\"}\n"
+    }
+   }
+  ]
+ },
+ "plan": {
+  "add": {
+   "report.org": {
+    "cid": "bafkreih4dkjwlphbs2akoyn74qs524etewiu5xyboxp7ohmhkza5pqpxi4",
+    "mode": 292,
+    "sha256": "fc1a9365bce19680a761bfe425dd709325914edf0175dff71d875641d7c1f747",
+    "size": 230
+   }
+  },
+  "archive": "projects/a/archives",
+  "collections": [],
+  "destination": "projects/a/archives/report.org",
+  "inventory_sha256": "4d449e080445acdfe716641bf43d0af071ab56f8a932604fcc4974eab56c8736",
+  "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "ledger": "projects/a/archive-integrity/ledger",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "links": [
+   {
+    "file": "report.org",
+    "from": "file:archives/trial/result.txt",
+    "kind": "cid",
+    "offset": 33,
+    "to": "ipfs://bafybeidqtowkno6plrwjjyfdnhczxlnsomr2vm27g2o4agx3tr4ywyv6f4/result.txt"
+   },
+   {
+    "file": "report.org",
+    "from": "file:../b/outside.txt",
+    "kind": "rumour",
+    "offset": 94,
+    "to": "ipfs://bafkreicqbulfhlickr6gwcidu3hjhiamf3vadgk5v2e77wm4lkik56spvm"
+   }
+  ],
+  "number": 2,
+  "operation": "seal",
+  "originals": {
+   "report.org": "24923b1ca592808b9f7845e842ee726d80f430c58488562100cca742fa3aeb5d"
+  },
+  "previous": "baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq",
+  "rumours": [
+   {
+    "cid": "bafkreicqbulfhlickr6gwcidu3hjhiamf3vadgk5v2e77wm4lkik56spvm",
+    "destination": "rumours/2026-09-28-500d1653ad02.org",
+    "text": "#+TITLE: Rumour of ../b/outside.txt\n#+DATE: 2026-09-28\n\nOn 2026-09-28, sealing =report.org= found a link to =../b/outside.txt=, outside the archive. It was then a file of 19 bytes, SHA-256 =55b1d86c88092c79a8e39759cb3394859e99c2c21075c2e318b241b952f93df5=.\n"
+   }
+  ],
+  "schema": 2,
+  "source": "projects/a/report.org"
+ },
+ "event": {
+  "name": "00000003-baguqeera6yskd7guq72vphrvkjeaqkywswe3dif3w4nnlseuxfvwvjivtuoq.json",
+  "encoded": "{\"add\":{\"report.org\":{\"cid\":\"bafkreih4dkjwlphbs2akoyn74qs524etewiu5xyboxp7ohmhkza5pqpxi4\",\"mode\":292,\"sha256\":\"fc1a9365bce19680a761bfe425dd709325914edf0175dff71d875641d7c1f747\",\"size\":230}},\"collections\":[],\"empty\":[],\"item\":\"report.org\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeerawvdjxsnw7g7vbydalcapsgsk4gvpvjyn5oemswqxwupba3rxiusa\"},\"root\":\"bafybeiaprbcwfckwqlb4jttaqmp6o6pptedvdrsjtuybfskse7ihtrr6uy\",\"schema\":3}"
+ },
+ "report": [
+  {
+   "archive": "projects/a/archives",
+   "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+   "head": "baguqeera6yskd7guq72vphrvkjeaqkywswe3dif3w4nnlseuxfvwvjivtuoq",
+   "events": 3,
+   "files": 3,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeiaprbcwfckwqlb4jttaqmp6o6pptedvdrsjtuybfskse7ihtrr6uy",
+   "recorded_root": "bafybeiaprbcwfckwqlb4jttaqmp6o6pptedvdrsjtuybfskse7ihtrr6uy",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  }
+ ]
+}

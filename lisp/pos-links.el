@@ -159,9 +159,20 @@ FROM must be at OFFSET."
         (unless item
           (pos-ledger--refuse 'unsealed "Link to an archived path not sealed: %s" target))
         (let ((path (expand-file-name item archive)))
-          (concat "ipfs://" (if (file-directory-p path) (pos-cid-directory path)
-                              (pos-cid-file path))
+          (concat "ipfs://"
+                  (cond ((pos-ledger-kept archive)
+                         (cdr (assoc item (pos-ledger-fold-cids archive))))
+                        ((file-directory-p path) (pos-cid-directory path))
+                        (t (pos-cid-file path)))
                   (unless (equal rel item) (concat "/" (substring rel (1+ (length item)))))))))))
+
+(defun pos-links--kept-p (target)
+  "Return non-nil if TARGET is enrolled in an archive kept by a keeper.
+Nothing is on disk there, and TARGET is a path its ledger folds to."
+  (let ((archive (pos-links--archive-of target)))
+    (and archive (pos-ledger-kept archive)
+         (assoc (file-relative-name target archive) (pos-ledger-fold-cids archive))
+         t)))
 
 (defun pos-links-garden (scope)
   "Return the root of the garden holding SCOPE.
@@ -216,7 +227,8 @@ included, and (broken . TARGET) for nothing.  Without SCOPE, any archive
 is cited."
   (let ((archive (pos-links--archive-of target)))
     (cond
-     ((not (or (file-exists-p target) (file-symlink-p target)))
+     ((not (or (file-exists-p target) (file-symlink-p target)
+               (pos-links--kept-p target)))
       (cons 'broken target))
      ((and archive (or (null scope) (pos-links-within-scope-p archive scope)))
       (cons 'cid (pos-links--sealed target)))

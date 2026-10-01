@@ -1,0 +1,54 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "A keeper that refuses the caller is sent nothing more, and the item stays where it is.",
+ "tree": [
+  {
+   "path": ".git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "projects/a/archive-integrity/checkpoints/6f9405a31a020cce68e4c667bbfc11ace041e5c32261549f98535ceaa28694e1.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archive-integrity/ledger/00000001-baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq.json",
+   "text": "{\"add\":{\"trial/result.txt\":{\"cid\":\"bafkreihwuikppjp43igcz3uwmc37ykpvmspdy2fk2shcb2kqcn6jrej2na\",\"mode\":292,\"sha256\":\"f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68\",\"size\":6},\"trial/sub/more.txt\":{\"cid\":\"bafkreiaypcl44cx46ifvborlg7okqsuvdnyen4u62wvzj4aqmgpwtvxbre\",\"mode\":292,\"sha256\":\"187897ce0afcf20b50ba2b37dca84a951b7046f29ed5ab94f010619f69d6e189\",\"size\":4}},\"collections\":[],\"empty\":[\"trial/hollow\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeihmzg6jkejgtd4fekyfoo3dma7oepox5pj6ajvndg4hdu45zhyjtm\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/note.txt",
+   "text": "a note"
+  }
+ ],
+ "source": "projects/a/note.txt",
+ "destination": "projects/a/archives/note.txt",
+ "claims": {
+  "plan": "as reviewed",
+  "scope": "projects/a",
+  "tool": "a fixture"
+ },
+ "keeper": {
+  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "token": "tape-token",
+  "exchanges": [
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 403,
+     "body": "{\"refused\":\"access\"}\n"
+    }
+   }
+  ]
+ },
+ "error": "access"
+}

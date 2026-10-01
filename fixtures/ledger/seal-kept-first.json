@@ -1,0 +1,121 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "The first seal of an archive a keeper keeps: the keeper is asked what it holds, the event is sent with the item's files, and once the keeper has it the event is written to the ledger and the item removed from where it lay. Nothing is written to archives/.",
+ "tree": [
+  {
+   "path": ".git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "projects/a/note.txt",
+   "text": "a note"
+  },
+  {
+   "path": "projects/a/trial/hollow",
+   "directory": true
+  },
+  {
+   "path": "projects/a/trial/result.txt",
+   "text": "result"
+  },
+  {
+   "path": "projects/a/trial/sub/more.txt",
+   "text": "more"
+  }
+ ],
+ "source": "projects/a/trial",
+ "destination": "projects/a/archives/trial",
+ "claims": {
+  "plan": "as reviewed",
+  "scope": "projects/a",
+  "tool": "a fixture"
+ },
+ "keeper": {
+  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "token": "tape-token",
+  "exchanges": [
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"erased\":[],\"events\":0,\"head\":null,\"ledger_id\":null,\"protocol\":1,\"root\":null}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-b120493f6a7567bbd6d20d206c0b9228103d6c42baa4e63e696a656551c171b4",
+     "body_sha256": "562bd92713bc9b8d86fa619b7d2ccc34cfea73ec058c10d463f40b147bdd5be3"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":1,\"head\":\"baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeihmzg6jkejgtd4fekyfoo3dma7oepox5pj6ajvndg4hdu45zhyjtm\"}\n"
+    }
+   }
+  ]
+ },
+ "plan": {
+  "schema": 2,
+  "operation": "seal",
+  "source": "projects/a/trial",
+  "destination": "projects/a/archives/trial",
+  "archive": "projects/a/archives",
+  "ledger": "projects/a/archive-integrity/ledger",
+  "number": 1,
+  "previous": null,
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "add": {
+   "trial/result.txt": {
+    "sha256": "f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68",
+    "size": 6,
+    "mode": 292,
+    "cid": "bafkreihwuikppjp43igcz3uwmc37ykpvmspdy2fk2shcb2kqcn6jrej2na"
+   },
+   "trial/sub/more.txt": {
+    "sha256": "187897ce0afcf20b50ba2b37dca84a951b7046f29ed5ab94f010619f69d6e189",
+    "size": 4,
+    "mode": 292,
+    "cid": "bafkreiaypcl44cx46ifvborlg7okqsuvdnyen4u62wvzj4aqmgpwtvxbre"
+   }
+  },
+  "collections": [],
+  "links": [],
+  "originals": {},
+  "rumours": [],
+  "inventory_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+  "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1"
+ },
+ "event": {
+  "name": "00000001-baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq.json",
+  "encoded": "{\"add\":{\"trial/result.txt\":{\"cid\":\"bafkreihwuikppjp43igcz3uwmc37ykpvmspdy2fk2shcb2kqcn6jrej2na\",\"mode\":292,\"sha256\":\"f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68\",\"size\":6},\"trial/sub/more.txt\":{\"cid\":\"bafkreiaypcl44cx46ifvborlg7okqsuvdnyen4u62wvzj4aqmgpwtvxbre\",\"mode\":292,\"sha256\":\"187897ce0afcf20b50ba2b37dca84a951b7046f29ed5ab94f010619f69d6e189\",\"size\":4}},\"collections\":[],\"empty\":[\"trial/hollow\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeihmzg6jkejgtd4fekyfoo3dma7oepox5pj6ajvndg4hdu45zhyjtm\",\"schema\":3}"
+ },
+ "report": [
+  {
+   "archive": "projects/a/archives",
+   "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+   "head": "baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq",
+   "events": 1,
+   "files": 2,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeihmzg6jkejgtd4fekyfoo3dma7oepox5pj6ajvndg4hdu45zhyjtm",
+   "recorded_root": "bafybeihmzg6jkejgtd4fekyfoo3dma7oepox5pj6ajvndg4hdu45zhyjtm",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  }
+ ]
+}

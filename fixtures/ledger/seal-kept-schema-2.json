@@ -1,0 +1,37 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "A keeper keeps a ledger from schema 3: one still of schema 2 is converted, and its archive moved, before anything is sealed to its keeper.",
+ "tree": [
+  {
+   "path": ".git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "projects/a/archive-integrity/ledger/00000001-f2e1ff029b53058305ec6fc50ea3f24282a12016985d6f1747ed1cc6bf90f8ad.json",
+   "text": "{\"add\":{\"old.txt\":{\"cid\":\"bafkreifhsn5wjogkuwhqg4q3w25m6xdyzmrv727a44frxbgntfkbiynary\",\"mode\":292,\"sha256\":\"a7937b64b8caa58f03721bb6bacf5c78cb235febe0e70b1b84cd99541461a08e\",\"size\":5}},\"collections\":[],\"item\":\"old.txt\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/note.txt",
+   "text": "a note"
+  }
+ ],
+ "source": "projects/a/note.txt",
+ "destination": "projects/a/archives/note.txt",
+ "claims": {
+  "plan": "as reviewed",
+  "scope": "projects/a",
+  "tool": "a fixture"
+ },
+ "keeper": {
+  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "token": "tape-token",
+  "exchanges": []
+ },
+ "error": "kept"
+}

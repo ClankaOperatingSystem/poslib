@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 14, in lockstep; the fixtures in =fixtures/= are its
+this document, version 15, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -118,8 +118,9 @@ and no file in =archives/=, which need not exist. One that holds a file
 is refused (=kept=): it has not been moved to its keeper. What it holds
 is what its ledger enrols, and its CIDs are those the ledger folds to
 ([[*From an inventory][From an inventory]]), so its ledger enrols a CID for every entry, else
-=entry=. Nothing below asks a keeper anything: a kept archive is read from
-its ledger alone.
+=entry=. Discovery, the check and planning read a kept archive from its
+ledger alone and ask its keeper nothing. Applying a plan sends the seal
+to the keeper ([[*To a keeper][To a keeper]]).
 
 ** Discovery
 
@@ -337,15 +338,20 @@ canonical JSON:
 - =collections=: the directories in the item, itself included, whose
   =README.org= declares them, sorted;
 - =inventory_sha256=: the SHA-256 of the archive's inventory, in
-  canonical JSON, as planned.
+  canonical JSON, as planned;
+- =kept=: for an archive a keeper keeps, the keeper's URL; for one on
+  disk the key is absent.
+
+For an archive a keeper keeps, the inventory is what its ledger enrols
+and nothing is compared with disk.
 
 Planning refuses: =source= (missing, or already archived), =destination=
 (not in an archive, existing, or unsafe), =sealed= (the destination lies
 within an item or collection already sealed: a sealed item never grows), =hidden= (a hidden file in the
 item, or a hidden destination), =link= (a symlink or second hard link in
 the item), =differs= (enrolled evidence in the archive is missing or
-changed), =kept= (a keeper keeps the archive: sealing to a keeper is not
-in this version), and for links, =unsealed=, =unresolved= and =loop=, below.
+changed), =kept= (a keeper keeps the archive, and its ledger is not yet of
+schema 3 or it still has files on disk), and for links, =unsealed=, =unresolved= and =loop=, below.
 Hidden or unenrolled files already elsewhere in the archive do not stop a
 seal; the check reports them.
 
@@ -370,7 +376,9 @@ move, and resolves:
   =ipfs://= and the CID of the sealed item holding it, else of the
   collection holding it, else of the enrolled file itself, then =/= and
   the path within it if it is not the whole (=cid=); a path never sealed
-  is refused (=unsealed=);
+  is refused (=unsealed=). In an archive a keeper keeps, a path its
+  ledger folds to is such a path though nothing is on disk, and the CID
+  is the fold's;
 - to anything else that exists, canon, another scope, or a container's
   archive, since a scope does not depend on its container: a rumour
   record, sealed first as an item of its own, whose CID the link cites
@@ -400,7 +408,9 @@ the garden's repository, which is never read; else =a directory=, or =a
 file of N bytes, SHA-256 =HEX== with
 =, titled "TITLE"= if the file has an Org =#+TITLE= or a Markdown =#=
 heading. A rumour already sealed, word for word, is cited, not sealed
-again; one differing at its destination is refused (=destination=).
+again; one differing at its destination is refused (=destination=). In
+an archive a keeper keeps, a rumour is sealed already when the ledger
+enrols its destination with its CID.
 
 Planning an item that holds Org or Markdown files is poslib's, since Org
 interpretation is; pyposlib refuses to plan it (=interpretation=), and
@@ -441,9 +451,58 @@ plan, uses =seal SOURCE DESTINATION --apply= or =write-new DESTINATION
 under its own hash, and prints =plan=, =hash=, =event= and =root=. The
 plan and its refusals are those of the two-step form.
 
+*** To a keeper
+
+A plan with =kept= is applied to its keeper, over
+=doc/remote-archive-protocol.txt=, and nothing is written to
+=archives/=. A plan is refused (=plan=) unless its archive is kept now
+as the plan says: by that keeper, or on disk for a plan without the key.
+
+1. The plan's hash must be the one reviewed, else =plan=.
+2. The keeper is asked what it holds. It must hold this ledger: as many
+   events, with the same head; or more, in which case the events the
+   ledger lacks are fetched by number and written to it, and the ledger
+   must then be valid and end at the keeper's head. Anything else is
+   refused (=chain=), with the ledger as it was. A seal interrupted
+   after its keeper took an event is finished this way, and so is a
+   ledger behind because another clone sealed.
+3. As step 2 above, the inventory being what the ledger enrols.
+4. Each rumour not yet sealed is sent: an event whose =item= is the
+   rumour and whose =add= is its entry, of mode =0444=, with the one
+   file its text is.
+5. Unless its event is in the ledger, the item's files in =originals=
+   are rewritten where it lies, its entries must be as planned, else
+   =plan=, and its event is sent with every file it enrols. The event
+   is as in step 6 above, of schema 3, =empty= as found in the item
+   where it lies.
+6. An event is written to the ledger once the keeper has answered that
+   it holds it, and not before. What a keeper refuses is refused by its
+   kind, and nothing is written.
+7. The item is then removed from where it lay, if its entries are still
+   as planned, else =plan=.
+8. The checkpoint, as step 8 above.
+
+With each event the client sends its claims, strings by name, which a
+keeper records and does not verify:
+
+- =plan=: the plan's hash; =tool=: =poslib= or =pyposlib=;
+- of the scope's repository, where there is one and git reads it:
+  =scope=, the scope's path in it; =commit= and =branch=, where its
+  =HEAD= is; =dirty=, =true= or =false=, whether git reports anything
+  changed or untracked; and =remote.NAME= for each remote, its URL less
+  any user and password.
+
+The keeper is reached with the bearer token in the environment's
+=POS_ARCHIVE_TOKEN=, if set.
+
 Fixtures: =fixtures/ledger/seal-*=: a tree, a source and destination, a
 date for rumours, and the plan, the last event and the report after it,
-paths relative to the tree; or the refusal.
+paths relative to the tree; or the refusal. A fixture sealed to a keeper
+has =keeper=, the keeper's =url=, a =token= and the =exchanges= in order,
+each a =request= and a =response= as a tape of
+=doc/remote-archive-protocol.txt= has them, and =claims=, sent in place
+of the client's own. A client makes each request as recorded and no
+other, and the item is gone afterwards unless the seal was refused.
 
 ** Conversion
 
