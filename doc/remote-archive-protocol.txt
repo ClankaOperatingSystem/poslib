@@ -156,9 +156,70 @@ still names it.
 
 8. Who is calling
 
-A request may carry "Authorization: Bearer {token}". What a token is,
-how it is obtained, and what its bearer may read or append are the
-keeper's, and outside the protocol.
+A request may carry "Authorization: Bearer {token}". What a token is
+and what its bearer may read or append are the keeper's.
+
+A keeper whose tokens come from an OAuth 2.0 authorization server may
+say how a person gets one. It then answers a request that carries no
+token it accepts with 401 and
+
+    WWW-Authenticate: Bearer resource_metadata="{url}"
+
+and answers GET {url}, with no token, with a JSON object (RFC 9728,
+which gives its usual place: /.well-known/oauth-protected-resource at
+the keeper's origin):
+
+    resource                the keeper's origin
+    authorization_servers   an array holding one issuer
+    scopes_supported        the scopes a client asks for
+    client_id               the public client a sealing tool signs in as
+
+A keeper that says none of this is given a token by other means, or
+none.
+
+Signing in. A client signs a person in when asked to, and at no other
+time: a seal or a check never opens a browser. Asked, it reads the
+keeper's object, then the issuer's own at
+{issuer}/.well-known/openid-configuration, and follows the
+authorization code flow with PKCE (RFC 7636, method S256) to a loopback
+address (RFC 8252):
+
+  - It listens on a free port of 127.0.0.1 and sends the person's
+    browser to authorization_endpoint with response_type=code, the
+    client_id, redirect_uri=http://localhost:{port}/callback, the
+    scopes with offline_access added, a state, and the code challenge.
+  - The browser comes back to the callback with a code and that state.
+  - It exchanges the code at token_endpoint, with the verifier and no
+    secret, for an access token and, where the issuer gives one, a
+    refresh token.
+
+Tokens kept. What signing in yields is kept in one file both libraries
+read: {config}/pos/tokens.json, where {config} is $XDG_CONFIG_HOME or
+~/.config. It is readable by its owner alone, mode 0600, and replaced
+whole by a rename. It holds a JSON object:
+
+    tokens    by "{issuer} {client_id}": access_token; expires_at, in
+              seconds since the epoch; refresh_token, or null; scopes
+    keepers   by a keeper's origin: its issuer and client_id
+
+Which token a request carries:
+
+  - The environment's POS_ARCHIVE_TOKEN, if set.
+  - Else the token kept for the keeper's origin. If it expires within a
+    minute and a refresh token is kept, it is first refreshed at the
+    issuer's token_endpoint (grant_type=refresh_token) and the file
+    rewritten.
+  - Else none.
+
+A client answered 401 by an origin it has no entry for reads that
+origin's object, at its usual place. If a token is kept for the issuer
+and client it names, the client records the origin under keepers and
+makes the request again, once. So signing in to one of a keeper's
+ledgers serves its others. Still refused, the request is refused as
+access, and the client says to sign in.
+
+fixtures/signin/ holds kept files, each with the token a request to
+each of several keepers then carries, or null.
 
 
 9. The ports
