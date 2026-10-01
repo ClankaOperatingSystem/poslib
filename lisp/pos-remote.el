@@ -40,6 +40,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'url)
+(require 'url-http)
 (require 'url-util)
 (require 'pos-ledger)
 
@@ -92,7 +93,15 @@ BODY is a unibyte string or nil.  Return (STATUS . BYTES)."
          (url-mime-encoding-string "identity")
          (url-show-status nil)
          (buffer (condition-case err
-                     (url-retrieve-synchronously url t t)
+                     ;; Left to itself url.el answers a 401's challenge:
+                     ;; it asks at the terminal for a name and password,
+                     ;; and for a scheme it does not know, Bearer among
+                     ;; them, it never finishes.  The refusal is the
+                     ;; caller's to read.  url-http is required above
+                     ;; because loading it here would undo this.
+                     (cl-letf (((symbol-function 'url-http-handle-authentication)
+                                (lambda (_proxy) t)))
+                       (url-retrieve-synchronously url t t))
                    (error (pos-ledger--refuse 'remote "%s: %s" url
                                               (error-message-string err))))))
     (unless buffer

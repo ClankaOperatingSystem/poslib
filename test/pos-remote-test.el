@@ -105,6 +105,42 @@ and one that means nothing here, as remote."
   "Return event NUMBER of ARCHIVE, from its list."
   (nth (1- number) (pos-remote-test-memory-events archive)))
 
+(defun pos-remote-test-refusing (challenge)
+  "Start a server on a loopback port that answers every request 401.
+CHALLENGE, if a string, is its WWW-Authenticate header.  Return the
+server process."
+  (make-network-process
+   :name "pos-remote-test" :server t :host "127.0.0.1" :service t
+   :family 'ipv4 :coding 'binary :noquery t
+   :filter
+   (lambda (connection data)
+     (let ((seen (concat (process-get connection 'seen) data)))
+       (process-put connection 'seen seen)
+       (when (string-search "\r\n\r\n" seen)
+         (process-send-string
+          connection
+          (concat "HTTP/1.1 401 Unauthorized\r\n"
+                  (and challenge (format "WWW-Authenticate: %s\r\n" challenge))
+                  "Content-Type: application/json\r\nContent-Length: 2\r\n"
+                  "Connection: close\r\n\r\n{}"))
+         (delete-process connection))))))
+
+(ert-deftest pos-remote/a-refusal-for-want-of-a-token-is-handed-back ()
+  "A 401 to a request with no token is the caller's, whatever it challenges.
+Emacs would otherwise ask at the terminal, or wait without end."
+  (dolist (challenge '(nil "Bearer"
+                       "Bearer resource_metadata=\"http://127.0.0.1/told\""
+                       "Basic realm=\"keeper\""))
+    (let ((server (pos-remote-test-refusing challenge)))
+      (unwind-protect
+          (should (equal (with-timeout (10 'waited)
+                           (pos-remote--send
+                            "GET" (format "http://127.0.0.1:%d/"
+                                          (process-contact server :service))
+                            nil nil))
+                         '(401 . "{}")))
+        (delete-process server)))))
+
 (ert-deftest pos-remote/a-port-takes-another-transport ()
   "The operations are generic: a keeper that is not HTTP answers them too."
   (should (equal "second"
