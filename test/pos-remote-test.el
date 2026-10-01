@@ -141,6 +141,25 @@ Emacs would otherwise ask at the terminal, or wait without end."
                          '(401 . "{}")))
         (delete-process server)))))
 
+(ert-deftest pos-remote/a-keeper-that-says-nothing-is-given-up-on ()
+  "A socket that takes a request and never answers it is not waited on.
+The exchange is refused once `pos-remote-timeout' has passed."
+  (let ((server (make-network-process
+                 :name "pos-remote-test" :server t :host "127.0.0.1"
+                 :service t :family 'ipv4 :coding 'binary :noquery t
+                 :filter #'ignore))
+        (pos-remote-timeout 1))
+    (unwind-protect
+        (should (equal (with-timeout (20 'waited)
+                         (condition-case err
+                             (pos-remote--send
+                              "GET" (format "http://127.0.0.1:%d/"
+                                            (process-contact server :service))
+                              nil nil)
+                           (pos-ledger-refused (cadr err))))
+                       'remote))
+      (delete-process server))))
+
 (ert-deftest pos-remote/a-port-takes-another-transport ()
   "The operations are generic: a keeper that is not HTTP answers them too."
   (should (equal "second"

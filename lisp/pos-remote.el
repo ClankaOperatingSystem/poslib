@@ -79,9 +79,14 @@ directory.")
     (413 . size))
   "The kind of refusal a status is, when its body does not say.")
 
+(defvar pos-remote-timeout 300
+  "Seconds an exchange with a keeper may take before it is given up.
+An exchange given up is refused as `remote'.  Nil waits without end.")
+
 (defun pos-remote--send (method url headers body)
   "Make one HTTP exchange: METHOD on URL with HEADERS, an alist, and BODY.
-BODY is a unibyte string or nil.  Return (STATUS . BYTES)."
+BODY is a unibyte string or nil.  Return (STATUS . BYTES).  A keeper
+that has not answered in `pos-remote-timeout' seconds is refused."
   (let* ((url-request-method method)
          ;; url.el joins these to the body, and refuses the request if
          ;; that makes multibyte text of the body's bytes.
@@ -102,7 +107,7 @@ BODY is a unibyte string or nil.  Return (STATUS . BYTES)."
                      ;; because loading it here would undo this.
                      (cl-letf (((symbol-function 'url-http-handle-authentication)
                                 (lambda (_proxy) t)))
-                       (url-retrieve-synchronously url t t))
+                       (url-retrieve-synchronously url t t pos-remote-timeout))
                    (error (pos-ledger--refuse 'remote "%s: %s" url
                                               (error-message-string err))))))
     (unless buffer
