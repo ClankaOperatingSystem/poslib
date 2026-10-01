@@ -41,43 +41,18 @@
                 pair))
             plan)))
 
-(defun pos-seal-test-tape (recorded)
-  "Return a function to send requests with that plays RECORDED, a keeper's.
-Each request must be the next one recorded, and is answered as it was.
-Called with no argument, it gives the exchanges not yet played."
-  (let ((left (append (alist-get 'exchanges recorded) nil))
-        (base (alist-get 'url recorded)))
-    (lambda (&optional method url headers body)
-      (if (null method)
-          left
-        (let* ((exchange (or (pop left)
-                             (error "A request the recording does not have: %s %s"
-                                    method url)))
-               (sent `((method . ,method)
-                       (path . ,(substring url (length base)))
-                       (authorization . ,(or (cdr (assoc "Authorization" headers)) :null))
-                       ,@(when body
-                           `((content_type . ,(cdr (assoc "Content-Type" headers)))
-                             (body_sha256 . ,(pos-ledger--sha body)))))))
-          (unless (equal (pos-ledger-json sent)
-                         (pos-ledger-json (alist-get 'request exchange)))
-            (error "Not the request recorded: %S" sent))
-          (cons (alist-get 'status (alist-get 'response exchange))
-                (encode-coding-string (alist-get 'body (alist-get 'response exchange))
-                                      'utf-8)))))))
-
 (defun pos-seal-test-run (fixture dir)
   "Seal FIXTURE, built in DIR; return what happened, relative to DIR.
 An alist of plan, event and report, or of error.  A fixture with a
 keeper is sealed to its recording, with the claims it gives."
   (let-alist fixture
-    (let* ((tape (and .keeper (pos-seal-test-tape .keeper)))
+    (let* ((tape (and .keeper (pos-ledger-test-tape .keeper)))
            (pos-remote-send-function (or tape pos-remote-send-function))
-           (pos-seal-keeper-function
+           (pos-remote-keeper-function
             (if tape
                 (lambda (url)
                   (pos-remote-http-create :url url :token (alist-get 'token .keeper)))
-              pos-seal-keeper-function))
+              pos-remote-keeper-function))
            (pos-seal-claims-function
             (if tape (lambda (&rest _) .claims) pos-seal-claims-function))
            (got (pos-seal-test-run-1 fixture dir)))
@@ -102,7 +77,9 @@ keeper is sealed to its recording, with the claims it gives."
             (event . ((name . ,(file-name-nondirectory (car result)))
                       (encoded . ,(decode-coding-string (pos-ledger--read (car result))
                                                         'utf-8))))
-            (report . ,(pos-ledger-test-relative (pos-ledger-check scope) dir))))
+            ;; The recording is of the seal: the report after it asks no keeper.
+            (report . ,(let ((pos-ledger-offline t))
+                         (pos-ledger-test-relative (pos-ledger-check scope) dir)))))
       (pos-ledger-refused `((error . ,(symbol-name (cadr err))))))))
 
 (ert-deftest pos-seal/every-shared-fixture-seals-the-same-bytes ()
@@ -429,9 +406,9 @@ the fixture's seal, planned."
   `(let ((fixture (pos-fixture "ledger" ,fixture)))
      (pos-fixture-with fixture dir
        (let-alist fixture
-         (let* ((tape (pos-seal-test-tape .keeper))
+         (let* ((tape (pos-ledger-test-tape .keeper))
                 (pos-remote-send-function tape)
-                (pos-seal-keeper-function
+                (pos-remote-keeper-function
                  (lambda (url)
                    (pos-remote-http-create :url url :token (alist-get 'token .keeper))))
                 (pos-seal-claims-function (lambda (&rest _) .claims))
@@ -470,6 +447,28 @@ before the scope's configuration changed is refused, and nothing is sent."
         (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan))))
       (should (equal events (nth 2 (pos-ledger-history (alist-get 'archive plan)))))
       (should (file-exists-p source)))))
+
+(ert-deftest pos-seal/a-keeper-with-another-head-is-a-finding ()
+  "Asked, a keeper that holds what the ledger has is no finding, and one
+ahead of it is; what a keeper has erased is not."
+  (dolist (expected '(("report-kept-asked" . nil) ("report-kept-erased" . nil)
+                      ("report-kept-keeper-ahead" . t)))
+    (let ((fixture (pos-fixture "ledger" (car expected))))
+      (pos-fixture-with fixture dir
+        (pos-ledger-test-with-keeper (alist-get 'keeper fixture)
+          (should (eq (cdr expected)
+                      (and (pos-seal-findings-p (pos-ledger-check dir)) t))))))))
+
+(ert-deftest pos-seal/a-check-told-to-stay-offline-asks-no-keeper ()
+  "With POS_ARCHIVE_OFFLINE set, a kept archive is reported from its
+ledger and nothing is sent."
+  (pos-fixture-with (pos-fixture "ledger" "report-kept-asked") dir
+    (let ((process-environment (cons "POS_ARCHIVE_OFFLINE=1" process-environment))
+          (pos-ledger-offline nil)
+          (pos-remote-send-function (lambda (&rest _) (error "A keeper was asked"))))
+      (let ((report (car (pos-ledger-check dir))))
+        (should (stringp (alist-get 'kept report)))
+        (should (eq :null (alist-get 'keeper report)))))))
 
 (ert-deftest pos-seal/the-claims-say-where-a-seal-came-from ()
   "The plan and the tool, and of a repository git reads: the scope, the

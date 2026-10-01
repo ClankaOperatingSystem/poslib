@@ -111,6 +111,14 @@ BODY is a unibyte string or nil.  Return (STATUS . BYTES)."
                           'binary))))
       (kill-buffer buffer))))
 
+(defvar pos-remote-keeper-function
+  (lambda (url) (pos-remote-http-create :url url :token (getenv "POS_ARCHIVE_TOKEN")))
+  "The function a keeper's URL is made a keeper with.
+What it returns answers `pos-remote-describe', `pos-remote-event',
+`pos-remote-append' and `pos-remote-read'.  By default the keeper is
+reached over HTTP, with the bearer token in the environment's
+POS_ARCHIVE_TOKEN.")
+
 (defvar pos-remote-send-function #'pos-remote--send
   "The function an exchange of `pos-remote-http' is made with.
 Called with a method, a URL, an alist of headers and a body, a unibyte

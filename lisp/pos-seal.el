@@ -577,13 +577,6 @@ Return (EVENT-FILE . ROOT)."
 
 ;;;; Sealing to a keeper
 
-(defvar pos-seal-keeper-function
-  (lambda (url) (pos-remote-http-create :url url :token (getenv "POS_ARCHIVE_TOKEN")))
-  "The function a keeper's URL is made a keeper with.
-What it returns answers `pos-remote-describe', `pos-remote-event' and
-`pos-remote-append'.  By default the keeper is reached over HTTP, with
-the bearer token in the environment's POS_ARCHIVE_TOKEN.")
-
 (defvar pos-seal-claims-function #'pos-seal-claims
   "The function a seal's claims are made with, given its plan and hash.")
 
@@ -667,7 +660,7 @@ Each event is sent with its files, written to the ledger once the
 keeper has it, and the item is then removed from where it lay.
 Interrupted, it resumes.  Return (EVENT-FILE . ROOT)."
   (let-alist plan
-    (let* ((keeper (funcall pos-seal-keeper-function .kept))
+    (let* ((keeper (funcall pos-remote-keeper-function .kept))
            (claims (funcall pos-seal-claims-function plan expected))
            (rel (file-relative-name .destination .archive))
            (_ (pos-seal--catch-up .archive .ledger keeper))
@@ -739,7 +732,10 @@ Interrupted, it resumes.  Return (EVENT-FILE . ROOT)."
                               (list .changed .missing .new .writable
                                     .checkpoint_writable .hidden .undeclared))
                     (and (not (eq .recorded_root :null))
-                         (not (equal .recorded_root .root))))))
+                         (not (equal .recorded_root .root)))
+                    ;; A keeper asked, whose head is not the ledger's.
+                    (and (not (eq .keeper :null))
+                         (not (equal (alist-get 'head .keeper) .head))))))
             report))
 
 (defun pos-seal--anchor-home (root)

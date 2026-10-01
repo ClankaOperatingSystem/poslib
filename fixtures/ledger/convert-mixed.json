@@ -72,6 +72,7 @@
   {
    "archive": "garden/projects/legacy/archives",
    "kept": null,
+   "keeper": null,
    "head": "fa53ddc083c49ccedf7fa4bcdff98f567f29d2b1d86e9f624f14cd6647ff126f",
    "events": 1,
    "files": 1,
@@ -88,6 +89,7 @@
   {
    "archive": "garden/projects/none/archives",
    "kept": null,
+   "keeper": null,
    "head": null,
    "events": 0,
    "files": 0,
@@ -104,6 +106,7 @@
   {
    "archive": "garden/projects/three/archives",
    "kept": null,
+   "keeper": null,
    "head": "baguqeerahxl2z4nijudicp5xdd6v3j46wmt4gim42is4nbjk3asamavwfqha",
    "events": 1,
    "files": 1,
@@ -120,6 +123,7 @@
   {
    "archive": "garden/projects/two/archives",
    "kept": null,
+   "keeper": null,
    "head": "baguqeerari6yxnt2epwnz47hq4ivsjvhxe5jbc4hllarzapu4u5aso4zaciq",
    "events": 2,
    "files": 1,
