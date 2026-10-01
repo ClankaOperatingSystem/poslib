@@ -40,6 +40,11 @@ describe    GET {base}/
         root        the root its last event recorded, or null
         erased      the CIDs whose bytes it has erased, sorted
 
+    A keeper that has agreed to keep the ledger and holds no event of
+    it yet answers with events 0 and with ledger_id, head and root
+    null. A keeper that keeps no ledger at {base} refuses describe, as
+    it does every operation there, as absent.
+
 event       GET {base}/events/{number}
 
     The bytes of event {number}, counting from 1, exactly as the
@@ -113,7 +118,8 @@ kind, and possibly message, for a person. A client goes by the kind.
     422  request     the request is not as section 2 has it
     413  size        the body is larger than the keeper takes
     401, 403  access the caller may not do this
-    404  absent      no such event, or nothing the ledger enrols there
+    404  absent      no ledger kept at {base}, no such event, or
+                     nothing the ledger enrols there
     410  erased      the bytes were erased (section 7)
 
 Kinds a keeper takes from doc/formats.org keep their names there. A
