@@ -8,7 +8,13 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-ledger.el= :: archive integrity ledgers, read and checked.
 - =lisp/pos-seal.el= :: sealing items into archives: a plan, reviewed, then applied.
 - =lisp/pos-index.el= :: the CID index, ephemera, and Org's =ipfs:= links.
+- =lisp/pos-remote.el= :: the client's side of an archive kept away from
+  its ledger, by a keeper reached at a URL.
 - =doc/formats.org= :: the formats shared with [[https://github.com/monkeypants/pyposlib][pyposlib]], in lockstep.
+- =doc/remote-archive-protocol.txt= :: what passes between a client and
+  the keeper of a ledger's archive; =lisp/pos-remote.el= and pyposlib's
+  =remote.py= are its clients, and any server that does what it says is
+  a keeper.
 - =fixtures/= :: their examples, run by both.
 - =test/= :: ERT tests.
 
