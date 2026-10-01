@@ -37,6 +37,7 @@
 ;; - `pos-seal-stage': stage new bytes, and plan to seal them.
 ;; - `pos-seal-apply': apply a plan, given its reviewed hash.
 ;; - `pos-seal-convert': bring schema 2 ledgers to schema 3.
+;; - `pos-seal-keep': move archives on disk to their keepers.
 ;; - `pos-seal-batch': the command line.
 
 ;;; Code:
@@ -583,13 +584,13 @@ Return (EVENT-FILE . ROOT)."
 (defun pos-seal-claims (plan expected)
   "Return the claims of this client about the seal of PLAN.
 An alist of strings by name, for a keeper to record: the plan's hash
-EXPECTED and the tool, and of the scope's repository, where there is one
-and git reads it, the scope's path, the commit and branch it is at,
-whether its working tree is dirty, and each remote's URL less any user
-and password."
+EXPECTED, where there was a plan, and the tool, and of the scope's
+repository, where there is one and git reads it, the scope's path, the
+commit and branch it is at, whether its working tree is dirty, and each
+remote's URL less any user and password."
   (let* ((scope (file-name-directory (alist-get 'archive plan)))
          (root (locate-dominating-file scope ".git"))
-         (claims `(("plan" . ,expected) ("tool" . "poslib"))))
+         (claims `(,@(when expected `(("plan" . ,expected))) ("tool" . "poslib"))))
     (when root
       (setq root (directory-file-name (expand-file-name root)))
       (let* ((process-environment
@@ -867,6 +868,131 @@ with the reason."
     `((converted . ,(vconcat (nreverse converted)))
       (skipped . ,(vconcat (nreverse skipped))))))
 
+;;;; Keeping an existing archive
+
+(defun pos-seal--added-paths (files entries)
+  "Return (ADDED . FIRST) for a ledger of event FILES enrolling ENTRIES.
+ADDED is, for each event in order, the paths it enrolled as the ledger
+now has them: an event before a schema 2 conversion enrolled paths that
+conversion may have renamed or removed.  FIRST is the index of the first
+schema 3 event, or nil."
+  (let* ((values (mapcar (lambda (file) (pos-ledger--parse (pos-ledger--read file)))
+                         files))
+         (conversion (seq-position values nil
+                                   (lambda (value _)
+                                     (and (eql (alist-get 'schema value) 2)
+                                          (equal (alist-get 'kind value) "conversion")))))
+         (rename (and conversion
+                      (mapcar (lambda (pair) (cons (pos-ledger--key (car pair)) (cdr pair)))
+                              (alist-get 'rename (nth conversion values)))))
+         (index -1))
+    (cons (mapcar
+           (lambda (value)
+             (setq index (1+ index))
+             (let ((paths (mapcar (lambda (pair) (pos-ledger--key (car pair)))
+                                  (alist-get 'add value))))
+               (when (and conversion (< index conversion))
+                 (setq paths (mapcar (lambda (path) (or (cdr (assoc path rename)) path))
+                                     paths)))
+               (seq-filter (lambda (path) (assoc path entries)) paths)))
+           values)
+          (seq-position values nil
+                        (lambda (value _) (eql (alist-get 'schema value) 3))))))
+
+(defun pos-seal-keep (root)
+  "Move to its keeper each archive under ROOT that is to be kept by one.
+That is, each whose scope's entry gives it to a keeper and whose files
+are still on disk.  The keeper is sent the events it lacks, in order,
+each with the files it enrolled; the first schema 3 event also with
+whatever enrolled before it was not sent in this run, since that event
+is where a keeper requires them.  Once the keeper holds the ledger's
+head and its root, the archive is removed from disk.  Refused unless
+every such archive is as its ledger says, with a ledger of schema 3
+beside it and nothing hidden, before anything is sent.  Interrupted, it
+resumes.  Return an alist: kept, each an archive with its keeper and
+the events and files sent; and skipped, each an archive with the
+reason."
+  (let (kept skipped pending)
+    (dolist (archive (pos-ledger-roots root))
+      (pcase-let* ((url (pos-ledger-kept archive))
+                   (`(,entries ,head ,_ ,files ,recorded ,_ ,_ ,empty)
+                    (pos-ledger-history archive))
+                   (reason (cond ((null url) "on disk")
+                                 ((null head) "no ledger")
+                                 ((null (pos-ledger-inventory archive)) "kept"))))
+        (if reason
+            (push `((archive . ,archive) (reason . ,reason)) skipped)
+          (pos-ledger--as-named archive files)
+          (unless (pos-ledger--event-cid-p head)
+            (pos-ledger--refuse
+             'kept "A keeper keeps a ledger of schema 3; convert this one first: %s"
+             archive))
+          (when (string-prefix-p (file-name-as-directory archive) (car files))
+            (pos-ledger--refuse
+             'ledger "A kept archive's ledger lies beside it, not inside: %s" archive))
+          (let* ((cids (condition-case err
+                           (pos-cid-tree archive)
+                         (pos-cid-sharding-unsupported
+                          (pos-ledger--refuse 'sharding-unsupported "%S" (cdr err)))))
+                 (actual (pos-ledger--with-cids
+                          entries (pos-ledger-inventory archive) cids)))
+            (pcase-let ((`(,missing ,changed ,new)
+                         (pos-ledger--differences entries actual)))
+              (when (or missing changed new
+                        (not (equal recorded (cdr (assoc "." cids))))
+                        (not (equal recorded
+                                    (cdr (assoc "." (pos-ledger-fold entries empty))))))
+                (pos-ledger--refuse
+                 'unclean "The archive is not as its ledger says; check it first: %s"
+                 archive)))
+            (when (seq-some (lambda (pair)
+                              (seq-some (lambda (part) (string-prefix-p "." part))
+                                        (split-string (car pair) "/")))
+                            entries)
+              (pos-ledger--refuse
+               'hidden "A keeper holds no hidden file, and this ledger enrols one: %s"
+               archive))
+            (push (list archive url entries head files recorded) pending)))))
+    (pcase-dolist (`(,archive ,url ,entries ,head ,files ,recorded) (nreverse pending))
+      (let* ((keeper (funcall pos-remote-keeper-function url))
+             (claims (funcall pos-seal-claims-function `((archive . ,archive)) nil))
+             (described (pos-remote-describe keeper))
+             (held (alist-get 'events described))
+             (names (mapcar #'file-name-nondirectory files))
+             sent)
+        (when (or (> held (length files))
+                  (and (> held 0)
+                       (not (equal (alist-get 'head described)
+                                   (substring (nth (1- held) names) 9 -5)))))
+          (pos-ledger--refuse 'chain "The keeper holds another ledger than this one: %s"
+                              archive))
+        (pcase-let ((`(,added . ,first) (pos-seal--added-paths files entries)))
+          (dotimes (i (length files))
+            (when (>= i held)
+              (let (batch)
+                (dolist (path (if (eql i first)
+                                  (apply #'append (seq-take added (1+ i)))
+                                (nth i added)))
+                  (let ((cid (alist-get 'cid (cdr (assoc path entries)))))
+                    (unless (or (member cid sent) (assoc cid batch))
+                      (push (cons cid (pos-ledger--read (expand-file-name path archive)))
+                            batch))))
+                (pos-remote-append keeper (nth i names) (pos-ledger--read (nth i files))
+                                   batch claims)
+                (setq sent (append (mapcar #'car batch) sent))))))
+        (let ((now (pos-remote-describe keeper)))
+          (unless (and (equal head (alist-get 'head now))
+                       (equal (length files) (alist-get 'events now))
+                       (equal recorded (alist-get 'root now)))
+            (pos-ledger--refuse 'chain "The keeper does not hold this ledger as it is: %s"
+                                archive)))
+        (delete-directory archive t)
+        (push `((archive . ,archive) (keeper . ,url)
+                (events . ,(- (length files) held)) (files . ,(length sent)))
+              kept)))
+    `((kept . ,(vconcat (nreverse kept)))
+      (skipped . ,(vconcat (nreverse skipped))))))
+
 ;;;; Command line
 
 (defconst pos-seal-usage
@@ -886,6 +1012,8 @@ with the reason."
       remove write bits from verified evidence; never enrols
   convert ROOT
       bring each schema 2 ledger under ROOT to schema 3, once it is clean
+  keep ROOT
+      move to its keeper each archive under ROOT a keeper is to keep
 
 --apply applies a program's own plan at once and prints both.
 Exit 0 done or clean, 1 findings, 2 refused.
@@ -944,6 +1072,9 @@ Exit 0 done or clean, 1 findings, 2 refused.
          (princ (pos-ledger-json (pos-seal-repair root))))
         (`("convert" ,root)
          (princ (decode-coding-string (pos-ledger-json (pos-seal-convert root))
+                                      'utf-8)))
+        (`("keep" ,root)
+         (princ (decode-coding-string (pos-ledger-json (pos-seal-keep root))
                                       'utf-8)))
         (`(,(or "help" "-h" "--help")) (princ pos-seal-usage))
         (_ (message "%s" pos-seal-usage)

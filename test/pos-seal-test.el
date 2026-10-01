@@ -150,6 +150,42 @@ refusal, as fixtures/ledger/ of kind convert."
   (pos-seal-plan (expand-file-name "trial" scope)
                  (expand-file-name "archives/trial" scope)))
 
+(ert-deftest pos-seal/every-shared-fixture-keeps-the-same-way ()
+  "What was moved to a keeper, what was left with its reason and the
+report after, or the refusal, as fixtures/ledger/ of kind keep: each
+request as its keeper recorded it, and a kept archive gone from disk."
+  (dolist (named (pos-fixtures "ledger"))
+    (let-alist (cdr named)
+      (when (equal .kind "keep")
+        (ert-info ((car named))
+          (pos-fixture-with (cdr named) dir
+            (let* ((root (expand-file-name .root dir))
+                   (base (file-name-as-directory (file-truename dir)))
+                   (relative (lambda (items)
+                               (vconcat
+                                (mapcar (lambda (item)
+                                          (cons (cons 'archive
+                                                      (file-relative-name
+                                                       (alist-get 'archive item) base))
+                                                (assq-delete-all 'archive
+                                                                 (copy-alist item))))
+                                        items))))
+                   (pos-seal-claims-function (lambda (&rest _) .claims))
+                   (got (pos-ledger-test-with-keeper .keeper
+                          (condition-case err
+                              (pos-seal-keep root)
+                            (pos-ledger-refused
+                             `((error . ,(symbol-name (cadr err)))))))))
+              (if .error
+                  (should (equal .error (alist-get 'error got)))
+                (should-not (alist-get 'error got))
+                (pos-ledger-test-same .kept (funcall relative (alist-get 'kept got)))
+                (pos-ledger-test-same .skipped (funcall relative (alist-get 'skipped got)))
+                (seq-doseq (item (alist-get 'kept got))
+                  (should-not (file-exists-p (alist-get 'archive item))))
+                (pos-ledger-test-same
+                 .report (pos-ledger-test-relative (pos-ledger-check root) dir))))))))))
+
 (ert-deftest pos-seal/sealing-removes-write-bits ()
   "The sealed files and the ledger event are read-only; CIDs do not change."
   (pos-seal-test-with-scope
