@@ -30,6 +30,10 @@
                     (file-name-directory (or load-file-name buffer-file-name)))
   "The shared fixtures.")
 
+;; No test reads or writes the tokens a person has kept by signing in.
+(setenv "XDG_CONFIG_HOME" (make-temp-file "pos-config" t))
+(setenv "POS_ARCHIVE_TOKEN" nil)
+
 (defun pos-fixtures (kind)
   "Return the fixtures of KIND, a subdirectory, as (NAME . FIXTURE)."
   (mapcar (lambda (file)

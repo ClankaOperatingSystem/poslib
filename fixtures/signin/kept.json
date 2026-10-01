@@ -1,0 +1,32 @@
+{
+ "description": "What signing in keeps, as either library writes it, and the token each keeper's requests then carry: one token serves two origins of one keeper, an origin nobody signed in to has none, and a token past its time with nothing to refresh it is no token.",
+ "file": {
+  "tokens": {
+   "https://issuer.example a-public-client": {
+    "access_token": "a-token",
+    "expires_at": 4102444800,
+    "refresh_token": null,
+    "scopes": ["openid", "a-scope", "offline_access"]
+   },
+   "https://other-issuer.example another-client": {
+    "access_token": "a-stale-token",
+    "expires_at": 1,
+    "refresh_token": null,
+    "scopes": ["openid"]
+   }
+  },
+  "keepers": {
+   "https://one.keeper.example": {"issuer": "https://issuer.example", "client_id": "a-public-client"},
+   "https://two.keeper.example:8443": {"issuer": "https://issuer.example", "client_id": "a-public-client"},
+   "https://stale.keeper.example": {"issuer": "https://other-issuer.example", "client_id": "another-client"}
+  }
+ },
+ "carried": [
+  {"url": "https://one.keeper.example", "token": "a-token"},
+  {"url": "https://one.keeper.example/ledgers/x/", "token": "a-token"},
+  {"url": "https://two.keeper.example:8443/", "token": "a-token"},
+  {"url": "https://two.keeper.example", "token": null},
+  {"url": "https://stale.keeper.example", "token": null},
+  {"url": "https://unknown.keeper.example", "token": null}
+ ]
+}

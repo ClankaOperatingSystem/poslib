@@ -43,6 +43,7 @@
 (require 'url-http)
 (require 'url-util)
 (require 'pos-ledger)
+(require 'pos-signin)
 
 (defvar url-http-end-of-headers)
 
@@ -126,7 +127,7 @@ BODY is a unibyte string or nil.  Return (STATUS . BYTES)."
 What it returns answers `pos-remote-describe', `pos-remote-event',
 `pos-remote-append' and `pos-remote-read'.  By default the keeper is
 reached over HTTP, with the bearer token in the environment's
-POS_ARCHIVE_TOKEN.")
+POS_ARCHIVE_TOKEN, else the one kept for it by signing in.")
 
 (defvar pos-remote-send-function #'pos-remote--send
   "The function an exchange of `pos-remote-http' is made with.
@@ -153,25 +154,38 @@ The boundary is taken from the bytes, so equal parts are equal bodies."
 (defun pos-remote--call (archive method path &optional body content-type)
   "Return the body ARCHIVE's keeper answers METHOD on PATH with.
 BODY, with its CONTENT-TYPE, is sent if given.  Any answer but 200 or
-201 is refused, by the kind its body names or its status means."
-  (let* ((token (pos-remote-http-token archive))
-         (answer (funcall pos-remote-send-function method
-                          (concat (string-remove-suffix "/" (pos-remote-http-url archive))
-                                  path)
-                          (append (when token
-                                    `(("Authorization" . ,(concat "Bearer " token))))
-                                  (when content-type
-                                    `(("Content-Type" . ,content-type))))
-                          body))
-         (status (car answer)))
-    (if (memq status '(200 201))
-        (cdr answer)
-      (let ((named (ignore-errors
-                     (alist-get 'refused (pos-ledger--parse (cdr answer))))))
-        (pos-ledger--refuse (cond ((stringp named) (intern named))
-                                  ((alist-get status pos-remote--kinds))
-                                  (t 'remote))
-                            "%s %s answered %d" method path status)))))
+201 is refused, by the kind its body names or its status means.
+Given no token, the request carries the one kept for the keeper by
+signing in, if there is one; and a keeper not seen before, refusing it,
+is asked once more with a token already kept that it takes."
+  (let* ((url (string-remove-suffix "/" (pos-remote-http-url archive)))
+         (given (let ((token (pos-remote-http-token archive)))
+                  (unless (member token '(nil "")) token)))
+         (exchange
+          (lambda (token)
+            (funcall pos-remote-send-function method (concat url path)
+                     (append (when token
+                               `(("Authorization" . ,(concat "Bearer " token))))
+                             (when content-type
+                               `(("Content-Type" . ,content-type))))
+                     body)))
+         (answer (funcall exchange (or given (pos-signin-token url)))))
+    (when (and (eql (car answer) 401) (null given))
+      (let ((adopted (pos-signin-adopt url)))
+        (when adopted
+          (setq answer (funcall exchange adopted)))))
+    (let ((status (car answer)))
+      (if (memq status '(200 201))
+          (cdr answer)
+        (let ((named (ignore-errors
+                       (alist-get 'refused (pos-ledger--parse (cdr answer))))))
+          (if (and (eql status 401) (null given))
+              (pos-ledger--refuse
+               'access "Not signed in to this keeper; sign in with: sign-in %s" url)
+            (pos-ledger--refuse (cond ((stringp named) (intern named))
+                                      ((alist-get status pos-remote--kinds))
+                                      (t 'remote))
+                                "%s %s answered %d" method path status)))))))
 
 (cl-defmethod pos-remote-describe ((archive pos-remote-http))
   "Return what the keeper of ARCHIVE has of its ledger, over HTTP."
