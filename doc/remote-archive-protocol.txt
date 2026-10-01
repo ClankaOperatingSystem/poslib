@@ -1,0 +1,205 @@
+The remote archive protocol
+Version 1
+
+A scope's archive is sealed evidence, and its ledger records every seal
+(doc/formats.org). The ledger stays with the scope. The archive need
+not: its bytes can be kept by a keeper, a server reached at a URL, and
+fetched when they are read. This document says what passes between a
+client, which seals and reads, and the keeper of one ledger's archive.
+
+It names no product. Any server that does what is written here is a
+keeper, and poslib and pyposlib are clients of any. Which keeper a scope
+uses is the scope's configuration and not this document's.
+
+
+1. The ledger and its base URL
+
+A keeper keeps archives by ledger. A ledger is known by its ledger_id,
+the UUID every one of its events carries, and the keeper gives each
+ledger a base URL. Every request below is made beneath that URL. How a
+client learns the URL, and how a keeper decides to keep a ledger at all,
+are outside the protocol.
+
+A keeper holds two things for a ledger: its events, as the bytes of the
+ledger's files, and the blocks of what those events enrol. It never
+holds the only copy of the events. The scope's ledger is the record;
+the keeper's copy lets it verify what it is sent and lets the two be
+compared.
+
+
+2. The four operations
+
+describe    GET {base}/
+
+    What the keeper holds of the ledger, as a JSON object:
+
+        protocol    1
+        ledger_id   the ledger's id, or null if it has no event yet
+        head        what names its last event, or null
+        events      how many events it holds
+        root        the root its last event recorded, or null
+        erased      the CIDs whose bytes it has erased, sorted
+
+event       GET {base}/events/{number}
+
+    The bytes of event {number}, counting from 1, exactly as the
+    ledger's file holds them.
+
+append      POST {base}/events
+
+    One event, with the bytes of files it or earlier events enrol, and
+    what the client says of itself. The body is multipart/form-data,
+    its parts in this order:
+
+        name        the ledger file's name, NNNNNNNN-NAME.json
+        event       the file's bytes
+        claims      a JSON object of strings (section 6)
+        {cid}       zero or more files, each part named by the CID of
+                    the bytes it holds
+
+    The answer is the description after the event, as describe gives
+    it: 201 if the event was appended, 200 if that event was already
+    the one of that number.
+
+read        GET {base}/ipfs/{cid}
+            GET {base}/ipfs/{cid}/{path}
+
+    The bytes of what the ledger enrols under {cid}: a file, an event,
+    or with {path} the file at that path beneath a directory. The path
+    is percent-encoded, segment by segment. This is the IPFS gateway's
+    path, so a gateway holding the same blocks answers the same.
+    Reading a directory itself is not in version 1.
+
+
+3. What a keeper verifies
+
+A keeper takes nothing on trust. Before it keeps anything of an append:
+
+  - The name is an event file's, its number the next the ledger needs,
+    and what names it is what the bytes give: the SHA-256 for an event
+    of schema 1 or 2, the CID for one of schema 3.
+  - The event is a valid next event of the chain it holds, as
+    doc/formats.org specifies under "Events": its keys, its schema, its
+    previous, its ledger_id, its entries. A schema 3 event is read
+    strictly, as a block.
+  - Each file's bytes have the CID its part is named by.
+  - For a schema 3 event, every entry the ledger then enrols has its
+    bytes held, from this request or an earlier one, hidden entries
+    apart, which IPFS would leave out; and the ledger folds to the
+    event's root (doc/formats.org, "From an inventory").
+
+Events of schema 1 and 2 are kept without their files being required,
+since they belong to a ledger being replayed whose root only its
+conversion to schema 3 makes checkable. An archive is kept from a
+schema 3 event onward: the conversion event, or a ledger's first.
+
+A keeper may refuse more than this, a body too large or a caller not
+allowed. It may not accept less.
+
+
+4. Refusals
+
+A refusal is a status and a JSON object with the member refused, the
+kind, and possibly message, for a person. A client goes by the kind.
+
+    409  chain       the event is not the next one: another number, or
+                     another event already at that number
+    422  sequence    the name is not the event's
+    422  encoding    a schema 3 event is not a block
+    422  identity    the event is another ledger's
+    422  entry       bytes are not their CID's, or bytes the ledger
+                     enrols are not held
+    422  root        the ledger does not fold to the event's root
+    422  request     the request is not as section 2 has it
+    413  size        the body is larger than the keeper takes
+    401, 403  access the caller may not do this
+    404  absent      no such event, or nothing the ledger enrols there
+    410  erased      the bytes were erased (section 7)
+
+Kinds a keeper takes from doc/formats.org keep their names there. A
+status with no such object is read by the table above, and anything
+else, or no answer at all, is the kind remote.
+
+
+5. The same event twice, and catching up
+
+Appending is safe to repeat. An event sent again at the number it
+already has answers 200 and changes nothing, so a client that lost the
+answer sends again. A different event at a number already taken is
+refused as chain, and so is an event beyond the next: the keeper holds
+a ledger other than the one the client has, and nothing is merged.
+
+A client behind the keeper, as after a crash between the keeper's
+answer and writing its own ledger file, asks describe, fetches the
+events it lacks by number, verifies them as it verifies its own ledger,
+and writes them. A keeper behind the client is sent the events it
+lacks, in order.
+
+
+6. Claims
+
+claims is what the client says about where the event came from: the
+repository's remotes, the commit the canon was at, whether the working
+tree was clean, the scope's path, the tool and its version. A keeper
+records them with the event as the client's words. It verifies none of
+them and decides nothing by them: the event and the files are what is
+checked, and who is calling is the keeper's to establish.
+
+
+7. Erasure
+
+A keeper may be required to erase bytes. It forgets the block, keeps
+the events, lists the CID in erased, and answers a read of it with 410.
+The ledger is unchanged: it still says what was sealed, and the CID
+still names it.
+
+
+8. Who is calling
+
+A request may carry "Authorization: Bearer {token}". What a token is,
+how it is obtained, and what its bearer may read or append are the
+keeper's, and outside the protocol.
+
+
+9. The ports
+
+A client's code calls the four operations through a port, so that a
+keeper can be HTTP, a test's tape, or another transport.
+
+  - pyposlib: remote.RemoteArchive, a typing.Protocol, with
+    HttpRemoteArchive its wire and Keeper the keeping side in memory.
+  - poslib: the generic functions pos-remote-describe,
+    pos-remote-event, pos-remote-append and pos-remote-read, with
+    pos-remote-http the wire.
+
+
+10. Fixtures
+
+fixtures/remote/ holds tapes. A tape has a base url, a token, and
+exchanges in order, each:
+
+    call        the operation and its arguments
+    request     the method, the path beneath the base URL, the
+                Authorization header, and for an append the content
+                type and the SHA-256 of the body
+    response    the status and the body
+    result      what the call returns: an object, or for event and
+                read an object whose bytes is the body
+    refused     in place of result, the kind
+
+A client must make each request as recorded and make of the response
+the result or refusal recorded. A keeper, sent a tape's requests in
+order from empty, must answer with the status recorded and the body
+recorded, or for a refusal the kind.
+
+For the request bodies to compare, the clients here write multipart one
+way: each part is
+
+    --{boundary} CRLF
+    Content-Disposition: form-data; name="{name}" CRLF CRLF
+    {bytes} CRLF
+
+then --{boundary}-- CRLF, the files in order of their CIDs, claims as
+canonical JSON, and the boundary "pos-" followed by the SHA-256, in
+hex, of the parts' bytes one after another. A keeper accepts any
+multipart/form-data body with those parts.
