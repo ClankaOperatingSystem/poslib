@@ -60,6 +60,7 @@
  "report": [
   {
    "archive": "scope/archives",
+   "kept": null,
    "head": "baguqeerayezapraevz5psqaw5b76mqf3u2ztcjjxqe5eccptedslv5xgey6a",
    "events": 2,
    "files": 2,

@@ -29,6 +29,7 @@
 ;; - `pos-ledger-history': what its ledger enrolled.
 ;; - `pos-ledger-fold-cids': the archive's CIDs from the ledger alone.
 ;; - `pos-ledger-event': a new event's name and bytes.
+;; - `pos-ledger-kept': the keeper an archive is kept by, if it has one.
 ;; - `pos-ledger-check': the report on every archive under a root.
 ;;
 ;; JSON values are Lisp values: objects alists, arrays vectors, strings,
@@ -51,6 +52,12 @@
 
 (defconst pos-ledger-declaration "#+COLLECTION: t"
   "The line in a collection's README.org that declares it one.")
+
+(defconst pos-ledger-configuration ".pos/config.yaml"
+  "A repository's configuration, relative to its root.
+It says how each scope's archive is kept, as doc/pos-directory.txt has it.")
+
+(declare-function pos-tree-read-config "pos-tree" (text))
 
 (define-error 'pos-ledger-refused "Archive integrity refused")
 
@@ -489,6 +496,52 @@ ADD is an alist of path and entry; PREVIOUS a hash or nil."
                   ,@(when ledger-id `((ledger_id . ,ledger-id)))))))
     (cons (format "%08d-%s.json" number (pos-ledger--sha bytes)) bytes)))
 
+;;;; Kept archives
+
+(defun pos-ledger-kept (archive)
+  "Return the base URL of ARCHIVE's keeper, or nil if it is kept on disk.
+ARCHIVE's scope is the directory holding it, and its repository the
+nearest directory at or above the scope that holds .git.  The
+repository's .pos/config.yaml says how each scope's archive is kept; a
+scope it does not name, in a repository without one or in none, keeps
+its archive on disk.  Refuse `config' for a configuration that is
+refused."
+  (let* ((scope (file-name-directory (directory-file-name (expand-file-name archive))))
+         (root (locate-dominating-file scope ".git"))
+         (file (and root (expand-file-name pos-ledger-configuration root))))
+    (when (and file (file-exists-p file))
+      (require 'pos-tree)
+      (let* ((config
+              (condition-case err
+                  (pos-tree-read-config
+                   (decode-coding-string (pos-ledger--read file) 'utf-8))
+                (pos-tree-refused
+                 (pos-ledger--refuse 'config "Configuration refused (%s): %s"
+                                     (cadr err) file))))
+             (path (directory-file-name
+                    (file-relative-name scope (expand-file-name root))))
+             (entry (seq-find (lambda (a) (equal (alist-get 'scope a) path))
+                              (alist-get 'archives config))))
+        (and entry (equal (alist-get 'kept entry) "remote")
+             (alist-get 'url entry))))))
+
+(defun pos-ledger--kept-here (dir)
+  "Return the archive of the scope DIR, if a keeper keeps it and none is here.
+DIR has a ledger beside where its archive would be, and no archives."
+  (let ((archive (expand-file-name "archives" dir)))
+    (and (not (file-exists-p archive)) (not (file-symlink-p archive))
+         (file-directory-p (expand-file-name (concat pos-ledger-integrity "/ledger")
+                                             dir))
+         (pos-ledger-kept archive)
+         archive)))
+
+(defun pos-ledger--kept-entries (archive known)
+  "Return KNOWN, what the ledger of the kept ARCHIVE enrols, as what it holds.
+Refuse `kept' if ARCHIVE has files on disk: it is not with its keeper yet."
+  (when (pos-ledger-inventory archive)
+    (pos-ledger--refuse 'kept "Kept by a keeper, and has files on disk: %s" archive))
+  known)
+
 ;;;; Discovery and checkpoints
 
 (defun pos-ledger--checked (root)
@@ -512,13 +565,19 @@ The system aliases /tmp and /var are allowed."
           (t (string< (car as) (car bs))))))
 
 (defun pos-ledger-roots (root)
-  "Return the outermost archives under ROOT, in path order."
+  "Return the outermost archives under ROOT, in path order.
+An archive a keeper keeps is found by its ledger, with no directory of
+its own."
   (let ((root (file-truename (pos-ledger--checked root))) found)
-    (unless (file-directory-p root)
+    (unless (or (file-directory-p root)
+                (and (equal (file-name-nondirectory root) "archives")
+                     (pos-ledger--kept-here (file-name-directory root))))
       (pos-ledger--refuse 'root "Root must be an existing directory"))
     (if (equal (file-name-nondirectory root) "archives")
         (list root)
       (named-let walk ((dir root))
+        (when-let* ((kept (pos-ledger--kept-here dir)))
+          (push kept found))
         (dolist (name (pos-ledger--entries dir))
           (let ((path (expand-file-name name dir)))
             (when (and (file-directory-p path)
@@ -564,17 +623,33 @@ The system aliases /tmp and /var are allowed."
 (defun pos-ledger--ledger-hashes (archive)
   "Return the hash and block CID of every ledger event in or beside ARCHIVE.
 Its own ledger's events and those of every ledger within it; an event
-goes by one or the other."
+goes by one or the other.  Of an archive a keeper keeps, the ledgers
+within are known by the names their events are enrolled under."
   (let ((folder (pos-ledger-folder archive)))
-    (mapcan (lambda (file)
-              (pos-ledger--regular file)
-              (let ((bytes (pos-ledger--read file)))
-                (list (pos-ledger--sha bytes) (pos-ledger--event-cid bytes))))
-            (append
-             (when (file-directory-p folder)
-               (directory-files folder t "\\.json\\'"))
-             (seq-filter #'pos-ledger--ledger-file-p
-                         (directory-files-recursively archive "\\.json\\'" nil nil nil))))))
+    (append
+     (mapcan (lambda (file)
+               (pos-ledger--regular file)
+               (let ((bytes (pos-ledger--read file)))
+                 (list (pos-ledger--sha bytes) (pos-ledger--event-cid bytes))))
+             (append
+              (when (file-directory-p folder)
+                (directory-files folder t "\\.json\\'"))
+              (when (file-directory-p archive)
+                (seq-filter #'pos-ledger--ledger-file-p
+                            (directory-files-recursively archive "\\.json\\'"
+                                                         nil nil nil)))))
+     (when (pos-ledger-kept archive)
+       (delq nil
+             (mapcar (lambda (pair)
+                       (pcase (reverse (split-string (car pair) "/"))
+                         ((and `(,name . ,folders)
+                               (guard (or (equal (car folders) pos-ledger-directory)
+                                          (and (equal (car folders) "ledger")
+                                               (equal (cadr folders)
+                                                      pos-ledger-integrity))))
+                               (guard (string-match pos-ledger--event-name name)))
+                          (match-string 2 name))))
+                     (car (pos-ledger-history archive))))))))
 
 (defun pos-ledger--check-anchors (root archives)
   "Refuse unless every head a checkpoint for ROOT names is in ARCHIVES."
@@ -706,10 +781,11 @@ Its README.org has the declaration line, or it is a capsule."
 
 (defun pos-ledger-check (root)
   "Return the check report on every archive under ROOT.
-A list of alists, one an archive: archive, head, events, files,
+A list of alists, one an archive: archive, kept, head, events, files,
 writable, checkpoint_writable, missing, changed, new, root,
 recorded_root, hidden and undeclared; the lists as vectors, so the
-report is a JSON value."
+report is a JSON value.  An archive a keeper keeps is reported from its
+ledger: nothing of it is on disk to read."
   (let* ((archives (pos-ledger-roots root))
          (_ (pos-ledger--check-anchors root archives))
          (writable-checkpoints
@@ -717,27 +793,35 @@ report is a JSON value."
                       (pos-ledger--checkpoint-files root archives)))
          reports)
     (dolist (archive archives)
-      (pcase-let* ((`(,known ,head ,events ,files ,recorded ,collections)
+      (pcase-let* ((`(,known ,head ,events ,files ,recorded ,collections ,_ ,empty)
                     (pos-ledger-history archive))
-                   (actual (pos-ledger-inventory archive))
-                   (cids (pos-ledger--cids archive))
+                   (kept (pos-ledger-kept archive))
+                   (actual (if kept (pos-ledger--kept-entries archive known)
+                             (pos-ledger-inventory archive)))
+                   (cids (if kept (and known (pos-ledger-fold known empty))
+                           (pos-ledger--cids archive)))
                    (`(,missing ,changed ,new)
-                    (pos-ledger--differences known (pos-ledger--with-cids known actual cids)))
+                    (unless kept
+                      (pos-ledger--differences
+                       known (pos-ledger--with-cids known actual cids))))
                    (writable
                     (sort (append
-                           (seq-filter (lambda (name)
-                                         (pos-ledger--writable-p
-                                          (expand-file-name name archive)))
-                                       (mapcar #'car actual))
+                           (unless kept
+                             (seq-filter (lambda (name)
+                                           (pos-ledger--writable-p
+                                            (expand-file-name name archive)))
+                                         (mapcar #'car actual)))
                            (mapcar (lambda (f) (file-relative-name f archive))
                                    (seq-filter #'pos-ledger--writable-p files)))
                           #'string<)))
-        (push `((archive . ,archive) (head . ,(or head :null)) (events . ,events)
+        (push `((archive . ,archive) (kept . ,(or kept :null))
+                (head . ,(or head :null)) (events . ,events)
                 (files . ,(length actual)) (writable . ,(vconcat writable))
                 (root . ,(or (cdr (assoc "." cids)) :null))
                 (recorded_root . ,(or recorded :null))
                 (hidden . ,(vconcat (pos-ledger--hidden actual)))
-                (undeclared . ,(vconcat (pos-ledger--undeclared archive collections)))
+                (undeclared . ,(vconcat (unless kept
+                                          (pos-ledger--undeclared archive collections))))
                 (checkpoint_writable . ,(vconcat (unless reports writable-checkpoints)))
                 (missing . ,(vconcat missing)) (changed . ,(vconcat changed))
                 (new . ,(vconcat new)))

@@ -45,7 +45,9 @@ An alist of CID and the paths, relative to SCOPE, that have it."
          (table (make-hash-table :test #'equal)))
     (dolist (archive (pos-ledger-roots scope))
       (condition-case nil
-          (dolist (pair (pos-cid-tree archive))
+          (dolist (pair (if (pos-ledger-kept archive)
+                            (pos-ledger-fold-cids archive)
+                          (pos-cid-tree archive)))
             (push (file-relative-name
                    (expand-file-name (if (equal (car pair) ".") "" (car pair)) archive)
                    scope)

@@ -360,5 +360,17 @@ a sealed file's bytes have changed."
       (should-error (pos-seal-repair scope) :type 'pos-ledger-refused)
       (should (/= 0 (logand (file-modes file) #o222))))))
 
+(ert-deftest pos-seal/a-kept-archive-is-checkpointed-and-repaired-by-its-ledger ()
+  "Its files are with its keeper: a checkpoint records its head, and
+repair protects its ledger's events and looks for nothing else."
+  (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
+    (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
+           (event (car (nth 3 (pos-ledger-history (expand-file-name "archives" scope))))))
+      (should (equal (expand-file-name "archive-integrity/checkpoints" scope)
+                     (pos-seal-checkpoint scope)))
+      (set-file-modes event #o644)
+      (should (equal '((repaired . 1) (unregistered . 0)) (pos-seal-repair scope)))
+      (should (zerop (logand (file-modes event) #o222))))))
+
 (provide 'pos-seal-test)
 ;;; pos-seal-test.el ends here

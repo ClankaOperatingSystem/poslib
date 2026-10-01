@@ -131,14 +131,17 @@ archive-integrity/ledger/, or in the legacy folder inside it, not both."
 (ert-deftest pos-ledger/a-check-reports-each-archive ()
   "Archives found outside hidden and underscored directories, checkpoints
 honoured, and every changed, missing, new, writable and hidden file named;
-the archive's CID beside the one recorded; collections no longer declared."
+the archive's CID beside the one recorded; collections no longer declared.
+An archive a keeper keeps is found by its ledger and reported from it."
   (dolist (named (pos-fixtures "ledger"))
     (let-alist (cdr named)
       (when (equal .kind "report")
         (ert-info ((car named))
           (pos-fixture-with (cdr named) dir
-            (pos-ledger-test-same
-             .report (pos-ledger-test-relative (pos-ledger-check dir) dir))))))))
+            (if .error
+                (pos-ledger-test-refused .error (pos-ledger-check dir))
+              (pos-ledger-test-same
+               .report (pos-ledger-test-relative (pos-ledger-check dir) dir)))))))))
 
 (ert-deftest pos-ledger/a-vanished-archive-is-detected ()
   "A checkpoint names ledger heads; removing an archive leaves one unmatched."
@@ -146,6 +149,48 @@ the archive's CID beside the one recorded; collections no longer declared."
     (let ((archive (expand-file-name "projects/A/archives" dir)))
       (pos-fixture-writable archive)
       (delete-directory archive t)
+      (pos-ledger-test-refused "anchor" (pos-ledger-check dir)))))
+
+;;;; Kept archives
+
+(ert-deftest pos-ledger/a-scope-s-own-repository-says-how-its-archive-is-kept ()
+  "The nearest repository at or above a scope decides, by the scope's path
+in it: a keeper's URL for a remote archive, and disk for every other.  A
+repository mounted beneath another is not its container's to configure."
+  (let ((dir (file-truename (make-temp-file "pos-kept" t))))
+    (unwind-protect
+        (let ((kept (lambda (scope)
+                      (pos-ledger-kept (expand-file-name (concat scope "archives") dir)))))
+          (make-directory (expand-file-name ".git" dir))
+          (make-directory (expand-file-name "projects/c/.git" dir) t)
+          (pos-fixture-write
+           (expand-file-name ".pos/config.yaml" dir)
+           (concat "pos: 1\narchives:\n"
+                   "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/root\n"
+                   "  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/a\n"
+                   "  - scope: projects/b\n    kept: uncommitted\n"))
+          (should (equal "https://keeper.example/root" (funcall kept "")))
+          (should (equal "https://keeper.example/a" (funcall kept "projects/a/")))
+          (should-not (funcall kept "projects/b/"))
+          (should-not (funcall kept "projects/a/projects/d/"))
+          (should-not (funcall kept "projects/c/")))
+      (delete-directory dir t))))
+
+(ert-deftest pos-ledger/a-kept-archive-is-checked-by-its-own-path ()
+  "Named as the root, an archive a keeper keeps is checked though no
+directory is there."
+  (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
+    (let ((report (pos-ledger-check (expand-file-name "projects/a/archives" dir))))
+      (should (equal 1 (length report)))
+      (should (equal 4 (alist-get 'files (car report)))))))
+
+(ert-deftest pos-ledger/a-kept-archive-s-vanished-ledger-is-detected ()
+  "A checkpoint names a kept archive's head; with its ledger gone, nothing
+is found there and the head is unmatched."
+  (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
+    (let ((integrity (expand-file-name "projects/a/archive-integrity" dir)))
+      (pos-fixture-writable integrity)
+      (delete-directory integrity t)
       (pos-ledger-test-refused "anchor" (pos-ledger-check dir)))))
 
 (provide 'pos-ledger-test)

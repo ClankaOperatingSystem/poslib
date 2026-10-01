@@ -67,6 +67,7 @@
    "files": 2,
    "head": "da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae",
    "hidden": [],
+   "kept": null,
    "missing": [],
    "new": [],
    "recorded_root": null,
@@ -84,6 +85,7 @@
    "files": 3,
    "head": "18291d954397177cf19d1b5fee4aff209fa05babae41ccd1afea2ef8717a9068",
    "hidden": [],
+   "kept": null,
    "missing": [
     "gone.md"
    ],
