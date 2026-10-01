@@ -1,0 +1,111 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "A seal interrupted after its keeper took the event and before the ledger had it: the keeper is one event ahead, the event is fetched and written, nothing is sent again, and the item is removed.",
+ "tree": [
+  {
+   "path": ".git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "projects/a/archive-integrity/checkpoints/6f9405a31a020cce68e4c667bbfc11ace041e5c32261549f98535ceaa28694e1.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archive-integrity/ledger/00000001-baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq.json",
+   "text": "{\"add\":{\"trial/result.txt\":{\"cid\":\"bafkreihwuikppjp43igcz3uwmc37ykpvmspdy2fk2shcb2kqcn6jrej2na\",\"mode\":292,\"sha256\":\"f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68\",\"size\":6},\"trial/sub/more.txt\":{\"cid\":\"bafkreiaypcl44cx46ifvborlg7okqsuvdnyen4u62wvzj4aqmgpwtvxbre\",\"mode\":292,\"sha256\":\"187897ce0afcf20b50ba2b37dca84a951b7046f29ed5ab94f010619f69d6e189\",\"size\":4}},\"collections\":[],\"empty\":[\"trial/hollow\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeihmzg6jkejgtd4fekyfoo3dma7oepox5pj6ajvndg4hdu45zhyjtm\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/note.txt",
+   "text": "a note"
+  }
+ ],
+ "source": "projects/a/note.txt",
+ "destination": "projects/a/archives/note.txt",
+ "claims": {
+  "plan": "as reviewed",
+  "scope": "projects/a",
+  "tool": "a fixture"
+ },
+ "keeper": {
+  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "token": "tape-token",
+  "exchanges": [
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"erased\":[],\"events\":2,\"head\":\"baguqeeraonh363zl7likbpjtwgfz377budtnffxcikl3p4p5ufw2mpelasgq\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeidz2euczwuoloquy4suosapjmx2o2lypb2uyscoa7o3a2abqlin4u\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "GET",
+     "path": "/events/2",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"add\":{\"note.txt\":{\"cid\":\"bafkreihwhy2kanhrtisehdznoszefpewnavl3bb6zrhkmp7p5vaanwdaum\",\"mode\":292,\"sha256\":\"f63e34a034f19a24438f2d74b242bc96682abd843ecc4ea63fefed4006d860a3\",\"size\":6}},\"collections\":[],\"empty\":[],\"item\":\"note.txt\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq\"},\"root\":\"bafybeidz2euczwuoloquy4suosapjmx2o2lypb2uyscoa7o3a2abqlin4u\",\"schema\":3}"
+    }
+   }
+  ]
+ },
+ "plan": {
+  "schema": 2,
+  "operation": "seal",
+  "source": "projects/a/note.txt",
+  "destination": "projects/a/archives/note.txt",
+  "archive": "projects/a/archives",
+  "ledger": "projects/a/archive-integrity/ledger",
+  "number": 2,
+  "previous": "baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "add": {
+   "note.txt": {
+    "sha256": "f63e34a034f19a24438f2d74b242bc96682abd843ecc4ea63fefed4006d860a3",
+    "size": 6,
+    "mode": 292,
+    "cid": "bafkreihwhy2kanhrtisehdznoszefpewnavl3bb6zrhkmp7p5vaanwdaum"
+   }
+  },
+  "collections": [],
+  "links": [],
+  "originals": {},
+  "rumours": [],
+  "inventory_sha256": "7ba09f99c8a8a6dda42c0254166c5bbacf31b0c25efd17b1f63499b5baf653d4",
+  "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1"
+ },
+ "event": {
+  "name": "00000002-baguqeeraonh363zl7likbpjtwgfz377budtnffxcikl3p4p5ufw2mpelasgq.json",
+  "encoded": "{\"add\":{\"note.txt\":{\"cid\":\"bafkreihwhy2kanhrtisehdznoszefpewnavl3bb6zrhkmp7p5vaanwdaum\",\"mode\":292,\"sha256\":\"f63e34a034f19a24438f2d74b242bc96682abd843ecc4ea63fefed4006d860a3\",\"size\":6}},\"collections\":[],\"empty\":[],\"item\":\"note.txt\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq\"},\"root\":\"bafybeidz2euczwuoloquy4suosapjmx2o2lypb2uyscoa7o3a2abqlin4u\",\"schema\":3}"
+ },
+ "report": [
+  {
+   "archive": "projects/a/archives",
+   "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+   "head": "baguqeeraonh363zl7likbpjtwgfz377budtnffxcikl3p4p5ufw2mpelasgq",
+   "events": 2,
+   "files": 3,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeidz2euczwuoloquy4suosapjmx2o2lypb2uyscoa7o3a2abqlin4u",
+   "recorded_root": "bafybeidz2euczwuoloquy4suosapjmx2o2lypb2uyscoa7o3a2abqlin4u",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  }
+ ]
+}

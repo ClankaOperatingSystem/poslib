@@ -41,9 +41,56 @@
                 pair))
             plan)))
 
+(defun pos-seal-test-tape (recorded)
+  "Return a function to send requests with that plays RECORDED, a keeper's.
+Each request must be the next one recorded, and is answered as it was.
+Called with no argument, it gives the exchanges not yet played."
+  (let ((left (append (alist-get 'exchanges recorded) nil))
+        (base (alist-get 'url recorded)))
+    (lambda (&optional method url headers body)
+      (if (null method)
+          left
+        (let* ((exchange (or (pop left)
+                             (error "A request the recording does not have: %s %s"
+                                    method url)))
+               (sent `((method . ,method)
+                       (path . ,(substring url (length base)))
+                       (authorization . ,(or (cdr (assoc "Authorization" headers)) :null))
+                       ,@(when body
+                           `((content_type . ,(cdr (assoc "Content-Type" headers)))
+                             (body_sha256 . ,(pos-ledger--sha body)))))))
+          (unless (equal (pos-ledger-json sent)
+                         (pos-ledger-json (alist-get 'request exchange)))
+            (error "Not the request recorded: %S" sent))
+          (cons (alist-get 'status (alist-get 'response exchange))
+                (encode-coding-string (alist-get 'body (alist-get 'response exchange))
+                                      'utf-8)))))))
+
 (defun pos-seal-test-run (fixture dir)
   "Seal FIXTURE, built in DIR; return what happened, relative to DIR.
-An alist of plan, event and report, or of error."
+An alist of plan, event and report, or of error.  A fixture with a
+keeper is sealed to its recording, with the claims it gives."
+  (let-alist fixture
+    (let* ((tape (and .keeper (pos-seal-test-tape .keeper)))
+           (pos-remote-send-function (or tape pos-remote-send-function))
+           (pos-seal-keeper-function
+            (if tape
+                (lambda (url)
+                  (pos-remote-http-create :url url :token (alist-get 'token .keeper)))
+              pos-seal-keeper-function))
+           (pos-seal-claims-function
+            (if tape (lambda (&rest _) .claims) pos-seal-claims-function))
+           (got (pos-seal-test-run-1 fixture dir)))
+      (when tape
+        (when (funcall tape)
+          (error "The recording was not played out"))
+        (unless (alist-get 'error got)
+          (when (file-exists-p (expand-file-name .source dir))
+            (error "The item was left where it lay"))))
+      got)))
+
+(defun pos-seal-test-run-1 (fixture dir)
+  "Seal FIXTURE, built in DIR, as `pos-seal-test-run' with its keeper bound."
   (let-alist fixture
     (condition-case err
         (let* ((plan (pos-seal-plan (expand-file-name .source dir)
@@ -371,6 +418,90 @@ repair protects its ledger's events and looks for nothing else."
       (set-file-modes event #o644)
       (should (equal '((repaired . 1) (unregistered . 0)) (pos-seal-repair scope)))
       (should (zerop (logand (file-modes event) #o222))))))
+
+;;;; Sealing to a keeper
+
+(defmacro pos-seal-test-with-kept (fixture &rest body)
+  "Evaluate BODY in FIXTURE's tree, a seal to a keeper, bound as `dir'.
+Its recording answers, `tape' gives what of it is left, and `plan' is
+the fixture's seal, planned."
+  (declare (indent 1))
+  `(let ((fixture (pos-fixture "ledger" ,fixture)))
+     (pos-fixture-with fixture dir
+       (let-alist fixture
+         (let* ((tape (pos-seal-test-tape .keeper))
+                (pos-remote-send-function tape)
+                (pos-seal-keeper-function
+                 (lambda (url)
+                   (pos-remote-http-create :url url :token (alist-get 'token .keeper))))
+                (pos-seal-claims-function (lambda (&rest _) .claims))
+                (source (expand-file-name .source dir))
+                (plan (pos-seal-plan source (expand-file-name .destination dir)
+                                     .ledger_id "2026-09-28")))
+           (ignore tape source plan)
+           ,@body)))))
+
+(ert-deftest pos-seal/an-item-changed-after-its-keeper-took-it-is-not-removed ()
+  "Resumed after the keeper has the event, a seal removes the item only
+if it is still what was sealed."
+  (pos-seal-test-with-kept "seal-kept-resumed"
+    (let ((hash (pos-ledger--sha (pos-ledger-json plan))))
+      (pos-fixture-write source "changed")
+      (pos-ledger-test-refused "plan" (pos-seal-apply plan hash))
+      (should-not (funcall tape))
+      (should (equal "changed" (pos-ledger--read source))))))
+
+(ert-deftest pos-seal/a-plan-is-applied-only-where-it-was-planned-for ()
+  "A plan says whether its archive is with a keeper, and which: one made
+before the scope's configuration changed is refused, and nothing is sent."
+  (pos-seal-test-with-kept "seal-kept-next"
+    (should (equal (alist-get 'url (alist-get 'keeper fixture)) (alist-get 'kept plan)))
+    (pos-fixture-write (expand-file-name ".pos/config.yaml" dir) "pos: 1\n")
+    (pos-ledger-test-refused "plan"
+      (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan))))
+    (should (equal 2 (length (funcall tape))))
+    (should (file-exists-p source))))
+
+(ert-deftest pos-seal/a-keeper-that-refuses-leaves-the-item-and-the-ledger ()
+  "Refused by its keeper, a seal writes no event and the item stays."
+  (pos-seal-test-with-kept "seal-kept-not-allowed"
+    (let ((events (nth 2 (pos-ledger-history (alist-get 'archive plan)))))
+      (pos-ledger-test-refused "access"
+        (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan))))
+      (should (equal events (nth 2 (pos-ledger-history (alist-get 'archive plan)))))
+      (should (file-exists-p source)))))
+
+(ert-deftest pos-seal/the-claims-say-where-a-seal-came-from ()
+  "The plan and the tool, and of a repository git reads: the scope, the
+commit and branch, whether the tree is dirty, and each remote without
+the user and password its URL may hold."
+  (pos-fixture-with (pos-fixture "ledger" "seal-kept-first") dir
+    (let* ((root (file-truename dir))
+           (git (lambda (&rest args)
+                  (with-temp-buffer
+                    (should (eq 0 (apply #'process-file "git" nil t nil "-C" root
+                                         "-c" "user.name=A" "-c" "user.email=a@example.org"
+                                         args)))
+                    (string-trim (buffer-string)))))
+           (plan (lambda ()
+                   (pos-seal-plan (expand-file-name "projects/a/trial" root)
+                                  (expand-file-name "projects/a/archives/trial" root)))))
+      (pos-ledger-test-same
+       '(("plan" . "the hash") ("tool" . "poslib") ("scope" . "projects/a"))
+       (pos-seal-claims (funcall plan) "the hash"))
+      (delete-directory (expand-file-name ".git" root) t)
+      (funcall git "init" "-q" "-b" "trunk")
+      (funcall git "remote" "add" "origin" "https://someone:secret@forge.example/some/one.git")
+      (funcall git "remote" "add" "mirror" "git@forge.example:some/one.git")
+      (funcall git "add" ".pos")
+      (funcall git "commit" "-q" "-m" "Configure")
+      (pos-ledger-test-same
+       `(("plan" . "the hash") ("tool" . "poslib") ("scope" . "projects/a")
+         ("commit" . ,(funcall git "rev-parse" "HEAD")) ("branch" . "trunk")
+         ("dirty" . "true")
+         ("remote.origin" . "https://forge.example/some/one.git")
+         ("remote.mirror" . "git@forge.example:some/one.git"))
+       (pos-seal-claims (funcall plan) "the hash")))))
 
 (provide 'pos-seal-test)
 ;;; pos-seal-test.el ends here
