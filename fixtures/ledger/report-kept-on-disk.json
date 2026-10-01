@@ -1,0 +1,103 @@
+{
+ "kind": "report",
+ "description": "An archive kept committed or uncommitted is on disk, and checked as one with no entry.",
+ "tree": [
+  {
+   "path": ".git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: committed\n  - scope: projects/b\n    kept: uncommitted\n"
+  },
+  {
+   "path": "projects/a/archive-integrity/checkpoints/457c6f0f73a01bd4a811873d84be3ff4ebfcd39a8e1a132500075066e8d70a98.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeerajwrmdmyz2ewzdtipg5f2pr7prers2zwzz7wp7zkfbs23ac5xq4ya\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archive-integrity/checkpoints/eb7868f31a2371be5d4b75ba4cf833909c3349b7301f653710bdf87d651a9ac9.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeeraxzkvo52pmsbimc7vzkymr46iwx4l6hfuk7p7tjjfb3wxwvkz7tnq\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archive-integrity/ledger/00000001-baguqeerajwrmdmyz2ewzdtipg5f2pr7prers2zwzz7wp7zkfbs23ac5xq4ya.json",
+   "text": "{\"add\":{\"first/a.txt\":{\"cid\":\"bafkreifhsn5wjogkuwhqg4q3w25m6xdyzmrv727a44frxbgntfkbiynary\",\"mode\":292,\"sha256\":\"a7937b64b8caa58f03721bb6bacf5c78cb235febe0e70b1b84cd99541461a08e\",\"size\":5}},\"collections\":[],\"empty\":[],\"item\":\"first\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeiddmlljvw765tmgilhvupwh7iqxkga2jnaupfh7r4ghuimt5yiici\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archive-integrity/ledger/00000002-baguqeeraxzkvo52pmsbimc7vzkymr46iwx4l6hfuk7p7tjjfb3wxwvkz7tnq.json",
+   "text": "{\"add\":{\"old/archive-integrity/checkpoints/3c7601402d1dadca7cf17c9bbad8da2bc4f95b26d66728a276a5929afedb1be9.json\":{\"cid\":\"bafkreib4oyauali5vxfhz4l4to5nrwrlyt4vwjwwm4uke5vfsknp5wy35e\",\"mode\":292,\"sha256\":\"3c7601402d1dadca7cf17c9bbad8da2bc4f95b26d66728a276a5929afedb1be9\",\"size\":108},\"old/archive-integrity/ledger/00000001-baguqeera6bmzevw23ovhgbqowcxuantrxtzlhzg5kfrahdxw2y6qdxjqryrq.json\":{\"cid\":\"bafkreihqlgjfnww3vjzqmdvqv5adm4n46kz6jxkrmiby55wwhua52meoem\",\"mode\":292,\"sha256\":\"f0599256dadbaa73060eb0af403671bcf2b3e4dd5162038ef6d63d01dd308e23\",\"size\":377},\"old/archives/note/n.txt\":{\"cid\":\"bafkreihnwrswequr4qcty3c6us36wmqn5r3t4effputlsxopavspryyq7a\",\"mode\":292,\"sha256\":\"edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8\",\"size\":4}},\"collections\":[],\"empty\":[],\"item\":\"old\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeerajwrmdmyz2ewzdtipg5f2pr7prers2zwzz7wp7zkfbs23ac5xq4ya\"},\"root\":\"bafybeibwdqvsu5xijfsnyymyzjoth7wxjtzvwqtv7pcsvlvffvaynerinm\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archives/first/a.txt",
+   "text": "first",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archives/old/archive-integrity/checkpoints/3c7601402d1dadca7cf17c9bbad8da2bc4f95b26d66728a276a5929afedb1be9.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeera6bmzevw23ovhgbqowcxuantrxtzlhzg5kfrahdxw2y6qdxjqryrq\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archives/old/archive-integrity/ledger/00000001-baguqeera6bmzevw23ovhgbqowcxuantrxtzlhzg5kfrahdxw2y6qdxjqryrq.json",
+   "text": "{\"add\":{\"note/n.txt\":{\"cid\":\"bafkreihnwrswequr4qcty3c6us36wmqn5r3t4effputlsxopavspryyq7a\",\"mode\":292,\"sha256\":\"edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8\",\"size\":4}},\"collections\":[],\"empty\":[],\"item\":\"note\",\"ledger_id\":\"2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e\",\"previous\":null,\"root\":\"bafybeiddwc2j7ojexycuey5iloplixexiwydklk5xmtkojyi2khcien6je\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archives/old/archives/note/n.txt",
+   "text": "note",
+   "mode": 292
+  },
+  {
+   "path": "projects/b/archive-integrity/checkpoints/d8dda82e0151a736495e8cfa381645ce2eabfa69e400897914dc798c7549eacd.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeera5q6iry7x6crcuhjwtwylp7s3drqfgnq3vjkqaqy4ghwqaq6j2lva\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/b/archive-integrity/ledger/00000001-baguqeera5q6iry7x6crcuhjwtwylp7s3drqfgnq3vjkqaqy4ghwqaq6j2lva.json",
+   "text": "{\"add\":{\"only/b.txt\":{\"cid\":\"bafkreib6epubmabzlffdhckpmvsodmjuro6xuaei2qwevs3t52xnlhaatu\",\"mode\":292,\"sha256\":\"3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d\",\"size\":1}},\"collections\":[],\"empty\":[],\"item\":\"only\",\"ledger_id\":\"1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d\",\"previous\":null,\"root\":\"bafybeigw7vxqwn5nml43xog6mvwqzt5xfibmis32czvydw5or76up7fxfq\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "projects/b/archives/only/b.txt",
+   "text": "b",
+   "mode": 292
+  }
+ ],
+ "report": [
+  {
+   "archive": "projects/a/archives",
+   "kept": null,
+   "head": "baguqeeraxzkvo52pmsbimc7vzkymr46iwx4l6hfuk7p7tjjfb3wxwvkz7tnq",
+   "events": 2,
+   "files": 4,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeibwdqvsu5xijfsnyymyzjoth7wxjtzvwqtv7pcsvlvffvaynerinm",
+   "recorded_root": "bafybeibwdqvsu5xijfsnyymyzjoth7wxjtzvwqtv7pcsvlvffvaynerinm",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  },
+  {
+   "archive": "projects/b/archives",
+   "kept": null,
+   "head": "baguqeera5q6iry7x6crcuhjwtwylp7s3drqfgnq3vjkqaqy4ghwqaq6j2lva",
+   "events": 1,
+   "files": 1,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeigw7vxqwn5nml43xog6mvwqzt5xfibmis32czvydw5or76up7fxfq",
+   "recorded_root": "bafybeigw7vxqwn5nml43xog6mvwqzt5xfibmis32czvydw5or76up7fxfq",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  }
+ ]
+}

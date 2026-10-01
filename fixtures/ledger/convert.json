@@ -47,6 +47,7 @@
  "report": [
   {
    "archive": "scope/archives",
+   "kept": null,
    "head": "baguqeerawiz5hnio6jy6xpbkarkt2cyrse6q3gc6ofud5hcr3wx3drlg3goa",
    "events": 3,
    "files": 3,

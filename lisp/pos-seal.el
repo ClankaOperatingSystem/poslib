@@ -267,6 +267,10 @@ from where it lies."
                         (when within
                           (pos-ledger--refuse 'sealed "Destination is within sealed %s: %s"
                                               within rel))))
+                   (_ (when (pos-ledger-kept archive)
+                        (pos-ledger--refuse
+                         'kept "Sealing into an archive a keeper keeps is not written: %s"
+                         archive)))
                    (actual (pos-ledger-inventory archive))
                    (`(,missing ,changed ,_)
                     (pos-ledger--differences
@@ -602,7 +606,10 @@ files changed, and unregistered, the files the ledgers do not know."
       (dolist (a report)
         (let ((archive (alist-get 'archive a)))
           (pcase-let ((`(,known ,_ ,_ ,files) (pos-ledger-history archive)))
-            (dolist (pair known) (funcall protect (expand-file-name (car pair) archive)))
+            ;; A keeper holds a kept archive's files; only its ledger is here.
+            (when (eq (alist-get 'kept a) :null)
+              (dolist (pair known)
+                (funcall protect (expand-file-name (car pair) archive))))
             (mapc protect files))))
       (mapc protect (pos-ledger--checkpoint-files root (pos-ledger-roots root))))
     `((repaired . ,count)

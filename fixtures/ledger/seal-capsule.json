@@ -58,6 +58,7 @@
  "report": [
   {
    "archive": "scope/archives",
+   "kept": null,
    "head": "baguqeeralrzqy3cfrcmdngscgx7gvccb4lvedq72xwwkfplowbtf67cvkora",
    "events": 1,
    "files": 2,

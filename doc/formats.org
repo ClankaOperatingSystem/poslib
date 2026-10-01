@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 13, in lockstep; the fixtures in =fixtures/= are its
+this document, version 14, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -100,12 +100,39 @@ inside the archive, in =archives/.archive-integrity/=, and checkpoints in
 =.archive-integrity-anchors/= beside the root. An archive with a ledger in
 both places is refused (=ledger=).
 
+** Kept archives
+
+A scope's archive is on disk, beside its ledger, or kept by a keeper, a
+server that holds its bytes (=doc/remote-archive-protocol.txt=). The
+scope's repository says which, in its =.pos/config.yaml=
+(=doc/pos-directory.txt=). The repository is the nearest directory at or
+above the scope that holds =.git=, and the scope's entry under =archives=
+is the one whose =scope= is its path from there, =.= for the repository's
+root. An entry kept =remote= gives the keeper's =url=. A scope with no
+entry, in a repository with no configuration, or in no repository, keeps
+its archive on disk, as does one kept =committed= or =uncommitted=. A
+configuration that document refuses is refused (=config=).
+
+An archive a keeper keeps has its ledger with its scope, as any other,
+and no file in =archives/=, which need not exist. One that holds a file
+is refused (=kept=): it has not been moved to its keeper. What it holds
+is what its ledger enrols, and its CIDs are those the ledger folds to
+([[*From an inventory][From an inventory]]), so its ledger enrols a CID for every entry, else
+=entry=. Nothing below asks a keeper anything: a kept archive is read from
+its ledger alone.
+
 ** Discovery
 
 From a root: the root itself if it is named =archives=; otherwise every
 directory named =archives= beneath it, not descending into one found, nor
 into any directory whose name begins with =.= or =_=. A symlinked
 directory met on the way is refused.
+
+An archive a keeper keeps is found by its ledger: for each directory met
+on that walk, the root included, that holds =archive-integrity/ledger/=
+and no =archives=, its =archives= is found if a keeper keeps it. A root
+named =archives= that does not exist is such an archive, or is refused
+(=root=).
 
 ** Inventory
 
@@ -220,7 +247,8 @@ the SHA-256 of its bytes, holding in canonical JSON:
 Every head a checkpoint names must name some event file of the archives
 found, or of a ledger within them, legacy or current, as retired scopes
 carry, by its hash or by its CID as a block; otherwise the check refuses
-(=anchor=).
+(=anchor=). A ledger within an archive a keeper keeps is known by the
+names its events are enrolled under.
 
 Checkpointing a root records the distinct heads of the archives found
 under it, once the check reports nothing changed, missing, new or
@@ -233,7 +261,8 @@ already there is kept; a different one under the same name refuses
 Repairing a root removes write bits from the enrolled files, ledger
 events and checkpoints under it, and from nothing else; it enrols
 nothing, and refuses if any enrolled file changed or is missing
-(=differs=).
+(=differs=). Of an archive a keeper keeps it looks at the ledger events
+alone.
 
 ** Check
 
@@ -241,6 +270,7 @@ For each archive found, in path order compared component by component,
 a report:
 
 - =archive=: its path; =head=, =events= and =files=;
+- =kept=: its keeper's URL, or =null= for an archive on disk;
 - =missing=, =changed=, =new=: enrolled paths absent, enrolled paths
   whose entry differs, and unenrolled paths, each sorted. A schema 2
   entry differs if the file's CID does, too;
@@ -260,9 +290,15 @@ that no file shows, such as an added directory. For a schema 3 ledger
 the recorded root is the fold of what it enrols, so the two agree when
 the archive holds that and nothing else.
 
+An archive a keeper keeps is reported from its ledger, there being
+nothing on disk to compare: =files= counts its entries, =root= is the
+fold's, =writable= lists ledger events alone, =hidden= is what the ledger
+enrols under a hidden name, and =missing=, =changed=, =new= and
+=undeclared= are empty.
+
 Fixtures: =fixtures/ledger/=: inventories with their first event,
 ledgers valid and refused, in both layouts and all three schemas, and
-reports.
+reports, of archives on disk and kept by a keeper.
 
 * Sealing
 
@@ -308,7 +344,8 @@ Planning refuses: =source= (missing, or already archived), =destination=
 within an item or collection already sealed: a sealed item never grows), =hidden= (a hidden file in the
 item, or a hidden destination), =link= (a symlink or second hard link in
 the item), =differs= (enrolled evidence in the archive is missing or
-changed), and for links, =unsealed=, =unresolved= and =loop=, below.
+changed), =kept= (a keeper keeps the archive: sealing to a keeper is not
+in this version), and for links, =unsealed=, =unresolved= and =loop=, below.
 Hidden or unenrolled files already elsewhere in the archive do not stop a
 seal; the check reports them.
 

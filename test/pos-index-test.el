@@ -71,6 +71,17 @@ byte for byte as it was."
       (should (pos-index-resolve scope (concat "ipfs://" note-cid)))
       (should (equal saved (pos-ledger--read file))))))
 
+(ert-deftest pos-index/a-kept-archive-is-indexed-from-its-ledger ()
+  "What a keeper keeps is not on disk to hash, so the index of a kept
+archive holds the CIDs its ledger folds to, at the paths they would have."
+  (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
+    (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
+           (cids (pos-ledger-fold-cids (expand-file-name "archives" scope)))
+           (index (pos-index-build scope)))
+      (should (equal ["archives/first/a.txt"]
+                     (cdr (assoc (cdr (assoc "first/a.txt" cids)) index))))
+      (should (equal ["archives"] (cdr (assoc (cdr (assoc "." cids)) index)))))))
+
 (ert-deftest pos-index/org-follows-ipfs-links ()
   "An ipfs: link in canon opens the archived file it names."
   (pos-index-test-with-sealed
