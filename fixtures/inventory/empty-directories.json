@@ -1,0 +1,42 @@
+{
+ "description": "Empty directories at three depths beside files, one holding only a hidden file: IPFS hashes each, and an inventory lists them by path.",
+ "tree": [
+  {
+   "path": "t/a.txt",
+   "text": "a"
+  },
+  {
+   "path": "t/hollow",
+   "directory": true
+  },
+  {
+   "path": "t/sub/b.txt",
+   "text": "b"
+  },
+  {
+   "path": "t/sub/void",
+   "directory": true
+  },
+  {
+   "path": "t/deep/er/still",
+   "directory": true
+  },
+  {
+   "path": "t/veiled/.hidden",
+   "text": "x"
+  }
+ ],
+ "entry": "t",
+ "cids": {
+  ".": "bafybeienjdahwx5mftsp6i3ib2ikefzjoqjagnfqlwpyyxc7hstb46e4ja",
+  "a.txt": "bafkreigks6arfsq3xxfpvqrrwonchxcnu6do76auprhhfomao6c273sixm",
+  "deep": "bafybeif25jvlihq5b6fgdhehmjk7hwvwxqlw5ddhjxi7nbtt7albo6mcry",
+  "deep/er": "bafybeibnjswpiku5ytmfircu57x3nkyv5jdam2rgqb5ycgqpl47ovejkau",
+  "deep/er/still": "bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354",
+  "hollow": "bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354",
+  "sub": "bafybeiduegbwdl2klaco2lcinm3lqsfvhnicdtbge4v4uqa2zirvbwyp2e",
+  "sub/b.txt": "bafkreib6epubmabzlffdhckpmvsodmjuro6xuaei2qwevs3t52xnlhaatu",
+  "sub/void": "bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354",
+  "veiled": "bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354"
+ }
+}

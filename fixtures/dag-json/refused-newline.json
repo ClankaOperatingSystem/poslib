@@ -1,0 +1,5 @@
+{
+ "description": "A final newline: canonical JSON, not a block.",
+ "bytes": "{\"a\":1}\n",
+ "error": "encoding"
+}

@@ -1,0 +1,15 @@
+{
+ "description": "Empty arrays, empty objects and null.",
+ "value": {
+  "a": [],
+  "o": {},
+  "n": null,
+  "l": [
+   null,
+   [],
+   {}
+  ]
+ },
+ "encoded": "{\"a\":[],\"l\":[null,[],{}],\"n\":null,\"o\":{}}",
+ "cid": "baguqeerabqwdvqybs3q5d5n5kjy77zgnmhniqnucugjdswktb763dpxbzkta"
+}

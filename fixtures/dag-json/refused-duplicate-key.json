@@ -1,0 +1,5 @@
+{
+ "description": "A key given twice.",
+ "bytes": "{\"a\":1,\"a\":2}",
+ "error": "encoding"
+}

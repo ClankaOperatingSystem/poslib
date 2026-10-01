@@ -1,0 +1,5 @@
+{
+ "description": "A float: DAG-JSON has them and a ledger does not.",
+ "bytes": "{\"a\":1.5}",
+ "error": "encoding"
+}

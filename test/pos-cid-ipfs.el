@@ -24,11 +24,14 @@
 ;; with the unixfs-v1-2025 profile, and `ipfs add --only-hash', which
 ;; stores and announces nothing.  For each fixture in fixtures/cid/,
 ;; kubo must give its recorded CID and so must we; for one we refuse,
-;; kubo must give the CID the fixture records it giving.
+;; kubo must give the CID the fixture records it giving.  Every block in
+;; fixtures/dag-json/, and every schema 3 event in fixtures/ledger/, kubo
+;; must store unchanged under the CID recorded, with `ipfs dag put'.
 
 ;;; Code:
 
 (require 'pos-cid)
+(require 'pos-ledger)
 (require 'pos-fixtures
          (expand-file-name "pos-fixtures"
                            (file-name-directory (or load-file-name
@@ -59,6 +62,60 @@
                    (when .params.links
                      (list (format "--max-file-links=%d" .params.links)))
                    (list path)))))
+
+(defun pos-cid-ipfs-block-agrees (repo label text recorded)
+  "Return non-nil if kubo in REPO stores TEXT unchanged under the CID RECORDED.
+As a dag-json block; LABEL names it in the message."
+  (let* ((bytes (encode-coding-string text 'utf-8 t))
+         (file (make-temp-file "pos-cid-ipfs-block"))
+         (ours (pos-cid-block pos-cid-dag-json bytes)))
+    (unwind-protect
+        (let* ((_ (let ((coding-system-for-write 'binary))
+                    (with-temp-file file
+                      (set-buffer-multibyte nil)
+                      (insert bytes))))
+               (kubo (pos-cid-ipfs-run repo "dag" "put" "--input-codec" "dag-json"
+                                       "--store-codec" "dag-json" file))
+               (stored (let ((coding-system-for-read 'utf-8))
+                         (pos-cid-ipfs-run repo "block" "get" kubo)))
+               (agrees (and (equal kubo recorded) (equal ours recorded)
+                            (equal stored text))))
+          (if agrees
+              (message "ok    %s" label)
+            (message "FAIL  %s: recorded %s, kubo %s, ours %s" label recorded kubo ours))
+          agrees)
+      (delete-file file))))
+
+(defun pos-cid-ipfs-check-blocks (repo)
+  "Compare every DAG-JSON fixture block with kubo in REPO; count failures.
+The blocks of fixtures/dag-json/, and every schema 3 event a ledger
+fixture holds or expects."
+  (let ((failed 0))
+    (dolist (named (pos-fixtures "dag-json"))
+      (let-alist (cdr named)
+        (unless (or .error
+                    (pos-cid-ipfs-block-agrees repo (concat "dag-json " (car named))
+                                               .encoded .cid))
+          (setq failed (1+ failed)))))
+    (dolist (named (pos-fixtures "ledger"))
+      (let ((fixture (cdr named)) events)
+        (unless (alist-get 'error fixture)
+          (seq-doseq (entry (alist-get 'tree fixture))
+            (let ((path (alist-get 'path entry)) (text (alist-get 'text entry)))
+              (when (and text (string-match-p "/ledger/" path))
+                (push (cons (file-name-nondirectory path) text) events))))
+          (seq-doseq (event (append (and (alist-get 'event fixture)
+                                         (list (alist-get 'event fixture)))
+                                    (alist-get 'converted fixture) nil))
+            (push (cons (alist-get 'name event) (alist-get 'encoded event)) events))
+          (dolist (event (nreverse events))
+            (let ((id (substring (car event) 9 -5)))
+              (when (pos-ledger--event-cid-p id)
+                (unless (pos-cid-ipfs-block-agrees
+                         repo (format "ledger %s %s" (car named) (substring (car event) 0 8))
+                         (cdr event) id)
+                  (setq failed (1+ failed)))))))))
+    failed))
 
 (defun pos-cid-ipfs-check-inventory (repo)
   "Compare every inventory fixture's root with kubo in REPO; count failures."
@@ -106,7 +163,8 @@
                     (setq failed (1+ failed))
                     (message "FAIL  %s: recorded %s, kubo %s, ours %s"
                              (car named) (or .cid .ipfs) kubo ours))))))
-          (setq failed (+ failed (pos-cid-ipfs-check-inventory repo))))
+          (setq failed (+ failed (pos-cid-ipfs-check-inventory repo)
+                          (pos-cid-ipfs-check-blocks repo))))
       (delete-directory repo t))
     (kill-emacs (if (zerop failed) 0 1))))
 

@@ -1,0 +1,133 @@
+{
+ "kind": "convert",
+ "description": "Under one root: a schema 2 ledger is converted; a schema 3 ledger, a legacy ledger and an archive with no ledger are left, each with its reason.",
+ "tree": [
+  {
+   "path": "garden/projects/legacy/.archive-integrity-anchors/7f0debeab86aadc647b633b67efb77c252e70061eb33c18aea50a5239c174658.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"fa53ddc083c49ccedf7fa4bcdff98f567f29d2b1d86e9f624f14cd6647ff126f\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "garden/projects/legacy/archives/.archive-integrity/00000001-fa53ddc083c49ccedf7fa4bcdff98f567f29d2b1d86e9f624f14cd6647ff126f.json",
+   "text": "{\"add\":{\"old.txt\":{\"mode\":292,\"sha256\":\"cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4\",\"size\":3}},\"ledger_id\":\"5d696131-8ef7-4cd6-8509-b5c910bc65a4\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "garden/projects/legacy/archives/old.txt",
+   "text": "old",
+   "mode": 292
+  },
+  {
+   "path": "garden/projects/none/archives",
+   "directory": true
+  },
+  {
+   "path": "garden/projects/three/archive-integrity/checkpoints/0d67b189d2ca2096d20236a98028eacee310529ed64eeafb29c4d30eeac3c1a1.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeerahxl2z4nijudicp5xdd6v3j46wmt4gim42is4nbjk3asamavwfqha\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "garden/projects/three/archive-integrity/ledger/00000001-baguqeerahxl2z4nijudicp5xdd6v3j46wmt4gim42is4nbjk3asamavwfqha.json",
+   "text": "{\"add\":{\"a/x.txt\":{\"cid\":\"bafkreibnoelefnzgwbcacyt4vh52ymxvzbjq7mmqhtcnwarfq4lzegsiqe\",\"mode\":292,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"size\":1}},\"collections\":[],\"empty\":[],\"item\":\"a\",\"ledger_id\":\"1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d\",\"previous\":null,\"root\":\"bafybeifeje3xu6nxykajeienwpnr6l7ndmq32sxu6xczyqvpnv66y2p4y4\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "garden/projects/three/archives/a/x.txt",
+   "text": "x",
+   "mode": 292
+  },
+  {
+   "path": "garden/projects/two/archive-integrity/ledger/00000001-650143ee2789bee3f24cac6ce4675d6e35d35be29788d8e6c3b6755726a7fae9.json",
+   "text": "{\"add\":{\"a/x.txt\":{\"cid\":\"bafkreibnoelefnzgwbcacyt4vh52ymxvzbjq7mmqhtcnwarfq4lzegsiqe\",\"mode\":292,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"size\":1}},\"collections\":[],\"item\":\"a\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeifeje3xu6nxykajeienwpnr6l7ndmq32sxu6xczyqvpnv66y2p4y4\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "garden/projects/two/archives/a/x.txt",
+   "text": "x",
+   "mode": 292
+  }
+ ],
+ "root": "garden",
+ "converted": [
+  {
+   "name": "00000002-baguqeerari6yxnt2epwnz47hq4ivsjvhxe5jbc4hllarzapu4u5aso4zaciq.json",
+   "encoded": "{\"empty\":[],\"from\":\"650143ee2789bee3f24cac6ce4675d6e35d35be29788d8e6c3b6755726a7fae9\",\"kind\":\"conversion\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeera4m2nd6nvbdrystbsste6a7xw7fc4un6nr5lv3iellhildyiesdva\"},\"root\":\"bafybeifeje3xu6nxykajeienwpnr6l7ndmq32sxu6xczyqvpnv66y2p4y4\",\"schema\":3}"
+  }
+ ],
+ "skipped": [
+  {
+   "archive": "garden/projects/legacy/archives",
+   "reason": "legacy entries"
+  },
+  {
+   "archive": "garden/projects/none/archives",
+   "reason": "no ledger"
+  },
+  {
+   "archive": "garden/projects/three/archives",
+   "reason": "schema 3"
+  }
+ ],
+ "report": [
+  {
+   "archive": "garden/projects/legacy/archives",
+   "head": "fa53ddc083c49ccedf7fa4bcdff98f567f29d2b1d86e9f624f14cd6647ff126f",
+   "events": 1,
+   "files": 1,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeieo5llvibookojweu3xybystgcxgnbms3bckrs7s2x4mrs4fllpge",
+   "recorded_root": null,
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  },
+  {
+   "archive": "garden/projects/none/archives",
+   "head": null,
+   "events": 0,
+   "files": 0,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeiczsscdsbs7ffqz55asqdf3smv6klcw3gofszvwlyarci47bgf354",
+   "recorded_root": null,
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  },
+  {
+   "archive": "garden/projects/three/archives",
+   "head": "baguqeerahxl2z4nijudicp5xdd6v3j46wmt4gim42is4nbjk3asamavwfqha",
+   "events": 1,
+   "files": 1,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeifeje3xu6nxykajeienwpnr6l7ndmq32sxu6xczyqvpnv66y2p4y4",
+   "recorded_root": "bafybeifeje3xu6nxykajeienwpnr6l7ndmq32sxu6xczyqvpnv66y2p4y4",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  },
+  {
+   "archive": "garden/projects/two/archives",
+   "head": "baguqeerari6yxnt2epwnz47hq4ivsjvhxe5jbc4hllarzapu4u5aso4zaciq",
+   "events": 2,
+   "files": 1,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeifeje3xu6nxykajeienwpnr6l7ndmq32sxu6xczyqvpnv66y2p4y4",
+   "recorded_root": "bafybeifeje3xu6nxykajeienwpnr6l7ndmq32sxu6xczyqvpnv66y2p4y4",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  }
+ ]
+}

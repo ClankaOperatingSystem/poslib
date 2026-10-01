@@ -1,0 +1,5 @@
+{
+ "description": "A boolean: DAG-JSON has them and a ledger does not.",
+ "bytes": "{\"a\":true}",
+ "error": "encoding"
+}

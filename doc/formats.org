@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 12, in lockstep; the fixtures in =fixtures/= are its
+this document, version 13, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -37,11 +37,11 @@ child's CID, name and DAG size, in byte order of name. So a ledger's
 enrolled entries give the archive's root, and a reader with the ledger
 and not the archive computes the CIDs a reader with the archive does.
 
-Two things a tree on disk can have that an inventory cannot: an empty
-directory, which IPFS hashes and which has no entry, and a hidden entry,
-which IPFS leaves out. An inventory holding a hidden component is
-refused; an empty directory is simply absent, so a tree that has one has
-a root the inventory does not reproduce.
+A directory that holds nothing has no file to derive it from, and IPFS
+hashes it all the same. So an inventory lists its empty directories
+beside its files, by path, and with them gives every CID the tree on
+disk has. A directory holding only hidden entries is empty, since IPFS
+leaves those out; an inventory holding a hidden component is refused.
 
 Fixtures: =fixtures/inventory/=. Each gives a tree, the entry to hash,
 and =cids=, the CID of every file and directory under it, the root as
@@ -49,21 +49,39 @@ and =cids=, the CID of every file and directory under it, the root as
 of its files must both give them, and kubo, run offline, is the referee
 for the root.
 
-* Canonical JSON
+* DAG-JSON
 
-Ledger events and checkpoints are JSON written one way, so that equal
-values are equal bytes:
+Ledger events, checkpoints, plans and reports are [[https://ipld.io/specs/codecs/dag-json/spec/][DAG-JSON]], IPLD's JSON
+written one way, so that equal values are equal bytes, kept to the
+values a ledger needs:
 
-- Values: objects, strings, integers and =null=.
+- Values: objects, arrays, strings, integers of 64 bits and =null=; no
+  floats and no booleans.
 - Object keys in the byte order of their UTF-8 encoding, which is code
-  point order.
-- No whitespace between tokens; one newline after the value.
+  point order, each once.
+- No whitespace between tokens.
 - Strings in UTF-8, unescaped, except: =\"= and =\\=; =\b=, =\f=, =\n=,
   =\r= and =\t=; other characters below U+0020 as =\u00xx=, lower-case
   hex. DEL and all non-ASCII characters are written raw.
 - Integers in decimal, without sign unless negative, without exponent.
+- A link to a block is the object ={"/": "CID"}=, and the key =/= is in
+  no other object.
 
-Fixtures: =fixtures/json/=, each a value and its encoding.
+A value written so is a block, and the block's CID is CIDv1 with the
+dag-json codec (=0x0129=) and sha2-256 over its bytes, in base32
+(=baguqeera...=): what =ipfs dag put --input-codec dag-json --store-codec
+dag-json= stores and names. A schema 3 event is a block. Canonical JSON,
+which schema 1 and 2 events, checkpoints, plans and reports are written
+in, is the same bytes and one newline after them, so a canonical JSON
+event less its newline is a block too.
+
+A block is read strictly: bytes that are not the one encoding of their
+value are refused (=encoding=).
+
+Fixtures: =fixtures/json/=, each a value and its canonical JSON;
+=fixtures/dag-json/=, each a value, its block and the block's CID, or
+bytes that are not a block, refused. kubo, run offline, is the referee
+for those blocks and for every schema 3 event in =fixtures/ledger/=.
 
 * Archive ledgers
 
@@ -115,10 +133,12 @@ and no =README.org= is added to it.
 
 ** Events
 
-The ledger is a sequence of files named =NNNNNNNN-HASH.json=: an
-eight-digit number counting from 1 without gaps, and the SHA-256 of the
-file's bytes. Each holds one event in canonical JSON, of schema 1 or 2.
-Once an event has schema 2, every later one does.
+The ledger is a sequence of files named =NNNNNNNN-NAME.json=: an
+eight-digit number counting from 1 without gaps, and what names the
+event. A schema 1 or 2 event is canonical JSON, named by the SHA-256 of
+the file's bytes; a schema 3 event is a block, named by its CID. Once an
+event has schema 2, every later one has schema 2 or 3; once one has
+schema 3, every later one does.
 
 Schema 1:
 
@@ -151,15 +171,40 @@ without =cid=), migrates them all: =schema= 2, =kind= =conversion=,
 - =collections=: every collection in the archive, sorted;
 - =root=: the archive's CID after it.
 
-The head is the hash of the last event; the recorded root is the last
-event's =root=, if it is of schema 2. An empty ledger directory is
-refused. Refusals are named: =ledger= (the ledger is not a directory, or
-there are two), =sequence= (name, number or hash), =chain= (keys, schema or
-=previous=, or a conversion where there is nothing legacy to convert),
-=identity=, =entry= (an entry, =item=, =root= or =collections=, or a
-conversion that leaves a legacy entry unaccounted for, names a wrong
-original or adds over an entry) and
-=empty=; =link= refuses a symlink or a second hard link anywhere.
+Schema 3 has what schema 2 has, as a block, and:
+
+- =previous=: a link to the preceding event's block, =null= for the
+  first;
+- =empty=: the paths of the empty directories in the item, sorted, each
+  once, possibly none; a directory holding only hidden entries is one,
+  since IPFS adds the directory and leaves those out;
+- =root=: the CID the ledger folds to after this event: that of the
+  inventory of its enrolled entries, less hidden ones, and its enrolled
+  empty directories ([[*From an inventory][From an inventory]]). It is the archive's CID
+  whenever the archive holds what its ledger enrols and nothing else.
+
+A ledger's first event may be of schema 3. A ledger of schema 2 that
+holds no legacy entry is brought to schema 3 by one event: =schema= 3,
+=kind= =conversion=, =ledger_id=, and:
+
+- =previous=: a link to the block the preceding event is, less its
+  newline;
+- =from=: the SHA-256 the preceding event is named by;
+- =empty=: every empty directory in the archive, sorted;
+- =root=: the CID the ledger folds to, the root the preceding event
+  recorded.
+
+The head is what names the last event, its hash or its CID; the recorded
+root is the last event's =root=, if it is of schema 2 or 3. An empty
+ledger directory is refused. Refusals are named: =ledger= (the ledger is
+not a directory, or there are two), =sequence= (name, number, hash or
+CID), =encoding= (a schema 3 event that is not a block), =chain= (keys,
+schema or =previous=, an event named otherwise than its schema is, a
+conversion where there is nothing to convert, or one whose =from= is not
+the head), =identity=, =entry= (an entry, =item=, =root=, =collections=
+or =empty=, or a conversion that leaves a legacy entry unaccounted for,
+names a wrong original or adds over an entry) and =empty=; =link=
+refuses a symlink or a second hard link anywhere.
 
 ** Checkpoints
 
@@ -169,12 +214,13 @@ root it covers, or in the legacy =.archive-integrity-anchors/=, named by
 the SHA-256 of its bytes, holding in canonical JSON:
 
 - =schema=: 1;
-- =heads=: sorted event hashes;
+- =heads=: sorted heads, each an event's hash or its CID;
 - =coverage=: =archive= for a root named =archives=, else =tree=.
 
-Every head a checkpoint names must be the hash of some event file of the
-archives found, or of a ledger within them, legacy or current, as
-retired scopes carry; otherwise the check refuses (=anchor=).
+Every head a checkpoint names must name some event file of the archives
+found, or of a ledger within them, legacy or current, as retired scopes
+carry, by its hash or by its CID as a block; otherwise the check refuses
+(=anchor=).
 
 Checkpointing a root records the distinct heads of the archives found
 under it, once the check reports nothing changed, missing, new or
@@ -210,10 +256,13 @@ a report:
   declares them, sorted.
 
 A root differing from the recorded root shows a change since sealing
-that no file shows, such as an added directory.
+that no file shows, such as an added directory. For a schema 3 ledger
+the recorded root is the fold of what it enrols, so the two agree when
+the archive holds that and nothing else.
 
 Fixtures: =fixtures/ledger/=: inventories with their first event,
-ledgers valid and refused, in both layouts and schemas, and reports.
+ledgers valid and refused, in both layouts and all three schemas, and
+reports.
 
 * Sealing
 
@@ -333,10 +382,13 @@ applies any plan.
    has been already; the item's entries must then be as planned, else
    =plan=; then the item moves to its destination in one rename.
 5. The item's entries at the destination must be as planned, else =plan=.
-6. Unless sealed already, its event, of schema 2, is written: =previous=,
-   the ledger's head; =ledger_id=, =add= and =collections= from the plan;
-   =item=, the destination's path within the archive; and =root=, the
-   archive's CID now.
+6. Unless sealed already, its event is written: =previous=, the ledger's
+   head; =ledger_id=, =add= and =collections= from the plan; =item=, the
+   destination's path within the archive; and =root=. In a ledger with
+   no event yet, or whose head is a block, the event is of schema 3,
+   with =empty= as found in the item where it now lies. In a ledger of
+   schema 1 or 2 it is of schema 2, its =root= the archive's CID now,
+   until the ledger is converted.
 7. Write bits are removed from the item's files and the rumours; events,
    like every ledger and checkpoint file, have mode =0444=.
 8. A checkpoint of the archive's head, of coverage =archive=, is written
@@ -355,6 +407,23 @@ plan and its refusals are those of the two-step form.
 Fixtures: =fixtures/ledger/seal-*=: a tree, a source and destination, a
 date for rumours, and the plan, the last event and the report after it,
 paths relative to the tree; or the refusal.
+
+** Conversion
+
+=convert ROOT= brings every schema 2 ledger found under ROOT to schema 3
+by the conversion event, and checkpoints each new head. It adds nothing
+to an archive, so there is no plan to review. Every archive is verified
+before any event is written: one with a file missing, changed or
+unenrolled, or whose CID is not the root its ledger recorded, refuses
+the whole (=unclean=), as does one whose ledger does not fold to that
+root (=root=). An archive with no ledger, a ledger already of schema 3,
+and a ledger holding legacy entries, which migration converts first, are
+left and reported with the reason. It prints =converted=, each an
+archive with its =event= and new =head=, and =skipped=, each an archive
+with its =reason=. Applied again, it finds its work done.
+
+Fixtures: =fixtures/ledger/convert*=: a tree and a root, and the events
+written, what was skipped and the report after; or the refusal.
 
 * Migration
 

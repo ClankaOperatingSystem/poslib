@@ -1,0 +1,5 @@
+{
+ "description": "Whitespace between tokens.",
+ "bytes": "{\"a\": 1}",
+ "error": "encoding"
+}

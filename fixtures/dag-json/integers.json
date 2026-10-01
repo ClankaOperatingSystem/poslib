@@ -1,0 +1,10 @@
+{
+ "description": "Integers of 64 bits, to both ends.",
+ "value": {
+  "max": 9223372036854775807,
+  "min": -9223372036854775808,
+  "zero": 0
+ },
+ "encoded": "{\"max\":9223372036854775807,\"min\":-9223372036854775808,\"zero\":0}",
+ "cid": "baguqeera6ayscsjelpb2s5tor7toq6abnq2zww4ouc5wltyfj5e622eqb6mq"
+}

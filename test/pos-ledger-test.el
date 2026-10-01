@@ -68,6 +68,20 @@
         (should (equal (encode-coding-string .encoded 'utf-8 t)
                        (pos-ledger-json .value)))))))
 
+(ert-deftest pos-ledger/a-block-is-dag-json-written-one-way ()
+  "Every fixture in fixtures/dag-json/: a value's block and its CID, or
+bytes that are not the one block of their value, refused."
+  (dolist (named (pos-fixtures "dag-json"))
+    (ert-info ((car named))
+      (let-alist (cdr named)
+        (if .error
+            (pos-ledger-test-refused .error
+              (pos-ledger--strict (encode-coding-string .bytes 'utf-8 t) (car named)))
+          (let ((block (encode-coding-string .encoded 'utf-8 t)))
+            (should (equal block (pos-ledger-block .value)))
+            (should (equal .cid (pos-ledger--event-cid block)))
+            (pos-ledger-test-same .value (pos-ledger--strict block (car named)))))))))
+
 ;;;; Inventories and events
 
 (ert-deftest pos-ledger/an-inventory-records-every-archived-file ()
@@ -102,8 +116,9 @@ archive-integrity/ledger/, or in the legacy folder inside it, not both."
             (let ((archive (expand-file-name .archive dir)))
               (if .error
                   (pos-ledger-test-refused .error (pos-ledger-history archive))
-                (pcase-let ((`(,entries ,head ,events ,_ ,root ,collections ,items)
+                (pcase-let ((`(,entries ,head ,events ,_ ,root ,collections ,items ,empty)
                              (pos-ledger-history archive)))
+                  (should (equal (or .empty []) (vconcat empty)))
                   (should (equal .items (vconcat items)))
                   (should (equal .head head))
                   (should (equal .events events))

@@ -23,7 +23,8 @@
 ;; Reads and checks archive ledgers as doc/formats.org specifies, in
 ;; lockstep with pyposlib.  Writing them is not here yet.
 ;;
-;; - `pos-ledger-json': canonical JSON bytes of a value.
+;; - `pos-ledger-json': DAG-JSON bytes of a value, and a newline.
+;; - `pos-ledger-block': the same without the newline, a block.
 ;; - `pos-ledger-inventory': what an archive holds.
 ;; - `pos-ledger-history': what its ledger enrolled.
 ;; - `pos-ledger-fold-cids': the archive's CIDs from the ledger alone.
@@ -57,7 +58,7 @@
   "Signal a refusal of KIND, with a message from FORMAT and ARGS."
   (signal 'pos-ledger-refused (list kind (apply #'format format args))))
 
-;;;; Canonical JSON
+;;;; DAG-JSON
 
 (defun pos-ledger--utf8< (a b)
   "Return non-nil if the string A precedes B as UTF-8 bytes."
@@ -85,7 +86,10 @@
   (cond
    ((eq value :null) "null")
    ((stringp value) (pos-ledger--string value))
-   ((integerp value) (number-to-string value))
+   ((integerp value)
+    (unless (<= (- (expt 2 63)) value (1- (expt 2 63)))
+      (error "No DAG-JSON for an integer of more than 64 bits: %S" value))
+    (number-to-string value))
    ((vectorp value) (concat "[" (mapconcat #'pos-ledger--encode value ",") "]"))
    ((listp value)
     (concat "{"
@@ -111,6 +115,55 @@
 (defun pos-ledger--sha (bytes)
   "Return the lower-case hex SHA-256 of BYTES."
   (secure-hash 'sha256 bytes))
+
+(defun pos-ledger-block (value)
+  "Return VALUE as a DAG-JSON block: its canonical bytes, with no newline."
+  (encode-coding-string (pos-ledger--encode value) 'utf-8))
+
+(defun pos-ledger--plain-p (value)
+  "Return non-nil if the JSON VALUE holds only what a block may.
+No object repeats a key, and the key / is a link's alone: an object of
+that one key and a CID."
+  (cond ((vectorp value) (seq-every-p #'pos-ledger--plain-p value))
+        ((consp value)
+         (and (equal (length value) (length (seq-uniq (mapcar #'car value))))
+              (or (not (assq '/ value))
+                  (and (null (cdr value))
+                       (stringp (cdar value))
+                       (string-match-p "\\`b[a-z2-7]+\\'" (cdar value))))
+              (seq-every-p (lambda (pair) (pos-ledger--plain-p (cdr pair))) value)))
+        (t t)))
+
+(defun pos-ledger--strict (bytes file)
+  "Return the value of BYTES, refusing unless BYTES is its one DAG-JSON block.
+FILE names what was read, for the refusal."
+  (let ((value (condition-case nil
+                   (let ((parsed (pos-ledger--parse bytes)))
+                     (and (pos-ledger--plain-p parsed)
+                          (equal (pos-ledger-block parsed) bytes)
+                          (list parsed)))
+                 (error nil))))
+    (unless value
+      (pos-ledger--refuse 'encoding "Not a DAG-JSON block: %s" file))
+    (car value)))
+
+(defun pos-ledger--event-cid (bytes)
+  "Return the CID a schema 3 event of BYTES is named by."
+  (pos-cid-block pos-cid-dag-json bytes))
+
+(defun pos-ledger--event-cid-p (value)
+  "Return non-nil if VALUE has the form of a schema 3 event's CID."
+  (and (stringp value)
+       (string-match-p "\\`baguqeera[a-z2-7]\\{52\\}\\'" value)
+       t))
+
+(defun pos-ledger--link (cid)
+  "Return a DAG-JSON link to CID."
+  `((/ . ,cid)))
+
+(defun pos-ledger--as-block (bytes)
+  "Return BYTES, an event written with a final newline, as a block without it."
+  (if (string-suffix-p "\n" bytes) (substring bytes 0 -1) bytes))
 
 ;;;; Files
 
@@ -286,51 +339,79 @@ from its fingerprint, and adds only new paths."
        (equal (append value nil)
               (seq-uniq (sort (append value nil) #'string<)))))
 
+(defconst pos-ledger--event-name
+  "\\`\\([0-9]\\{8\\}\\)-\\([0-9a-f]\\{64\\}\\|baguqeera[a-z2-7]\\{52\\}\\)\\.json\\'"
+  "An event file's name: its number, and its hash or, in schema 3, its CID.")
+
 (defun pos-ledger-history (archive)
-  "Return ARCHIVE's ledger as (ENTRIES HEAD EVENTS FILES ROOT COLLECTIONS ITEMS).
-ENTRIES is an alist of path and entry; HEAD the last event's hash;
-EVENTS their number; FILES the event files; ROOT the archive CID the
-last event recorded, if it records one; COLLECTIONS every path sealed
-as a collection, sorted; ITEMS the path of each item a schema 2 event
-sealed, sorted.  No ledger is (nil nil 0 nil nil nil nil)."
+  "Return ARCHIVE's ledger as a list of what it enrolled and recorded.
+\(ENTRIES HEAD EVENTS FILES ROOT COLLECTIONS ITEMS EMPTY): ENTRIES is
+an alist of path and entry; HEAD the last event's hash or, in
+schema 3, its CID; EVENTS their number; FILES the event files; ROOT the
+archive CID the last event recorded, if it records one; COLLECTIONS
+every path sealed as a collection, sorted; ITEMS the path of each item
+a schema 2 or 3 event sealed, sorted; EMPTY the empty directories the
+schema 3 events enrolled, sorted.  No ledger is (nil nil 0 nil nil nil
+nil nil)."
   (let ((folder (pos-ledger-folder archive))
-        entries previous files ledger-id (number 0) schema root collections items
-        converted)
+        entries previous previous-cid files ledger-id (number 0) schema root
+        collections items converted empty)
     (cond
      ((not (or (file-exists-p folder) (file-symlink-p folder)))
-      (list nil nil 0 nil nil nil nil))
+      (list nil nil 0 nil nil nil nil nil))
      ((or (file-symlink-p folder) (not (file-directory-p folder)))
       (pos-ledger--refuse 'ledger "Invalid ledger: %s" folder))
      (t
       (dolist (name (pos-ledger--entries folder))
         (let* ((path (expand-file-name name folder))
                (_ (pos-ledger--regular path))
-               (bytes (pos-ledger--read path)))
+               (bytes (pos-ledger--read path))
+               (id (and (string-match pos-ledger--event-name name)
+                        (= (1+ number) (string-to-number (match-string 1 name)))
+                        (match-string 2 name)))
+               (blocked (pos-ledger--event-cid-p id)))
           (setq number (1+ number))
-          (unless (and (string-match "\\`\\([0-9]\\{8\\}\\)-\\([0-9a-f]\\{64\\}\\)\\.json\\'" name)
-                       (= number (string-to-number (match-string 1 name)))
-                       (equal (pos-ledger--sha bytes) (match-string 2 name)))
+          (unless (and id (equal id (if blocked (pos-ledger--event-cid bytes)
+                                      (pos-ledger--sha bytes))))
             (pos-ledger--refuse 'sequence "Ledger sequence/hash failure: %s" path))
-          (let* ((event (pos-ledger--parse bytes))
+          (let* ((event (if blocked (pos-ledger--strict bytes path)
+                          (pos-ledger--parse bytes)))
                  (keys (and (listp event) (pos-ledger--keys event)))
-                 (event-previous (alist-get 'previous event)))
-            (unless (and (pcase (alist-get 'schema event)
-                           (1 (and (not (eql schema 2))
-                                   (member keys '(("add" "previous" "schema")
-                                                  ("add" "ledger_id" "previous"
-                                                   "schema")))))
-                           (2 (or (equal keys '("add" "collections" "item" "ledger_id"
-                                                "previous" "root" "schema"))
-                                  (and (equal keys '("add" "collections" "convert" "kind"
-                                                     "ledger_id" "previous" "remove"
-                                                     "rename" "root" "schema"))
-                                       (equal (alist-get 'kind event) "conversion")
-                                       (not converted)
-                                       (seq-some (lambda (e) (not (assq 'cid (cdr e))))
-                                                 entries)))))
-                         (equal event-previous (or previous :null)))
+                 (version (and (listp event) (alist-get 'schema event)))
+                 (legacy (seq-some (lambda (e) (not (assq 'cid (cdr e)))) entries))
+                 (conversion
+                  (and (eql version 2)
+                       (equal keys '("add" "collections" "convert" "kind" "ledger_id"
+                                     "previous" "remove" "rename" "root" "schema"))
+                       (equal (alist-get 'kind event) "conversion")
+                       (not converted) legacy))
+                 (to-blocks
+                  (and (eql version 3)
+                       (equal keys '("empty" "from" "kind" "ledger_id" "previous"
+                                     "root" "schema"))
+                       (equal (alist-get 'kind event) "conversion")
+                       (eql schema 2) (not legacy)
+                       (equal (alist-get 'from event) previous)))
+                 (follows (cond ((and (eql version 3) previous-cid)
+                                 (pos-ledger--link previous-cid))
+                                (previous)
+                                (t :null))))
+            (unless (and (or (and (eql version 1) (not (memq schema '(2 3)))
+                                  (member keys '(("add" "previous" "schema")
+                                                 ("add" "ledger_id" "previous"
+                                                  "schema"))))
+                             (and (eql version 2) (not (eql schema 3))
+                                  (equal keys '("add" "collections" "item" "ledger_id"
+                                                "previous" "root" "schema")))
+                             conversion
+                             (and (eql version 3) (memq schema '(nil 3))
+                                  (equal keys '("add" "collections" "empty" "item"
+                                                "ledger_id" "previous" "root" "schema")))
+                             to-blocks)
+                         (eq (eql version 3) blocked)
+                         (equal (alist-get 'previous event) follows))
               (pos-ledger--refuse 'chain "Ledger chain failure: %s" path))
-            (setq schema (alist-get 'schema event))
+            (setq schema version)
             (let ((event-id (alist-get 'ledger_id event)))
               (cond
                (event-id
@@ -340,11 +421,11 @@ sealed, sorted.  No ledger is (nil nil 0 nil nil nil nil)."
                 (setq ledger-id event-id))
                (ledger-id
                 (pos-ledger--refuse 'identity "Ledger identity removed"))))
-            (setq root (when (eql schema 2) (alist-get 'root event)))
-            (when (alist-get 'kind event)
+            (setq root (when (memq schema '(2 3)) (alist-get 'root event)))
+            (when conversion
               (setq converted t
                     entries (pos-ledger--convert entries event path)))
-            (when (and (eql schema 2) (not (alist-get 'kind event)))
+            (when (and (memq schema '(2 3)) (not conversion) (not to-blocks))
               (let ((item (alist-get 'item event)))
                 (unless (and (pos-ledger--cid-p root)
                              (stringp item) (pos-ledger--safe-p item)
@@ -356,14 +437,25 @@ sealed, sorted.  No ledger is (nil nil 0 nil nil nil nil)."
                                              (pos-ledger--key (car pair)) item))
                                           (alist-get 'add event)))
                   (pos-ledger--refuse 'entry "Invalid root, item or collections: %s" path))
+                (when (eql schema 3)
+                  (unless (and (pos-ledger--collections-p (alist-get 'empty event))
+                               (seq-every-p (lambda (p) (pos-ledger--within-p p item))
+                                            (alist-get 'empty event)))
+                    (pos-ledger--refuse 'entry "Invalid empty directories: %s" path)))
                 (push item items))
               (setq collections (append (alist-get 'collections event) collections)))
-            (when (alist-get 'kind event)
+            (when conversion
               (unless (and (pos-ledger--cid-p root)
                            (pos-ledger--collections-p (alist-get 'collections event)))
                 (pos-ledger--refuse 'entry "Invalid root or collections: %s" path))
               (setq collections (append (alist-get 'collections event) collections)))
-            (let ((add (unless (alist-get 'kind event) (alist-get 'add event))))
+            (when to-blocks
+              (unless (and (pos-ledger--cid-p root)
+                           (pos-ledger--collections-p (alist-get 'empty event)))
+                (pos-ledger--refuse 'entry "Invalid root or empty directories: %s" path)))
+            (when (eql schema 3)
+              (setq empty (append (alist-get 'empty event) empty)))
+            (let ((add (unless (or conversion to-blocks) (alist-get 'add event))))
               (unless (listp add)
                 (pos-ledger--refuse 'entry "Invalid ledger additions"))
               (dolist (pair add)
@@ -374,17 +466,20 @@ sealed, sorted.  No ledger is (nil nil 0 nil nil nil nil)."
                             (assoc name entries))
                     (pos-ledger--refuse
                      'entry "Ledger cannot replace an earlier entry or index itself"))
-                  (unless (pos-ledger--entry-p (cdr pair) schema)
+                  (unless (pos-ledger--entry-p (cdr pair) (if (eql schema 1) 1 2))
                     (pos-ledger--refuse 'entry "Invalid ledger entry"))
                   (push (cons name (cdr pair)) entries)))))
-          (setq previous (pos-ledger--sha bytes))
+          (setq previous id
+                previous-cid (if blocked id
+                               (pos-ledger--event-cid (pos-ledger--as-block bytes))))
           (push path files)))
       (unless files
         (pos-ledger--refuse 'empty "Empty ledger needs investigation: %s" folder))
       (list (sort entries (lambda (a b) (string< (car a) (car b))))
             previous number (nreverse files) root
             (seq-uniq (sort collections #'string<))
-            (sort items #'string<))))))
+            (sort items #'string<)
+            (seq-uniq (sort empty #'string<)))))))
 
 (defun pos-ledger-event (add previous number &optional ledger-id)
   "Return (NAME . BYTES), event NUMBER enrolling ADD after PREVIOUS.
@@ -467,9 +562,14 @@ The system aliases /tmp and /var are allowed."
              (equal (file-name-nondirectory grandparent) pos-ledger-integrity)))))
 
 (defun pos-ledger--ledger-hashes (archive)
-  "Return the hashes of ARCHIVE's ledger events and of every ledger within it."
+  "Return the hash and block CID of every ledger event in or beside ARCHIVE.
+Its own ledger's events and those of every ledger within it; an event
+goes by one or the other."
   (let ((folder (pos-ledger-folder archive)))
-    (mapcar (lambda (file) (pos-ledger--regular file) (pos-ledger--sha (pos-ledger--read file)))
+    (mapcan (lambda (file)
+              (pos-ledger--regular file)
+              (let ((bytes (pos-ledger--read file)))
+                (list (pos-ledger--sha bytes) (pos-ledger--event-cid bytes))))
             (append
              (when (file-directory-p folder)
                (directory-files folder t "\\.json\\'"))
@@ -494,7 +594,9 @@ The system aliases /tmp and /var are allowed."
                      (eql 1 (alist-get 'schema value))
                      (member (alist-get 'coverage value) '("archive" "tree"))
                      (vectorp (alist-get 'heads value))
-                     (seq-every-p #'pos-ledger--hex-p (alist-get 'heads value)))
+                     (seq-every-p (lambda (head) (or (pos-ledger--hex-p head)
+                                                     (pos-ledger--event-cid-p head)))
+                                  (alist-get 'heads value)))
           (pos-ledger--refuse 'checkpoint "Invalid checkpoint"))
         (when (or (not archive-root) (equal (alist-get 'coverage value) "archive"))
           (setq required (append (alist-get 'heads value) required)))))
@@ -515,18 +617,32 @@ Nil if IPFS would shard a directory in it, or ARCHIVE is not yet made."
       (and (file-exists-p archive) (pos-cid-tree archive))
     (pos-cid-sharding-unsupported nil)))
 
+(defun pos-ledger-fold (entries &optional empty)
+  "Return the CIDs the enrolled ENTRIES and the EMPTY directories give.
+As `pos-cid-tree' gives them from disk, the root as \".\".  A hidden
+entry is left out, as IPFS leaves it out.  Refuses `entry' when an
+entry records no CID, as a legacy ledger's do."
+  (pos-cid-inventory
+   (delq nil
+         (mapcar (lambda (pair)
+                   (let ((path (pos-ledger--key (car pair)))
+                         (entry (cdr pair)))
+                     (unless (assq 'cid entry)
+                       (pos-ledger--refuse 'entry "No CID enrolled for %s" path))
+                     (unless (seq-some (lambda (part) (string-prefix-p "." part))
+                                       (split-string path "/"))
+                       (list path (alist-get 'cid entry) (alist-get 'size entry)))))
+                 entries))
+   empty))
+
 (defun pos-ledger-fold-cids (archive)
   "Return ARCHIVE's CIDs from its ledger alone, as `pos-cid-tree' gives them.
-Every enrolled file's CID as recorded and every directory's derived from
-them, the root as \".\"; nothing is read from the archive itself.  Refuses
-`entry' when an enrolled entry records no CID, as a legacy ledger's do."
-  (pos-cid-inventory
-   (mapcar (lambda (pair)
-             (let ((entry (cdr pair)))
-               (unless (assq 'cid entry)
-                 (pos-ledger--refuse 'entry "No CID enrolled for %s" (car pair)))
-               (list (car pair) (alist-get 'cid entry) (alist-get 'size entry))))
-           (car (pos-ledger-history archive)))))
+Every enrolled file's CID as recorded, every directory's derived from
+them, the empty ones as recorded, the root as \".\"; nothing is read from
+the archive itself.  Refuses `entry' when an enrolled entry records no
+CID, as a legacy ledger's do."
+  (let ((history (pos-ledger-history archive)))
+    (pos-ledger-fold (nth 0 history) (nth 7 history))))
 
 (defun pos-ledger--with-cids (known actual cids)
   "Return ACTUAL with a CID from CIDS in each entry KNOWN records one for."
