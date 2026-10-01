@@ -70,6 +70,7 @@
   {
    "archive": "projects/a/archives",
    "kept": null,
+   "keeper": null,
    "head": "baguqeeraxzkvo52pmsbimc7vzkymr46iwx4l6hfuk7p7tjjfb3wxwvkz7tnq",
    "events": 2,
    "files": 4,
@@ -86,6 +87,7 @@
   {
    "archive": "projects/b/archives",
    "kept": null,
+   "keeper": null,
    "head": "baguqeera5q6iry7x6crcuhjwtwylp7s3drqfgnq3vjkqaqy4ghwqaq6j2lva",
    "events": 1,
    "files": 1,

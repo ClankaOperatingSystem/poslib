@@ -1,0 +1,64 @@
+{
+ "kind": "report",
+ "description": "A keeper that holds an event the ledger lacks, as after another clone sealed: the report gives the keeper's head beside the ledger's, and their difference is a finding.",
+ "tree": [
+  {
+   "path": ".git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "projects/a/archive-integrity/checkpoints/4e41241f3b8ed9248ce1afe102323636467c730ef55eb10291832df12d7ad0e4.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeerall7pjdjtntusqb7mh6vyczswb6saasbqamrtukypqkqq7627epzq\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archive-integrity/ledger/00000001-baguqeerall7pjdjtntusqb7mh6vyczswb6saasbqamrtukypqkqq7627epzq.json",
+   "text": "{\"add\":{\"trial/result.txt\":{\"cid\":\"bafkreihwuikppjp43igcz3uwmc37ykpvmspdy2fk2shcb2kqcn6jrej2na\",\"mode\":292,\"sha256\":\"f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68\",\"size\":6},\"trial/sub/more.txt\":{\"cid\":\"bafkreiaypcl44cx46ifvborlg7okqsuvdnyen4u62wvzj4aqmgpwtvxbre\",\"mode\":292,\"sha256\":\"187897ce0afcf20b50ba2b37dca84a951b7046f29ed5ab94f010619f69d6e189\",\"size\":4}},\"collections\":[],\"empty\":[],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeibitvsllacovw3t3bkspdvwf2bkkm7vlyfx3jg2w577cchuhi527y\",\"schema\":3}",
+   "mode": 292
+  }
+ ],
+ "keeper": {
+  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "token": "tape-token",
+  "exchanges": [
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"erased\":[],\"events\":2,\"head\":\"baguqeeradvjdsydmjbv5lk3axg7z7brz5k2wxnycajm4g2qni3jiamrvhyea\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeibyr2gwdz6tczhk2cgegxtdphvwjievv5v7ejabo5zi65g7drysqy\"}\n"
+    }
+   }
+  ]
+ },
+ "report": [
+  {
+   "archive": "projects/a/archives",
+   "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+   "keeper": {
+    "head": "baguqeeradvjdsydmjbv5lk3axg7z7brz5k2wxnycajm4g2qni3jiamrvhyea",
+    "events": 2,
+    "erased": []
+   },
+   "head": "baguqeerall7pjdjtntusqb7mh6vyczswb6saasbqamrtukypqkqq7627epzq",
+   "events": 1,
+   "files": 2,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeibitvsllacovw3t3bkspdvwf2bkkm7vlyfx3jg2w577cchuhi527y",
+   "recorded_root": "bafybeibitvsllacovw3t3bkspdvwf2bkkm7vlyfx3jg2w577cchuhi527y",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  }
+ ]
+}

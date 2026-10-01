@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 16, in lockstep; the fixtures in =fixtures/= are its
+this document, version 17, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -118,9 +118,10 @@ and no file in =archives/=, which need not exist. One that holds a file
 is refused (=kept=): it has not been moved to its keeper. What it holds
 is what its ledger enrols, and its CIDs are those the ledger folds to
 ([[*From an inventory][From an inventory]]), so its ledger enrols a CID for every entry, else
-=entry=. Discovery, the check and planning read a kept archive from its
-ledger alone and ask its keeper nothing. Applying a plan sends the seal
-to the keeper ([[*To a keeper][To a keeper]]).
+=entry=. Discovery and planning read a kept archive from its ledger alone
+and ask its keeper nothing. The check reads it from its ledger and then
+asks its keeper what it holds ([[*Check][Check]]). Applying a plan sends the
+seal to the keeper ([[*To a keeper][To a keeper]]).
 
 A scope's entry may also name its ledger, by =ledger=, with an archive
 kept any way. A keeper may be bound to a ledger's id before the ledger
@@ -279,6 +280,10 @@ a report:
 
 - =archive=: its path; =head=, =events= and =files=;
 - =kept=: its keeper's URL, or =null= for an archive on disk;
+- =keeper=: what its keeper holds, or =null= for an archive on disk or
+  a keeper not asked: =head= and =events= as the keeper describes them,
+  and =erased=, the paths the ledger enrols, files and directories, whose
+  CIDs the keeper says it has erased, sorted;
 - =missing=, =changed=, =new=: enrolled paths absent, enrolled paths
   whose entry differs, and unenrolled paths, each sorted. A schema 2
   entry differs if the file's CID does, too;
@@ -304,9 +309,20 @@ fold's, =writable= lists ledger events alone, =hidden= is what the ledger
 enrols under a hidden name, and =missing=, =changed=, =new= and
 =undeclared= are empty.
 
+Its keeper is then asked to describe what it holds
+(=doc/remote-archive-protocol.txt=), with the bearer token in the
+environment's =POS_ARCHIVE_TOKEN= if set, unless =POS_ARCHIVE_OFFLINE= is
+set to anything, when no keeper is asked. What a keeper refuses refuses
+the check, by its kind. A keeper whose =head= is not the ledger's holds
+another ledger, or more or less of this one: that is a finding, and
+sealing brings the ledger up to date or refuses. What a keeper has
+erased is not a finding: the ledger still says what was sealed.
+
 Fixtures: =fixtures/ledger/=: inventories with their first event,
 ledgers valid and refused, in both layouts and all three schemas, and
-reports, of archives on disk and kept by a keeper.
+reports, of archives on disk and kept by a keeper. A report fixture
+with =keeper= is checked asking that recording, as a seal's is sent to
+one ([[*To a keeper][To a keeper]]); every other is checked asking no keeper.
 
 * Sealing
 
@@ -511,7 +527,8 @@ has =keeper=, the keeper's =url=, a =token= and the =exchanges= in order,
 each a =request= and a =response= as a tape of
 =doc/remote-archive-protocol.txt= has them, and =claims=, sent in place
 of the client's own. A client makes each request as recorded and no
-other, and the item is gone afterwards unless the seal was refused.
+other, and the item is gone afterwards unless the seal was refused. The
+report after a seal is made asking no keeper.
 
 ** Conversion
 

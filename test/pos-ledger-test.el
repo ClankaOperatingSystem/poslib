@@ -27,10 +27,57 @@
 
 (require 'ert)
 (require 'pos-ledger)
+(require 'pos-remote)
 (require 'pos-fixtures
          (expand-file-name "pos-fixtures"
                            (file-name-directory (or load-file-name
                                                     buffer-file-name))))
+
+;; A test asks no keeper but one a fixture has recorded.
+(setq pos-ledger-offline t)
+
+(defun pos-ledger-test-tape (recorded)
+  "Return a function to send requests with that plays RECORDED, a keeper's.
+Each request must be the next one recorded, and is answered as it was.
+Called with no argument, it gives the exchanges not yet played."
+  (let ((left (append (alist-get 'exchanges recorded) nil))
+        (base (alist-get 'url recorded)))
+    (lambda (&optional method url headers body)
+      (if (null method)
+          left
+        (let* ((exchange (or (pop left)
+                             (error "A request the recording does not have: %s %s"
+                                    method url)))
+               (sent `((method . ,method)
+                       (path . ,(substring url (length base)))
+                       (authorization . ,(or (cdr (assoc "Authorization" headers)) :null))
+                       ,@(when body
+                           `((content_type . ,(cdr (assoc "Content-Type" headers)))
+                             (body_sha256 . ,(pos-ledger--sha body)))))))
+          (unless (equal (pos-ledger-json sent)
+                         (pos-ledger-json (alist-get 'request exchange)))
+            (error "Not the request recorded: %S" sent))
+          (cons (alist-get 'status (alist-get 'response exchange))
+                (encode-coding-string (alist-get 'body (alist-get 'response exchange))
+                                      'utf-8)))))))
+
+(defmacro pos-ledger-test-with-keeper (recorded &rest body)
+  "Evaluate BODY with RECORDED, a fixture's keeper, answering if there is one.
+With one, checks ask it, and it must be played out; with none, they
+ask nobody."
+  (declare (indent 1))
+  `(let* ((recorded ,recorded)
+          (tape (and recorded (pos-ledger-test-tape recorded)))
+          (pos-ledger-offline (not tape))
+          (pos-remote-send-function (or tape pos-remote-send-function))
+          (pos-remote-keeper-function
+           (if tape
+               (lambda (url)
+                 (pos-remote-http-create :url url :token (alist-get 'token recorded)))
+             pos-remote-keeper-function)))
+     (prog1 (progn ,@body)
+       (when (and tape (funcall tape))
+         (error "The recording was not played out")))))
 
 (defun pos-ledger-test-same (expected actual)
   "Check that EXPECTED and ACTUAL are the same JSON value."
@@ -132,16 +179,18 @@ archive-integrity/ledger/, or in the legacy folder inside it, not both."
   "Archives found outside hidden and underscored directories, checkpoints
 honoured, and every changed, missing, new, writable and hidden file named;
 the archive's CID beside the one recorded; collections no longer declared.
-An archive a keeper keeps is found by its ledger and reported from it."
+An archive a keeper keeps is found by its ledger and reported from it,
+and where a fixture has recorded its keeper, with what the keeper holds."
   (dolist (named (pos-fixtures "ledger"))
     (let-alist (cdr named)
       (when (equal .kind "report")
         (ert-info ((car named))
           (pos-fixture-with (cdr named) dir
-            (if .error
-                (pos-ledger-test-refused .error (pos-ledger-check dir))
-              (pos-ledger-test-same
-               .report (pos-ledger-test-relative (pos-ledger-check dir) dir)))))))))
+            (pos-ledger-test-with-keeper .keeper
+              (if .error
+                  (pos-ledger-test-refused .error (pos-ledger-check dir))
+                (pos-ledger-test-same
+                 .report (pos-ledger-test-relative (pos-ledger-check dir) dir))))))))))
 
 (ert-deftest pos-ledger/a-vanished-archive-is-detected ()
   "A checkpoint names ledger heads; removing an archive leaves one unmatched."

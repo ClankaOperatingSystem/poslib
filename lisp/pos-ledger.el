@@ -59,6 +59,12 @@
 It says how each scope's archive is kept, as doc/pos-directory.txt has it.")
 
 (declare-function pos-tree-read-config "pos-tree" (text))
+(declare-function pos-remote-describe "pos-remote" (archive))
+(defvar pos-remote-keeper-function)
+
+(defvar pos-ledger-offline nil
+  "Non-nil if a check is to ask no keeper.
+The environment's POS_ARCHIVE_OFFLINE, set to anything, says the same.")
 
 (define-error 'pos-ledger-refused "Archive integrity refused")
 
@@ -572,6 +578,27 @@ Refuse `kept' if ARCHIVE has files on disk: it is not with its keeper yet."
     (pos-ledger--refuse 'kept "Kept by a keeper, and has files on disk: %s" archive))
   known)
 
+(defun pos-ledger--ask (url cids)
+  "Return what the keeper at URL has of a ledger, for its archive's report.
+CIDS is what the ledger folds to.  An alist: head and events as the
+keeper describes them, and erased, the paths the ledger enrols whose
+bytes the keeper has erased, sorted.  Nil if no keeper is to be asked.
+Refuse as the keeper does."
+  (unless (or pos-ledger-offline
+              (not (member (getenv "POS_ARCHIVE_OFFLINE") '(nil ""))))
+    (require 'pos-remote)
+    (let* ((described (pos-remote-describe (funcall pos-remote-keeper-function url)))
+           (erased (append (alist-get 'erased described) nil)))
+      `((head . ,(alist-get 'head described))
+        (events . ,(alist-get 'events described))
+        (erased . ,(vconcat
+                    (sort (delq nil (mapcar (lambda (pair)
+                                              (and (member (cdr pair) erased)
+                                                   (not (equal (car pair) "."))
+                                                   (car pair)))
+                                            cids))
+                          #'string<)))))))
+
 ;;;; Discovery and checkpoints
 
 (defun pos-ledger--checked (root)
@@ -811,11 +838,12 @@ Its README.org has the declaration line, or it is a capsule."
 
 (defun pos-ledger-check (root)
   "Return the check report on every archive under ROOT.
-A list of alists, one an archive: archive, kept, head, events, files,
-writable, checkpoint_writable, missing, changed, new, root,
+A list of alists, one an archive: archive, kept, keeper, head, events,
+files, writable, checkpoint_writable, missing, changed, new, root,
 recorded_root, hidden and undeclared; the lists as vectors, so the
 report is a JSON value.  An archive a keeper keeps is reported from its
-ledger: nothing of it is on disk to read."
+ledger, nothing of it being on disk to read, and its keeper is asked
+what it holds unless `pos-ledger-offline' says not."
   (let* ((archives (pos-ledger-roots root))
          (_ (pos-ledger--check-anchors root archives))
          (writable-checkpoints
@@ -846,6 +874,7 @@ ledger: nothing of it is on disk to read."
                                    (seq-filter #'pos-ledger--writable-p files)))
                           #'string<)))
         (push `((archive . ,archive) (kept . ,(or kept :null))
+                (keeper . ,(or (and kept (pos-ledger--ask kept cids)) :null))
                 (head . ,(or head :null)) (events . ,events)
                 (files . ,(length actual)) (writable . ,(vconcat writable))
                 (root . ,(or (cdr (assoc "." cids)) :null))

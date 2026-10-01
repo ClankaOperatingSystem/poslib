@@ -96,6 +96,7 @@
   {
    "archive": "projects/a/archives",
    "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+   "keeper": null,
    "head": "baguqeeraonh363zl7likbpjtwgfz377budtnffxcikl3p4p5ufw2mpelasgq",
    "events": 2,
    "files": 3,

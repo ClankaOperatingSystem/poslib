@@ -50,6 +50,7 @@
   {
    "archive": "scope/archives",
    "kept": null,
+   "keeper": null,
    "head": "baguqeerasblocyhcctl2ird62xqs5azul4fkckgkuwtknwrrndnjaujhmjhq",
    "events": 2,
    "files": 3,
