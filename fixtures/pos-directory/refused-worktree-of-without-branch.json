@@ -1,0 +1,5 @@
+{
+ "about": "A worktree of a child lacks its branch.",
+ "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\nworktrees:\n  - path: _worktrees/x\n    of: projects/a\n",
+ "refused": "missing-key"
+}

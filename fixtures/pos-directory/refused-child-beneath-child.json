@@ -1,0 +1,5 @@
+{
+ "about": "A child's path passes through another child.",
+ "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n  - path: projects/a/projects/b\n    remote: git@example.org:b.git\n",
+ "refused": "bad-path"
+}

@@ -1,0 +1,47 @@
+{
+ "about": "Every key, with a child's defaults filled in.",
+ "yaml": "pos: 1\nchildren:\n  - path: responsibilities/employment\n    remote: git@example.org:person/employment.git\n  - path: projects/a/projects/b\n    remote: https://example.org/b.git\n    branch: long-feature\n    skills-up: true\nworktrees:\n  - path: projects/fix/_worktrees/do-the-thing\n    of: responsibilities/employment\n    branch: do-the-thing\n  - path: _worktrees/product\n    remote: git@example.org:team/product.git\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://ledger.example.org/\n  - scope: projects/fix\n    kept: uncommitted\nserver:\n  name: example\n  mcp: https://pos.example.org/mcp\n",
+ "config": {
+  "children": [
+   {
+    "path": "responsibilities/employment",
+    "remote": "git@example.org:person/employment.git",
+    "branch": "master",
+    "skills-up": false
+   },
+   {
+    "path": "projects/a/projects/b",
+    "remote": "https://example.org/b.git",
+    "branch": "long-feature",
+    "skills-up": true
+   }
+  ],
+  "worktrees": [
+   {
+    "path": "projects/fix/_worktrees/do-the-thing",
+    "of": "responsibilities/employment",
+    "branch": "do-the-thing"
+   },
+   {
+    "path": "_worktrees/product",
+    "remote": "git@example.org:team/product.git",
+    "branch": "master"
+   }
+  ],
+  "archives": [
+   {
+    "scope": ".",
+    "kept": "remote",
+    "url": "https://ledger.example.org/"
+   },
+   {
+    "scope": "projects/fix",
+    "kept": "uncommitted"
+   }
+  ],
+  "server": {
+   "name": "example",
+   "mcp": "https://pos.example.org/mcp"
+  }
+ }
+}

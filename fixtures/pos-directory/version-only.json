@@ -1,0 +1,10 @@
+{
+ "about": "A file that declares nothing.",
+ "yaml": "pos: 1\n",
+ "config": {
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null
+ }
+}
