@@ -18,12 +18,21 @@ section 5 works with no server at all.
 A repository's configuration is .pos/config.yaml, at its root and
 committed with it. A repository without one declares nothing.
 
-The file is YAML, read as data: mappings, sequences, strings, integers
-and the booleans true and false. It uses no anchors, aliases, tags or
-second document, and a string that could be read as another type is
-quoted. A reader checks every value's type after parsing and refuses the
-file on a mismatch, so that two YAML libraries that differ over a bare
-word give the same result or the same refusal.
+The file is YAML: mappings, sequences and scalars. It uses no anchors,
+aliases, tags or second document, and a mapping holds a key once; what
+a reader makes of a key written twice is not defined.
+
+A reader takes every scalar as the text written and guesses no type
+from it, quoted or not. YAML libraries differ over what a bare word
+is, and one that resolves types may resolve a quoted word too. The
+keys below say what each value is:
+
+    a string    any text but the empty one, null and ~
+    a boolean   true or false, in those letters
+    an integer  a whole number in digits, with no leading zero
+
+So a branch named 1.10 or no is that text, and a value left empty is
+refused.
 
 The top level is a mapping:
 
