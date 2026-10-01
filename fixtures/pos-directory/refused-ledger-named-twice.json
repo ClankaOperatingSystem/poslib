@@ -1,0 +1,5 @@
+{
+ "about": "Two entries name one ledger.",
+ "yaml": "pos: 1\narchives:\n  - scope: \".\"\n    kept: committed\n    ledger: 5bb17c0d-43f7-4628-8af9-b8088892a188\n  - scope: projects/fix\n    kept: committed\n    ledger: 5bb17c0d-43f7-4628-8af9-b8088892a188\n",
+ "refused": "bad-value"
+}

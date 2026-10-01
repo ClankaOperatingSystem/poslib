@@ -1,0 +1,5 @@
+{
+ "about": "A ledger's id is in lower-case letters.",
+ "yaml": "pos: 1\narchives:\n  - scope: \".\"\n    kept: committed\n    ledger: 5BB17C0D-43F7-4628-8AF9-B8088892A188\n",
+ "refused": "bad-value"
+}
