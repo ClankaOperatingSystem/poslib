@@ -650,7 +650,7 @@ Exit 0 nothing to do, 1 something to do or to report, 2 refused.
   "The command line's usage.")
 
 (defun pos-tree--print (plan)
-  "Print PLAN as JSON and exit: 0 if it holds nothing, 1 if it holds anything."
+  "Print PLAN as JSON and exit, with 0 for an empty plan and 1 otherwise."
   (princ (decode-coding-string (pos-ledger-json plan) 'utf-8))
   (kill-emacs (if (and (seq-empty-p (alist-get 'actions plan))
                        (seq-empty-p (alist-get 'findings plan)))
