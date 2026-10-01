@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 15, in lockstep; the fixtures in =fixtures/= are its
+this document, version 16, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -121,6 +121,13 @@ is what its ledger enrols, and its CIDs are those the ledger folds to
 =entry=. Discovery, the check and planning read a kept archive from its
 ledger alone and ask its keeper nothing. Applying a plan sends the seal
 to the keeper ([[*To a keeper][To a keeper]]).
+
+A scope's entry may also name its ledger, by =ledger=, with an archive
+kept any way. A keeper may be bound to a ledger's id before the ledger
+has an event, so the entry says what the id is: a ledger's first event
+takes it ([[*Plans][Plans]]). A ledger with events that is not the one named, its
+last =ledger_id= another or none, is refused (=identity=) by the check
+and by planning.
 
 ** Discovery
 
@@ -324,8 +331,8 @@ canonical JSON:
   an archive without one, =archive-integrity/ledger/= beside it;
 - =number= and =previous=: the event to be written and the head it
   follows, =null= for none;
-- =ledger_id=: the ledger's, else one supplied, else a random version 4
-  UUID;
+- =ledger_id=: the ledger's, else the one its scope's entry names, else
+  one supplied, else a random version 4 UUID;
 - =add=: the item's files by path within the archive, each a schema 2
   entry of its bytes once its links are rewritten: =cid=, =mode= less write
   bits, =sha256=, =size=;
@@ -351,7 +358,9 @@ within an item or collection already sealed: a sealed item never grows), =hidden
 item, or a hidden destination), =link= (a symlink or second hard link in
 the item), =differs= (enrolled evidence in the archive is missing or
 changed), =kept= (a keeper keeps the archive, and its ledger is not yet of
-schema 3 or it still has files on disk), and for links, =unsealed=, =unresolved= and =loop=, below.
+schema 3 or it still has files on disk), =identity= (the ledger, or the
+id supplied for a new one, is not the one the scope's entry names), and
+for links, =unsealed=, =unresolved= and =loop=, below.
 Hidden or unenrolled files already elsewhere in the archive do not stop a
 seal; the check reports them.
 

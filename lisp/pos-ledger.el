@@ -30,6 +30,7 @@
 ;; - `pos-ledger-fold-cids': the archive's CIDs from the ledger alone.
 ;; - `pos-ledger-event': a new event's name and bytes.
 ;; - `pos-ledger-kept': the keeper an archive is kept by, if it has one.
+;; - `pos-ledger-named': the id an archive's ledger is to have, if named.
 ;; - `pos-ledger-check': the report on every archive under a root.
 ;;
 ;; JSON values are Lisp values: objects alists, arrays vectors, strings,
@@ -498,14 +499,14 @@ ADD is an alist of path and entry; PREVIOUS a hash or nil."
 
 ;;;; Kept archives
 
-(defun pos-ledger-kept (archive)
-  "Return the base URL of ARCHIVE's keeper, or nil if it is kept on disk.
+(defun pos-ledger--entry (archive)
+  "Return the entry for ARCHIVE's scope in its repository's configuration.
 ARCHIVE's scope is the directory holding it, and its repository the
-nearest directory at or above the scope that holds .git.  The
-repository's .pos/config.yaml says how each scope's archive is kept; a
-scope it does not name, in a repository without one or in none, keeps
-its archive on disk.  Refuse `config' for a configuration that is
-refused."
+nearest directory at or above the scope that holds .git.  The entry is
+the one under archives in the repository's .pos/config.yaml whose scope
+is the scope's path there, or nil: for a scope it does not name, in a
+repository without one or in none.  Refuse `config' for a configuration
+that is refused."
   (let* ((scope (file-name-directory (directory-file-name (expand-file-name archive))))
          (root (locate-dominating-file scope ".git"))
          (file (and root (expand-file-name pos-ledger-configuration root))))
@@ -522,8 +523,37 @@ refused."
                     (file-relative-name scope (expand-file-name root))))
              (entry (seq-find (lambda (a) (equal (alist-get 'scope a) path))
                               (alist-get 'archives config))))
-        (and entry (equal (alist-get 'kept entry) "remote")
-             (alist-get 'url entry))))))
+        entry))))
+
+(defun pos-ledger-kept (archive)
+  "Return the base URL of ARCHIVE's keeper, or nil if it is kept on disk.
+A keeper has the archive of a scope whose entry in its repository's
+.pos/config.yaml is kept remote; every other is on disk."
+  (let ((entry (pos-ledger--entry archive)))
+    (and entry (equal (alist-get 'kept entry) "remote")
+         (alist-get 'url entry))))
+
+(defun pos-ledger-named (archive)
+  "Return the id ARCHIVE's ledger is to have, or nil if none is named.
+The ledger key of the scope's entry in its repository's
+.pos/config.yaml: a keeper may be bound to a ledger's id before the
+ledger has an event, so the entry says what the id is."
+  (alist-get 'ledger (pos-ledger--entry archive)))
+
+(defun pos-ledger-identity (files)
+  "Return the ledger_id of the last of the event FILES that has one."
+  (seq-some (lambda (file)
+              (alist-get 'ledger_id (pos-ledger--parse (pos-ledger--read file))))
+            (reverse files)))
+
+(defun pos-ledger--as-named (archive files)
+  "Refuse `identity' unless ARCHIVE's ledger, of event FILES, is the one named.
+A ledger with no event yet, or an archive no entry names a ledger for,
+is not refused."
+  (let ((named (pos-ledger-named archive)))
+    (when (and named files (not (equal named (pos-ledger-identity files))))
+      (pos-ledger--refuse 'identity "Not the ledger its entry names, %s: %s"
+                          named archive))))
 
 (defun pos-ledger--kept-here (dir)
   "Return the archive of the scope DIR, if kept by a keeper and not here.
@@ -795,6 +825,7 @@ ledger: nothing of it is on disk to read."
     (dolist (archive archives)
       (pcase-let* ((`(,known ,head ,events ,files ,recorded ,collections ,_ ,empty)
                     (pos-ledger-history archive))
+                   (_ (pos-ledger--as-named archive files))
                    (kept (pos-ledger-kept archive))
                    (actual (if kept (pos-ledger--kept-entries archive known)
                              (pos-ledger-inventory archive)))
