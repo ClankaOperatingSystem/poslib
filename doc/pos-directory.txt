@@ -1,0 +1,230 @@
+The .pos directory
+Version 1
+
+A personal operating system is a tree of scopes: a root, and beneath it
+projects and responsibilities, each of which may hold more. A scope may
+be a repository of its own, shared with other people, and checked out in
+place within the tree. This document says how a repository declares the
+repositories beneath it and what it needs configured, in a directory
+named .pos at its root, and what a tool does with those declarations.
+
+It names no server. poslib and pyposlib read .pos, and a server a
+repository names is whichever its owners run. Everything here but
+section 5 works with no server at all.
+
+
+1. The file
+
+A repository's configuration is .pos/config.yaml, at its root and
+committed with it. A repository without one declares nothing.
+
+The file is YAML, read as data: mappings, sequences, strings, integers
+and the booleans true and false. It uses no anchors, aliases, tags or
+second document, and a string that could be read as another type is
+quoted. A reader checks every value's type after parsing and refuses the
+file on a mismatch, so that two YAML libraries that differ over a bare
+word give the same result or the same refusal.
+
+The top level is a mapping:
+
+    pos         1, the version of this document; required
+    children    the repositories mounted beneath this one (section 2)
+    worktrees   other working trees (section 3)
+    archives    where archives are kept (section 4)
+    server      the server this repository is bound to (section 5)
+
+A reader refuses the whole file for a key not written here, at any
+level, and for a version it does not know.
+
+The file holds no credential. What a person signs in with is theirs and
+stays out of a repository other people share.
+
+
+2. Children
+
+children is a sequence. Each entry is a mapping:
+
+    path        where the repository is checked out, relative to this
+                repository's root
+    remote      the git remote it is cloned from
+    branch      the branch its working tree rests on; master when absent
+    skills-up   true if the child's skills are also linked into this
+                repository (section 6); false when absent
+
+A child is checked out in place. path is its working tree, and what is
+there is its own repository, with a .pos of its own if it mounts
+children. So a tree is declared recursively, each repository naming only
+what is directly beneath it.
+
+path is one or more pairs of projects/NAME or responsibilities/NAME, as
+in responsibilities/employment or projects/a/projects/b. It does not
+pass through another child: what is beneath a child is the child's to
+declare.
+
+branch is the branch the work is based on. That is usually the
+repository's default branch. For the length of a feature branch that
+takes many pull requests it is that branch, and the entry is changed
+back afterwards.
+
+The container does not track a child. Its path is written to the
+container's .git/info/exclude before the child is cloned, since staging
+everything in a container records an unexcluded child as an embedded
+repository.
+
+What a container keeps to itself about a child sits in a file beside
+it: responsibilities/NAME.org beside responsibilities/NAME/. The file is
+the container's and the child never sees it.
+
+
+3. Worktrees
+
+worktrees is a sequence of working trees that are not scopes: a
+repository that does not follow this layout, or a branch other than the
+one a child rests on. Each entry is a mapping:
+
+    path        where it is checked out, relative to this repository's
+                root: SCOPE/_worktrees/NAME, or _worktrees/NAME at the
+                root, where SCOPE is a scope of this repository and not
+                a child
+    of          the path of one of this repository's children: the
+                working tree is a git worktree of that child's clone
+    remote      in place of of: the git remote it is cloned from, a
+                clone of its own
+    branch      the branch it rests on; required with of, master when
+                absent with remote
+
+A working tree beneath _worktrees is disposable once its commits are
+pushed. Its path is written to .git/info/exclude as a child's is. The
+commits of a git worktree are in its child's clone, so it is that clone
+whose unpushed branches matter.
+
+
+4. Archives
+
+archives is a sequence saying where a scope's archive is kept. Each
+entry is a mapping:
+
+    scope       the scope's path within this repository; "." is the
+                repository's root
+    kept        committed: on disk and committed with the repository
+                uncommitted: on disk and not committed
+                remote: by a keeper (doc/remote-archive-protocol.txt)
+    url         with remote, the base URL the keeper gives the scope's
+                ledger
+
+A scope no entry names keeps its archive committed. In every case the
+ledger stays with the scope and is committed.
+
+
+5. The server
+
+server binds the repository to a server its owners run. It is a
+mapping:
+
+    name        what a coding agent knows the server by
+    mcp         the URL of the server's MCP endpoint
+
+Absent, the repository is bound to none.
+
+A binding reaches down and never up. The server is configured for
+sessions started in this repository and in the repositories beneath it,
+and for none above it: what a shared repository declares cannot reach
+the repository that contains it.
+
+For each coding agent a tool supports, it writes the file that agent
+reads for MCP servers, in this repository and in each repository
+beneath it. The files are untracked, with their paths in
+.git/info/exclude, and a file a repository tracks is left as it is.
+Nothing is written outside the tree.
+
+
+6. Skills
+
+A repository's skills are in .agents/skills/, one directory each,
+holding a SKILL.md. .claude/skills is only ever a symbolic link to
+../.agents/skills. A skill committed beneath .claude/skills is a
+finding, and its repair is to move the skill to .agents/skills and make
+the link.
+
+A coding agent looks for skills from where a session starts up to the
+root of that repository and no further. A repository mounted in place
+therefore sees none of its containers' skills. Links supply them:
+
+  - Down, always. Each of a repository's own skills is linked into
+    .agents/skills/ of every repository beneath it, at any depth.
+  - Up, only when asked. Where a child's entry has skills-up true, the
+    child's own skills are linked into this repository, and no farther.
+  - Only a repository's own skills are linked. A link is never linked
+    on, so nothing returns to where it came from and nothing passes
+    from one child to another.
+  - Where two skills have one name, the nearer has it: a repository's
+    own skill before any link, a nearer container's before a farther
+    one's, and a container's before a child's. Two children's skills
+    of one name are a finding, and neither is linked.
+  - A link is a relative symbolic link to the skill's directory. It is
+    untracked, with its path in .git/info/exclude of the repository it
+    is made in.
+
+A linked skill calls only what travels with it or is installed: scripts
+within its own directory, which the link carries, and installed
+commands. Nothing in a repository's bin/ is linked. A skill that calls
+into its own repository outside its directory holds a file named
+.pos-local in its directory, and is not linked.
+
+
+7. The two steps
+
+One tool brings a tree to what its .pos files declare, in two steps.
+
+The first step prints a plan: what needs to be done, if anything. It
+changes nothing and uses no network. Everything in a plan can be told
+from the disk.
+
+The second step is given a plan and does those things and nothing else.
+It refuses a plan the tree no longer matches.
+
+A plan holds actions:
+
+    clone       a declared child or worktree that is not there
+    exclude     a path to add to a .git/info/exclude
+    link        a skill link to make, or the .claude/skills link
+    unlink      a link the tool made whose skill or declaration is gone
+    configure   an agent's file to write or remove for a server
+
+and findings, which the tool reports and does not act on:
+
+  - a configuration file it refuses
+  - a child whose working tree is on a branch other than the declared
+    one: nothing is planned in it or beneath it
+  - a path already taken: by something that is not a repository, or by
+    a repository cloned from another remote
+  - a repository mounted beneath this one that no entry declares, or
+    whose entry is gone
+  - skills committed beneath .claude/skills
+  - two children's skills of one name
+
+When the tree is as declared, the plan is empty.
+
+The tool keeps these rules:
+
+  - A repository declares only beneath itself. A path is relative,
+    holds no "..", and passes through no symbolic link.
+  - A child's .pos is read from its declared branch as committed, and
+    not from its working tree, so configuration that is not yet merged
+    mounts nothing. The .pos of the repository the tool is run in is
+    read from its working tree.
+  - It never writes over what is there, never removes a working tree,
+    and never writes outside the tree it is run in.
+  - Run in a repository, it takes that repository as the root. It does
+    not look for a container, and a link whose target is outside the
+    tree is left as it is.
+  - A link is the tool's if it is an untracked symbolic link in
+    .agents/skills/ whose target is a skill's directory in another
+    repository of the tree. It keeps no record besides.
+
+
+8. Tests
+
+An implementation is tested in real repositories. A test makes a
+temporary directory, makes new repositories inside it with git init,
+configures them, and tests the tool's behaviour in them.
