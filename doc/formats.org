@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 17, in lockstep; the fixtures in =fixtures/= are its
+this document, version 18, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -115,7 +115,7 @@ configuration that document refuses is refused (=config=).
 
 An archive a keeper keeps has its ledger with its scope, as any other,
 and no file in =archives/=, which need not exist. One that holds a file
-is refused (=kept=): it has not been moved to its keeper. What it holds
+is refused (=kept=): it has not been moved to its keeper ([[*Keeping][Keeping]]). What it holds
 is what its ledger enrols, and its CIDs are those the ledger folds to
 ([[*From an inventory][From an inventory]]), so its ledger enrols a CID for every entry, else
 =entry=. Discovery and planning read a kept archive from its ledger alone
@@ -529,6 +529,57 @@ each a =request= and a =response= as a tape of
 of the client's own. A client makes each request as recorded and no
 other, and the item is gone afterwards unless the seal was refused. The
 report after a seal is made asking no keeper.
+
+** Keeping
+
+=keep ROOT= moves to its keeper each archive under ROOT whose scope's
+entry says a keeper keeps it and whose files are still on disk, the
+state the check refuses as =kept=. An archive with no keeper, no ledger,
+or no file on disk is left, with the reason: =on disk=, =no ledger= or
+=kept=.
+
+Before anything is sent, every archive to be moved must have: the ledger
+its entry names, if it names one (=identity=); a head that is a schema 3
+event (=kept=); its ledger beside it and not in the legacy folder inside
+(=ledger=); nothing missing, changed or new, with its CID both the
+recorded root and what its ledger folds to (=unclean=); and no hidden
+path enrolled (=hidden=), since a keeper holds no hidden file.
+
+Then, for each archive:
+
+1. The keeper is asked what it holds. It must hold the ledger's first
+   events and no other: no more events than the ledger has, its head
+   naming the ledger's event of that number; else =chain=.
+2. Each event it lacks is sent in order, as its ledger file's bytes, with
+   the files that event enrolled and the ledger still enrols. They are
+   read from the paths they have now, since a schema 2 conversion may
+   have renamed or removed what an earlier event enrolled, and each is
+   named by the CID the ledger enrols it under. No file is sent twice in
+   one run.
+3. The first schema 3 event is sent also with every file enrolled before
+   it that this run has not sent: it is the event at which a keeper
+   requires them.
+4. The keeper is asked again, and must describe the ledger's head, its
+   number of events and its recorded root; else =chain=.
+5. The archive is removed from disk, its empty directories with it. The
+   ledger and its checkpoints are unchanged.
+
+The claims sent with each event are a seal's, without =plan=. What the
+keeper refuses is refused by its kind, with the archive still on disk.
+
+Run again after an interruption, it sends what the keeper still lacks. A
+keeper limits what one append may hold (=size=). Files travel with the
+events that enrolled them so that an archive larger than that limit can
+be moved; one event's files larger than it cannot, and a run
+interrupted before the first schema 3 event sends at that event the
+files of the events before it again.
+
+It prints =kept=, each an =archive= with its =keeper= and the =events=
+and =files= sent, and =skipped=, each an =archive= with its =reason=.
+
+Fixtures: =fixtures/ledger/keep*=, of kind =keep=: a tree, the =root=,
+=claims= and a =keeper= as a seal to a keeper has them, and =kept=,
+=skipped= and the report after, made asking no keeper; or the refusal.
 
 ** Conversion
 
