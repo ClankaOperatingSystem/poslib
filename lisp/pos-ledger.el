@@ -121,7 +121,7 @@
   (encode-coding-string (pos-ledger--encode value) 'utf-8))
 
 (defun pos-ledger--plain-p (value)
-  "Return non-nil if the JSON VALUE holds only what a block may.
+  "Return non-nil if the JSON VALUE is only what a block may hold.
 No object repeats a key, and the key / is a link's alone: an object of
 that one key and a CID."
   (cond ((vectorp value) (seq-every-p #'pos-ledger--plain-p value))
