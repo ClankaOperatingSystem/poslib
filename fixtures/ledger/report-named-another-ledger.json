@@ -1,0 +1,34 @@
+{
+ "kind": "report",
+ "description": "An archive whose ledger is not the one its scope's entry names is refused.",
+ "tree": [
+  {
+   "path": ".git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: committed\n    ledger: 1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d\n"
+  },
+  {
+   "path": "projects/a/archive-integrity/checkpoints/7ed999916867a8f6352a609b2b56724cc1c4ef18791c2aa5e4ef307bc71ae64e.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archive-integrity/ledger/00000001-baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq.json",
+   "text": "{\"add\":{\"trial/result.txt\":{\"cid\":\"bafkreihwuikppjp43igcz3uwmc37ykpvmspdy2fk2shcb2kqcn6jrej2na\",\"mode\":292,\"sha256\":\"f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68\",\"size\":6}},\"collections\":[],\"empty\":[],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeibzyhit5f35u5mte5ffc4befyszlijr4h7ynnsdj4ofxr6iv7b4dq\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/archives/trial/result.txt",
+   "text": "result",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/note.txt",
+   "text": "a note"
+  }
+ ],
+ "error": "identity"
+}

@@ -1,0 +1,22 @@
+{
+ "kind": "seal",
+ "ledger_id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+ "description": "A new ledger given another id than its scope's entry names is refused.",
+ "tree": [
+  {
+   "path": ".git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: committed\n    ledger: 0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "projects/a/trial/result.txt",
+   "text": "result"
+  }
+ ],
+ "source": "projects/a/trial",
+ "destination": "projects/a/archives/trial",
+ "error": "identity"
+}

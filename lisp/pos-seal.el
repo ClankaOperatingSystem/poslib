@@ -102,8 +102,7 @@ PATH is relative to the archive, from REL for SOURCE."
 
 (defun pos-seal--last-id (files)
   "Return the ledger_id of the last of the event FILES that has one."
-  (seq-some (lambda (file) (alist-get 'ledger_id (pos-ledger--parse (pos-ledger--read file))))
-            (reverse files)))
+  (pos-ledger-identity files))
 
 ;;;; Links
 
@@ -242,10 +241,10 @@ item, from WRITTEN-AT if given."
 
 (defun pos-seal-plan (source destination &optional ledger-id date as-destination)
   "Return the plan to seal SOURCE at DESTINATION, inside an archive.
-LEDGER-ID names a new ledger; by default one is made at random.  DATE,
-by default today's, dates any rumours the item's links need.  With
-AS-DESTINATION, a file's links are read as written from DESTINATION, not
-from where it lies."
+LEDGER-ID names a new ledger; by default it takes the id its scope's
+entry names, else one made at random.  DATE, by default today's, dates
+any rumours the item's links need.  With AS-DESTINATION, a file's links
+are read as written from DESTINATION, not from where it lies."
   (let* ((source (directory-file-name (file-truename (pos-ledger--checked source))))
          (destination (directory-file-name (expand-file-name destination)))
          (archive (pos-seal--outermost-archive destination)))
@@ -273,6 +272,11 @@ from where it lies."
                         (when within
                           (pos-ledger--refuse 'sealed "Destination is within sealed %s: %s"
                                               within rel))))
+                   (named (pos-ledger-named archive))
+                   (_ (pos-ledger--as-named archive files))
+                   (_ (when (and named ledger-id (not (equal named ledger-id)))
+                        (pos-ledger--refuse
+                         'identity "Not the ledger its entry names, %s: %s" named archive)))
                    (kept (pos-ledger-kept archive))
                    (_ (when (and kept head (not (pos-ledger--event-cid-p head)))
                         (pos-ledger--refuse
@@ -323,7 +327,7 @@ from where it lies."
               (source . ,source) (destination . ,destination) (archive . ,archive)
               (ledger . ,(pos-seal--ledger-folder archive))
               (number . ,(1+ events)) (previous . ,(or head :null))
-              (ledger_id . ,(or (pos-seal--last-id files) ledger-id (pos-seal--uuid)))
+              (ledger_id . ,(or (pos-seal--last-id files) named ledger-id (pos-seal--uuid)))
               (add . ,add) (collections . ,(vconcat collections))
               (links . ,links) (originals . ,originals) (rumours . ,rumours)
               (inventory_sha256 . ,(pos-ledger--sha (pos-ledger-json actual)))
