@@ -175,7 +175,7 @@ into file nodes of at most `pos-cid-file-max-links' links."
   (car nodes))
 
 (defun pos-cid--file-tsize (size)
-  "Return the bytes of the DAG a file of SIZE bytes makes, from SIZE alone.
+  "Return the size of the DAG of a file of SIZE bytes, from SIZE alone.
 A leaf's size is its chunk's and a node's is its block's plus its
 children's, and a binary CID is 36 bytes whatever it hashes, so no
 content is needed."
