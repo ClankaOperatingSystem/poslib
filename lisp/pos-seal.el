@@ -21,14 +21,17 @@
 ;;; Commentary:
 
 ;; Sealing, as doc/formats.org specifies: an item moves into an archive
-;; in one rename, and a schema 2 ledger event enrols it, with its CIDs,
-;; the archive's root CID and the collections it holds.  Always two
+;; in one rename, and a ledger event enrols it, with its CIDs, the
+;; archive's root CID and the collections it holds: a schema 3 event, a
+;; DAG-JSON block named by its CID, unless the ledger is still of schema
+;; 1 or 2, which `pos-seal-convert' brings to schema 3.  Always two
 ;; steps: a plan, reviewed, then its application, which refuses if
 ;; anything the plan relied on has changed and resumes if interrupted.
 ;;
 ;; - `pos-seal-plan': the plan to seal SOURCE at DESTINATION.
 ;; - `pos-seal-stage': stage new bytes, and plan to seal them.
 ;; - `pos-seal-apply': apply a plan, given its reviewed hash.
+;; - `pos-seal-convert': bring schema 2 ledgers to schema 3.
 ;; - `pos-seal-batch': the command line.
 
 ;;; Code:
@@ -365,19 +368,57 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
     (unless (file-exists-p file)
       (pos-seal--write-new file bytes))))
 
+(defun pos-seal--empty-under (top rel)
+  "Return the directories at or under TOP holding nothing IPFS would add.
+As paths from REL for TOP; see `pos-seal--empty'."
+  (when (and (file-directory-p top) (not (file-symlink-p top)))
+    (let ((names (seq-remove (lambda (name) (string-prefix-p "." name))
+                             (pos-ledger--entries top))))
+      (if names
+          (mapcan (lambda (name)
+                    (pos-seal--empty-under (expand-file-name name top)
+                                           (if (string-empty-p rel) name
+                                             (concat rel "/" name))))
+                  names)
+        (unless (string-empty-p rel) (list rel))))))
+
+(defun pos-seal--empty (top rel)
+  "Return the empty directories at or under TOP, as sorted paths from REL.
+Hidden entries count for nothing and hidden directories are not entered,
+as IPFS leaves both out."
+  (sort (pos-seal--empty-under top rel) #'string<))
+
 (defun pos-seal--event (plan destination add collections)
-  "Write the schema 2 event of PLAN sealing ADD at DESTINATION; return its hash."
+  "Write the event of PLAN sealing ADD at DESTINATION; return what names it.
+A ledger with no event yet, or one whose head is a block, takes a schema 3
+event: a DAG-JSON block named by its CID, its root the fold of what the
+ledger enrols.  A schema 1 or 2 ledger takes a schema 2 event, named by
+its hash, until it is converted."
   (let-alist plan
-    (pcase-let* ((`(,_ ,head ,events) (pos-ledger-history .archive))
-                 (bytes (pos-ledger-json
-                         `((schema . 2) (previous . ,(or head :null)) (ledger_id . ,.ledger_id)
-                           (item . ,(file-relative-name destination .archive))
-                           (add . ,add) (root . ,(pos-cid-directory .archive))
-                           (collections . ,collections))))
-                 (hash (pos-ledger--sha bytes)))
-      (pos-seal--write-new (expand-file-name (format "%08d-%s.json" (1+ events) hash) .ledger)
+    (pcase-let* ((`(,entries ,head ,events ,_ ,_ ,_ ,_ ,empties)
+                  (pos-ledger-history .archive))
+                 (item (file-relative-name destination .archive))
+                 (blocks (or (null head) (pos-ledger--event-cid-p head)))
+                 (empty (and blocks (pos-seal--empty destination item)))
+                 (bytes
+                  (if blocks
+                      (pos-ledger-block
+                       `((schema . 3)
+                         (previous . ,(if head (pos-ledger--link head) :null))
+                         (ledger_id . ,.ledger_id) (item . ,item) (add . ,add)
+                         (root . ,(cdr (assoc "." (pos-ledger-fold
+                                                   (append add entries)
+                                                   (append empty empties)))))
+                         (collections . ,collections) (empty . ,(vconcat empty))))
+                    (pos-ledger-json
+                     `((schema . 2) (previous . ,(or head :null)) (ledger_id . ,.ledger_id)
+                       (item . ,item)
+                       (add . ,add) (root . ,(pos-cid-directory .archive))
+                       (collections . ,collections)))))
+                 (name (if blocks (pos-ledger--event-cid bytes) (pos-ledger--sha bytes))))
+      (pos-seal--write-new (expand-file-name (format "%08d-%s.json" (1+ events) name) .ledger)
                            bytes)
-      hash)))
+      name)))
 
 (defun pos-seal--sealed (plan)
   "Return the items PLAN's events have sealed so far, refusing a stranger's.
@@ -385,7 +426,7 @@ Events since PLAN's previous head must seal PLAN's rumours, then its item,
 in order."
   (let-alist plan
     (let* ((files (nth 3 (pos-ledger-history .archive)))
-           (hashes (mapcar (lambda (f) (pos-ledger--sha (pos-ledger--read f))) files))
+           (hashes (mapcar (lambda (f) (substring (file-name-nondirectory f) 9 -5)) files))
            (since (if (eq .previous :null) files
                     (let ((at (seq-position hashes .previous)))
                       (unless at
@@ -567,6 +608,65 @@ files changed, and unregistered, the files the ledgers do not know."
     `((repaired . ,count)
       (unregistered . ,(apply #'+ (mapcar (lambda (a) (length (alist-get 'new a))) report))))))
 
+;;;; Conversion
+
+(defun pos-seal-convert (root)
+  "Bring each schema 2 ledger under ROOT to schema 3, by one event.
+The event links the head as a block, names the hash it had, and enrols
+the empty directories the archive holds, so that the fold of the ledger
+is the archive's CID.  Refused unless every archive is as its ledger
+says, before any event is written.  Return an alist: converted, each an
+archive with its event file and new head; and skipped, each an archive
+with the reason."
+  (let (converted skipped pending)
+    (dolist (archive (pos-ledger-roots root))
+      (pcase-let* ((`(,entries ,head ,events ,files ,recorded)
+                    (pos-ledger-history archive))
+                   (reason
+                    (cond ((null head) "no ledger")
+                          ((pos-ledger--event-cid-p head) "schema 3")
+                          ((seq-some (lambda (e) (not (assq 'cid (cdr e)))) entries)
+                           "legacy entries"))))
+        (if reason
+            (push `((archive . ,archive) (reason . ,reason)) skipped)
+          (let* ((cids (condition-case err
+                           (pos-cid-tree archive)
+                         (pos-cid-sharding-unsupported
+                          (pos-ledger--refuse 'sharding-unsupported "%S" (cdr err)))))
+                 (actual (pos-ledger--with-cids
+                          entries (pos-ledger-inventory archive) cids)))
+            (pcase-let ((`(,missing ,changed ,new)
+                         (pos-ledger--differences entries actual)))
+              (when (or missing changed new
+                        (not (equal recorded (cdr (assoc "." cids)))))
+                (pos-ledger--refuse
+                 'unclean "The archive is not as its ledger says; check it first: %s"
+                 archive)))
+            (let* ((empty (pos-seal--empty archive ""))
+                   (folded (cdr (assoc "." (pos-ledger-fold entries empty)))))
+              (unless (equal folded recorded)
+                (pos-ledger--refuse
+                 'root "The ledger does not account for the archive's CID: %s" archive))
+              (let* ((head-file (car (last files)))
+                     (bytes (pos-ledger-block
+                             `((schema . 3) (kind . "conversion") (from . ,head)
+                               (previous . ,(pos-ledger--link
+                                             (pos-ledger--event-cid
+                                              (pos-ledger--as-block
+                                               (pos-ledger--read head-file)))))
+                               (ledger_id . ,(pos-seal--last-id files))
+                               (empty . ,(vconcat empty)) (root . ,folded))))
+                     (name (pos-ledger--event-cid bytes))
+                     (file (expand-file-name (format "%08d-%s.json" (1+ events) name)
+                                             (file-name-directory head-file))))
+                (push (list archive file bytes name) pending)))))))
+    (pcase-dolist (`(,archive ,file ,bytes ,name) (nreverse pending))
+      (pos-seal--write-new file bytes)
+      (pos-seal--checkpoint archive name)
+      (push `((archive . ,archive) (event . ,file) (head . ,name)) converted))
+    `((converted . ,(vconcat (nreverse converted)))
+      (skipped . ,(vconcat (nreverse skipped))))))
+
 ;;;; Command line
 
 (defconst pos-seal-usage
@@ -584,6 +684,8 @@ files changed, and unregistered, the files the ledgers do not know."
       record the ledger heads under ROOT, once the check is clean
   repair ROOT
       remove write bits from verified evidence; never enrols
+  convert ROOT
+      bring each schema 2 ledger under ROOT to schema 3, once it is clean
 
 --apply applies a program's own plan at once and prints both.
 Exit 0 done or clean, 1 findings, 2 refused.
@@ -640,6 +742,9 @@ Exit 0 done or clean, 1 findings, 2 refused.
          (princ (pos-ledger-json `((checkpointed . ,(pos-seal-checkpoint root))))))
         (`("repair" ,root)
          (princ (pos-ledger-json (pos-seal-repair root))))
+        (`("convert" ,root)
+         (princ (decode-coding-string (pos-ledger-json (pos-seal-convert root))
+                                      'utf-8)))
         (`(,(or "help" "-h" "--help")) (princ pos-seal-usage))
         (_ (message "%s" pos-seal-usage)
            (kill-emacs 2)))

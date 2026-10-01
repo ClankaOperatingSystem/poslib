@@ -1,0 +1,5 @@
+{
+ "description": "The key / beside another key: a link is an object of that one key.",
+ "bytes": "{\"a\":{\"/\":\"bafkreigks6arfsq3xxfpvqrrwonchxcnu6do76auprhhfomao6c273sixm\",\"b\":1}}",
+ "error": "encoding"
+}

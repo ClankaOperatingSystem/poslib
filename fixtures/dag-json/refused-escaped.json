@@ -1,0 +1,5 @@
+{
+ "description": "A non-ASCII character escaped where it is written raw.",
+ "bytes": "{\"a\":\"\\u00e9\"}",
+ "error": "encoding"
+}

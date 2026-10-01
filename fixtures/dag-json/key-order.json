@@ -1,0 +1,22 @@
+{
+ "description": "Keys in the byte order of their UTF-8, at every level: aaa before b, e and m before é.",
+ "value": {
+  "b": 1,
+  "a": 2,
+  "aaa": 3,
+  "bb": 4,
+  "é": 5,
+  "e": 6,
+  "m": {
+   "z": 1,
+   "a": [
+    {
+     "y": 1,
+     "b": 2
+    }
+   ]
+  }
+ },
+ "encoded": "{\"a\":2,\"aaa\":3,\"b\":1,\"bb\":4,\"e\":6,\"m\":{\"a\":[{\"b\":2,\"y\":1}],\"z\":1},\"é\":5}",
+ "cid": "baguqeerae23pamntjij4w5gj3twisnzpvjb2ikbftn73hxw46bhvlwwsakvq"
+}

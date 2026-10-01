@@ -174,6 +174,19 @@ different CIDs, each as IPFS computes it."
                 entries))))
     entries))
 
+(defun pos-cid-test-empty (dir &optional rel)
+  "Return the directories under DIR that hold nothing IPFS would add.
+As paths from REL, the path of DIR itself."
+  (let ((names (seq-remove (lambda (name) (string-prefix-p "." name))
+                           (directory-files dir nil directory-files-no-dot-files-regexp))))
+    (if (and (null names) rel)
+        (list rel)
+      (mapcan (lambda (name)
+                (let ((path (expand-file-name name dir)))
+                  (when (file-directory-p path)
+                    (pos-cid-test-empty path (if rel (concat rel "/" name) name)))))
+              names))))
+
 (defun pos-cid-test-by-path (cids)
   "Return the alist CIDS sorted by path."
   (sort (copy-sequence cids) (lambda (a b) (string< (car a) (car b)))))
@@ -195,7 +208,8 @@ inventory of its files give every CID recorded, as pyposlib must also."
             (should (equal recorded (pos-cid-test-by-path (pos-cid-tree path))))
             (should (equal recorded
                            (pos-cid-test-by-path
-                            (pos-cid-inventory (pos-cid-test-entries path)))))))))))
+                            (pos-cid-inventory (pos-cid-test-entries path)
+                                               (pos-cid-test-empty path)))))))))))
 
 (ert-deftest pos-cid/a-cid-decodes-to-the-bytes-it-encodes ()
   (let ((cid (pos-cid--cid pos-cid--raw "hello")))
@@ -223,7 +237,9 @@ DAG give the size the file's real DAG has."
   (let ((cid (pos-cid-bytes "x")))
     (dolist (path '(".hidden" "a/.b/c" "a//b" ""))
       (should-error (pos-cid-inventory (list (list path cid 1)))))
-    (should-error (pos-cid-inventory (list (list "a" cid 1) (list "a/b" cid 1))))))
+    (should-error (pos-cid-inventory (list (list "a" cid 1) (list "a/b" cid 1))))
+    (dolist (empty '("a" "a/b" ".c" "d//e"))
+      (should-error (pos-cid-inventory (list (list "a/b" cid 1)) (list empty))))))
 
 (provide 'pos-cid-test)
 ;;; pos-cid-test.el ends here

@@ -72,6 +72,42 @@ An alist of plan, event and report, or of error."
                 (pos-ledger-test-same .event (alist-get 'event got))
                 (pos-ledger-test-same .report (alist-get 'report got))))))))))
 
+(ert-deftest pos-seal/every-shared-fixture-converts-the-same-bytes ()
+  "The conversion events, what was skipped and the report after, or the
+refusal, as fixtures/ledger/ of kind convert."
+  (dolist (named (pos-fixtures "ledger"))
+    (let-alist (cdr named)
+      (when (equal .kind "convert")
+        (ert-info ((car named))
+          (pos-fixture-with (cdr named) dir
+            (let* ((root (expand-file-name .root dir))
+                   (base (file-name-as-directory (file-truename dir)))
+                   (got (condition-case err
+                            (pos-seal-convert root)
+                          (pos-ledger-refused
+                           `((error . ,(symbol-name (cadr err))))))))
+              (if .error
+                  (should (equal .error (alist-get 'error got)))
+                (should-not (alist-get 'error got))
+                (pos-ledger-test-same
+                 .converted
+                 (vconcat
+                  (mapcar (lambda (c)
+                            (let ((file (alist-get 'event c)))
+                              `((name . ,(file-name-nondirectory file))
+                                (encoded . ,(decode-coding-string
+                                             (pos-ledger--read file) 'utf-8)))))
+                          (alist-get 'converted got))))
+                (pos-ledger-test-same
+                 .skipped
+                 (vconcat
+                  (mapcar (lambda (s)
+                            `((archive . ,(file-relative-name (alist-get 'archive s) base))
+                              (reason . ,(alist-get 'reason s))))
+                          (alist-get 'skipped got))))
+                (pos-ledger-test-same
+                 .report (pos-ledger-test-relative (pos-ledger-check root) dir))))))))))
+
 (defmacro pos-seal-test-with-scope (&rest body)
   "Evaluate BODY with `scope' a temporary scope holding archives/ and an item."
   (declare (indent 0))

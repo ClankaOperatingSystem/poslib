@@ -1,0 +1,66 @@
+{
+ "kind": "report",
+ "description": "A clean schema 3 archive: its head is a CID, a checkpoint names it, and the archive's CID, empty directories included, is the root the ledger folds to.",
+ "tree": [
+  {
+   "path": "scope/archive-integrity/checkpoints/193a72b2558319baf0ec79e09ff9de4eb8ad1cc5ecddc0e0b24b7989780a495b.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeerasblocyhcctl2ird62xqs5azul4fkckgkuwtknwrrndnjaujhmjhq\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/checkpoints/457c6f0f73a01bd4a811873d84be3ff4ebfcd39a8e1a132500075066e8d70a98.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeerajwrmdmyz2ewzdtipg5f2pr7prers2zwzz7wp7zkfbs23ac5xq4ya\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000001-baguqeerajwrmdmyz2ewzdtipg5f2pr7prers2zwzz7wp7zkfbs23ac5xq4ya.json",
+   "text": "{\"add\":{\"first/a.txt\":{\"cid\":\"bafkreifhsn5wjogkuwhqg4q3w25m6xdyzmrv727a44frxbgntfkbiynary\",\"mode\":292,\"sha256\":\"a7937b64b8caa58f03721bb6bacf5c78cb235febe0e70b1b84cd99541461a08e\",\"size\":5}},\"collections\":[],\"empty\":[],\"item\":\"first\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeiddmlljvw765tmgilhvupwh7iqxkga2jnaupfh7r4ghuimt5yiici\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000002-baguqeerasblocyhcctl2ird62xqs5azul4fkckgkuwtknwrrndnjaujhmjhq.json",
+   "text": "{\"add\":{\"second/b.txt\":{\"cid\":\"bafkreiawgz5kznt2jiaxzdnivokwqlglheegg6apoekn3ifa4dcvmrghyq\",\"mode\":292,\"sha256\":\"16367aacb67a4a017c8da8ab95682ccb390863780f7114dda0a0e0c55644c7c4\",\"size\":6},\"second/sub/c.txt\":{\"cid\":\"bafkreibopuwahkkqplrgl3hvwu2wrbnfgoj2eau5eqjzjglsmwq2ewxpyy\",\"mode\":292,\"sha256\":\"2e7d2c03a9507ae265ecf5b5356885a53393a2029d241394997265a1a25aefc6\",\"size\":1}},\"collections\":[],\"empty\":[\"second/hollow\",\"second/sub/void\"],\"item\":\"second\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeerajwrmdmyz2ewzdtipg5f2pr7prers2zwzz7wp7zkfbs23ac5xq4ya\"},\"root\":\"bafybeiat2lm5kos4eia64oydhkujppwccv3zcp7sdbwqjqtcngglgk2s2q\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/first/a.txt",
+   "text": "first",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/second/b.txt",
+   "text": "second",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/second/hollow",
+   "directory": true
+  },
+  {
+   "path": "scope/archives/second/sub/c.txt",
+   "text": "c",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/second/sub/void",
+   "directory": true
+  }
+ ],
+ "report": [
+  {
+   "archive": "scope/archives",
+   "head": "baguqeerasblocyhcctl2ird62xqs5azul4fkckgkuwtknwrrndnjaujhmjhq",
+   "events": 2,
+   "files": 3,
+   "writable": [],
+   "checkpoint_writable": [],
+   "root": "bafybeiat2lm5kos4eia64oydhkujppwccv3zcp7sdbwqjqtcngglgk2s2q",
+   "recorded_root": "bafybeiat2lm5kos4eia64oydhkujppwccv3zcp7sdbwqjqtcngglgk2s2q",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  }
+ ]
+}

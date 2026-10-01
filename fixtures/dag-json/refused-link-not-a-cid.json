@@ -1,0 +1,5 @@
+{
+ "description": "The key / with something other than a CID.",
+ "bytes": "{\"a\":{\"/\":\"x\"}}",
+ "error": "encoding"
+}

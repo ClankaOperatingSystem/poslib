@@ -32,6 +32,7 @@
 ;; - `pos-cid-inventory': the same from the files' paths, CIDs and
 ;;   sizes alone, nothing read: how a ledger gives its archive's root.
 ;; - `pos-cid-decode': the bytes of a CID written in base32.
+;; - `pos-cid-block': the CID of one block under a codec.
 ;;
 ;; A directory large enough to need HAMT sharding signals
 ;; `pos-cid-sharding-unsupported' rather than return a wrong CID.
@@ -57,6 +58,7 @@
 
 (defconst pos-cid--raw #x55 "Multicodec for raw bytes.")
 (defconst pos-cid--dag-pb #x70 "Multicodec for dag-pb.")
+(defconst pos-cid-dag-json #x0129 "Multicodec for dag-json.")
 
 (defun pos-cid--varint (n)
   "Return N as an unsigned LEB128 byte string."
@@ -309,14 +311,20 @@ receives a relative path and a CID as text, files as given."
       (funcall visit (if (string-empty-p rel) "." rel) (pos-cid--text (car n)))
       n)))
 
-(defun pos-cid-inventory (entries)
+(defun pos-cid-block (codec block)
+  "Return the CID of BLOCK, a unibyte string, under the multicodec CODEC.
+With `pos-cid-dag-json', how a DAG-JSON ledger event is named."
+  (pos-cid--text (pos-cid--cid codec block)))
+
+(defun pos-cid-inventory (entries &optional empty)
   "Return the CID of every file and directory over ENTRIES, root included.
 ENTRIES lists a tree's files as (PATH CID SIZE): the relative path, the
 CID as text and the size in bytes.  Directories are derived from the
-paths as `pos-cid-tree' finds them on disk, so an empty directory has no
-place here, and a hidden component is refused since IPFS would leave it
-out.  An alist of relative path and CID, files as given, the root \".\".
-Signals `pos-cid-sharding-unsupported' as `pos-cid-directory' does."
+paths as `pos-cid-tree' finds them on disk; one that holds nothing has
+no file to derive it from and is listed in EMPTY, by its path.  A hidden
+component is refused since IPFS would leave it out.  An alist of
+relative path and CID, files as given, the root \".\".  Signals
+`pos-cid-sharding-unsupported' as `pos-cid-directory' does."
   (let ((tree (make-hash-table :test #'equal)) cids)
     (dolist (entry entries)
       (let* ((path (nth 0 entry))
@@ -338,6 +346,21 @@ Signals `pos-cid-sharding-unsupported' as `pos-cid-directory' does."
                        (pos-cid--file-tsize (nth 2 entry))
                        (nth 1 entry))
                  node)))
+    (dolist (path empty)
+      (let ((parts (split-string path "/"))
+            (node tree))
+        (dolist (part parts)
+          (when (or (string-empty-p part) (string-prefix-p "." part))
+            (error "Not a path IPFS would add: %s" path)))
+        (dolist (part (butlast parts))
+          (let ((child (gethash part node)))
+            (unless (or (null child) (hash-table-p child))
+              (error "A file and a directory share a path: %s" path))
+            (setq node (or child
+                           (puthash part (make-hash-table :test #'equal) node)))))
+        (when (gethash (car (last parts)) node)
+          (error "Not an empty directory: %s" path))
+        (puthash (car (last parts)) (make-hash-table :test #'equal) node)))
     (pos-cid--inventory-directory
      tree "" (lambda (rel cid) (push (cons rel cid) cids)))
     (nreverse cids)))

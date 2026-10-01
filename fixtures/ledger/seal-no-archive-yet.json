@@ -11,8 +11,8 @@
  "source": "scope/note.txt",
  "destination": "scope/archives/note.txt",
  "event": {
-  "encoded": "{\"add\":{\"note.txt\":{\"cid\":\"bafkreifwiduebmm5g6dgbmzpwunoddlh3tfuvbmwukphxvzmdmvoleupie\",\"mode\":292,\"sha256\":\"b640e840b19d378660b32fb51ae18d67dccb4a8596a29e7bd72c1b2ae5928f41\",\"size\":6}},\"collections\":[],\"item\":\"note.txt\",\"ledger_id\":\"5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d\",\"previous\":null,\"root\":\"bafybeibzm7veymxtopftwljh7bac5vwcal675kcd2eahphwhyvxceiebhi\",\"schema\":2}\n",
-  "name": "00000001-79d9a2c4718fadf7d185edfe424b736f110ae72579df1be54e5df2c4b2dd7c88.json"
+  "name": "00000001-baguqeeratl4ec2bdxptddmplnssn66xsm67e7uo5oym43dv2utc3e25iksaq.json",
+  "encoded": "{\"add\":{\"note.txt\":{\"cid\":\"bafkreifwiduebmm5g6dgbmzpwunoddlh3tfuvbmwukphxvzmdmvoleupie\",\"mode\":292,\"sha256\":\"b640e840b19d378660b32fb51ae18d67dccb4a8596a29e7bd72c1b2ae5928f41\",\"size\":6}},\"collections\":[],\"empty\":[],\"item\":\"note.txt\",\"ledger_id\":\"5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d\",\"previous\":null,\"root\":\"bafybeibzm7veymxtopftwljh7bac5vwcal675kcd2eahphwhyvxceiebhi\",\"schema\":3}"
  },
  "plan": {
   "add": {
@@ -41,18 +41,18 @@
  "report": [
   {
    "archive": "scope/archives",
-   "changed": [],
-   "checkpoint_writable": [],
+   "head": "baguqeeratl4ec2bdxptddmplnssn66xsm67e7uo5oym43dv2utc3e25iksaq",
    "events": 1,
    "files": 1,
-   "head": "79d9a2c4718fadf7d185edfe424b736f110ae72579df1be54e5df2c4b2dd7c88",
-   "hidden": [],
-   "missing": [],
-   "new": [],
-   "recorded_root": "bafybeibzm7veymxtopftwljh7bac5vwcal675kcd2eahphwhyvxceiebhi",
+   "writable": [],
+   "checkpoint_writable": [],
    "root": "bafybeibzm7veymxtopftwljh7bac5vwcal675kcd2eahphwhyvxceiebhi",
+   "recorded_root": "bafybeibzm7veymxtopftwljh7bac5vwcal675kcd2eahphwhyvxceiebhi",
+   "hidden": [],
    "undeclared": [],
-   "writable": []
+   "missing": [],
+   "changed": [],
+   "new": []
   }
  ]
 }

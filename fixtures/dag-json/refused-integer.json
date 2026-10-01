@@ -1,0 +1,5 @@
+{
+ "description": "An integer of more than 64 bits.",
+ "bytes": "{\"a\":9223372036854775808}",
+ "error": "encoding"
+}

@@ -1,0 +1,47 @@
+{
+ "kind": "history",
+ "description": "A conversion to schema 3 that names another hash than the head it follows.",
+ "tree": [
+  {
+   "path": "scope/archive-integrity/checkpoints/3b04c8add171212dec07e1507f5cf88a3ebb5ec908ee8097b798ba0d7293cf75.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeeracvjbtpjlwzqlh3hwbrrfljqdcq5kjmiqbug6zarwpfkppmxndf2q\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/checkpoints/3be45779f9b475b1a1549836bc7d5c0487b98b64f98e77c5f224a40140319802.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeerav6dj2fzang6f2ktw746wd3gozodwq3ruy3tl7mbqzrc7cb4ou5ea\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000001-854d7aaa4014af2e747c06b78584d60502731626f9c4b1e2a172e590ac15b74f.json",
+   "text": "{\"add\":{\"old/a.txt\":{\"cid\":\"bafkreiglubvvonx26z7fjmd3kypk5fbzlz3uyul2pwiquvbwtyjghth32q\",\"mode\":292,\"sha256\":\"cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4\",\"size\":3}},\"collections\":[],\"item\":\"old\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeiecnelpaa5d2nzzcybwfao6cdm5txngbfbefg65h5ts4j7w3nb4nq\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000002-baguqeeraywut6xm7vndwr442yy4btjicu4s65l775uptvc2yfvybupuy7ira.json",
+   "text": "{\"empty\":[\"old/hollow\"],\"from\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"kind\":\"conversion\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeerayamsr4gfouhnf6pwad5zookvo2i634ggcl7zelzz74naxntz4wta\"},\"root\":\"bafybeiecnelpaa5d2nzzcybwfao6cdm5txngbfbefg65h5ts4j7w3nb4nq\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000003-baguqeerav6dj2fzang6f2ktw746wd3gozodwq3ruy3tl7mbqzrc7cb4ou5ea.json",
+   "text": "{\"add\":{\"new/b.txt\":{\"cid\":\"bafkreiarkb5a4l26nhk57jakmkq3263o4v7gxtmfyz6jxbbrwnx76ioeg4\",\"mode\":292,\"sha256\":\"11507a0e2f5e69d5dfa40a62a1bd7b6ee57e6bcd85c67c9b8431b36fff21c437\",\"size\":3}},\"collections\":[],\"empty\":[],\"item\":\"new\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeeracvjbtpjlwzqlh3hwbrrfljqdcq5kjmiqbug6zarwpfkppmxndf2q\"},\"root\":\"bafybeifo4o6jrnzb2bqm6vbcwfzpthy7bqwluzfgf5c74heeawha66fjte\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/new/b.txt",
+   "text": "new",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/old/a.txt",
+   "text": "old",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/old/hollow",
+   "directory": true
+  }
+ ],
+ "archive": "scope/archives",
+ "error": "chain"
+}

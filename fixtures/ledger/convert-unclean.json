@@ -1,0 +1,45 @@
+{
+ "kind": "convert",
+ "description": "An archive holding a file its ledger does not enrol is not converted.",
+ "tree": [
+  {
+   "path": "scope/archive-integrity/ledger/00000001-650143ee2789bee3f24cac6ce4675d6e35d35be29788d8e6c3b6755726a7fae9.json",
+   "text": "{\"add\":{\"a/x.txt\":{\"cid\":\"bafkreibnoelefnzgwbcacyt4vh52ymxvzbjq7mmqhtcnwarfq4lzegsiqe\",\"mode\":292,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"size\":1}},\"collections\":[],\"item\":\"a\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeifeje3xu6nxykajeienwpnr6l7ndmq32sxu6xczyqvpnv66y2p4y4\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000002-c9173ae0214861adbe6dc1b11a42d7b9b5ee38bac59c016c5bdd0c84221c5507.json",
+   "text": "{\"add\":{\"b/sub/z.txt\":{\"cid\":\"bafkreiczjzizvzezgevssqz3pxmks77qndppzouxkw3nluaoqtcsjvt3ay\",\"mode\":292,\"sha256\":\"594e519ae499312b29433b7dd8a97ff068defcba9755b6d5d00e84c524d67b06\",\"size\":1},\"b/y.txt\":{\"cid\":\"bafkreifb7tsdmocu76eiz72lrz4hlvqayjuchecbfkgppgzx2cyrcsfq7i\",\"mode\":292,\"sha256\":\"a1fce4363854ff888cff4b8e7875d600c2682390412a8cf79b37d0b11148b0fa\",\"size\":1}},\"collections\":[],\"item\":\"b\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"650143ee2789bee3f24cac6ce4675d6e35d35be29788d8e6c3b6755726a7fae9\",\"root\":\"bafybeie4jro3kybdsfmvvwwd2dvinaoyamdvvmocawbitxzhzqgtakizmq\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/a/x.txt",
+   "text": "x",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/b/hollow",
+   "directory": true
+  },
+  {
+   "path": "scope/archives/b/sub/void",
+   "directory": true
+  },
+  {
+   "path": "scope/archives/b/sub/z.txt",
+   "text": "z",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/b/y.txt",
+   "text": "y",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/stray.txt",
+   "text": "unenrolled"
+  }
+ ],
+ "root": "scope",
+ "error": "unclean"
+}

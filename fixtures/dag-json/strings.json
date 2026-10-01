@@ -1,0 +1,8 @@
+{
+ "description": "Control characters escaped, a quote and a backslash escaped, DEL and non-ASCII raw.",
+ "value": {
+  "s": "é\u0001\"\\\n\t 日本"
+ },
+ "encoded": "{\"s\":\"é\\u0001\\\"\\\\\\n\\t 日本\"}",
+ "cid": "baguqeerasnp4gr4xi5bhc2af2xfz55uyot2b6pf3tn5ej5dj34qewqmoggya"
+}

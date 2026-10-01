@@ -1,0 +1,24 @@
+{
+ "description": "A schema 3 ledger event: previous is a link, and the block has no final newline.",
+ "value": {
+  "schema": 3,
+  "previous": {
+   "/": "baguqeeraiqjw7i2vwntyuekgvulpp2det2kpwt6cd7tx5ayqybqpmhfk76fa"
+  },
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "item": "journal/a.txt",
+  "add": {
+   "journal/a.txt": {
+    "cid": "bafkreigks6arfsq3xxfpvqrrwonchxcnu6do76auprhhfomao6c273sixm",
+    "mode": 292,
+    "sha256": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+    "size": 1
+   }
+  },
+  "root": "bafybeieqjezw4guc2tgxprr2gzwce6tvwfzruplfyeqd66aofd23lapcky",
+  "collections": [],
+  "empty": []
+ },
+ "encoded": "{\"add\":{\"journal/a.txt\":{\"cid\":\"bafkreigks6arfsq3xxfpvqrrwonchxcnu6do76auprhhfomao6c273sixm\",\"mode\":292,\"sha256\":\"ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb\",\"size\":1}},\"collections\":[],\"empty\":[],\"item\":\"journal/a.txt\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeeraiqjw7i2vwntyuekgvulpp2det2kpwt6cd7tx5ayqybqpmhfk76fa\"},\"root\":\"bafybeieqjezw4guc2tgxprr2gzwce6tvwfzruplfyeqd66aofd23lapcky\",\"schema\":3}",
+ "cid": "baguqeeravqttzkly6rwl5m6uyxu57kzpplsj7casm5ijgyuevrewq7dixppq"
+}
