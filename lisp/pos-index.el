@@ -26,7 +26,8 @@
 ;; itself evidence.
 ;;
 ;; - `pos-index-build': rebuild and save a scope's index.
-;; - `pos-index-resolve': the file an ipfs:// link names.
+;; - `pos-index-resolve': where the file an ipfs:// link names is.
+;; - `pos-index-fetch': a buffer of a file fetched from its keeper.
 ;; - Org follows ipfs: links through it.
 
 ;;; Code:
@@ -34,6 +35,7 @@
 (require 'ol)
 (require 'pos-cid)
 (require 'pos-ledger)
+(require 'pos-remote)
 
 (defconst pos-index-file "_index/cids.json"
   "Where a scope keeps its index, relative to the scope.")
@@ -89,19 +91,68 @@ An alist of CID and the paths, relative to SCOPE, that have it."
                 (and (file-exists-p file) file)))
             (cdr (assoc cid index))))
 
+(defun pos-index--kept (scope index cid path)
+  "Return where a keeper has the file INDEX gives for CID and PATH in SCOPE.
+As (URL FILE-CID NAME): the keeper's base URL, the CID the ledger enrols
+the file under, and the file's name; or nil if INDEX gives no file a
+keeper keeps.  A directory is not a file: the protocol reads none."
+  (seq-some
+   (lambda (base)
+     (let* ((file (expand-file-name (concat base (when path (concat "/" path))) scope))
+            (archive (seq-find
+                      (lambda (a) (string-prefix-p (file-name-as-directory a) file))
+                      (pos-ledger-roots scope)))
+            (url (and archive (pos-ledger-kept archive)))
+            (entry (and url (assoc (file-relative-name file archive)
+                                   (car (pos-ledger-history archive))))))
+       (and entry
+            (list url (alist-get 'cid (cdr entry)) (file-name-nondirectory file)))))
+   (cdr (assoc cid index))))
+
 (defun pos-index-resolve (scope uri)
-  "Return the file URI names, from SCOPE's index, rebuilding it if need be."
+  "Return where the file URI names is, from SCOPE's index.
+A file on disk, or for a file a keeper keeps, the URL the keeper has it
+at.  The index is rebuilt if it does not have it."
   (pcase-let* ((scope (file-name-as-directory (file-truename scope)))
-               (`(,cid . ,path) (pos-index--parse uri)))
+               (`(,cid . ,path) (pos-index--parse uri))
+               (kept (lambda (index)
+                       (pcase (pos-index--kept scope index cid path)
+                         (`(,url ,file-cid ,_)
+                          (concat (string-remove-suffix "/" url) "/ipfs/" file-cid))))))
     (or (pos-index--lookup scope (pos-index--load scope) cid path)
+        (funcall kept (pos-index--load scope))
         (pos-index--lookup scope (pos-index-build scope) cid path)
+        (funcall kept (pos-index--load scope))
         (error "No archived file for %s under %s" uri scope))))
 
+(defun pos-index-fetch (scope uri)
+  "Return a buffer holding the file URI names, fetched from its keeper.
+SCOPE's index says which keeper has it; nil if none does.  The buffer
+is read-only, visits no file, and is in the mode the file's name
+gives."
+  (pcase-let* ((scope (file-name-as-directory (file-truename scope)))
+               (`(,cid . ,path) (pos-index--parse uri)))
+    (pcase (or (pos-index--kept scope (pos-index--load scope) cid path)
+               (pos-index--kept scope (pos-index-build scope) cid path))
+      (`(,url ,file-cid ,name)
+       (let ((bytes (pos-remote-read (funcall pos-remote-keeper-function url) file-cid))
+             (buffer (generate-new-buffer name)))
+         (with-current-buffer buffer
+           (insert (decode-coding-string bytes 'utf-8))
+           (goto-char (point-min))
+           (let ((buffer-file-name (expand-file-name name scope)))
+             (set-auto-mode))
+           (set-buffer-modified-p nil)
+           (setq buffer-read-only t))
+         buffer)))))
+
 (defun pos-index--scopes (directory)
-  "Return the scopes above DIRECTORY that have archives, nearest first."
+  "Return the scopes above DIRECTORY that have archives, nearest first.
+On disk, or kept by a keeper and known by their ledgers."
   (let (scopes (dir (file-name-as-directory (expand-file-name directory))))
     (while dir
-      (when (and (file-directory-p (expand-file-name "archives" dir))
+      (when (and (or (file-directory-p (expand-file-name "archives" dir))
+                     (pos-ledger--kept-here (directory-file-name dir)))
                  (not (equal (file-name-nondirectory (directory-file-name dir))
                              "archives")))
         (push dir scopes))
@@ -111,13 +162,21 @@ An alist of CID and the paths, relative to SCOPE, that have it."
 
 (defun pos-index-follow (path &optional _)
   "Visit the archived file an Org ipfs: link names; PATH is after ipfs:.
-Each scope above the current file is tried, nearest first."
-  (let ((uri (concat "ipfs:" path)))
-    (find-file
-     (or (seq-some (lambda (scope)
-                     (ignore-errors (pos-index-resolve scope uri)))
-                   (pos-index--scopes default-directory))
-         (user-error "No archived file for %s" uri)))))
+Each scope above the current file is tried, nearest first.  A file a
+keeper keeps is fetched from it and shown read-only."
+  (let* ((uri (concat "ipfs:" path))
+         (scopes (pos-index--scopes default-directory))
+         (file (seq-some (lambda (scope)
+                           (let ((found (ignore-errors (pos-index-resolve scope uri))))
+                             (and found (file-name-absolute-p found) found)))
+                         scopes)))
+    (cond (file (find-file file))
+          ((seq-some (lambda (scope)
+                       (when-let* ((buffer (pos-index-fetch scope uri)))
+                         (pop-to-buffer-same-window buffer)
+                         buffer))
+                     scopes))
+          (t (user-error "No archived file for %s" uri)))))
 
 (org-link-set-parameters "ipfs" :follow #'pos-index-follow)
 

@@ -82,6 +82,65 @@ archive holds the CIDs its ledger folds to, at the paths they would have."
                      (cdr (assoc (cdr (assoc "first/a.txt" cids)) index))))
       (should (equal ["archives"] (cdr (assoc (cdr (assoc "." cids)) index)))))))
 
+(defmacro pos-index-test-with-kept (&rest body)
+  "Evaluate BODY in a tree whose scope projects/a a keeper keeps.
+`scope' is the scope, `cids' what its ledger folds to, `url' its
+keeper's URL, and `asked' collects the requests made, each answered
+with the bytes \"result\"."
+  (declare (indent 0))
+  `(let ((fixture (pos-fixture "ledger" "report-kept-asked")))
+     (pos-fixture-with fixture dir
+       (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
+              (cids (pos-ledger-fold-cids (expand-file-name "archives" scope)))
+              (url (alist-get 'url (alist-get 'keeper fixture)))
+              (asked nil)
+              (pos-remote-keeper-function
+               (lambda (base) (pos-remote-http-create :url base :token "a-token")))
+              (pos-remote-send-function
+               (lambda (method url headers _body)
+                 (push (list method url (cdr (assoc "Authorization" headers))) asked)
+                 (cons 200 "result"))))
+         (ignore cids url asked)
+         ,@body))))
+
+(ert-deftest pos-index/a-file-a-keeper-keeps-resolves-to-where-the-keeper-has-it ()
+  "By its item's CID and its path, or by its own CID, a file sealed to a
+keeper resolves to the keeper's URL for the file's CID.  A directory
+resolves to nothing: the protocol reads files."
+  (pos-index-test-with-kept
+    (let ((there (concat url "/ipfs/" (cdr (assoc "trial/result.txt" cids)))))
+      (should (equal there (pos-index-resolve
+                            scope (concat "ipfs://" (cdr (assoc "trial" cids))
+                                          "/result.txt"))))
+      (should (equal there (pos-index-resolve
+                            scope (concat "ipfs://" (cdr (assoc "trial/result.txt" cids))))))
+      (should-error (pos-index-resolve scope (concat "ipfs://" (cdr (assoc "trial" cids)))))
+      (should-not asked))))
+
+(ert-deftest pos-index/org-follows-an-ipfs-link-to-its-keeper ()
+  "An ipfs: link to a file a keeper keeps is fetched from the keeper,
+with the caller's token, and shown read-only in the mode its name gives."
+  (pos-index-test-with-kept
+    (let ((canon (expand-file-name "notes.org" scope))
+          (file-cid (cdr (assoc "trial/result.txt" cids))))
+      (pos-fixture-write canon (concat "[[ipfs://" (cdr (assoc "trial" cids))
+                                       "/result.txt][the result]]\n"))
+      (with-current-buffer (find-file-noselect canon)
+        (unwind-protect
+            (progn
+              (goto-char (point-min))
+              (search-forward "ipfs:")
+              (save-window-excursion
+                (org-open-at-point)
+                (should (equal "result" (buffer-string)))
+                (should buffer-read-only)
+                (should-not buffer-file-name)
+                (should (derived-mode-p 'text-mode))
+                (kill-buffer))
+              (should (equal `(("GET" ,(concat url "/ipfs/" file-cid) "Bearer a-token"))
+                             asked)))
+          (kill-buffer))))))
+
 (ert-deftest pos-index/org-follows-ipfs-links ()
   "An ipfs: link in canon opens the archived file it names."
   (pos-index-test-with-sealed
