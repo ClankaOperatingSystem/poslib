@@ -130,9 +130,16 @@ entry is a mapping:
                 remote: by a keeper (doc/remote-archive-protocol.txt)
     url         with remote, the base URL the keeper gives the scope's
                 ledger
+    ledger      the id of the scope's ledger, a UUID in canonical form
+                with lower-case letters; optional, with any kept
 
 A scope no entry names keeps its archive committed. In every case the
 ledger stays with the scope and is committed.
+
+A ledger otherwise draws its id when its first event is made. A keeper
+may be bound to a ledger's id before that event exists, so an entry can
+say what the id is. An entry whose ledger is not such a UUID is refused
+as bad-value, and so is a file in which two entries name one ledger.
 
 
 5. The server

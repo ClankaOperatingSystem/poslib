@@ -61,6 +61,11 @@
     (concat pair "\\(?:/" pair "\\)*"))
   "Matches a scope's path: pairs of projects/NAME or responsibilities/NAME.")
 
+(defconst pos-tree--uuid-regexp
+  (concat "\\`[0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-"
+          "[0-9a-f]\\{4\\}-[0-9a-f]\\{12\\}\\'")
+  "Matches a UUID in canonical form, when letters' case is not folded.")
+
 (defun pos-tree--scope-path-p (path)
   "Return non-nil if PATH is a scope's path beneath a repository's root."
   (and (string-match-p (concat "\\`" pos-tree--scope-regexp "\\'") path)
@@ -201,24 +206,36 @@ CHILDREN are the repository's children, already checked."
           (lambda (entry)
             (let-alist (pos-tree--mapping
                         entry "An archive"
-                        '(("scope" string t) ("kept" string t) ("url" string nil)))
+                        '(("scope" string t) ("kept" string t)
+                          ("ledger" string nil) ("url" string nil)))
               (unless (equal .scope ".")
                 (unless (pos-tree--scope-path-p .scope)
                   (pos-tree--refuse 'bad-path "Not a scope's path: %s" .scope))
                 (pos-tree--own-scope .scope children "An archive"))
               (unless (member .kept '("committed" "uncommitted" "remote"))
                 (pos-tree--refuse 'bad-value "An archive is not kept %s" .kept))
-              (cond
-               ((not (equal .kept "remote"))
-                (when .url
-                  (pos-tree--refuse 'bad-value "Only a remote archive has a url: %s"
-                                    .scope))
-                `((scope . ,.scope) (kept . ,.kept)))
-               (.url `((scope . ,.scope) (kept . ,.kept) (url . ,.url)))
-               (t (pos-tree--refuse 'missing-key "A remote archive lacks url")))))
+              (when (and .ledger
+                         (not (let ((case-fold-search nil))
+                                (string-match-p pos-tree--uuid-regexp .ledger))))
+                (pos-tree--refuse 'bad-value "Not a ledger's id: %s" .ledger))
+              (let ((ledger (and .ledger `((ledger . ,.ledger)))))
+                (cond
+                 ((not (equal .kept "remote"))
+                  (when .url
+                    (pos-tree--refuse 'bad-value "Only a remote archive has a url: %s"
+                                      .scope))
+                  `((scope . ,.scope) (kept . ,.kept) ,@ledger))
+                 (.url `((scope . ,.scope) (kept . ,.kept) ,@ledger (url . ,.url)))
+                 (t (pos-tree--refuse 'missing-key "A remote archive lacks url"))))))
           entries)))
     (pos-tree--distinct (mapcar (lambda (a) (alist-get 'scope a)) archives)
                         "An archive's scope")
+    (let ((seen nil))
+      (dolist (archive archives)
+        (when-let* ((ledger (alist-get 'ledger archive)))
+          (when (member ledger seen)
+            (pos-tree--refuse 'bad-value "A ledger is named twice: %s" ledger))
+          (push ledger seen))))
     archives))
 
 (defun pos-tree-read-config (text)
