@@ -71,7 +71,6 @@
   {
    "archive": "scope/archives",
    "changed": [],
-   "checkpoint_writable": [],
    "events": 2,
    "files": 3,
    "head": "326ceebdf3d3930ae9c7676c70333c431215ed4df3b330ff281b3a56a3c1868d",

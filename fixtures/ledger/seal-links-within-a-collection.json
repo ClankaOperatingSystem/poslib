@@ -94,7 +94,6 @@
   {
    "archive": "scope/archives",
    "changed": [],
-   "checkpoint_writable": [],
    "events": 2,
    "files": 4,
    "head": "b0bdd4cfe51e0d9e49d6ffda4fd52a6e5af297151fc36d9083f00909ea87ba6a",

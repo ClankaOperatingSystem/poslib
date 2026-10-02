@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
-this document, version 18, in lockstep; the fixtures in =fixtures/= are its
+this document, version 19, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -271,7 +271,8 @@ Repairing a root removes write bits from the enrolled files, ledger
 events and checkpoints under it, and from nothing else; it enrols
 nothing, and refuses if any enrolled file changed or is missing
 (=differs=). Of an archive a keeper keeps it looks at the ledger events
-alone.
+alone. A check counts a write bit on an archive's files only: see
+=writable= below.
 
 ** Check
 
@@ -287,10 +288,10 @@ a report:
 - =missing=, =changed=, =new=: enrolled paths absent, enrolled paths
   whose entry differs, and unenrolled paths, each sorted. A schema 2
   entry differs if the file's CID does, too;
-- =writable=: files and ledger events with any write bit, sorted, ledger
-  events by their path from the archive (=../archive-integrity/ledger/...=);
-- =checkpoint_writable=: writable checkpoint files, in the first report
-  only;
+- =writable=: the archive's files with any write bit, sorted. A ledger event
+  or a checkpoint with one is not a finding. Each is named by a hash
+  of its bytes, which the check holds it to, and Git keeps no write
+  bit, so every clone has them writable;
 - =root=: the archive's CID now, or =null= if IPFS would shard a
   directory in it; =recorded_root=: the recorded root, or =null=;
 - =hidden=: files with a hidden component, other than within legacy
@@ -305,9 +306,8 @@ the archive holds that and nothing else.
 
 An archive a keeper keeps is reported from its ledger, there being
 nothing on disk to compare: =files= counts its entries, =root= is the
-fold's, =writable= lists ledger events alone, =hidden= is what the ledger
-enrols under a hidden name, and =missing=, =changed=, =new= and
-=undeclared= are empty.
+fold's, =hidden= is what the ledger enrols under a hidden name, and
+=writable=, =missing=, =changed=, =new= and =undeclared= are empty.
 
 Its keeper is then asked to describe what it holds
 (=doc/remote-archive-protocol.txt=), with the bearer token in the
