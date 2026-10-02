@@ -731,7 +731,7 @@ Interrupted, it resumes.  Return (EVENT-FILE . ROOT)."
                 (or (eq .head :null)
                     (seq-some (lambda (list) (> (length list) 0))
                               (list .changed .missing .new .writable
-                                    .checkpoint_writable .hidden .undeclared))
+                                    .hidden .undeclared))
                     (and (not (eq .recorded_root :null))
                          (not (equal .recorded_root .root)))
                     ;; A keeper asked, whose head is not the ledger's.
@@ -758,8 +758,7 @@ the tree; one with the same bytes already recorded is kept."
     (when (seq-some (lambda (archive)
                       (let-alist archive
                         (seq-some (lambda (list) (> (length list) 0))
-                                  (list .changed .missing .new .writable
-                                        .checkpoint_writable))))
+                                  (list .changed .missing .new .writable))))
                     report)
       (pos-ledger--refuse 'unclean "Enrol new records and restore permissions \
 before checkpointing: %s" root))

@@ -839,16 +839,15 @@ Its README.org has the declaration line, or it is a capsule."
 (defun pos-ledger-check (root)
   "Return the check report on every archive under ROOT.
 A list of alists, one an archive: archive, kept, keeper, head, events,
-files, writable, checkpoint_writable, missing, changed, new, root,
-recorded_root, hidden and undeclared; the lists as vectors, so the
-report is a JSON value.  An archive a keeper keeps is reported from its
-ledger, nothing of it being on disk to read, and its keeper is asked
-what it holds unless `pos-ledger-offline' says not."
+files, writable, missing, changed, new, root, recorded_root, hidden and
+undeclared; the lists as vectors, so the report is a JSON value.  An
+archive a keeper keeps is reported from its ledger, nothing of it being
+on disk to read, and its keeper is asked what it holds unless
+`pos-ledger-offline' says not.  A write bit on a ledger event or a
+checkpoint is not reported: each is named by a hash of its bytes, and a
+clone does not keep the bit."
   (let* ((archives (pos-ledger-roots root))
          (_ (pos-ledger--check-anchors root archives))
-         (writable-checkpoints
-          (seq-filter #'pos-ledger--writable-p
-                      (pos-ledger--checkpoint-files root archives)))
          reports)
     (dolist (archive archives)
       (pcase-let* ((`(,known ,head ,events ,files ,recorded ,collections ,_ ,empty)
@@ -864,15 +863,12 @@ what it holds unless `pos-ledger-offline' says not."
                       (pos-ledger--differences
                        known (pos-ledger--with-cids known actual cids))))
                    (writable
-                    (sort (append
-                           (unless kept
-                             (seq-filter (lambda (name)
-                                           (pos-ledger--writable-p
-                                            (expand-file-name name archive)))
-                                         (mapcar #'car actual)))
-                           (mapcar (lambda (f) (file-relative-name f archive))
-                                   (seq-filter #'pos-ledger--writable-p files)))
-                          #'string<)))
+                    (unless kept
+                      (sort (seq-filter (lambda (name)
+                                          (pos-ledger--writable-p
+                                           (expand-file-name name archive)))
+                                        (mapcar #'car actual))
+                            #'string<))))
         (push `((archive . ,archive) (kept . ,(or kept :null))
                 (keeper . ,(or (and kept (pos-ledger--ask kept cids)) :null))
                 (head . ,(or head :null)) (events . ,events)
@@ -882,7 +878,6 @@ what it holds unless `pos-ledger-offline' says not."
                 (hidden . ,(vconcat (pos-ledger--hidden actual)))
                 (undeclared . ,(vconcat (unless kept
                                           (pos-ledger--undeclared archive collections))))
-                (checkpoint_writable . ,(vconcat (unless reports writable-checkpoints)))
                 (missing . ,(vconcat missing)) (changed . ,(vconcat changed))
                 (new . ,(vconcat new)))
               reports)))
