@@ -1,6 +1,6 @@
 #+TITLE: Formats
 
-The byte-level formats poslib and [[https://github.com/monkeypants/pyposlib][pyposlib]] share. Both implement
+The byte-level formats poslib and [[https://github.com/ClankaOperatingSystem/pyposlib][pyposlib]] share. Both implement
 this document, version 19, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
