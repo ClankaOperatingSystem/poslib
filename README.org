@@ -13,6 +13,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-tree.el= :: a tree of repositories as =.pos/= declares it:
   the plan of what to clone, exclude and link, which changes nothing,
   and its application.
+- =lisp/pos-startup.el= :: what a session opens with: prompts, then views
+  of what is next, scheduled, due and to be reviewed, each item labelled
+  by its scope.
 - =doc/formats.org= :: the formats shared with [[https://github.com/ClankaOperatingSystem/pyposlib][pyposlib]], in lockstep.
 - =doc/remote-archive-protocol.txt= :: what passes between a client and
   the keeper of a ledger's archive; =lisp/pos-remote.el= and pyposlib's
