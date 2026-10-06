@@ -26,6 +26,7 @@
 ;;
 ;; - `pos-links-in-file': the path links in a file, with byte offsets.
 ;; - `pos-links-resolve': where one leads, from where it was written.
+;; - `pos-links-link': the ipfs:// link to a sealed path in an archive.
 
 ;;; Code:
 
@@ -233,6 +234,14 @@ is cited."
      ((and archive (or (null scope) (pos-links-within-scope-p archive scope)))
       (cons 'cid (pos-links--sealed target)))
      (t (cons 'rumour target)))))
+
+(defun pos-links-link (path)
+  "Return the ipfs:// link to PATH, a sealed path in an archive, or refuse.
+The link is the one a sealed item's link to PATH is rewritten to."
+  (let ((target (directory-file-name (expand-file-name path))))
+    (unless (pos-links--archive-of target)
+      (pos-ledger--refuse 'unsealed "Not a path in an archive: %s" target))
+    (pos-links--sealed target)))
 
 (provide 'pos-links)
 ;;; pos-links.el ends here
