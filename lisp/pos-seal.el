@@ -1013,6 +1013,8 @@ reason."
       bring each schema 2 ledger under ROOT to schema 3, once it is clean
   keep ROOT
       move to its keeper each archive under ROOT a keeper is to keep
+  link PATH
+      print the ipfs:// link to PATH, a sealed path in an archive
   sign-in URL
       sign in to the keeper at URL, in a browser, and keep the token
 
@@ -1077,6 +1079,9 @@ Exit 0 done or clean, 1 findings, 2 refused.
         (`("keep" ,root)
          (princ (decode-coding-string (pos-ledger-json (pos-seal-keep root))
                                       'utf-8)))
+        (`("link" ,path)
+         (princ (pos-links-link path))
+         (terpri))
         (`("sign-in" ,url)
          (princ (json-serialize (pos-signin url) :false-object :false))
          (terpri))

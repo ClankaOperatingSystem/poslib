@@ -336,6 +336,47 @@ a rumour already sealed word for word is cited, not sealed again."
       (should (file-exists-p (expand-file-name "result.md" target)))
       (should (equal 1 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
 
+(ert-deftest pos-seal/a-sealed-path-has-a-link ()
+  "A sealed item's link is ipfs:// and its CID; a path within it adds the
+path, a collection's member included.  A path never sealed, and a path
+in no archive, are refused."
+  (pos-seal-test-with-scope
+    (pos-fixture-write (expand-file-name "trial/README.org" scope)
+                       "#+TITLE: Trial\n#+COLLECTION: t\n")
+    (let* ((archive (pos-seal-test-sealed scope))
+           (cid (cdr (assoc "trial" (pos-ledger-fold-cids archive)))))
+      (should (equal (concat "ipfs://" cid)
+                     (pos-links-link (expand-file-name "trial" archive))))
+      (should (equal (concat "ipfs://" cid)
+                     (pos-links-link (expand-file-name "trial/" archive))))
+      (should (equal (concat "ipfs://" cid "/result.md")
+                     (pos-links-link (expand-file-name "trial/result.md" archive))))
+      (should (equal 'unsealed
+                     (cadr (should-error (pos-links-link (expand-file-name "other" archive))
+                                         :type 'pos-ledger-refused))))
+      (should (equal 'unsealed
+                     (cadr (should-error (pos-links-link (expand-file-name "trial" scope))
+                                         :type 'pos-ledger-refused)))))))
+
+(ert-deftest pos-seal/a-program-prints-a-sealed-path-s-link ()
+  "link PATH prints the link on one line; a path never sealed exits 2."
+  (pos-seal-test-with-scope
+    (let* ((archive (pos-seal-test-sealed scope))
+           (run (lambda (path)
+                  (with-temp-buffer
+                    (list (call-process (expand-file-name invocation-name invocation-directory)
+                                        nil '(t nil) nil "-Q" "--batch"
+                                        "-L" (file-name-directory
+                                              (expand-file-name (locate-library "markdown-mode")))
+                                        "-L" (file-name-directory
+                                              (expand-file-name (locate-library "pos-seal")))
+                                        "-l" "pos-seal" "-f" "pos-seal-batch" "link" path)
+                          (buffer-string))))))
+      (should (equal (list 0 (concat (pos-links-link (expand-file-name "trial/result.md" archive))
+                                     "\n"))
+                     (funcall run (expand-file-name "trial/result.md" archive))))
+      (should (equal '(2 "") (funcall run (expand-file-name "other" archive)))))))
+
 (ert-deftest pos-seal/reading-links-reads-nothing-else ()
   "A #+SETUPFILE in an item is not followed while its links are read."
   (pos-seal-test-with-scope

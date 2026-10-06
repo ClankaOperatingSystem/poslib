@@ -416,6 +416,11 @@ move, and resolves:
 A resolved link's target is replaced whole: in Org the raw link, as
 =ipfs://CID/PATH::SEARCH=; in Markdown the URL, as =ipfs://CID/PATH#FRAGMENT=.
 
+=link PATH= prints the link to PATH, a path in an archive, as a sealed
+item's link to it is rewritten: =ipfs://=, the CID and the path within
+it, on one line. A path never sealed, or in no archive, is refused
+(=unsealed=). It reads the archive and writes nothing.
+
 A rumour lies at =rumours/DATE-HASH.org= in the archive, HASH the first 12
 hex digits of the SHA-256 of its text, DATE the plan's; one rumour serves
 every link to its target from the item, and rumours of one target that
