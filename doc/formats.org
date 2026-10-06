@@ -269,10 +269,23 @@ already there is kept; a different one under the same name refuses
 
 Repairing a root removes write bits from the enrolled files, ledger
 events and checkpoints under it, and from nothing else; it enrols
-nothing, and refuses if any enrolled file changed or is missing
-(=differs=). Of an archive a keeper keeps it looks at the ledger events
-alone. A check counts a write bit on an archive's files only: see
-=writable= below.
+nothing. It restores recorded read permissions when content matches,
+but refuses changed bytes, changed executable or special mode bits,
+and missing files (=differs=). Before changing anything, repair validates every archive
+and the paths of its recorded empty directories. Before restoring any
+directory, the schema 3 ledger's enrolled files and empty directories
+must reconstruct the recorded root, else =root=. Missing directories are recreated, including
+their missing parents; a file or symlink in the way refuses (=differs=,
+or =link= when inventory detects the symlink). No ledger or checkpoint
+bytes change, and no unrecorded directory is invented or removed.
+
+The result gives =repaired=, the files whose permissions were repaired;
+=restored=, the directories created; and =unregistered=, the unknown
+files left alone. Run =repair= after a Git clone or checkout, then
+=check=: Git preserves neither empty directories nor read permissions or write bits.
+Of an archive a keeper keeps repair looks at the ledger events alone
+and creates no local archive. A check counts a write bit on an archive's
+files only: see =writable= below.
 
 ** Check
 
@@ -457,8 +470,9 @@ applies any plan.
 4. Unless the item has moved already, each file in =originals= is
    rewritten where it lies, its links replaced at their offsets, unless it
    has been already; each empty directory named =_seal= in the item, a
-   staging directory left behind, is removed, hidden directories not
-   being entered; the item's entries must then be as planned, else
+   staging directory left behind, is removed; hidden directories and
+   nested =archives/= are not entered, nor are symlinks followed. The
+   item's entries must then be as planned, else
    =plan=; then the item moves to its destination in one rename, and
    the directory it lay in is removed if it is =_seal= and left empty,
    as a record staged by =write-new= leaves it.
