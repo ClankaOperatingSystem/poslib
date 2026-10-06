@@ -78,10 +78,14 @@ An alist of CID and the paths, relative to SCOPE, that have it."
               (alist-get 'cids (pos-ledger--parse (pos-ledger--read file)))))))
 
 (defun pos-index--parse (uri)
-  "Return (CID . PATH) from URI, ipfs://CID or ipfs://CID/PATH."
-  (unless (string-match "\\`\\(?:ipfs:\\)?//\\([^/?#]+\\)\\(?:/\\([^?#]*\\)\\)?" uri)
+  "Return (CID . PATH) from URI, ipfs://CID or ipfs://CID/PATH.
+PATH ends where an Org search begins, at ::, as a sealed item's link
+is written (doc/formats.org, \"Links\")."
+  (unless (string-match "\\`\\(?:ipfs:\\)?//\\([^/?#:]+\\)\\(?:/\\([^?#]*\\)\\)?" uri)
     (error "Not an ipfs:// link: %s" uri))
-  (cons (match-string 1 uri) (match-string 2 uri)))
+  (let ((cid (match-string 1 uri))
+        (path (match-string 2 uri)))
+    (cons cid (and path (substring path 0 (string-search "::" path))))))
 
 (defun pos-index--lookup (scope index cid path)
   "Return the existing file INDEX gives for CID and PATH in SCOPE, or nil."

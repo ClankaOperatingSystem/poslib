@@ -156,5 +156,20 @@ with the caller's token, and shown read-only in the mode its name gives."
               (kill-buffer))
           (kill-buffer (find-buffer-visiting canon)))))))
 
+(ert-deftest pos-index/org-follows-an-ipfs-link-that-carries-a-search ()
+  "An ipfs: link written with an Org search after :: opens the file."
+  (pos-index-test-with-sealed
+    (let ((canon (expand-file-name "notes.org" scope)))
+      (pos-fixture-write canon (concat "[[ipfs://" trial-cid "/result.md::result][the result]]\n"))
+      (with-current-buffer (find-file-noselect canon)
+        (unwind-protect
+            (progn
+              (goto-char (point-min))
+              (org-open-at-point)
+              (should (equal (file-truename (expand-file-name "archives/trial/result.md" scope))
+                             (file-truename buffer-file-name)))
+              (kill-buffer))
+          (kill-buffer (find-buffer-visiting canon)))))))
+
 (provide 'pos-index-test)
 ;;; pos-index-test.el ends here
