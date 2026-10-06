@@ -1074,7 +1074,7 @@ reason."
 ;;;; Command line
 
 (defun pos-seal-recall (root)
-  "Bring back from its keeper each archive under ROOT that a keeper keeps.
+  "Bring back to disk each archive under ROOT that is with a keeper.
 The reverse of `pos-seal-keep'.  Every file the ledger enrols and the
 disk lacks is read from the keeper, by the CID the ledger enrols it
 under, held to that CID, and written at its path with its recorded
