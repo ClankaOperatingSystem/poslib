@@ -1,0 +1,86 @@
+{
+ "kind": "recall",
+ "description": "A file the keeper has erased cannot be brought back.",
+ "tree": [
+  {
+   "path": "scope/.git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": "scope/.pos/config.yaml",
+   "text": "pos: 2\nprojects: projects/\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "scope/archive-integrity/checkpoints/50f92cd410def12f06eb86355042de6652aa36808b057299cd9e160092510caf.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeerauabti4jjb5s6kofb6vpdxvtzbz3qgqnv2u2hj5zmjio2z2awib2q\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/checkpoints/920eca23dd96d89fdcfb3217197a340d2bef9d1738410198d95b57378b818f01.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeerag4ppgzlcha6rjtmwb4rja73j5mkg7mfiosvmc7uozmm6vfm7zd2a\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000001-baguqeerauabti4jjb5s6kofb6vpdxvtzbz3qgqnv2u2hj5zmjio2z2awib2q.json",
+   "text": "{\"add\":{\"first/a.txt\":{\"cid\":\"bafkreiajm4iv6katunkb5lxxpxu5tvlxh4oaybbrjmf37zh7hm5ryvnv2u\",\"mode\":292,\"sha256\":\"0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5\",\"size\":4},\"first/b.txt\":{\"cid\":\"bafkreiajm4iv6katunkb5lxxpxu5tvlxh4oaybbrjmf37zh7hm5ryvnv2u\",\"mode\":292,\"sha256\":\"0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5\",\"size\":4},\"first/sub/c.txt\":{\"cid\":\"bafkreidumeob2zcvwu2deorb7ajtu32d3q5idchhxfdps3omfdo6smx4wi\",\"mode\":292,\"sha256\":\"74611c1d6455b534323a21f8133a6f43dc3a8188e7b946f96dcc28dde932fcb2\",\"size\":4}},\"collections\":[],\"empty\":[\"first/hollow\"],\"item\":\"first\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeihr3xtms34hk43wuq5wluayywaugjwodyd4xfnv76trex6ns4uznu\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000002-baguqeerag4ppgzlcha6rjtmwb4rja73j5mkg7mfiosvmc7uozmm6vfm7zd2a.json",
+   "text": "{\"add\":{\"second.txt\":{\"cid\":\"bafkreiawgz5kznt2jiaxzdnivokwqlglheegg6apoekn3ifa4dcvmrghyq\",\"mode\":292,\"sha256\":\"16367aacb67a4a017c8da8ab95682ccb390863780f7114dda0a0e0c55644c7c4\",\"size\":6}},\"collections\":[],\"empty\":[],\"item\":\"second.txt\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeerauabti4jjb5s6kofb6vpdxvtzbz3qgqnv2u2hj5zmjio2z2awib2q\"},\"root\":\"bafybeibh6fecglaf3hf7pvzq7fnulgfbpdnijnls7zgl42iluhjpoxrqba\",\"schema\":3}",
+   "mode": 292
+  }
+ ],
+ "root": "scope",
+ "keeper": {
+  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "token": "tape-token",
+  "exchanges": [
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"erased\":[\"bafkreiawgz5kznt2jiaxzdnivokwqlglheegg6apoekn3ifa4dcvmrghyq\"],\"events\":2,\"head\":\"baguqeerag4ppgzlcha6rjtmwb4rja73j5mkg7mfiosvmc7uozmm6vfm7zd2a\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeibh6fecglaf3hf7pvzq7fnulgfbpdnijnls7zgl42iluhjpoxrqba\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "GET",
+     "path": "/ipfs/bafkreiajm4iv6katunkb5lxxpxu5tvlxh4oaybbrjmf37zh7hm5ryvnv2u",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "same"
+    }
+   },
+   {
+    "request": {
+     "method": "GET",
+     "path": "/ipfs/bafkreidumeob2zcvwu2deorb7ajtu32d3q5idchhxfdps3omfdo6smx4wi",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "deep"
+    }
+   },
+   {
+    "request": {
+     "method": "GET",
+     "path": "/ipfs/bafkreiawgz5kznt2jiaxzdnivokwqlglheegg6apoekn3ifa4dcvmrghyq",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 410,
+     "body": "{\"message\":\"Erased on 2026-10-07: bafkreiawgz5kznt2jiaxzdnivokwqlglheegg6apoekn3ifa4dcvmrghyq\",\"refused\":\"erased\"}\n"
+    }
+   }
+  ]
+ },
+ "error": "erased"
+}
