@@ -84,11 +84,12 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
   "The questions a session opens with.")
 
 (defconst pos-startup-views
-  '("next" "scheduled" "deadlines" "reviews" "reviews-to-schedule" "all")
+  '("next" "scheduled" "deadlines" "reviews" "reviews-to-schedule" "intray"
+    "all")
   "The names of the views, in the order they are printed.")
 
 (defconst pos-startup-default-views
-  '("next" "scheduled" "deadlines" "reviews" "reviews-to-schedule")
+  '("next" "scheduled" "deadlines" "reviews" "reviews-to-schedule" "intray")
   "The views `pos-startup-report' prints when none is named.")
 
 (defvar pos-startup--root nil
@@ -307,6 +308,26 @@ Active projects, by `pos-startup-active-statuses', and responsibilities."
                         (seq-remove (lambda (scope) (member scope reviewed))
                                     (pos-startup--responsibilities root))))))
 
+(defun pos-startup--intray (root)
+  "Return the intray view of ROOT.
+Each open item under Unsorted in a file named intray.org: what has
+been captured and not yet placed."
+  (let (lines)
+    (dolist (file (pos-startup-files root))
+      (when (string= "intray.org" (file-name-nondirectory file))
+        (with-current-buffer (find-file-noselect file)
+          (org-map-entries
+           (lambda ()
+             (when (and (org-entry-is-todo-p)
+                        (string= "Unsorted" (car (org-get-outline-path))))
+               (push (format "%-54s %s %s" (pos-startup--label)
+                             (org-get-todo-state)
+                             (org-link-display-format
+                              (org-get-heading t t t t)))
+                     lines)))
+           nil 'file))))
+    (pos-startup--list "Intray, to be placed" (nreverse lines))))
+
 (defun pos-startup-view (root view)
   "Return VIEW, one of `pos-startup-views', of the Org files under ROOT.
 Text: a title, then one line for each item, labelled by its scope."
@@ -363,6 +384,7 @@ Text: a title, then one line for each item, labelled by its scope."
           (pos-startup--agenda (lambda () (org-agenda-list nil nil 1))))))
       ("reviews" (pos-startup--reviews root))
       ("reviews-to-schedule" (pos-startup--reviews-to-schedule root))
+      ("intray" (pos-startup--intray root))
       ("all"
        (let ((org-agenda-overriding-header "All TODO items"))
          (pos-startup--or-none (pos-startup--agenda #'org-todo-list))))
