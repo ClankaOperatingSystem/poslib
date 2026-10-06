@@ -59,6 +59,18 @@
                         ("responsibilities/garden/index.org" . "* TODO Prune the hedge\n")
                         ("responsibilities/home/projects/roof/project.org"
                          . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Call the roofer\n")
+                        ("health/.clanka/config.yml" . "pos: 2\nprojects: projects/\n")
+                        ("health/intray.org"
+                         . ,(concat "* Unsorted\n** TODO Book [[https://example.org][the dentist]]\n"
+                                    "** DONE Buy floss\n"
+                                    "* TODO Review health :review:\nSCHEDULED: "
+                                    (pos-startup-test-day 2) "\n"))
+                        ("health/projects/checkup.org"
+                         . ":PROPERTIES:\n:STATUS: COMMITTED\n:END:\n* TODO Find the card\n")
+                        ("health/teeth/.pos/config.yaml" . "pos: 2\nprojects: projects/\n")
+                        ("health/teeth/intray.org" . "* Unsorted\n")
+                        ("tools/widget/.clanka/config.yml" . "pos: 2\nmethodologies: methodologies/\n")
+                        ("tools/widget/notes.org" . "* TODO Oil the widget\n")
                         ("archives/old.org" . "* NEXT Archived\n")
                         ("projects/alpha/attic/draft.org" . "* NEXT In the attic\n")
                         ("_tmp/scratch.org" . "* NEXT Generated\n")
@@ -86,14 +98,18 @@
   (pos-startup-test-with-tree
     (should (equal (mapcar (lambda (file) (file-relative-name file root))
                            (pos-startup-files root))
-                   '("intray.org"
+                   '("health/intray.org"
+                     "health/projects/checkup.org"
+                     "health/teeth/intray.org"
+                     "intray.org"
                      "projects/alpha/notes.org"
                      "projects/alpha/project.org"
                      "projects/beta/project.org"
                      "projects/gamma/project.org"
                      "responsibilities/garden/index.org"
                      "responsibilities/home/index.org"
-                     "responsibilities/home/projects/roof/project.org")))))
+                     "responsibilities/home/projects/roof/project.org"
+                     "tools/widget/notes.org")))))
 
 (ert-deftest pos-startup-owner/is-the-last-scope-the-path-names ()
   "A project within a responsibility is a project; the root owns the rest."
@@ -107,6 +123,18 @@
     (should (equal (pos-startup--owner "/r/projects/solo.org" root)
                    '(project . "projects/solo")))
     (should-not (pos-startup--owner "/r/intray.org" root))))
+
+(ert-deftest pos-startup-owner/a-configured-directory-is-a-responsibility ()
+  "A configuration that says where projects belong makes a responsibility."
+  (pos-startup-test-with-tree
+    (should (equal (pos-startup--configured root) '("health" "health/teeth")))
+    (should (equal (pos-startup--owner (concat root "health/intray.org") root)
+                   '(responsibility . "health")))
+    (should (equal (pos-startup--owner (concat root "health/teeth/intray.org") root)
+                   '(responsibility . "health/teeth")))
+    (should (equal (pos-startup--owner (concat root "health/projects/checkup.org") root)
+                   '(project . "health/projects/checkup")))
+    (should-not (pos-startup--owner (concat root "tools/widget/notes.org") root))))
 
 (ert-deftest pos-startup-view/next-labels-each-item-by-its-scope ()
   "The label drops projects segments and project.org; a link is its text."
@@ -146,6 +174,8 @@
       (should (string-prefix-p "Responsibility reviews, late or due in the next 7 days\n"
                                (nth 1 parts)))
       (should (string-match-p "responsibilities/home/index +Scheduled: +TODO Review the home"
+                              (nth 1 parts)))
+      (should (string-match-p "health/intray +Scheduled: +TODO Review health"
                               (nth 1 parts))))))
 
 (ert-deftest pos-startup-view/reviews-to-schedule-names-active-scopes-without-one ()
@@ -153,10 +183,11 @@
   (pos-startup-test-with-tree
     (let ((parts (split-string (pos-startup-view root "reviews-to-schedule") "\n\n" t)))
       (should (equal (mapcar #'car (pos-startup-test-lines (nth 0 parts)))
-                     '("projects/beta" "responsibilities/home/projects/roof")))
+                     '("health/projects/checkup" "projects/beta"
+                       "responsibilities/home/projects/roof")))
       (should (equal (split-string (nth 1 parts) "\n" t " +")
                      '("Responsibilities with a review to be scheduled"
-                       "responsibilities/garden"))))))
+                       "health/teeth" "responsibilities/garden"))))))
 
 (ert-deftest pos-startup-view/an-empty-view-says-none ()
   "A view with no item, and each empty list of a view, says so."
@@ -179,7 +210,7 @@
   (pos-startup-test-with-tree
     (let ((text (pos-startup-report root)))
       (should (string-prefix-p pos-startup-prompts text))
-      (should (string-match-p "^Files read: 8$" text))
+      (should (string-match-p "^Files read: 12$" text))
       (dolist (title '("NEXT items" "Scheduled items, next 14 days" "Deadlines, all open"
                        "Project reviews, late" "Projects with a review to be scheduled"))
         (should (string-match-p (concat "^" title) text)))
