@@ -8,7 +8,7 @@
   },
   {
    "path": "scope/.pos/config.yaml",
-   "text": "pos: 1\n"
+   "text": "pos: 2\nprojects: projects/\n"
   },
   {
    "path": "scope/archive-integrity/checkpoints/3b04c8add171212dec07e1507f5cf88a3ebb5ec908ee8097b798ba0d7293cf75.json",

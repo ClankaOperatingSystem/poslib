@@ -1,5 +1,5 @@
 {
  "about": "A boolean is exactly true or false.",
- "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    skills-up: True\n",
+ "yaml": "pos: 2\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    skills-up: True\n",
  "refused": "wrong-type"
 }

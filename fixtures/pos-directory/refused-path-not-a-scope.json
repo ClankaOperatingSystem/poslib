@@ -1,5 +1,0 @@
-{
- "about": "A child's path is not pairs of projects/NAME or responsibilities/NAME.",
- "yaml": "pos: 1\nchildren:\n  - path: vendor/a\n    remote: git@example.org:a.git\n",
- "refused": "bad-path"
-}

@@ -1,7 +1,11 @@
 {
  "about": "Every key, with a child's defaults filled in.",
- "yaml": "pos: 1\nchildren:\n  - path: responsibilities/employment\n    remote: git@example.org:person/employment.git\n  - path: projects/a/projects/b\n    remote: https://example.org/b.git\n    branch: long-feature\n    skills-up: true\nworktrees:\n  - path: projects/fix/_worktrees/do-the-thing\n    of: responsibilities/employment\n    branch: do-the-thing\n  - path: _worktrees/product\n    remote: git@example.org:team/product.git\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://ledger.example.org/\n  - scope: projects/fix\n    kept: uncommitted\nserver:\n  name: example\n  mcp: https://pos.example.org/mcp\n",
+ "yaml": "pos: 2\nprojects: projects/\nimage: ghcr.io/example/clankos:latest\nchildren:\n  - path: responsibilities/employment\n    remote: git@example.org:person/employment.git\n  - path: projects/a/projects/b\n    remote: https://example.org/b.git\n    branch: long-feature\n    skills-up: true\nworktrees:\n  - path: projects/fix/_worktrees/do-the-thing\n    of: responsibilities/employment\n    branch: do-the-thing\n  - path: _worktrees/product\n    remote: git@example.org:team/product.git\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://ledger.example.org/\n  - scope: projects/fix\n    kept: uncommitted\nserver:\n  name: example\n  mcp: https://pos.example.org/mcp\n",
  "config": {
+  "kind": "responsibility",
+  "projects": "projects",
+  "methodologies": null,
+  "image": "ghcr.io/example/clankos:latest",
   "children": [
    {
     "path": "responsibilities/employment",

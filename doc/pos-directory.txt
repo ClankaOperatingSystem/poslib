@@ -1,22 +1,32 @@
-The .pos directory
-Version 1
+The configuration directory
+Version 2
 
-A personal operating system is a tree of scopes: a root, and beneath it
-projects and responsibilities, each of which may hold more. A scope may
-be a repository of its own, shared with other people, and checked out in
-place within the tree. This document says how a repository declares the
-repositories beneath it and what it needs configured, in a directory
-named .pos at its root, and what a tool does with those declarations.
+A personal operating system is a tree of responsibilities: a root, and
+beneath it responsibilities, each of which may hold more, with projects
+and products as its leaves. Each is a node. A node is a directory of
+the repository that holds it, or a repository of its own, shared with
+other people and checked out in place within the tree. This document
+says how a node declares what is beneath it and what it needs
+configured, in a configuration directory at its root, and what a tool
+does with those declarations.
 
-It names no server. poslib and pyposlib read .pos, and a server a
-repository names is whichever its owners run. Everything here but
+It names no server. poslib and pyposlib read the configuration, and a
+server a node names is whichever its owners run. Everything here but
 section 5 works with no server at all.
+
+Version 1 of this document is not read: a file that says pos: 1 is
+refused, and is rewritten to this version.
 
 
 1. The file
 
-A repository's configuration is .pos/config.yaml, at its root and
-committed with it. A repository without one declares nothing.
+A node's configuration directory is named .clanka or .pos. The two
+names mean the same; .clanka is the one a tool writes. In it the
+configuration is config.yaml or config.yml, which mean the same too.
+It is committed with the node. A node has one configuration: two
+directories, or two files in one, are refused (two-configurations). A
+directory without one declares nothing, and what kind of thing it is
+follows from that (section 2).
 
 The file is YAML: mappings, sequences and scalars. It uses no anchors,
 aliases, tags or second document, and a mapping holds a key once; what
@@ -36,23 +46,45 @@ refused.
 
 The top level is a mapping:
 
-    pos         1, the version of this document; required
-    children    the repositories mounted beneath this one (section 2)
+    pos             2, the version of this document; required
+    projects        where this node's projects belong: a path beneath
+                    it, usually projects/. It makes the node a
+                    responsibility
+    methodologies   where this node's methodologies belong: a path
+                    beneath it, usually methodologies/. It makes the
+                    node a project
+    image           the container image this node's commands run in
+    children    what is declared beneath this one (section 2)
     worktrees   other working trees (section 3)
     archives    where archives are kept (section 4)
     server      the server this repository is bound to (section 5)
+
+A node is a responsibility or a project, and says which by the one of
+projects and methodologies it has. A responsibility holds projects and
+has no methodologies; a project has methodologies and holds no
+projects. A file with both is refused (bad-value). A file with neither
+is not refused: its node is unconfigured, which a tool reports, and a
+person is asked which it is before the node is used.
+
+A final slash on either path is dropped.
+
+image is written on a line of its own, as "image: NAME" from the start
+of the line, with NAME unquoted and holding no space, quotation mark
+or #, so that a tool with no YAML reader finds it by its line. Any
+other way of writing it is refused (bad-value).
 
 A reader refuses the whole file for a key not written here, at any
 level, and for a version it does not know. A refusal has a kind:
 
     not-yaml          the text is not readable as YAML
     not-a-mapping     the file, or an entry, is not a mapping
-    unknown-version   pos is a number other than 1
+    unknown-version   pos is a number other than 2
     unknown-key       a key this document does not define
     missing-key       a required key is absent
     wrong-type        a value is not of its key's type
     bad-path          a path this document does not allow
     bad-value         a value this document does not allow
+    two-configurations  the node has more than one configuration
 
 The file holds no credential. What a person signs in with is theirs and
 stays out of a repository other people share.
@@ -62,37 +94,54 @@ stays out of a repository other people share.
 
 children is a sequence. Each entry is a mapping:
 
-    path        where the repository is checked out, relative to this
-                repository's root
-    remote      the git remote it is cloned from
-    branch      the branch its working tree rests on; master when absent
-    skills-up   true if the child's skills are also linked into this
-                repository (section 6); false when absent
+    path        where the child is, relative to this node
+    remote      the git remote it is cloned from; absent for a child
+                that is a directory of this node's repository
+    branch      with remote, the branch its working tree rests on;
+                master when absent
+    skills-up   with remote, true if the child's skills are also linked
+                into this repository (section 6); false when absent
 
-A child is checked out in place. path is its working tree, and what is
-there is its own repository, with a .pos of its own if it mounts
-children. So a tree is declared recursively, each repository naming only
-what is directly beneath it.
+An entry is a boundary. Its path and everything beneath it is the
+child's and not this node's. The entry does not say what the child is;
+what is at the path does:
 
-path is one or more pairs of projects/NAME or responsibilities/NAME, as
-in responsibilities/employment or projects/a/projects/b. It does not
-pass through another child: what is beneath a child is the child's to
-declare.
+    a configuration that says where its methodologies belong   a project
+    any other configuration                             a responsibility
+    no configuration                                           a product
 
-branch is the branch the work is based on. That is usually the
-repository's default branch. For the length of a feature branch that
-takes many pull requests it is that branch, and the entry is changed
-back afterwards.
+A responsibility is a branch of the tree: it declares children of its
+own, each node naming only what is directly beneath it. A project and a
+product are leaves. A product is a subject, under its own rules, and
+this document says nothing of what is in it.
 
-The container does not track a child. Its path is written to the
-container's .git/info/exclude before the child is cloned, since staging
-everything in a container records an unexcluded child as an embedded
-repository. The line written for a path is the path with a slash
-before it, which anchors it at the repository's root.
+path is any path that stays beneath the node: relative, with no empty
+part and no part that is . or .., and no backslash. No folder name
+carries meaning. It does not pass through another child: what is
+beneath a child is the child's to declare.
 
-What a container keeps to itself about a child sits in a file beside
-it: responsibilities/NAME.org beside responsibilities/NAME/. The file is
-the container's and the child never sees it.
+A child with a remote is a repository checked out in place. branch is
+the branch the work is based on. That is usually the repository's
+default branch. For the length of a feature branch that takes many pull
+requests it is that branch, and the entry is changed back afterwards.
+
+The repository that holds the declaring node does not track such a
+child. Its path is written to that repository's .git/info/exclude
+before the child is cloned, since staging everything in a container
+records an unexcluded child as an embedded repository. The line written
+for a path is the path from the repository's root with a slash before
+it, which anchors it there.
+
+A child with no remote is a directory of the same repository, tracked
+and committed with it. It has no branch and no skills-up, and an entry
+that gives it either is refused (bad-value). Nothing is excluded or
+cloned for it. What its own configuration declares is declared for the
+repository it is part of.
+
+A responsibility's one-file projects are Org files where its projects
+belong, and no entry declares them: making the file is the commitment.
+A project that needs a directory is given one, with a configuration,
+and is then declared.
 
 
 3. Worktrees
@@ -101,12 +150,12 @@ worktrees is a sequence of working trees that are not scopes: a
 repository that does not follow this layout, or a branch other than the
 one a child rests on. Each entry is a mapping:
 
-    path        where it is checked out, relative to this repository's
-                root: SCOPE/_worktrees/NAME, or _worktrees/NAME at the
-                root, where SCOPE is a scope of this repository and not
-                a child
-    of          the path of one of this repository's children: the
-                working tree is a git worktree of that child's clone
+    path        where it is checked out, relative to this node:
+                PATH/_worktrees/NAME, or _worktrees/NAME, where PATH
+                is beneath the node and not in a child
+    of          the path of one of this node's children that has a
+                remote: the working tree is a git worktree of that
+                child's clone
     remote      in place of of: the git remote it is cloned from, a
                 clone of its own
     branch      the branch it rests on; required with of, master when
@@ -120,21 +169,26 @@ whose unpushed branches matter.
 
 4. Archives
 
-archives is a sequence saying where a scope's archive is kept. Each
-entry is a mapping:
+archives is a sequence saying where an archive is kept. An archive
+belongs to a scope: the directory that holds it. Each entry is a
+mapping:
 
-    scope       the scope's path within this repository; "." is the
-                repository's root
+    scope       the scope's path beneath this node, not in a child;
+                "." is the node itself
     kept        committed: on disk and committed with the repository
-                uncommitted: on disk and not committed
+                uncommitted: on disk and not committed, its path
+                ignored by Git
                 remote: by a keeper (doc/remote-archive-protocol.txt)
     url         with remote, the base URL the keeper gives the scope's
                 ledger
     ledger      the id of the scope's ledger, a UUID in canonical form
                 with lower-case letters; optional, with any kept
 
-A scope no entry names keeps its archive committed. In every case the
+A scope no entry names keeps its archive uncommitted. In every case the
 ledger stays with the scope and is committed.
+
+The entry for an archive is looked for in the nearest node at or above
+its scope: the nearest directory with a configuration.
 
 A ledger otherwise draws its id when its first event is made. A keeper
 may be bound to a ledger's id before that event exists, so an entry can
@@ -144,7 +198,8 @@ as bad-value, and so is a file in which two entries name one ledger.
 
 5. The server
 
-server binds the repository to a server its owners run. It is a
+server binds a repository to a server its owners run. It is read from
+the configuration at a repository's root. It is a
 mapping:
 
     name        what a coding agent knows the server by
@@ -202,7 +257,8 @@ into its own repository outside its directory holds a file named
 
 7. The two steps
 
-One tool brings a tree to what its .pos files declare, in two steps.
+One tool brings a tree to what its configurations declare, in two
+steps.
 
 The first step prints a plan: what needs to be done, if anything. It
 changes nothing and uses no network. Everything in a plan can be told
@@ -231,17 +287,25 @@ and findings, which the tool reports and does not act on:
                     beneath it, and links to its skills are left
     path-taken      a path taken by something that is not a
                     repository, or that is or passes through a
-                    symbolic link
+                    symbolic link; and a child with no remote whose
+                    path is a repository, or is not a directory
     other-remote    a path taken by a repository cloned from another
                     remote
-    undeclared      a repository mounted beneath this one that no entry
-                    declares, or whose entry is gone
+    undeclared      a repository beneath this one, or a directory with
+                    a configuration, that no entry declares or whose
+                    entry is gone. A git submodule, which its
+                    repository tracks, is not one. Archives, attics, and
+                    hidden and underscore directories are not looked in
+    missing         a child with no remote whose directory is not there
+    unconfigured    a node whose configuration says neither where its
+                    projects belong nor its methodologies. What it
+                    declares is planned all the same
     claude-skills   a .claude/skills that is not the link
     name-clash      two children's skills of one name
 
 A plan is a JSON object:
 
-    pos         1
+    pos         2
     actions     an array, in an order they can be done in
     findings    an array
 
@@ -264,12 +328,13 @@ empty.
 
 The tool keeps these rules:
 
-  - A repository declares only beneath itself. A path is relative,
-    holds no "..", and passes through no symbolic link.
-  - A child's .pos is read from its declared branch as committed, and
-    not from its working tree, so configuration that is not yet merged
-    mounts nothing. The .pos of the repository the tool is run in is
-    read from its working tree.
+  - A node declares only beneath itself. A path is relative, holds no
+    "..", and passes through no symbolic link.
+  - A mounted child's configuration is read from its declared branch as
+    committed, and not from its working tree, so configuration that is
+    not yet merged mounts nothing. The configuration of the repository
+    the tool is run in, and of each directory of a repository, is read
+    from the working tree.
   - It never writes over what is there, never removes a working tree,
     and never writes outside the tree it is run in.
   - Run in a repository, it takes that repository as the root. It does
@@ -289,5 +354,8 @@ configures them, and tests the tool's behaviour in them.
 fixtures/pos-directory/ holds configuration files for both libraries.
 Each fixture is a JSON object: about, what it shows; yaml, the file's
 text; and either config, what a reader makes of it, or refused, the
-kind of refusal. config has children, worktrees and archives, each an
-array with every default filled in, and server, an object or null.
+kind of refusal. config has kind, which is responsibility, project or null;
+projects, methodologies and image, each a string or null; children,
+worktrees and archives, each an array with every default filled in, a
+child with no remote having null for its remote and branch; and
+server, an object or null.

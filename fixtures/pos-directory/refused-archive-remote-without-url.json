@@ -1,5 +1,5 @@
 {
  "about": "A remote archive lacks its url.",
- "yaml": "pos: 1\narchives:\n  - scope: \".\"\n    kept: remote\n",
+ "yaml": "pos: 2\narchives:\n  - scope: \".\"\n    kept: remote\n",
  "refused": "missing-key"
 }

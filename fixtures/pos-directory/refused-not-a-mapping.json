@@ -1,5 +1,5 @@
 {
  "about": "The top level is a sequence.",
- "yaml": "- pos: 1\n",
+ "yaml": "- pos: 2\n",
  "refused": "not-a-mapping"
 }

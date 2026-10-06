@@ -10,7 +10,7 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-index.el= :: the CID index, ephemera, and Org's =ipfs:= links.
 - =lisp/pos-remote.el= :: the client's side of an archive kept away from
   its ledger, by a keeper reached at a URL.
-- =lisp/pos-tree.el= :: a tree of repositories as =.pos/= declares it:
+- =lisp/pos-tree.el= :: a tree of repositories as its configurations declare it:
   the plan of what to clone, exclude and link, which changes nothing,
   and its application.
 - =lisp/pos-startup.el= :: what a session opens with: prompts, then views
@@ -21,7 +21,7 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   the keeper of a ledger's archive; =lisp/pos-remote.el= and pyposlib's
   =remote.py= are its clients, and any server that does what it says is
   a keeper.
-- =doc/pos-directory.txt= :: what a repository declares in =.pos/=: the
+- =doc/pos-directory.txt= :: what a node declares in =.clanka/= or =.pos/=: the
   repositories mounted beneath it, working trees, where archives are
   kept and the server it is bound to; how skills are linked through the
   tree; and the two steps of the tool that makes a tree as declared.

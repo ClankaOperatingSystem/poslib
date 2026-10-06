@@ -1,0 +1,5 @@
+{
+ "about": "A branch is a repository's: a child with no remote has none.",
+ "yaml": "pos: 2\nchildren:\n  - path: health\n    branch: master\n",
+ "refused": "bad-value"
+}

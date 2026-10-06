@@ -1,0 +1,5 @@
+{
+ "about": "A git worktree is of a repository: a child with a remote.",
+ "yaml": "pos: 2\nchildren:\n  - path: health\nworktrees:\n  - path: _worktrees/x\n    of: health\n    branch: x\n",
+ "refused": "bad-value"
+}

@@ -210,7 +210,7 @@ repository mounted beneath another is not its container's to configure."
           (make-directory (expand-file-name "projects/c/.git" dir) t)
           (pos-fixture-write
            (expand-file-name ".pos/config.yaml" dir)
-           (concat "pos: 1\narchives:\n"
+           (concat "pos: 2\nprojects: projects/\narchives:\n"
                    "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/root\n"
                    "  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/a\n"
                    "  - scope: projects/b\n    kept: uncommitted\n"))
@@ -219,6 +219,32 @@ repository mounted beneath another is not its container's to configure."
           (should-not (funcall kept "projects/b/"))
           (should-not (funcall kept "projects/a/projects/d/"))
           (should-not (funcall kept "projects/c/")))
+      (delete-directory dir t))))
+
+(ert-deftest pos-ledger/an-archive-s-entry-is-in-its-nearest-node ()
+  "The node is the nearest directory with a configuration, of either
+name, whether or not it is a repository; two in one node are refused."
+  (let ((dir (file-truename (make-temp-file "pos-kept" t))))
+    (unwind-protect
+        (let ((kept (lambda (scope)
+                      (pos-ledger-kept (expand-file-name (concat scope "archives") dir)))))
+          (pos-fixture-write
+           (expand-file-name ".clanka/config.yml" dir)
+           (concat "pos: 2\nprojects: projects/\narchives:\n"
+                   "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/root\n"
+                   "  - scope: health\n    kept: remote\n    url: https://keeper.example/wrong\n"))
+          (pos-fixture-write
+           (expand-file-name "health/.pos/config.yaml" dir)
+           (concat "pos: 2\nprojects: projects/\narchives:\n"
+                   "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/health\n"))
+          (should (equal "https://keeper.example/root" (funcall kept "")))
+          (should (equal "https://keeper.example/health" (funcall kept "health/")))
+          (should-not (funcall kept "health/diet/"))
+          (pos-fixture-write (expand-file-name "health/.clanka/config.yaml" dir)
+                             "pos: 2\nprojects: projects/\n")
+          (should (eq 'config
+                      (condition-case err (funcall kept "health/")
+                        (pos-ledger-refused (nth 1 err))))))
       (delete-directory dir t))))
 
 (ert-deftest pos-ledger/a-kept-archive-is-checked-by-its-own-path ()

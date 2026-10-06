@@ -92,7 +92,7 @@ FILES is a plist of path and text.  Return DIR."
 
 (defun pos-tree-test-config (&rest children)
   "Return a config.yaml's text declaring CHILDREN, each an entry's text."
-  (concat "pos: 1\nchildren:\n" (apply #'concat children)))
+  (concat "pos: 2\nprojects: projects/\nchildren:\n" (apply #'concat children)))
 
 ;;;; Reading and doing plans
 
@@ -160,7 +160,7 @@ Return that last plan.  Fail if ten rounds do not settle it."
     (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
                                           "README" "root\n")))
       (should (equal (pos-tree-plan root)
-                     '((pos . 1) (actions . []) (findings . [])))))))
+                     '((pos . 2) (actions . []) (findings . [])))))))
 
 (ert-deftest pos-tree/only-a-repository-is-planned ()
   (pos-tree-test-with dir
@@ -290,7 +290,7 @@ to do, and no repository sees a change to commit."
   (pos-tree-test-with dir
     (let* ((child (apply #'pos-tree-test-repository
                          (expand-file-name "origins/child" dir)
-                         ".pos/config.yaml" "pos: 1\nteam: []\n"
+                         ".pos/config.yaml" "pos: 2\nteam: []\n"
                          (pos-tree-test-skill "c")))
            (root (apply #'pos-tree-test-repository (expand-file-name "root" dir)
                         (pos-tree-test-skill "r"))))
@@ -300,9 +300,147 @@ to do, and no repository sees a change to commit."
       (should (equal (seq-filter (lambda (line) (string-match-p "child" line))
                                  (pos-tree-test-summary (pos-tree-test-settle root)))
                      '("config-refused projects/child")))
-      (pos-tree-test-write root ".pos/config.yaml" "pos: 1\nteam: []\n")
+      (pos-tree-test-write root ".pos/config.yaml" "pos: 2\nteam: []\n")
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
                      '("config-refused ."))))))
+
+;;;; Names, kinds and directories
+
+(ert-deftest pos-tree/a-configuration-has-either-name ()
+  "Either directory and either file name is read, alike."
+  (dolist (file '(".clanka/config.yaml" ".clanka/config.yml"
+                  ".pos/config.yaml" ".pos/config.yml"))
+    (pos-tree-test-with dir
+      (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
+                                              "README" "child\n"))
+             (root (pos-tree-test-repository (expand-file-name "root" dir)
+                                             "README" "root\n")))
+        (pos-tree-test-write root file
+                             (pos-tree-test-config
+                              (pos-tree-test-child "work" child)))
+        (ert-info (file :prefix "file: ")
+          (should (equal (pos-tree-config-file root) file))
+          (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                         '("exclude . work" "clone work"))))))))
+
+(ert-deftest pos-tree/two-configurations-are-refused ()
+  "Both directories, or both file names in one, and nothing is planned."
+  (dolist (other '(".pos/config.yaml" ".clanka/config.yml"))
+    (pos-tree-test-with dir
+      (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
+                                            "README" "root\n")))
+        (pos-tree-test-write root ".clanka/config.yaml" "pos: 2\nprojects: projects/\n")
+        (pos-tree-test-write root other "pos: 2\nprojects: projects/\n")
+        (should (eq 'two-configurations
+                    (condition-case err (pos-tree-config-file root)
+                      (pos-tree-refused (nth 1 err)))))
+        (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                       '("config-refused .")))
+        ;; Every path in a plan is relative to the root.
+        (should-not (string-match-p
+                     (regexp-quote dir)
+                     (decode-coding-string
+                      (pos-ledger-json (pos-tree-plan root)) 'utf-8)))))))
+
+(ert-deftest pos-tree/a-child-s-configuration-is-read-from-its-branch-by-either-name ()
+  "A mounted child that names itself .clanka/config.yml declares as any other."
+  (pos-tree-test-with dir
+    (let* ((grandchild (pos-tree-test-repository
+                        (expand-file-name "origins/grandchild" dir) "README" "g\n"))
+           (child (pos-tree-test-repository
+                   (expand-file-name "origins/child" dir)
+                   ".clanka/config.yml"
+                   (pos-tree-test-config (pos-tree-test-child "deeper" grandchild))))
+           (root (pos-tree-test-repository (expand-file-name "root" dir)
+                                           "README" "root\n")))
+      (pos-tree-test-write root ".clanka/config.yaml"
+                           (pos-tree-test-config (pos-tree-test-child "child" child)))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
+      (should (file-exists-p (expand-file-name "child/deeper/README" root))))))
+
+(ert-deftest pos-tree/a-node-that-names-neither-location-is-unconfigured ()
+  "It is found, and what it declares is planned all the same."
+  (pos-tree-test-with dir
+    (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
+                                            "README" "child\n"))
+           (root (pos-tree-test-repository (expand-file-name "root" dir)
+                                           "README" "root\n")))
+      (pos-tree-test-write root ".clanka/config.yaml"
+                           (concat "pos: 2\nchildren:\n"
+                                   (pos-tree-test-child "work" child)))
+      (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                     '("exclude . work" "clone work" "unconfigured ."))))))
+
+(ert-deftest pos-tree/a-child-with-no-remote-is-a-directory ()
+  "Nothing is excluded or cloned for it; one that is not there is found."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
+                                          "README" "root\n"
+                                          "health/README" "health\n")))
+      (pos-tree-test-write root ".clanka/config.yaml"
+                           (concat "pos: 2\nprojects: projects/\nchildren:\n"
+                                   "  - path: health\n  - path: wealth\n"
+                                   "  - path: README\n"))
+      (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                     '("path-taken README" "missing wealth"))))))
+
+(ert-deftest pos-tree/a-directory-declares-what-is-beneath-it ()
+  "A directory's own configuration mounts a repository beneath it, which
+is excluded in the repository the directory is part of, and is given
+that repository's skills."
+  (pos-tree-test-with dir
+    (let* ((product (pos-tree-test-repository (expand-file-name "origins/product" dir)
+                                              "README" "product\n"))
+           (root (apply #'pos-tree-test-repository (expand-file-name "root" dir)
+                        "employment/.clanka/config.yaml"
+                        (pos-tree-test-config (pos-tree-test-child "widget" product))
+                        (pos-tree-test-skill "r"))))
+      (pos-tree-test-write root ".clanka/config.yaml"
+                           "pos: 2\nprojects: projects/\nchildren:\n  - path: employment\n")
+      (should (equal (seq-filter (lambda (line) (string-match-p "widget" line))
+                                 (pos-tree-test-summary (pos-tree-plan root)))
+                     '("exclude . employment/widget" "clone employment/widget")))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
+      (should (file-exists-p (expand-file-name "employment/widget/README" root)))
+      (should (file-exists-p (expand-file-name
+                              "employment/widget/.agents/skills/r/SKILL.md" root))))))
+
+(ert-deftest pos-tree/a-repository-declared-with-no-remote-is-found ()
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
+                                          "README" "root\n")))
+      (pos-tree-test-repository (expand-file-name "health" root) "README" "h\n")
+      (pos-tree-test-write root ".clanka/config.yaml"
+                           "pos: 2\nprojects: projects/\nchildren:\n  - path: health\n")
+      (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                     '("path-taken health"))))))
+
+(ert-deftest pos-tree/what-no-entry-declares-is-found-wherever-it-is ()
+  "A repository, and a directory with a configuration, at any depth; but
+not in an archive, an attic, or a hidden or underscore directory."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 "README" "root\n"
+                 "health/.clanka/config.yaml" "pos: 2\nprojects: projects/\n"
+                 "health/diet/.pos/config.yml" "pos: 2\nprojects: projects/\n"
+                 "stray/deep/.clanka/config.yaml" "pos: 2\nprojects: projects/\n"
+                 "archives/old/.clanka/config.yaml" "pos: 2\nprojects: projects/\n"
+                 "_work/x/.clanka/config.yaml" "pos: 2\nprojects: projects/\n")))
+      ;; A submodule is tracked, and is not found.
+      (let ((process-environment (cons "GIT_ALLOW_PROTOCOL=file" process-environment)))
+        (pos-tree-test-git root "submodule" "--quiet" "add"
+                           (pos-tree-test-repository
+                            (expand-file-name "origins/module" dir) "README" "m\n")
+                           "tests/module")
+        (pos-tree-test-commit root))
+      (pos-tree-test-repository (expand-file-name "vendor/lib" root) "README" "l\n")
+      (pos-tree-test-repository (expand-file-name "attic/lib" root) "README" "l\n")
+      (pos-tree-test-write root ".clanka/config.yaml"
+                           "pos: 2\nprojects: projects/\nchildren:\n  - path: health\n")
+      (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                     '("undeclared health/diet" "undeclared stray/deep"
+                       "undeclared vendor/lib"))))))
 
 (ert-deftest pos-tree/a-worktree-of-a-child-is-excluded-and-cloned ()
   (pos-tree-test-with dir

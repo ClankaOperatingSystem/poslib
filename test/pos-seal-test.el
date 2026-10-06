@@ -469,7 +469,7 @@ if it is still what was sealed."
 before the scope's configuration changed is refused, and nothing is sent."
   (pos-seal-test-with-kept "seal-kept-next"
     (should (equal (alist-get 'url (alist-get 'keeper fixture)) (alist-get 'kept plan)))
-    (pos-fixture-write (expand-file-name ".pos/config.yaml" dir) "pos: 1\n")
+    (pos-fixture-write (expand-file-name ".pos/config.yaml" dir) "pos: 2\nprojects: projects/\n")
     (pos-ledger-test-refused "plan"
       (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan))))
     (should (equal 2 (length (funcall tape))))

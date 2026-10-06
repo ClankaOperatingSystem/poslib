@@ -1,5 +1,5 @@
 {
  "about": "A worktree has both of and remote.",
- "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\nworktrees:\n  - path: _worktrees/x\n    of: projects/a\n    remote: git@example.org:a.git\n    branch: x\n",
+ "yaml": "pos: 2\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\nworktrees:\n  - path: _worktrees/x\n    of: projects/a\n    remote: git@example.org:a.git\n    branch: x\n",
  "refused": "bad-value"
 }
