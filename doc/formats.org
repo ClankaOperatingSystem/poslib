@@ -618,6 +618,48 @@ Fixtures: =fixtures/ledger/keep*=, of kind =keep=: a tree, the =root=,
 =claims= and a =keeper= as a seal to a keeper has them, and =kept=,
 =skipped= and the report after, made asking no keeper; or the refusal.
 
+** Recalling
+
+=recall ROOT= brings back from its keeper each archive under ROOT whose
+scope's entry says a keeper keeps it: the reverse of =keep=. A scope that
+retires is recalled first, so that its container seals its files. An
+archive with no keeper or no ledger is left, with the reason: =on disk=
+or =no ledger=.
+
+Before any keeper is asked, every archive to be brought back must have:
+the ledger its entry names, if it names one (=identity=); a head that is
+a schema 3 event (=kept=); a ledger that folds to its recorded root
+(=root=); and nothing on disk that the ledger does not enrol or that is
+not as enrolled, its mode included (=differs=).
+
+Then, for each archive:
+
+1. The keeper is asked what it holds, and must describe the ledger's
+   head, its number of events and its recorded root; else =chain=.
+2. Each enrolled file the disk lacks is read from the keeper by the CID
+   the ledger enrols it under, in order of path, one read serving every
+   path of that CID. Bytes that are not that CID's are refused
+   (=entry=). The file is written at its path, with its recorded mode.
+3. Each empty directory the ledger records is made.
+4. The archive's CID must then be the recorded root; else =root=.
+
+What the keeper refuses is refused by its kind, erased bytes as
+=erased=, with what was already written left on disk. Run again, it
+reads only what the disk still lacks. The keeper is sent nothing and
+holds what it held.
+
+The archive is then on disk as its ledger says, and its entry still
+says a keeper keeps it: the state the check refuses as =kept= and =keep=
+begins from. Changing the entry is the person's to do.
+
+It prints =recalled=, each an =archive= with its =keeper= and the
+=files= read, and =skipped=, each an =archive= with its =reason=.
+
+Fixtures: =fixtures/ledger/recall*=, of kind =recall=: a tree, the
+=root= and a =keeper= as a seal to a keeper has them, and =recalled=,
+=skipped= and =after=, the archive's files and empty directories as a
+fixture tree lists them; or the refusal.
+
 ** Conversion
 
 =convert ROOT= brings every schema 2 ledger found under ROOT to schema 3

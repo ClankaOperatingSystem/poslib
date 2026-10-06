@@ -368,8 +368,9 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
   "Remove FILE's write bits."
   (set-file-modes file (logand (pos-ledger--mode file) (lognot #o222)) 'nofollow))
 
-(defun pos-seal--write-new (file bytes)
-  "Publish BYTES at FILE, which must not exist, read-only for all."
+(defun pos-seal--write-new (file bytes &optional mode)
+  "Publish BYTES at FILE, which must not exist, read-only for all.
+With MODE, a recorded mode that has no write bit, the file has it."
   (make-directory (file-name-directory file) t)
   (let ((temp (make-temp-file (expand-file-name "_integrity-" (file-name-directory file)))))
     (unwind-protect
@@ -378,7 +379,7 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
             (with-temp-file temp
               (set-buffer-multibyte nil)
               (insert bytes)))
-          (set-file-modes temp #o444)
+          (set-file-modes temp (or mode #o444))
           (add-name-to-file temp file))
       (delete-file temp))))
 
@@ -1072,6 +1073,78 @@ reason."
 
 ;;;; Command line
 
+(defun pos-seal-recall (root)
+  "Bring back from its keeper each archive under ROOT that a keeper keeps.
+The reverse of `pos-seal-keep'.  Every file the ledger enrols and the
+disk lacks is read from the keeper, by the CID the ledger enrols it
+under, held to that CID, and written at its path with its recorded
+mode; the empty directories the ledger records are made.  Refused
+before anything is asked unless the ledger is of schema 3 and folds to
+its recorded root, and what is on disk already is enrolled and
+unchanged.  The keeper must hold the ledger as it is.  Interrupted, it
+resumes.  The archive is then on disk as its ledger says, and still its
+keeper's by its entry, the state `pos-seal-keep' begins from.  Return
+an alist: recalled, each an archive with its keeper and the files read;
+and skipped, each an archive with the reason."
+  (let (recalled skipped pending)
+    (dolist (archive (pos-ledger-roots root))
+      (pcase-let* ((url (pos-ledger-kept archive))
+                   (`(,entries ,head ,_ ,files ,recorded ,_ ,_ ,empty)
+                    (pos-ledger-history archive))
+                   (reason (cond ((null url) "on disk")
+                                 ((null head) "no ledger"))))
+        (if reason
+            (push `((archive . ,archive) (reason . ,reason)) skipped)
+          (pos-ledger--as-named archive files)
+          (unless (pos-ledger--event-cid-p head)
+            (pos-ledger--refuse 'kept "A keeper keeps a ledger of schema 3: %s" archive))
+          (unless (equal recorded (cdr (assoc "." (pos-ledger-fold entries empty))))
+            (pos-ledger--refuse
+             'root "The ledger does not fold to its recorded root: %s" archive))
+          (let* ((cids (and (file-directory-p archive)
+                            (condition-case err
+                                (pos-cid-tree archive)
+                              (pos-cid-sharding-unsupported
+                               (pos-ledger--refuse 'sharding-unsupported "%S" (cdr err))))))
+                 (actual (pos-ledger--with-cids
+                          entries (pos-ledger-inventory archive) cids)))
+            (pcase-let ((`(,missing ,changed ,new)
+                         (pos-ledger--differences entries actual)))
+              (when (or changed new)
+                (pos-ledger--refuse
+                 'differs "What is on disk is not what the ledger enrols: %s" archive))
+              (push (list archive url entries head files recorded empty missing)
+                    pending))))))
+    (pcase-dolist (`(,archive ,url ,entries ,head ,files ,recorded ,empty ,missing)
+                   (nreverse pending))
+      (let* ((keeper (funcall pos-remote-keeper-function url))
+             (described (pos-remote-describe keeper))
+             read)
+        (unless (and (equal head (alist-get 'head described))
+                     (equal (length files) (alist-get 'events described))
+                     (equal recorded (alist-get 'root described)))
+          (pos-ledger--refuse 'chain "The keeper does not hold this ledger as it is: %s"
+                              archive))
+        (dolist (path missing)
+          (let* ((entry (cdr (assoc path entries)))
+                 (cid (alist-get 'cid entry)))
+            (unless (assoc cid read)
+              (let ((bytes (pos-remote-read keeper cid)))
+                (unless (equal cid (pos-cid-bytes bytes))
+                  (pos-ledger--refuse 'entry "The keeper's bytes are not those of %s" cid))
+                (push (cons cid bytes) read)))
+            (pos-seal--write-new (expand-file-name path archive)
+                                 (cdr (assoc cid read)) (alist-get 'mode entry))))
+        (dolist (path empty)
+          (make-directory (expand-file-name path archive) t))
+        (make-directory archive t)
+        (unless (equal recorded (cdr (assoc "." (pos-cid-tree archive))))
+          (pos-ledger--refuse
+           'root "The archive brought back is not its recorded root: %s" archive))
+        (push `((archive . ,archive) (keeper . ,url) (files . ,(length read))) recalled)))
+    `((recalled . ,(vconcat (nreverse recalled)))
+      (skipped . ,(vconcat (nreverse skipped))))))
+
 (defconst pos-seal-usage
   "Usage: COMMAND ...  (help prints this; Emacs itself takes --help)
 
@@ -1091,6 +1164,8 @@ reason."
       bring each schema 2 ledger under ROOT to schema 3, once it is clean
   keep ROOT
       move to its keeper each archive under ROOT a keeper is to keep
+  recall ROOT
+      bring back from its keeper each archive under ROOT a keeper keeps
   link PATH
       print the ipfs:// link to PATH, a sealed path in an archive
   fetch LINK
@@ -1159,6 +1234,9 @@ Exit 0 done or clean, 1 findings, 2 refused.
                                       'utf-8)))
         (`("keep" ,root)
          (princ (decode-coding-string (pos-ledger-json (pos-seal-keep root))
+                                      'utf-8)))
+        (`("recall" ,root)
+         (princ (decode-coding-string (pos-ledger-json (pos-seal-recall root))
                                       'utf-8)))
         (`("link" ,path)
          (princ (pos-links-link path))

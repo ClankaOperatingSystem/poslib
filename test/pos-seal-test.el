@@ -186,6 +186,57 @@ request as its keeper recorded it, and a kept archive gone from disk."
                 (pos-ledger-test-same
                  .report (pos-ledger-test-relative (pos-ledger-check root) dir))))))))))
 
+(ert-deftest pos-seal/every-shared-fixture-recalls-the-same-way ()
+  "What was brought back from a keeper, what was left with its reason and
+the archive on disk after, or the refusal, as fixtures/ledger/ of kind
+recall: each request as its keeper recorded it."
+  (dolist (named (pos-fixtures "ledger"))
+    (let-alist (cdr named)
+      (when (equal .kind "recall")
+        (ert-info ((car named))
+          (pos-fixture-with (cdr named) dir
+            (let* ((root (expand-file-name .root dir))
+                   (base (file-name-as-directory (file-truename dir)))
+                   (relative (lambda (items)
+                               (vconcat
+                                (mapcar (lambda (item)
+                                          (cons (cons 'archive
+                                                      (file-relative-name
+                                                       (alist-get 'archive item) base))
+                                                (assq-delete-all 'archive
+                                                                 (copy-alist item))))
+                                        items))))
+                   (got (pos-ledger-test-with-keeper .keeper
+                          (condition-case err
+                              (pos-seal-recall root)
+                            (pos-ledger-refused
+                             `((error . ,(symbol-name (cadr err)))))))))
+              (if .error
+                  (should (equal .error (alist-get 'error got)))
+                (should-not (alist-get 'error got))
+                (pos-ledger-test-same .recalled (funcall relative (alist-get 'recalled got)))
+                (pos-ledger-test-same .skipped (funcall relative (alist-get 'skipped got)))
+                (let (after)
+                  (named-let walk ((here (expand-file-name "archives" (file-truename root))))
+                    (let ((names (directory-files here nil directory-files-no-dot-files-regexp)))
+                      (unless names
+                        (push (list (file-relative-name here base) 'directory) after))
+                      (dolist (name names)
+                        (let ((path (expand-file-name name here)))
+                          (if (file-directory-p path)
+                              (walk path)
+                            (push (list (file-relative-name path base)
+                                        (decode-coding-string (pos-ledger--read path) 'utf-8)
+                                        (logand (file-modes path) #o777))
+                                  after))))))
+                  (should (equal (mapcar (lambda (entry)
+                                           (let-alist entry
+                                             (if .directory
+                                                 (list .path 'directory)
+                                               (list .path .text .mode))))
+                                         .after)
+                                 (sort after (lambda (a b) (string< (car a) (car b)))))))))))))))
+
 (ert-deftest pos-seal/sealing-removes-write-bits ()
   "The sealed files and the ledger event are read-only; CIDs do not change."
   (pos-seal-test-with-scope
