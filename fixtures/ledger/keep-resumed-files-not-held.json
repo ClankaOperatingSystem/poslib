@@ -1,0 +1,152 @@
+{
+ "kind": "keep",
+ "description": "A keeper that holds a ledger's old event and not its file refuses the first schema 3 event for want of it, and is sent that event again with the file.",
+ "tree": [
+  {
+   "path": "scope/.git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": "scope/.pos/config.yaml",
+   "text": "pos: 2\nprojects: projects/\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "scope/archive-integrity/checkpoints/3b04c8add171212dec07e1507f5cf88a3ebb5ec908ee8097b798ba0d7293cf75.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeeracvjbtpjlwzqlh3hwbrrfljqdcq5kjmiqbug6zarwpfkppmxndf2q\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/checkpoints/3be45779f9b475b1a1549836bc7d5c0487b98b64f98e77c5f224a40140319802.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeerav6dj2fzang6f2ktw746wd3gozodwq3ruy3tl7mbqzrc7cb4ou5ea\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000001-854d7aaa4014af2e747c06b78584d60502731626f9c4b1e2a172e590ac15b74f.json",
+   "text": "{\"add\":{\"old/a.txt\":{\"cid\":\"bafkreiglubvvonx26z7fjmd3kypk5fbzlz3uyul2pwiquvbwtyjghth32q\",\"mode\":292,\"sha256\":\"cba06b5736faf67e54b07b561eae94395e774c517a7d910a54369e1263ccfbd4\",\"size\":3}},\"collections\":[],\"item\":\"old\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeiecnelpaa5d2nzzcybwfao6cdm5txngbfbefg65h5ts4j7w3nb4nq\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000002-baguqeeracvjbtpjlwzqlh3hwbrrfljqdcq5kjmiqbug6zarwpfkppmxndf2q.json",
+   "text": "{\"empty\":[\"old/hollow\"],\"from\":\"854d7aaa4014af2e747c06b78584d60502731626f9c4b1e2a172e590ac15b74f\",\"kind\":\"conversion\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeerayamsr4gfouhnf6pwad5zookvo2i634ggcl7zelzz74naxntz4wta\"},\"root\":\"bafybeiecnelpaa5d2nzzcybwfao6cdm5txngbfbefg65h5ts4j7w3nb4nq\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000003-baguqeerav6dj2fzang6f2ktw746wd3gozodwq3ruy3tl7mbqzrc7cb4ou5ea.json",
+   "text": "{\"add\":{\"new/b.txt\":{\"cid\":\"bafkreiarkb5a4l26nhk57jakmkq3263o4v7gxtmfyz6jxbbrwnx76ioeg4\",\"mode\":292,\"sha256\":\"11507a0e2f5e69d5dfa40a62a1bd7b6ee57e6bcd85c67c9b8431b36fff21c437\",\"size\":3}},\"collections\":[],\"empty\":[],\"item\":\"new\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeeracvjbtpjlwzqlh3hwbrrfljqdcq5kjmiqbug6zarwpfkppmxndf2q\"},\"root\":\"bafybeifo4o6jrnzb2bqm6vbcwfzpthy7bqwluzfgf5c74heeawha66fjte\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/new/b.txt",
+   "text": "new",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/old/a.txt",
+   "text": "old",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/old/hollow",
+   "directory": true
+  }
+ ],
+ "root": "scope",
+ "claims": {
+  "scope": ".",
+  "tool": "a fixture"
+ },
+ "keeper": {
+  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "token": "tape-token",
+  "exchanges": [
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"erased\":[],\"events\":1,\"head\":\"854d7aaa4014af2e747c06b78584d60502731626f9c4b1e2a172e590ac15b74f\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeiecnelpaa5d2nzzcybwfao6cdm5txngbfbefg65h5ts4j7w3nb4nq\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-b77eb59ac853ee9b20bf408b240ff328bcb8d236ec9d795debb418a1407a1c93",
+     "body_sha256": "c54d22ccb021dd7489718e8b437f0ab418a48874d771c8d4f49e713d20b1d8a5"
+    },
+    "response": {
+     "status": 422,
+     "body": "{\"message\":\"Bytes not held for old/a.txt\",\"refused\":\"entry\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-84a88ff64ef83e192d12c0e8e533dc95e32ed730f27ce12df66d1c2ec420dd34",
+     "body_sha256": "de04b5f6ddb1b213bcc3936b08845068643414cfd206a58c4e4f1f83d07744d7"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":2,\"head\":\"baguqeeracvjbtpjlwzqlh3hwbrrfljqdcq5kjmiqbug6zarwpfkppmxndf2q\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeiecnelpaa5d2nzzcybwfao6cdm5txngbfbefg65h5ts4j7w3nb4nq\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-a0e9e088df927b16d4dea6926648cc27ee561e4a664641cf79aef8c1e956c1e7",
+     "body_sha256": "9f6fc4cbb42d9c00d9aac52530a50070443f89ca1ada0f100780d7039c1f5823"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":3,\"head\":\"baguqeerav6dj2fzang6f2ktw746wd3gozodwq3ruy3tl7mbqzrc7cb4ou5ea\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeifo4o6jrnzb2bqm6vbcwfzpthy7bqwluzfgf5c74heeawha66fjte\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"erased\":[],\"events\":3,\"head\":\"baguqeerav6dj2fzang6f2ktw746wd3gozodwq3ruy3tl7mbqzrc7cb4ou5ea\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeifo4o6jrnzb2bqm6vbcwfzpthy7bqwluzfgf5c74heeawha66fjte\"}\n"
+    }
+   }
+  ]
+ },
+ "kept": [
+  {
+   "archive": "scope/archives",
+   "keeper": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+   "events": 2,
+   "files": 2
+  }
+ ],
+ "skipped": [],
+ "report": [
+  {
+   "archive": "scope/archives",
+   "changed": [],
+   "events": 3,
+   "files": 2,
+   "head": "baguqeerav6dj2fzang6f2ktw746wd3gozodwq3ruy3tl7mbqzrc7cb4ou5ea",
+   "hidden": [],
+   "keeper": null,
+   "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+   "missing": [],
+   "new": [],
+   "recorded_root": "bafybeifo4o6jrnzb2bqm6vbcwfzpthy7bqwluzfgf5c74heeawha66fjte",
+   "root": "bafybeifo4o6jrnzb2bqm6vbcwfzpthy7bqwluzfgf5c74heeawha66fjte",
+   "undeclared": [],
+   "writable": []
+  }
+ ]
+}

@@ -981,10 +981,12 @@ schema 3 event, or nil."
   "Move to its keeper each archive under ROOT that is to be kept by one.
 That is, each whose scope's entry gives it to a keeper and whose files
 are still on disk.  The keeper is sent the events it lacks, in order,
-each with the files it enrolled; the first schema 3 event also with
-whatever enrolled before it was not sent in this run, since that event
-is where a keeper requires them.  Once the keeper holds the ledger's
-head and its root, the archive is removed from disk.  Refused unless
+each with the files it enrolled.  A keeper that holds earlier events is
+taken to hold their files; if it refuses the first schema 3 event for
+want of them, that event is sent again with every file enrolled before
+it, since it is where a keeper requires them.  Once the keeper holds
+the ledger's head and its root, the archive is removed from disk.
+Refused unless
 every such archive is as its ledger says, with a ledger of schema 3
 beside it and nothing hidden, before anything is sent.  Interrupted, it
 resumes.  Return an alist: kept, each an archive with its keeper and
@@ -1044,19 +1046,30 @@ reason."
                                    (substring (nth (1- held) names) 9 -5)))))
           (pos-ledger--refuse 'chain "The keeper holds another ledger than this one: %s"
                               archive))
-        (pcase-let ((`(,added . ,first) (pos-seal--added-paths files entries)))
+        (pcase-let* ((`(,added . ,first) (pos-seal--added-paths files entries))
+                     (batch-of
+                      (lambda (paths)
+                        (let (batch)
+                          (dolist (path paths)
+                            (let ((cid (alist-get 'cid (cdr (assoc path entries)))))
+                              (unless (or (member cid sent) (assoc cid batch))
+                                (push (cons cid (pos-ledger--read
+                                                 (expand-file-name path archive)))
+                                      batch))))
+                          batch))))
           (dotimes (i (length files))
             (when (>= i held)
-              (let (batch)
-                (dolist (path (if (eql i first)
-                                  (apply #'append (seq-take added (1+ i)))
-                                (nth i added)))
-                  (let ((cid (alist-get 'cid (cdr (assoc path entries)))))
-                    (unless (or (member cid sent) (assoc cid batch))
-                      (push (cons cid (pos-ledger--read (expand-file-name path archive)))
-                            batch))))
-                (pos-remote-append keeper (nth i names) (pos-ledger--read (nth i files))
-                                   batch claims)
+              (let ((batch (funcall batch-of (nth i added)))
+                    (event (pos-ledger--read (nth i files))))
+                (condition-case err
+                    (pos-remote-append keeper (nth i names) event batch claims)
+                  (pos-ledger-refused
+                   ;; The keeper took an earlier event without its files:
+                   ;; they go with the event at which it requires them.
+                   (unless (and (eq (cadr err) 'entry) (eql i first) (> held 0))
+                     (signal (car err) (cdr err)))
+                   (setq batch (funcall batch-of (apply #'append (seq-take added (1+ i)))))
+                   (pos-remote-append keeper (nth i names) event batch claims)))
                 (setq sent (append (mapcar #'car batch) sent))))))
         (let ((now (pos-remote-describe keeper)))
           (unless (and (equal head (alist-get 'head now))

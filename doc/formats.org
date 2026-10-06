@@ -593,9 +593,11 @@ Then, for each archive:
    have renamed or removed what an earlier event enrolled, and each is
    named by the CID the ledger enrols it under. No file is sent twice in
    one run.
-3. The first schema 3 event is sent also with every file enrolled before
-   it that this run has not sent: it is the event at which a keeper
-   requires them.
+3. A keeper that already holds earlier events is taken to hold their
+   files, sent with them by the run that sent the events. If it refuses
+   the first schema 3 event as =entry=, the event at which a keeper
+   requires every file enrolled before it, that event is sent once more
+   with all of them.
 4. The keeper is asked again, and must describe the ledger's head, its
    number of events and its recorded root; else =chain=.
 5. The archive is removed from disk, its empty directories with it. The
@@ -607,9 +609,7 @@ keeper refuses is refused by its kind, with the archive still on disk.
 Run again after an interruption, it sends what the keeper still lacks. A
 keeper limits what one append may hold (=size=). Files travel with the
 events that enrolled them so that an archive larger than that limit can
-be moved; one event's files larger than it cannot, and a run
-interrupted before the first schema 3 event sends at that event the
-files of the events before it again.
+be moved; one event's files larger than it cannot.
 
 It prints =kept=, each an =archive= with its =keeper= and the =events=
 and =files= sent, and =skipped=, each an =archive= with its =reason=.
