@@ -456,8 +456,12 @@ applies any plan.
    an event whose =item= is the rumour and whose =add= is its entry.
 4. Unless the item has moved already, each file in =originals= is
    rewritten where it lies, its links replaced at their offsets, unless it
-   has been already; the item's entries must then be as planned, else
-   =plan=; then the item moves to its destination in one rename.
+   has been already; each empty directory named =_seal= in the item, a
+   staging directory left behind, is removed, hidden directories not
+   being entered; the item's entries must then be as planned, else
+   =plan=; then the item moves to its destination in one rename, and
+   the directory it lay in is removed if it is =_seal= and left empty,
+   as a record staged by =write-new= leaves it.
 5. The item's entries at the destination must be as planned, else =plan=.
 6. Unless sealed already, its event is written: =previous=, the ledger's
    head; =ledger_id=, =add= and =collections= from the plan; =item=, the
@@ -501,7 +505,8 @@ as the plan says: by that keeper, or on disk for a plan without the key.
    rumour and whose =add= is its entry, of mode =0444=, with the one
    file its text is.
 5. Unless its event is in the ledger, the item's files in =originals=
-   are rewritten where it lies, its entries must be as planned, else
+   are rewritten where it lies, its staging directories left empty are
+   removed as in step 4 above, its entries must be as planned, else
    =plan=, and its event is sent with every file it enrols. The event
    is as in step 6 above, of schema 3, =empty= as found in the item
    where it lies.
@@ -509,7 +514,8 @@ as the plan says: by that keeper, or on disk for a plan without the key.
    it holds it, and not before. What a keeper refuses is refused by its
    kind, and nothing is written.
 7. The item is then removed from where it lay, if its entries are still
-   as planned, else =plan=.
+   as planned, else =plan=, and the directory it lay in as in step 4
+   above.
 8. The checkpoint, as step 8 above.
 
 With each event the client sends its claims, strings by name, which a
