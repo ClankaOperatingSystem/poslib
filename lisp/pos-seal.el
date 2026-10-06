@@ -444,6 +444,28 @@ Hidden entries count for nothing and hidden directories are not entered,
 as IPFS leaves both out."
   (sort (pos-seal--empty-under top rel) #'string<))
 
+(defun pos-seal--staging-p (dir)
+  "Return non-nil if DIR is a staging directory left empty: _seal, holding nothing."
+  (and (equal (file-name-nondirectory (directory-file-name dir)) "_seal")
+       (file-directory-p dir) (not (file-symlink-p dir))
+       (directory-empty-p dir)))
+
+(defun pos-seal--leave-stage (source)
+  "Remove the directory SOURCE lay in, if a staging directory left empty.
+A record staged by write-new leaves it so."
+  (let ((stage (file-name-directory (directory-file-name source))))
+    (when (pos-seal--staging-p stage) (delete-directory stage))))
+
+(defun pos-seal--drop-staging (top)
+  "Remove each staging directory left empty under TOP, an item.
+Hidden directories and nested archives are not entered, nor links followed."
+  (when (and (file-directory-p top) (not (file-symlink-p top)))
+    (dolist (name (pos-ledger--entries top))
+      (let ((path (expand-file-name name top)))
+        (cond ((or (string-prefix-p "." name) (equal name "archives")))
+              ((pos-seal--staging-p path) (delete-directory path))
+              (t (pos-seal--drop-staging path)))))))
+
 (defun pos-seal--event-of (plan item add collections empty)
   "Return the event of PLAN sealing ADD as ITEM, as (FILE NAME BYTES).
 FILE is its ledger file's name and NAME what names it; COLLECTIONS and
@@ -587,8 +609,10 @@ Return (EVENT-FILE . ROOT)."
                               (lambda (a b) (string< (car a) (car b))))))
           (pos-ledger--refuse 'plan "Item changed since review: %s" .source))
         (pos-seal--staging plan .source t)
+        (pos-seal--drop-staging .source)
         (make-directory (file-name-directory .destination) t)
         (rename-file .source .destination))
+      (pos-seal--leave-stage .source)
       (unless (equal (pos-ledger-json .add)
                      (pos-ledger-json (funcall add-of (mapcar (lambda (a) (pos-ledger--key (car a)))
                                                               .add))))
@@ -735,6 +759,7 @@ Interrupted, it resumes.  Return (EVENT-FILE . ROOT)."
           (unless (equal (pos-ledger-json .add) (pos-ledger-json entries))
             (pos-ledger--refuse 'plan "Item changed since review: %s" .source))
           (pos-seal--staging plan .source t)
+          (pos-seal--drop-staging .source)
           (funcall send rel .add .collections (pos-seal--empty .source rel)
                    (seq-uniq
                     (mapcar (lambda (pair)
@@ -749,6 +774,7 @@ Interrupted, it resumes.  Return (EVENT-FILE . ROOT)."
         (if (file-directory-p .source)
             (delete-directory .source t)
           (delete-file .source)))
+      (pos-seal--leave-stage .source)
       (pcase-let ((`(,_ ,head ,_ ,files) (pos-ledger-history .archive)))
         (pos-seal--checkpoint .archive head)
         (cons (car (last files))

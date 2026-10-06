@@ -465,7 +465,11 @@ applies any plan.
    rewritten where it lies, its links replaced at their offsets, unless it
    has been already; the item's entries must then be as planned, else
    =plan=; remove its planned empty staging directory, then move the item
-   to its destination in one rename.
+   to its destination in one rename. Empty staging directories in active
+   descendants are also removed before the move, without entering hidden
+   directories, following links or entering nested =archives/=. After
+   the move, remove the directory the item lay in if it is =_seal= and
+   left empty, as a record staged by =write-new= leaves it.
 5. The item's entries at the destination must be as planned, else =plan=.
 6. Unless sealed already, its event is written: =previous=, the ledger's
    head; =ledger_id=, =add= and =collections= from the plan; =item=, the
@@ -483,9 +487,9 @@ applies any plan.
 Applying a plan again after an interruption finishes it, and after
 completion changes nothing.
 
-Staging removal is nonrecursive and concerns only the source's own
-=_seal/=. Nonempty staging, other empty directories and staging directories
-inside nested evidence remain part of the item. On resumption after the
+The plan's staging-removal field concerns the source's own =_seal/=.
+Nonempty staging, other empty directories and staging directories inside
+nested archives remain part of the item. On resumption after the
 move, planned removal finishes at the destination before its event is
 written. Already sealed evidence is never pruned.
 
@@ -516,15 +520,17 @@ as the plan says: by that keeper, or on disk for a plan without the key.
    file its text is.
 5. Unless its event is in the ledger, the item's files in =originals=
    are rewritten where it lies, its entries must be as planned, else
-   =plan=; its planned empty staging directory is removed, and its event
-   is sent with every file it enrols. The event
+   =plan=; its planned empty staging directory and empty staging in active
+   descendants are removed as in step 4 above, and its event is sent
+   with every file it enrols. The event
    is as in step 6 above, of schema 3, =empty= as found in the item
    where it lies.
 6. An event is written to the ledger once the keeper has answered that
    it holds it, and not before. What a keeper refuses is refused by its
    kind, and nothing is written.
 7. The item is then removed from where it lay, if its entries are still
-   as planned, else =plan=.
+   as planned, else =plan=, and the directory it lay in as in step 4
+   above.
 8. The checkpoint, as step 8 above.
 
 With each event the client sends its claims, strings by name, which a

@@ -398,6 +398,37 @@ a rumour already sealed word for word is cited, not sealed again."
       (should (file-exists-p (expand-file-name "result.md" target)))
       (should (equal 1 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
 
+(ert-deftest pos-seal/a-staging-directory-left-empty-is-not-sealed ()
+  "An empty _seal in an item, at any depth, is removed and no event records
+it; one that holds something is sealed as it is, and another empty
+directory is recorded.  The check after the seal is clean."
+  (pos-seal-test-with-scope
+    (dolist (dir '("trial/_seal" "trial/child/_seal" "trial/kept/_seal" "trial/hollow"))
+      (make-directory (expand-file-name dir scope) t))
+    (pos-fixture-write (expand-file-name "trial/kept/_seal/plan.json" scope) "{}")
+    (let* ((archive (pos-seal-test-sealed scope))
+           (event (pos-ledger--parse
+                   (pos-ledger--read (car (last (nth 3 (pos-ledger-history archive))))))))
+      (should (equal ["trial/child" "trial/hollow"] (alist-get 'empty event)))
+      (should-not (file-exists-p (expand-file-name "trial/_seal" archive)))
+      (should-not (file-exists-p (expand-file-name "trial/child/_seal" archive)))
+      (should (file-exists-p (expand-file-name "trial/kept/_seal/plan.json" archive)))
+      (should-not (pos-seal-findings-p (pos-ledger-check scope))))))
+
+(ert-deftest pos-seal/a-new-record-leaves-no-staging-directory ()
+  "A record staged by write-new is sealed and _seal, left empty, is gone;
+a _seal that holds something else stays."
+  (pos-seal-test-with-scope
+    (let ((seal (lambda (name)
+                  (let ((plan (pos-seal-stage "record\n" (expand-file-name
+                                                          (concat "archives/" name) scope))))
+                    (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))))))
+      (funcall seal "first.txt")
+      (should-not (file-exists-p (expand-file-name "_seal" scope)))
+      (pos-fixture-write (expand-file-name "_seal/other.json" scope) "{}")
+      (funcall seal "second.txt")
+      (should (equal '("other.json") (pos-ledger--entries (expand-file-name "_seal" scope)))))))
+
 (ert-deftest pos-seal/a-sealed-path-has-a-link ()
   "A sealed item's link is ipfs:// and its CID; a path within it adds the
 path, a collection's member included.  A path never sealed, and a path
