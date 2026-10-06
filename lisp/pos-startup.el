@@ -27,8 +27,11 @@
 ;;
 ;; The files are every Org file under the root outside archives, attics
 ;; and directories that are hidden or begin with an underscore.  A file
-;; belongs to the scope its path names: the last projects/NAME or
-;; responsibilities/NAME in it, else the root.
+;; belongs to the deepest scope on its path, else the root.  A scope is
+;; a responsibility, which is a directory whose configuration says
+;; where its projects belong, as doc/pos-directory.txt has it, or a
+;; directory within one named responsibilities; or a project, which is
+;; what is directly within a directory named projects.
 ;;
 ;; - `pos-startup-report': the prompts and the views, as text.
 ;; - `pos-startup-view': one view, as text.
@@ -41,6 +44,7 @@
 (require 'org-agenda)
 (require 'seq)
 (require 'pos)
+(require 'pos-tree)
 
 (defcustom pos-startup-excluded-directories '("archives" "attic")
   "Names of directories whose Org files are not read.
@@ -90,6 +94,10 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
 (defvar pos-startup--root nil
   "The root being read, while a view is made.")
 
+(defvar pos-startup--configured nil
+  "The configured responsibilities found, as (ROOT . PATHS), or nil.
+Bound while a view is made, so that the tree is walked once for it.")
+
 ;;;; Files and scopes
 
 (defun pos-startup--excluded-p (directory)
@@ -108,16 +116,60 @@ Excluded directories are not entered."
          t)
         #'string<))
 
+(defun pos-startup--directories (root)
+  "Return the directories under ROOT whose Org files are read."
+  (when (file-directory-p root)
+    (seq-filter (lambda (entry)
+                  (and (file-directory-p entry)
+                       (not (pos-startup--excluded-p entry))))
+                (directory-files-recursively
+                 root "" t
+                 (lambda (directory) (not (pos-startup--excluded-p directory)))
+                 t))))
+
+(defun pos-startup--configured (root)
+  "Return the path of each configured responsibility beneath ROOT.
+A directory whose configuration says where its projects belong, as
+doc/pos-directory.txt has it.  Relative to ROOT, which is not one of
+them, sorted.  A configuration that is refused makes nothing a
+responsibility."
+  (if (equal (car pos-startup--configured) root)
+      (cdr pos-startup--configured)
+    (let (found)
+      (dolist (directory (pos-startup--directories root))
+        (when (equal "responsibility"
+                     (ignore-errors
+                       (when-let* ((file (pos-tree-config-file directory)))
+                         (alist-get
+                          'kind
+                          (pos-tree-read-config
+                           (with-temp-buffer
+                             (insert-file-contents
+                              (expand-file-name file directory))
+                             (buffer-string)))))))
+          (push (file-relative-name directory root) found)))
+      (setq found (sort found #'string<))
+      ;; Kept for the length of a view only: the tree may change after.
+      (when pos-startup--root
+        (setq pos-startup--configured (cons root found)))
+      found)))
+
 (defun pos-startup--owner (file root)
   "Return (KIND . PATH) for the scope under ROOT that FILE belongs to.
 KIND is the symbol project or responsibility, and PATH is relative to
-ROOT.  Nil for a file that belongs to ROOT itself."
+ROOT.  The scope is the deepest on FILE's path: a configured
+responsibility, or what a directory named projects or responsibilities
+holds.  Nil for a file that belongs to ROOT itself."
   (let* ((parts (split-string (file-relative-name file root) "/" t))
+         (configured (pos-startup--configured root))
          (owner nil) (index 0))
     (while (< (1+ index) (length parts))
-      (let ((kind (pcase (nth index parts)
+      (let ((here (mapconcat #'identity (seq-take parts (1+ index)) "/"))
+            (kind (pcase (nth index parts)
                     ("projects" 'project)
                     ("responsibilities" 'responsibility))))
+        (when (member here configured)
+          (setq owner (cons 'responsibility here)))
         (when kind
           (setq owner (cons kind (mapconcat #'identity
                                             (seq-take parts (+ index 2)) "/")))))
@@ -172,19 +224,15 @@ That is, holding an open, scheduled heading tagged
     scopes))
 
 (defun pos-startup--responsibilities (root)
-  "Return the path of each directory directly within a responsibilities/.
-Relative to ROOT, sorted."
-  (let (found)
-    (dolist (entry (directory-files-recursively
-                    root "" t
-                    (lambda (directory) (not (pos-startup--excluded-p directory)))
-                    t))
-      (when (and (file-directory-p entry)
-                 (not (pos-startup--excluded-p entry))
-                 (string= "responsibilities"
-                          (file-name-nondirectory
-                           (directory-file-name (file-name-directory entry)))))
-        (push (file-relative-name entry root) found)))
+  "Return the path of each responsibility beneath ROOT.
+Each configured one, and each directory directly within a
+responsibilities/.  Relative to ROOT, sorted."
+  (let ((found (copy-sequence (pos-startup--configured root))))
+    (dolist (entry (pos-startup--directories root))
+      (when (string= "responsibilities"
+                     (file-name-nondirectory
+                      (directory-file-name (file-name-directory entry))))
+        (cl-pushnew (file-relative-name entry root) found :test #'string=)))
     (sort found #'string<)))
 
 ;;;; Views
@@ -264,6 +312,7 @@ Active projects, by `pos-startup-active-statuses', and responsibilities."
 Text: a title, then one line for each item, labelled by its scope."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (pos-startup--root root)
+         (pos-startup--configured nil)
          (org-agenda-files (pos-startup-files root))
          (org-todo-keywords pos-todo-keywords)
          ;; Label each line by its scope: the default is the file's
