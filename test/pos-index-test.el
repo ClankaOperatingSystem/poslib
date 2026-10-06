@@ -204,6 +204,29 @@ link to no archived file exits 2 and prints nothing."
         (should (equal (list 0 bytes) (funcall run (concat "ipfs://" cid "/bytes.bin"))))
         (should (equal '(2 "") (funcall run (concat "ipfs://" cid "/other.bin"))))))))
 
+(ert-deftest pos-index/a-fetched-file-is-decoded-as-its-bytes-say ()
+  "A kept file of bytes that are not text is shown as visiting it would
+show it: undecoded, one character a byte, though some of its bytes
+would read as UTF-8.  UTF-8 text is still text."
+  (pos-index-test-with-kept
+    (let ((uri (concat "ipfs://" (cdr (assoc "trial/result.txt" cids))))
+          (bytes (concat (apply #'unibyte-string (number-sequence 0 255)) "\303\251\377")))
+      (let ((pos-remote-send-function (lambda (&rest _) (cons 200 bytes))))
+        (with-current-buffer (pos-index-fetch scope uri)
+          (unwind-protect
+              (progn
+                (should (eq 'no-conversion buffer-file-coding-system))
+                (should (= (length bytes) (buffer-size)))
+                (should (equal bytes (encode-coding-string (buffer-string)
+                                                           'no-conversion))))
+            (kill-buffer))))
+      (let ((pos-remote-send-function
+             (lambda (&rest _) (cons 200 (encode-coding-string "café" 'utf-8)))))
+        (with-current-buffer (pos-index-fetch scope uri)
+          (unwind-protect
+              (should (equal "café" (buffer-string)))
+            (kill-buffer)))))))
+
 (ert-deftest pos-index/org-follows-ipfs-links ()
   "An ipfs: link in canon opens the archived file it names."
   (pos-index-test-with-sealed
