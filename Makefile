@@ -2,9 +2,11 @@
 # make check-ipfs IPFS=path/to/ipfs: CID fixtures against kubo, offline.
 
 EMACS ?= emacs
-# Dependencies, from Package-Requires, installed from GNU and NonGNU ELPA into _deps/.
-PKGS   = --eval '(progn (require (quote package)) (setq package-user-dir (expand-file-name "_deps") package-gnupghome-dir (expand-file-name "_deps/gnupg") package-archives (quote (("gnu" . "https://elpa.gnu.org/packages/") ("nongnu" . "https://elpa.nongnu.org/nongnu/")))) (package-initialize))'
-BATCH  = $(EMACS) -Q --batch $(PKGS) -L lisp
+# Dependencies, from Package-Requires, each fetched from its Git repository
+# at one commit into _deps/: markdown-mode 2.8 and yaml 1.2.4.
+MARKDOWN_MODE = f5d520b3ee7722dd2231ab586ba51d8eb166e49b
+YAML          = 5546f36bde24a9a8c1934e0f6ce205cd41d72537
+BATCH  = $(EMACS) -Q --batch -L _deps/markdown-mode -L _deps/yaml -L lisp
 SRC    = lisp/pos.el lisp/pos-capture.el lisp/pos-cid.el lisp/pos-ledger.el lisp/pos-links.el lisp/pos-seal.el lisp/pos-index.el lisp/pos-migrate.el lisp/pos-signin.el lisp/pos-remote.el lisp/pos-tree.el lisp/pos-startup.el
 IPFS  ?= ipfs
 
@@ -12,8 +14,21 @@ IPFS  ?= ipfs
 
 check: lint test
 
+# fetch NAME URL COMMIT FILE: _deps/NAME at COMMIT with FILE compiled,
+# fetched again if it is at another commit.
+define fetch
+	@if [ "$$(cat _deps/$(1)/.commit 2>/dev/null)" != "$(3)" ]; then \
+	     rm -rf _deps/$(1) && git init -q _deps/$(1) \
+	  && git -C _deps/$(1) fetch -q --depth 1 $(2) $(3) \
+	  && git -C _deps/$(1) checkout -q FETCH_HEAD \
+	  && $(EMACS) -Q --batch -f batch-byte-compile _deps/$(1)/$(4) 2>/dev/null \
+	  && echo $(3) > _deps/$(1)/.commit; \
+	 fi
+endef
+
 deps:
-	@$(BATCH) --eval '(dolist (pkg (quote (markdown-mode yaml))) (unless (package-installed-p pkg) (package-refresh-contents) (package-install pkg)))'
+	$(call fetch,markdown-mode,https://github.com/jrblevin/markdown-mode.git,$(MARKDOWN_MODE),markdown-mode.el)
+	$(call fetch,yaml,https://github.com/zkry/yaml.el.git,$(YAML),yaml.el)
 
 test: deps
 	$(BATCH) -l ert -l test/pos-test.el -l test/pos-capture-test.el \
