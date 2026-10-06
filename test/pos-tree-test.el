@@ -92,7 +92,8 @@ FILES is a plist of path and text.  Return DIR."
 
 (defun pos-tree-test-config (&rest children)
   "Return a config.yaml's text declaring CHILDREN, each an entry's text."
-  (concat "pos: 2\nprojects: projects/\nchildren:\n" (apply #'concat children)))
+  (concat "pos: 2\nprojects: projects/\narchives:\n  - scope: .\n    kept: committed\n"
+          (if children (concat "children:\n" (apply #'concat children)) "children: []\n")))
 
 ;;;; Reading and doing plans
 
@@ -103,6 +104,7 @@ FILES is a plist of path and text.  Return DIR."
              (let-alist action
                (pcase .do
                  ("exclude" (format "exclude %s %s" .repository .path))
+                 ("archive-excludes" (format "archive-excludes %s" .repository))
                  ("clone" (format "clone %s" .path))
                  ("link" (format "link %s -> %s" .path .target))
                  ("unlink" (format "unlink %s" .path)))))
@@ -369,10 +371,10 @@ to do, and no repository sees a change to commit."
                            (concat "pos: 2\nchildren:\n"
                                    (pos-tree-test-child "work" child)))
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("exclude . work" "clone work" "unconfigured ."))))))
+                     '("exclude . work" "clone work" "archive-excludes ." "unconfigured ."))))))
 
 (ert-deftest pos-tree/a-child-with-no-remote-is-a-directory ()
-  "Nothing is excluded or cloned for it; one that is not there is found."
+  "The directory itself is not excluded or cloned; a missing one is found."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
                                           "README" "root\n"
@@ -382,7 +384,7 @@ to do, and no repository sees a change to commit."
                                    "  - path: health\n  - path: wealth\n"
                                    "  - path: README\n"))
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("path-taken README" "missing wealth"))))))
+                     '("archive-excludes ." "path-taken README" "missing wealth"))))))
 
 (ert-deftest pos-tree/a-directory-declares-what-is-beneath-it ()
   "A directory's own configuration mounts a repository beneath it, which
@@ -413,7 +415,7 @@ that repository's skills."
       (pos-tree-test-write root ".clanka/config.yaml"
                            "pos: 2\nprojects: projects/\nchildren:\n  - path: health\n")
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("path-taken health"))))))
+                     '("archive-excludes ." "path-taken health"))))))
 
 (ert-deftest pos-tree/what-no-entry-declares-is-found-wherever-it-is ()
   "A repository, and a directory with a configuration, at any depth; but
@@ -439,7 +441,7 @@ not in an archive, an attic, or a hidden or underscore directory."
       (pos-tree-test-write root ".clanka/config.yaml"
                            "pos: 2\nprojects: projects/\nchildren:\n  - path: health\n")
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("undeclared health/diet" "undeclared stray/deep"
+                     '("archive-excludes ." "undeclared health/diet" "undeclared stray/deep"
                        "undeclared vendor/lib"))))))
 
 (ert-deftest pos-tree/a-worktree-of-a-child-is-excluded-and-cloned ()
@@ -716,6 +718,44 @@ not in an archive, an attic, or a hidden or underscore directory."
                  ".claude/skills/old/SKILL.md" "---\nname: old\n---\n")))
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
                      '("claude-skills .claude/skills"))))))
+
+(ert-deftest pos-tree/archives-follow-each-scope-and-policy-changes ()
+  (pos-tree-test-with dir
+    (let* ((root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".clanka/config.yml" (pos-tree-test-config "  - path: work\n")
+                  "work/.clanka/config.yml" "pos: 2\nprojects: projects/\n"
+                  "work/archive-integrity/README" "The ledger stays tracked.\n"))
+           (file (pos-tree--exclude-file root)))
+      (pos-tree-test-write root "archives/evidence" "root\n")
+      (pos-tree-test-write root "work/archives/evidence" "child\n")
+      (pos-tree-test-write root "work/older/archives/evidence" "older\n")
+      (write-region "/private-file\n" nil file nil 'silent)
+      (pos-tree-test-settle root)
+      (should (eq 0 (car (pos-tree--git root "check-ignore" "-q" "work/archives/evidence"))))
+      (should (eq 0 (car (pos-tree--git root "check-ignore" "-q" "work/older/archives/evidence"))))
+      (should (eq 1 (car (pos-tree--git root "check-ignore" "-q" "archives/evidence"))))
+      (should (pos-tree--tracked-p root "work/archive-integrity/README"))
+      (pos-tree-test-write root "work/.clanka/config.yml"
+                           (pos-tree-test-config))
+      (pos-tree-ignore-archives root)
+      (should (eq 1 (car (pos-tree--git root "check-ignore" "-q" "work/archives/evidence"))))
+      (should (eq 0 (car (pos-tree--git root "check-ignore" "-q" "work/older/archives/evidence"))))
+      (should (file-exists-p (expand-file-name "work/archives/evidence" root)))
+      (should (string-prefix-p "/private-file\n"
+                               (with-temp-buffer (insert-file-contents file) (buffer-string)))))))
+
+(ert-deftest pos-tree/archive-rules-preserve-damaged-blocks ()
+  (pos-tree-test-with dir
+    (let* ((root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".pos/config.yml" "pos: 2\nprojects: projects/\n"))
+           (file (pos-tree--exclude-file root)))
+      (write-region pos-tree--archive-begin nil file nil 'silent)
+      (should (equal (pos-tree-test-summary (pos-tree-ignore-archives root))
+                     '("config-refused .")))
+      (should (equal (with-temp-buffer (insert-file-contents file) (buffer-string))
+                     pos-tree--archive-begin)))))
 
 (provide 'pos-tree-test)
 ;;; pos-tree-test.el ends here
