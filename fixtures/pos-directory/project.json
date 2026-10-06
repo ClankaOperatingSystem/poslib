@@ -1,0 +1,14 @@
+{
+ "about": "A node that says where its methodologies belong is a project.",
+ "yaml": "pos: 2\nmethodologies: methodologies\n",
+ "config": {
+  "kind": "project",
+  "projects": null,
+  "methodologies": "methodologies",
+  "image": null,
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null
+ }
+}

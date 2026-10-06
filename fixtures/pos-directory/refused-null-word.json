@@ -1,5 +1,5 @@
 {
  "about": "The words for null are no string, quoted or not.",
- "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    branch: \"null\"\n",
+ "yaml": "pos: 2\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    branch: \"null\"\n",
  "refused": "wrong-type"
 }

@@ -1,7 +1,11 @@
 {
  "about": "An archive's entry may name its ledger, whatever way it is kept.",
- "yaml": "pos: 1\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://ledger.example.org/\n    ledger: 5bb17c0d-43f7-4628-8af9-b8088892a188\n  - scope: projects/fix\n    kept: committed\n    ledger: 0f8fad5b-d9cb-469f-a165-70867728950e\n",
+ "yaml": "pos: 2\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://ledger.example.org/\n    ledger: 5bb17c0d-43f7-4628-8af9-b8088892a188\n  - scope: projects/fix\n    kept: committed\n    ledger: 0f8fad5b-d9cb-469f-a165-70867728950e\n",
  "config": {
+  "kind": null,
+  "projects": null,
+  "methodologies": null,
+  "image": null,
   "children": [],
   "worktrees": [],
   "server": null,

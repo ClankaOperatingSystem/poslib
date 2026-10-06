@@ -1,0 +1,5 @@
+{
+ "about": "The image is written unquoted, so that a tool with no YAML reader finds it by its line.",
+ "yaml": "pos: 2\nimage: \"ghcr.io/example/clankos:v1.2.3\"\n",
+ "refused": "bad-value"
+}

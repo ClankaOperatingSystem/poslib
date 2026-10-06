@@ -1,0 +1,27 @@
+{
+ "about": "A child with no remote is a directory of this repository; it has no branch.",
+ "yaml": "pos: 2\nprojects: projects/\nchildren:\n  - path: health\n  - path: projects/kitchen\n",
+ "config": {
+  "kind": "responsibility",
+  "projects": "projects",
+  "methodologies": null,
+  "image": null,
+  "children": [
+   {
+    "path": "health",
+    "remote": null,
+    "branch": null,
+    "skills-up": false
+   },
+   {
+    "path": "projects/kitchen",
+    "remote": null,
+    "branch": null,
+    "skills-up": false
+   }
+  ],
+  "worktrees": [],
+  "archives": [],
+  "server": null
+ }
+}

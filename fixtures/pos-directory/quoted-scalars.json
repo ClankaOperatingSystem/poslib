@@ -1,7 +1,11 @@
 {
  "about": "Quoting changes nothing: a quoted version and a quoted boolean are read as the same text unquoted.",
- "yaml": "pos: \"1\"\nchildren:\n  - path: \"projects/a\"\n    remote: 'git@example.org:a.git'\n    skills-up: \"true\"\n",
+ "yaml": "pos: \"2\"\nchildren:\n  - path: \"projects/a\"\n    remote: 'git@example.org:a.git'\n    skills-up: \"true\"\n",
  "config": {
+  "kind": null,
+  "projects": null,
+  "methodologies": null,
+  "image": null,
   "children": [
    {
     "path": "projects/a",

@@ -1,0 +1,21 @@
+{
+ "about": "A child may be at any path beneath the node; no folder name carries meaning.",
+ "yaml": "pos: 2\nchildren:\n  - path: vendor/a\n    remote: git@example.org:a.git\n",
+ "config": {
+  "kind": null,
+  "projects": null,
+  "methodologies": null,
+  "image": null,
+  "children": [
+   {
+    "path": "vendor/a",
+    "remote": "git@example.org:a.git",
+    "branch": "master",
+    "skills-up": false
+   }
+  ],
+  "worktrees": [],
+  "archives": [],
+  "server": null
+ }
+}

@@ -1,5 +1,5 @@
 {
  "about": "A worktree is of a path that is not a declared child.",
- "yaml": "pos: 1\nworktrees:\n  - path: _worktrees/x\n    of: projects/a\n    branch: x\n",
+ "yaml": "pos: 2\nworktrees:\n  - path: _worktrees/x\n    of: projects/a\n    branch: x\n",
  "refused": "bad-value"
 }

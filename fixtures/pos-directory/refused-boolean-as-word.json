@@ -1,5 +1,5 @@
 {
  "about": "skills-up is a bare word some YAML readers take for a boolean and others for a string. A reader that takes it for a boolean must refuse it here all the same.",
- "yaml": "pos: 1\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    skills-up: yes\n",
+ "yaml": "pos: 2\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    skills-up: yes\n",
  "refused": "wrong-type"
 }

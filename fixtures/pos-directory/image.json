@@ -1,0 +1,14 @@
+{
+ "about": "The image, on its one line.",
+ "yaml": "pos: 2\nprojects: projects/\nimage: ghcr.io/example/clankos:v1.2.3\n",
+ "config": {
+  "kind": "responsibility",
+  "projects": "projects",
+  "methodologies": null,
+  "image": "ghcr.io/example/clankos:v1.2.3",
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null
+ }
+}

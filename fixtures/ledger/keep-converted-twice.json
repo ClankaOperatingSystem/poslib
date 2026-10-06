@@ -8,7 +8,7 @@
   },
   {
    "path": "scope/.pos/config.yaml",
-   "text": "pos: 1\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+   "text": "pos: 2\nprojects: projects/\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
   },
   {
    "path": "scope/archive-integrity/checkpoints/7b2dd2047c4c7d374dc3a9aaf373242921ab1c056f232c2935d396d945da3321.json",

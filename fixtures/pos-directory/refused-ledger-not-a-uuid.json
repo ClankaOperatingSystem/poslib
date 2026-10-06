@@ -1,5 +1,5 @@
 {
  "about": "A ledger's id is a UUID.",
- "yaml": "pos: 1\narchives:\n  - scope: \".\"\n    kept: committed\n    ledger: my-ledger\n",
+ "yaml": "pos: 2\narchives:\n  - scope: \".\"\n    kept: committed\n    ledger: my-ledger\n",
  "refused": "bad-value"
 }

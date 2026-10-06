@@ -1,5 +1,5 @@
 {
  "about": "An archive is kept in a way the document does not name.",
- "yaml": "pos: 1\narchives:\n  - scope: \".\"\n    kept: elsewhere\n",
+ "yaml": "pos: 2\narchives:\n  - scope: \".\"\n    kept: elsewhere\n",
  "refused": "bad-value"
 }

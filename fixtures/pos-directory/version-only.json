@@ -1,7 +1,11 @@
 {
  "about": "A file that declares nothing.",
- "yaml": "pos: 1\n",
+ "yaml": "pos: 2\n",
  "config": {
+  "kind": null,
+  "projects": null,
+  "methodologies": null,
+  "image": null,
   "children": [],
   "worktrees": [],
   "archives": [],

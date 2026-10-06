@@ -1,0 +1,5 @@
+{
+ "about": "The image is on one line of its own, the key at the start of it.",
+ "yaml": "pos: 2\nimage:\n  ghcr.io/example/clankos:v1.2.3\n",
+ "refused": "bad-value"
+}

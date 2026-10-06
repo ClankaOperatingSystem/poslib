@@ -8,7 +8,7 @@
   },
   {
    "path": ".pos/config.yaml",
-   "text": "pos: 1\narchives:\n  - scope: projects/a\n    kept: committed\n  - scope: projects/b\n    kept: uncommitted\n"
+   "text": "pos: 2\nprojects: projects/\narchives:\n  - scope: projects/a\n    kept: committed\n  - scope: projects/b\n    kept: uncommitted\n"
   },
   {
    "path": "projects/a/archive-integrity/checkpoints/457c6f0f73a01bd4a811873d84be3ff4ebfcd39a8e1a132500075066e8d70a98.json",

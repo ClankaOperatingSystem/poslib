@@ -1,0 +1,5 @@
+{
+ "about": "A node is a responsibility or a project, not both.",
+ "yaml": "pos: 2\nprojects: projects/\nmethodologies: methodologies/\n",
+ "refused": "bad-value"
+}

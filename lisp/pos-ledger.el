@@ -54,10 +54,6 @@
 (defconst pos-ledger-declaration "#+COLLECTION: t"
   "The line in a collection's README.org that declares it one.")
 
-(defconst pos-ledger-configuration ".pos/config.yaml"
-  "A repository's configuration, relative to its root.
-It says how each scope's archive is kept, as doc/pos-directory.txt has it.")
-
 (declare-function pos-tree-read-config "pos-tree" (text))
 (declare-function pos-remote-describe "pos-remote" (archive))
 (defvar pos-remote-keeper-function)
@@ -503,22 +499,48 @@ ADD is an alist of path and entry; PREVIOUS a hash or nil."
                   ,@(when ledger-id `((ledger_id . ,ledger-id)))))))
     (cons (format "%08d-%s.json" number (pos-ledger--sha bytes)) bytes)))
 
+;;;; Configuration
+
+(defconst pos-ledger-config-directories '(".clanka" ".pos")
+  "The names a configuration directory may have, the one written first.")
+
+(defconst pos-ledger-config-names '("config.yaml" "config.yml")
+  "The names a configuration file may have within its directory.")
+
+(defun pos-ledger-config-paths ()
+  "Return every path a node's configuration may have, relative to the node."
+  (mapcan (lambda (directory)
+            (mapcar (lambda (name) (concat directory "/" name))
+                    pos-ledger-config-names))
+          pos-ledger-config-directories))
+
+(defun pos-ledger-config-files (dir)
+  "Return the configuration files the node at DIR has, relative to it.
+One, as doc/pos-directory.txt allows, or none; two are refused by
+whoever reads them."
+  (seq-filter (lambda (file) (file-exists-p (expand-file-name file dir)))
+              (pos-ledger-config-paths)))
+
 ;;;; Kept archives
 
 (defun pos-ledger--entry (archive)
-  "Return the entry for ARCHIVE's scope in its repository's configuration.
-ARCHIVE's scope is the directory holding it, and its repository the
-nearest directory at or above the scope that holds .git.  The entry is
-the one under archives in the repository's .pos/config.yaml whose scope
-is the scope's path there, or nil: for a scope it does not name, in a
-repository without one or in none.  Refuse `config' for a configuration
-that is refused."
+  "Return the entry for ARCHIVE's scope in its node's configuration.
+ARCHIVE's scope is the directory holding it, and its node the nearest
+directory at or above the scope that holds a configuration, as
+doc/pos-directory.txt names one.  The entry is the one under archives
+there whose scope is the scope's path from the node, or nil: for a
+scope it does not name, or beneath no node.  Refuse `config' for a
+configuration that is refused, and for two in one node."
   (let* ((scope (file-name-directory (directory-file-name (expand-file-name archive))))
-         (root (locate-dominating-file scope ".git"))
-         (file (and root (expand-file-name pos-ledger-configuration root))))
-    (when (and file (file-exists-p file))
+         (node (locate-dominating-file scope #'pos-ledger-config-files))
+         (files (and node (pos-ledger-config-files node))))
+    (when (cdr files)
+      (pos-ledger--refuse 'config "Configuration refused (two-configurations): %s"
+                          node))
+    (when files
       (require 'pos-tree)
-      (let* ((config
+      (let* ((file (expand-file-name (car files) node))
+             (config
               (condition-case err
                   (pos-tree-read-config
                    (decode-coding-string (pos-ledger--read file) 'utf-8))
@@ -526,23 +548,22 @@ that is refused."
                  (pos-ledger--refuse 'config "Configuration refused (%s): %s"
                                      (cadr err) file))))
              (path (directory-file-name
-                    (file-relative-name scope (expand-file-name root))))
-             (entry (seq-find (lambda (a) (equal (alist-get 'scope a) path))
-                              (alist-get 'archives config))))
-        entry))))
+                    (file-relative-name scope (expand-file-name node)))))
+        (seq-find (lambda (a) (equal (alist-get 'scope a) path))
+                  (alist-get 'archives config))))))
 
 (defun pos-ledger-kept (archive)
   "Return the base URL of ARCHIVE's keeper, or nil if it is kept on disk.
-A keeper has the archive of a scope whose entry in its repository's
-.pos/config.yaml is kept remote; every other is on disk."
+A keeper has the archive of a scope whose entry in its node's
+configuration is kept remote; every other is on disk."
   (let ((entry (pos-ledger--entry archive)))
     (and entry (equal (alist-get 'kept entry) "remote")
          (alist-get 'url entry))))
 
 (defun pos-ledger-named (archive)
   "Return the id ARCHIVE's ledger is to have, or nil if none is named.
-The ledger key of the scope's entry in its repository's
-.pos/config.yaml: a keeper may be bound to a ledger's id before the
+The ledger key of the scope's entry in its node's configuration: a
+keeper may be bound to a ledger's id before the
 ledger has an event, so the entry says what the id is."
   (alist-get 'ledger (pos-ledger--entry archive)))
 

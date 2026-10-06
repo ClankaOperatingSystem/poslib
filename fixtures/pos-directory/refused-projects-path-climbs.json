@@ -1,0 +1,5 @@
+{
+ "about": "Where projects belong is beneath the node.",
+ "yaml": "pos: 2\nprojects: ../elsewhere\n",
+ "refused": "bad-path"
+}
