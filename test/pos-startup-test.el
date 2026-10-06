@@ -189,13 +189,23 @@
                      '("Responsibilities with a review to be scheduled"
                        "health/teeth" "responsibilities/garden"))))))
 
+(ert-deftest pos-startup-view/intray-lists-what-is-captured-and-not-placed ()
+  "Open items under Unsorted in each intray, labelled by its scope."
+  (pos-startup-test-with-tree
+    (let ((text (pos-startup-view root "intray")))
+      (should (string-prefix-p "Intray, to be placed\n" text))
+      (should (equal (pos-startup-test-lines text)
+                     '(("health/intray" . "TODO Book the dentist")
+                       ("intray" . "NEXT Answer the letter")
+                       ("intray" . "TODO Sort the shelf")))))))
+
 (ert-deftest pos-startup-view/an-empty-view-says-none ()
   "A view with no item, and each empty list of a view, says so."
   (let ((root (file-name-as-directory (make-temp-file "pos-startup" t))))
     (unwind-protect
         (progn
           (with-temp-file (expand-file-name "intray.org" root) (insert "* Unsorted\n"))
-          (dolist (view '("next" "scheduled" "deadlines" "all"))
+          (dolist (view '("next" "scheduled" "deadlines" "intray" "all"))
             (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view))))
           (should (= 2 (length (split-string (pos-startup-view root "reviews")
                                              "  (none)\n" t))))
@@ -212,7 +222,8 @@
       (should (string-prefix-p pos-startup-prompts text))
       (should (string-match-p "^Files read: 12$" text))
       (dolist (title '("NEXT items" "Scheduled items, next 14 days" "Deadlines, all open"
-                       "Project reviews, late" "Projects with a review to be scheduled"))
+                       "Project reviews, late" "Projects with a review to be scheduled"
+                       "Intray, to be placed"))
         (should (string-match-p (concat "^" title) text)))
       (should-not (string-match-p "^All TODO items" text)))
     (let ((text (pos-startup-report root '("all"))))
