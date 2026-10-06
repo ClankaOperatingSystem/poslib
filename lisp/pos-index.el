@@ -146,15 +146,19 @@ keeper keeps such a file."
 (defun pos-index-fetch (scope uri)
   "Return a buffer holding the file URI names, fetched from its keeper.
 SCOPE's index says which keeper has it; nil if none does.  The buffer
-is read-only, visits no file, and is in the mode the file's name
-gives."
+is read-only, visits no file, and has the coding and the mode the
+file's name and bytes give, as visiting the file would."
   (pcase (pos-index--kept-read scope uri)
     (`(,bytes ,_ ,name)
-     (let ((buffer (generate-new-buffer name)))
+     (let ((buffer (generate-new-buffer name))
+           (file (expand-file-name name scope)))
        (with-current-buffer buffer
-         (insert (decode-coding-string bytes 'utf-8))
+         ;; The bytes as they are, then decoded as a file of that name is.
+         (insert bytes)
+         (decode-coding-inserted-region (point-min) (point-max) file)
+         (setq buffer-file-coding-system last-coding-system-used)
          (goto-char (point-min))
-         (let ((buffer-file-name (expand-file-name name scope)))
+         (let ((buffer-file-name file))
            (set-auto-mode))
          (set-buffer-modified-p nil)
          (setq buffer-read-only t))
