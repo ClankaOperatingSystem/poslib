@@ -423,6 +423,116 @@ planned, because of a finding."
   (unless (pos-tree--excluded-p dir path)
     (pos-tree--act "exclude" `(repository . ,(pos-tree--rel dir)) `(path . ,path))))
 
+(defconst pos-tree--archive-begin "# BEGIN ClankOS archive excludes\n"
+  "Opening marker of the archive rules this tool maintains.")
+
+(defconst pos-tree--archive-end "# END ClankOS archive excludes\n"
+  "Closing marker of the archive rules this tool maintains.")
+
+(defun pos-tree--archive-block (text)
+  "Return the bounds of our block in TEXT, or nil; refuse damaged markers."
+  (let ((offset 0) starts ends)
+    (dolist (line (split-string text "\n"))
+      (when (equal (concat line "\n") pos-tree--archive-begin) (push offset starts))
+      (when (equal (concat line "\n") pos-tree--archive-end)
+        (push (+ offset (length line) 1) ends))
+      (setq offset (+ offset (length line) 1)))
+    (when (or starts ends)
+      (unless (and (= (length starts) 1) (= (length ends) 1)
+                   (< (car starts) (car ends)))
+        (pos-tree--refuse 'archive-excludes "Damaged archive exclude block"))
+      (cons (car starts) (min (length text) (car ends))))))
+
+(defun pos-tree--archive-text (dir paths)
+  "Return the old exclude text and its replacement for DIR and archive PATHS.
+Preserve rules outside our block.  Quote glob characters and spaces in
+anchored, directory-only Git patterns."
+  (let* ((file (pos-tree--exclude-file dir))
+         (old (with-temp-buffer
+                (when (file-symlink-p file)
+                  (pos-tree--refuse 'archive-excludes "The exclude file is a symbolic link"))
+                (when (file-exists-p file) (insert-file-contents file))
+                (buffer-string)))
+         (bounds (pos-tree--archive-block old))
+         (block (if (seq-empty-p paths) ""
+                  (concat pos-tree--archive-begin
+                          (mapconcat
+                           (lambda (path)
+                             (concat "/" (mapconcat
+                                          (lambda (c)
+                                            (concat (if (memq c '(?\\ ?* ?? ?\[ ?\] ?\s)) "\\" "")
+                                                    (char-to-string c))) path "") "/\n"))
+                           paths "")
+                          pos-tree--archive-end))))
+    (cons old (if bounds
+                  (concat (substring old 0 (car bounds)) block (substring old (cdr bounds)))
+                (concat old (if (and (not (string-empty-p old))
+                                     (not (string-suffix-p "\n" old))
+                                     (not (string-empty-p block))) "\n" "") block)))))
+
+(defvar pos-tree--archive-paths nil
+  "Uncommitted archive paths in the repository being planned.")
+
+(defvar pos-tree--archive-refused nil
+  "Whether an invalid node prevents updating this repository's archive rules.")
+
+(defun pos-tree--archive-scopes (dir boundaries &optional prefix)
+  "Find archive scopes below DIR, stopping at BOUNDARIES and configurations.
+PREFIX is the path relative to the node, or nil at its root."
+  (let (scopes)
+    (dolist (name (directory-files dir nil directory-files-no-dot-files-regexp))
+      (let ((full (expand-file-name name dir)) (path (concat prefix name)))
+        (unless (or (file-symlink-p full) (not (file-directory-p full))
+                    (seq-some (lambda (boundary)
+                                (or (equal path boundary)
+                                    (string-prefix-p (concat boundary "/") path))) boundaries))
+          (cond
+           ((equal name "archives") (push (if prefix (directory-file-name prefix) ".") scopes))
+           ((and (not (member name '("attic" "node_modules")))
+                 (not (string-prefix-p "." name)) (not (string-prefix-p "_" name))
+                 (not (pos-tree--repository-p full)) (not (pos-ledger-config-files full)))
+            (setq scopes (append (pos-tree--archive-scopes full boundaries (concat path "/"))
+                                 scopes)))))))
+    scopes))
+
+(defun pos-tree--plan-archives (repo base config)
+  "Collect uncommitted archives for CONFIG at BASE in REPO."
+  (let* ((entries (append (alist-get 'archives config) nil))
+         (boundaries (mapcar (lambda (e) (alist-get 'path e))
+                             (append (alist-get 'children config) (alist-get 'worktrees config) nil)))
+         (scopes (sort (delete-dups
+                        (append '(".") (mapcar (lambda (e) (alist-get 'scope e)) entries)
+                                (pos-tree--archive-scopes base boundaries))) #'string<)))
+    (dolist (scope scopes)
+      (unless (let ((at base) boundary)
+                (dolist (part (unless (equal scope ".") (split-string scope "/")))
+                  (setq at (expand-file-name part at))
+                  (when (or (pos-tree--repository-p at) (pos-ledger-config-files at))
+                    (setq boundary t)))
+                boundary)
+        (let* ((path (expand-file-name "archives" (expand-file-name scope base)))
+               (within (file-relative-name path repo))
+               (entry (seq-find (lambda (e) (equal (alist-get 'scope e) scope)) entries)))
+          (cond
+           ((pos-tree--through-link-p repo within)
+            (pos-tree--find "path-taken" (pos-tree--rel path) "a symbolic link")
+            (setq pos-tree--archive-refused t))
+           ((equal (or (alist-get 'kept entry) "uncommitted") "uncommitted")
+            (push within pos-tree--archive-paths))))))))
+
+(defun pos-tree--archive-excludes (repo)
+  "Plan the managed archive exclusions of REPO, unless a node was refused."
+  (unless pos-tree--archive-refused
+    (let ((paths (vconcat (sort (delete-dups pos-tree--archive-paths) #'string<))))
+      (condition-case err
+          (let ((texts (pos-tree--archive-text repo paths)))
+            (unless (equal (car texts) (cdr texts))
+              (pos-tree--act "archive-excludes" `(repository . ,(pos-tree--rel repo))
+                             `(paths . ,paths))))
+        (pos-tree-refused
+         (pos-tree--find "config-refused" (pos-tree--rel repo)
+                         (format "%s: %s" (nth 1 err) (nth 2 err))))))))
+
 (defun pos-tree--through-link-p (dir path)
   "Return non-nil if PATH, beneath DIR, is or passes through a symbolic link."
   (let ((at dir) found)
@@ -482,6 +592,7 @@ of those that are there and are not planned."
         (worktrees (sort (append (alist-get 'worktrees config) nil)
                          (lambda (a b) (string< (alist-get 'path a) (alist-get 'path b)))))
         nodes held)
+    (when config (pos-tree--plan-archives repo base config))
     (when (eq (alist-get 'kind config) :null)
       (pos-tree--find "unconfigured" (pos-tree--rel base)))
     (dolist (child children)
@@ -538,6 +649,7 @@ of those that are there and are not planned."
                     (setq nodes (append (reverse (car below)) nodes)
                           held (append (cdr below) held))))
               (pos-tree-refused
+               (setq pos-tree--archive-refused t)
                (pos-tree--find "config-refused" shown
                                (format "%s: %s" (nth 1 err) (nth 2 err))))))))))
     (dolist (worktree worktrees)
@@ -566,8 +678,11 @@ Return its node, with a node for each repository beneath it that is
 mounted as declared, by this repository or by a directory of it."
   (let* ((pos-tree--mounted nil)
          (pos-tree--local nil)
+         (pos-tree--archive-paths nil)
+         (pos-tree--archive-refused nil)
          (declared (pos-tree--declared dir dir config)))
     (pos-tree--undeclared dir pos-tree--mounted pos-tree--local)
+    (when config (pos-tree--archive-excludes dir))
     (pos-tree--node :dir dir :config config :children (car declared)
                     :held (cdr declared))))
 
@@ -717,6 +832,12 @@ if ROOT is not a repository."
   "Do ACTION, of a plan for the tree at ROOT, a directory name."
   (let-alist action
     (pcase .do
+      ("archive-excludes"
+       (let* ((dir (expand-file-name .repository root))
+              (file (pos-tree--exclude-file dir))
+              (text (cdr (pos-tree--archive-text dir .paths))))
+         (make-directory (file-name-directory file) t)
+         (write-region text nil file nil 'silent)))
       ("exclude"
        (let ((file (pos-tree--exclude-file (expand-file-name .repository root))))
          (make-directory (file-name-directory file) t)
@@ -767,6 +888,14 @@ network."
       (pos-tree--do dir action))
     (pos-tree-plan root)))
 
+(defun pos-tree-ignore-archives (root)
+  "Apply only archive exclusions at ROOT; return the remaining tree plan.
+Read a fresh plan.  Clone no repository and change no skill link."
+  (seq-doseq (action (alist-get 'actions (pos-tree-plan root)))
+    (when (equal (alist-get 'do action) "archive-excludes")
+      (pos-tree--do (expand-file-name root) action)))
+  (pos-tree-plan root))
+
 ;;;; Command line
 
 (defconst pos-tree-usage
@@ -778,6 +907,9 @@ network."
   apply ROOT PLAN
       do what the plan in the file PLAN holds, or - for standard input,
       if the tree at ROOT still gives it; print the plan that remains
+  archives ROOT
+      update only the managed archive rules in Git's info/exclude;
+      print the remaining plan; do not clone repositories or link skills
 
 Exit 0 nothing to do, 1 something to do or to report, 2 refused.
 "
@@ -796,6 +928,7 @@ Exit 0 nothing to do, 1 something to do or to report, 2 refused.
   (condition-case err
       (pcase (prog1 command-line-args-left (setq command-line-args-left nil))
         (`("plan" ,root) (pos-tree--print (pos-tree-plan root)))
+        (`("archives" ,root) (pos-tree--print (pos-tree-ignore-archives root)))
         (`("apply" ,root ,file)
          (pos-tree--print
           (pos-tree-apply

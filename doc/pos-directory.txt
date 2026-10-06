@@ -190,6 +190,24 @@ ledger stays with the scope and is committed.
 The entry for an archive is looked for in the nearest node at or above
 its scope: the nearest directory with a configuration.
 
+The tree tool maintains a marked block in each repository's
+.git/info/exclude for its uncommitted archives. It covers each declared
+node, each explicitly named archive scope (even before its directory
+exists), and other scopes found by their archives directories. It
+does not enter archives, attics, hidden or underscore directories,
+node_modules, undeclared nodes, or products. A declared child reads
+its own policy; a parent's default does not override it.
+
+Patterns are anchored at the repository root, match directories only,
+and quote spaces and Git glob characters. When a policy changes, the
+block is replaced, leaving all rules outside it alone. Committed and
+remote archives get no exclusion from this block. A damaged block,
+symbolic link at an archive path or exclude file, or a refused local
+node configuration is reported and leaves the repository's block
+unchanged. The tool does not remove files from Git's index; already
+tracked files stay tracked. Existing user ignore rules, including
+/archives/ written by earlier initiate versions, stay as they are.
+
 A ledger otherwise draws its id when its first event is made. A keeper
 may be bound to a ledger's id before that event exists, so an entry can
 say what the id is. An entry whose ledger is not such a UUID is refused
@@ -274,6 +292,7 @@ A plan holds actions:
 
     clone       a declared child or worktree that is not there
     exclude     a path to add to a .git/info/exclude
+    archive-excludes  replace the managed archive block in info/exclude
     link        a skill link to make, or the .claude/skills link
     unlink      a link the tool made whose skill or declaration is gone
     configure   an agent's file to write or remove for a server
@@ -314,6 +333,8 @@ An action is an object whose do is the action's name. With it:
     clone       path, branch, and remote or of
     exclude     repository and path, the path relative to the
                 repository
+    archive-excludes  repository and paths, a sorted array of archive
+                directory paths relative to that repository
     link        path and target, the text of the link
     unlink      path
 
@@ -335,14 +356,22 @@ The tool keeps these rules:
     not yet merged mounts nothing. The configuration of the repository
     the tool is run in, and of each directory of a repository, is read
     from the working tree.
-  - It never writes over what is there, never removes a working tree,
-    and never writes outside the tree it is run in.
+  - It replaces only its marked archive block, otherwise never writes
+    over what is there, never removes a working tree, and never writes
+    outside the tree it is run in.
   - Run in a repository, it takes that repository as the root. It does
     not look for a container, and a link whose target is outside the
     tree is left as it is.
   - A link is the tool's if it is an untracked symbolic link in
     .agents/skills/ whose target is a skill's directory in another
     repository of the tree. It keeps no record besides.
+
+The archives ROOT command applies only archive-excludes actions from
+a fresh plan and prints the remaining plan. It clones nothing and
+changes no skill link. Initiation and tree-building commands use this
+operation after writing configuration. Like plan and apply, it exits
+0 for an empty remaining plan, 1 for remaining work or findings, and
+2 for a refusal.
 
 
 8. Tests
