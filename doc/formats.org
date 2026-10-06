@@ -362,6 +362,9 @@ canonical JSON:
   =README.org= declares them, sorted;
 - =inventory_sha256=: the SHA-256 of the archive's inventory, in
   canonical JSON, as planned;
+- =remove_empty_staging=: =_seal= only when the source directory's own
+  immediate =_seal/= is empty; otherwise the key is absent. Planning
+  leaves it in place;
 - =kept=: for an archive a keeper keeps, the keeper's URL; for one on
   disk the key is absent.
 
@@ -452,12 +455,17 @@ applies any plan.
 2. The events since the plan's =previous= must seal a prefix of its
    rumours, then its item, in order, else =plan=; before any, the archive's
    inventory must be as planned.
+   Before publishing rumours for an unsealed item, check its staging
+   directory: if removal was planned, it must still be a real empty
+   directory or already absent, else =plan=. An empty =_seal/= without
+   planned removal also refuses (=plan=), requiring a new plan.
 3. Each rumour not yet sealed is published at its destination and sealed:
    an event whose =item= is the rumour and whose =add= is its entry.
 4. Unless the item has moved already, each file in =originals= is
    rewritten where it lies, its links replaced at their offsets, unless it
    has been already; the item's entries must then be as planned, else
-   =plan=; then the item moves to its destination in one rename.
+   =plan=; remove its planned empty staging directory, then move the item
+   to its destination in one rename.
 5. The item's entries at the destination must be as planned, else =plan=.
 6. Unless sealed already, its event is written: =previous=, the ledger's
    head; =ledger_id=, =add= and =collections= from the plan; =item=, the
@@ -474,6 +482,12 @@ applies any plan.
 
 Applying a plan again after an interruption finishes it, and after
 completion changes nothing.
+
+Staging removal is nonrecursive and concerns only the source's own
+=_seal/=. Nonempty staging, other empty directories and staging directories
+inside nested evidence remain part of the item. On resumption after the
+move, planned removal finishes at the destination before its event is
+written. Already sealed evidence is never pruned.
 
 A program that seals or writes records itself, with no one to review each
 plan, uses =seal SOURCE DESTINATION --apply= or =write-new DESTINATION
@@ -502,7 +516,8 @@ as the plan says: by that keeper, or on disk for a plan without the key.
    file its text is.
 5. Unless its event is in the ledger, the item's files in =originals=
    are rewritten where it lies, its entries must be as planned, else
-   =plan=, and its event is sent with every file it enrols. The event
+   =plan=; its planned empty staging directory is removed, and its event
+   is sent with every file it enrols. The event
    is as in step 6 above, of schema 3, =empty= as found in the item
    where it lies.
 6. An event is written to the ledger once the keeper has answered that

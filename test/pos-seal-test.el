@@ -150,6 +150,68 @@ refusal, as fixtures/ledger/ of kind convert."
   (pos-seal-plan (expand-file-name "trial" scope)
                  (expand-file-name "archives/trial" scope)))
 
+(ert-deftest pos-seal/remove-only-the-items-own-empty-staging ()
+  "Planning leaves staging alone; applying removes only the planned directory."
+  (pos-seal-test-with-scope
+    (dolist (name '("_seal" "empty" "archives/old/_seal"))
+      (make-directory (expand-file-name (concat "trial/" name) scope) t))
+    (let* ((plan (pos-seal-test-plan scope))
+           (hash (pos-ledger--sha (pos-ledger-json plan))))
+      (should (equal "_seal" (alist-get 'remove_empty_staging plan)))
+      (should (file-directory-p (expand-file-name "trial/_seal" scope)))
+      (let* ((result (pos-seal-apply plan hash))
+             (event (pos-ledger--parse (pos-ledger--read (car result)))))
+        (should (equal (append (alist-get 'empty event) nil)
+                       '("trial/archives/old/_seal" "trial/empty")))
+        (should-not (file-exists-p (expand-file-name "archives/trial/_seal" scope)))
+        (should (equal result (pos-seal-apply plan hash)))))))
+
+(ert-deftest pos-seal/nonempty-staging-is-preserved ()
+  "Staged bytes are evidence, not disposable empty staging."
+  (pos-seal-test-with-scope
+    (pos-fixture-write (expand-file-name "trial/_seal/draft.txt" scope) "draft")
+    (let ((plan (pos-seal-test-plan scope)))
+      (should-not (alist-get 'remove_empty_staging plan))
+      (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))
+      (should (equal "draft" (pos-ledger--read
+                             (expand-file-name "archives/trial/_seal/draft.txt" scope)))))))
+
+(ert-deftest pos-seal/changed-staging-refuses-before-moving ()
+  "A changed staging directory must not be deleted or archived by an old plan."
+  (dolist (change '(file directory hidden symlink unplanned))
+    (ert-info ((symbol-name change))
+      (pos-seal-test-with-scope
+        (let ((folder (expand-file-name "trial/_seal" scope)))
+          (unless (eq change 'unplanned) (make-directory folder))
+          (let ((plan (pos-seal-test-plan scope)))
+            (pcase change
+              ('file (pos-fixture-write (expand-file-name "draft.txt" folder) "draft"))
+              ('hidden (pos-fixture-write (expand-file-name ".hidden" folder) "draft"))
+              ('directory (make-directory (expand-file-name "empty" folder)))
+              ('symlink
+               (delete-directory folder)
+               (make-symbolic-link (expand-file-name "archives" scope) folder))
+              ('unplanned (make-directory folder)))
+            (pos-ledger-test-refused
+             "plan" (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan))))
+            (should (file-exists-p folder))
+            (should-not (file-exists-p (expand-file-name "archives/trial" scope)))))))))
+
+(ert-deftest pos-seal/staging-removal-resumes-before-and-after-the-move ()
+  "A missing staging directory or a move without an event can be resumed."
+  (dolist (moved '(nil t))
+    (pos-seal-test-with-scope
+      (let ((folder (expand-file-name "trial/_seal" scope)))
+        (make-directory folder)
+        (let* ((plan (pos-seal-test-plan scope))
+               (hash (pos-ledger--sha (pos-ledger-json plan))))
+          (if moved
+              (rename-file (alist-get 'source plan) (alist-get 'destination plan))
+            (delete-directory folder))
+          (let ((result (pos-seal-apply plan hash)))
+            (should (equal result (pos-seal-apply plan hash))))
+          (should-not (file-exists-p (expand-file-name "archives/trial/_seal" scope))))))))
+
 (ert-deftest pos-seal/every-shared-fixture-keeps-the-same-way ()
   "What was moved to a keeper, what was left with its reason and the
 report after, or the refusal, as fixtures/ledger/ of kind keep: each

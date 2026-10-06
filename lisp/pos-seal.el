@@ -240,6 +240,30 @@ item, from WRITTEN-AT if given."
 
 ;;;; Plans
 
+(defun pos-seal--empty-staging-p (source)
+  "Return non-nil if directory SOURCE's own _seal is a real, empty directory."
+  (let ((folder (expand-file-name "_seal" source)))
+    (and (file-directory-p source) (not (file-symlink-p folder))
+         (file-directory-p folder) (directory-empty-p folder))))
+
+(defun pos-seal--staging (plan source &optional remove)
+  "Check PLAN's removal of SOURCE's own empty staging directory.
+With REMOVE, remove that directory only.  Absence is safe on resumption;
+a nonempty directory, file or link is never removed."
+  (let ((folder (expand-file-name "_seal" source)))
+    (if (equal (alist-get 'remove_empty_staging plan) "_seal")
+        (when (or (file-exists-p folder) (file-symlink-p folder))
+          (unless (pos-seal--empty-staging-p source)
+            (pos-ledger--refuse 'plan "Staging directory changed since review: %s" folder))
+          (when remove
+            (condition-case nil
+                (delete-directory folder)
+              (file-error
+               (pos-ledger--refuse 'plan "Cannot remove empty staging directory: %s" folder)))))
+      (when (pos-seal--empty-staging-p source)
+        (pos-ledger--refuse 'plan "Empty staging directory was not in the reviewed plan: %s"
+                            folder)))))
+
 (defun pos-seal-plan (source destination &optional ledger-id date as-destination)
   "Return the plan to seal SOURCE at DESTINATION, inside an archive.
 LEDGER-ID names a new ledger; by default it takes the id its scope's
@@ -332,6 +356,7 @@ are read as written from DESTINATION, not from where it lies."
               (add . ,add) (collections . ,(vconcat collections))
               (links . ,links) (originals . ,originals) (rumours . ,rumours)
               (inventory_sha256 . ,(pos-ledger--sha (pos-ledger-json actual)))
+              ,@(when (pos-seal--empty-staging-p source) '((remove_empty_staging . "_seal")))
               ,@(when kept `((kept . ,kept))))))))))
 
 (defun pos-seal-stage (bytes destination &optional ledger-id)
@@ -537,6 +562,8 @@ Return (EVENT-FILE . ROOT)."
         (unless (equal (pos-ledger--sha (pos-ledger-json (pos-ledger-inventory .archive)))
                        .inventory_sha256)
           (pos-ledger--refuse 'plan "Archive changed since review: %s" .archive)))
+      (unless (member rel sealed)
+        (pos-seal--staging plan (if (file-exists-p .destination) .destination .source)))
       ;; Rumours first: each an item of its own.
       (seq-doseq (rumour .rumours)
         (let-alist rumour
@@ -559,6 +586,7 @@ Return (EVENT-FILE . ROOT)."
                                       (pos-seal--files .source rel))
                               (lambda (a b) (string< (car a) (car b))))))
           (pos-ledger--refuse 'plan "Item changed since review: %s" .source))
+        (pos-seal--staging plan .source t)
         (make-directory (file-name-directory .destination) t)
         (rename-file .source .destination))
       (unless (equal (pos-ledger-json .add)
@@ -566,6 +594,7 @@ Return (EVENT-FILE . ROOT)."
                                                               .add))))
         (pos-ledger--refuse 'plan "Item changed after the move: %s" .destination))
       (unless (member rel sealed)
+        (pos-seal--staging plan .destination t)
         (pos-seal--event plan .destination .add .collections))
       (dolist (pair .add)
         (pos-seal--protect (expand-file-name (pos-ledger--key (car pair)) .archive)))
@@ -684,6 +713,8 @@ Interrupted, it resumes.  Return (EVENT-FILE . ROOT)."
                                 .archive (car (pos-ledger-history .archive)))))
                              .inventory_sha256)))
         (pos-ledger--refuse 'plan "Archive changed since review: %s" .archive))
+      (unless (member rel sealed)
+        (pos-seal--staging plan .source))
       ;; Rumours first: each an item of its own, of the one file its text is.
       (seq-doseq (rumour .rumours)
         (let-alist rumour
@@ -703,6 +734,7 @@ Interrupted, it resumes.  Return (EVENT-FILE . ROOT)."
         (let ((entries (funcall entries-of)))
           (unless (equal (pos-ledger-json .add) (pos-ledger-json entries))
             (pos-ledger--refuse 'plan "Item changed since review: %s" .source))
+          (pos-seal--staging plan .source t)
           (funcall send rel .add .collections (pos-seal--empty .source rel)
                    (seq-uniq
                     (mapcar (lambda (pair)

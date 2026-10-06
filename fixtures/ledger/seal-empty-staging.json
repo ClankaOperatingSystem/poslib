@@ -1,0 +1,84 @@
+{
+ "kind": "seal",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "description": "An empty staging directory immediately inside the retiring item is removed before sealing; the event and root are unchanged.",
+ "tree": [
+  {
+   "path": "scope/archives",
+   "directory": true
+  },
+  {
+   "path": "scope/trial/README.org",
+   "text": "#+TITLE: Trial\n#+COLLECTION: t\n\nWhat it holds.\n"
+  },
+  {
+   "path": "scope/trial/sub/x.txt",
+   "text": "data"
+  },
+  {
+   "path": "scope/trial/empty",
+   "directory": true
+  },
+  {
+   "path": "scope/trial/_seal",
+   "directory": true
+  }
+ ],
+ "source": "scope/trial",
+ "destination": "scope/archives/trial",
+ "event": {
+  "name": "00000001-baguqeerabss7d6oon3uonbszd72xry5mtgewxszcpvvxvvtxofihicduxoaq.json",
+  "encoded": "{\"add\":{\"trial/README.org\":{\"cid\":\"bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy\",\"mode\":292,\"sha256\":\"b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae\",\"size\":47},\"trial/sub/x.txt\":{\"cid\":\"bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4\",\"mode\":292,\"sha256\":\"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7\",\"size\":4}},\"collections\":[\"trial\"],\"empty\":[\"trial/empty\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm\",\"schema\":3}"
+ },
+ "plan": {
+  "add": {
+   "trial/README.org": {
+    "cid": "bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy",
+    "mode": 292,
+    "sha256": "b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae",
+    "size": 47
+   },
+   "trial/sub/x.txt": {
+    "cid": "bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4",
+    "mode": 292,
+    "sha256": "3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7",
+    "size": 4
+   }
+  },
+  "archive": "scope/archives",
+  "collections": [
+   "trial"
+  ],
+  "destination": "scope/archives/trial",
+  "inventory_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+  "ledger": "scope/archive-integrity/ledger",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "links": [],
+  "number": 1,
+  "operation": "seal",
+  "originals": {},
+  "previous": null,
+  "rumours": [],
+  "schema": 2,
+  "source": "scope/trial",
+  "remove_empty_staging": "_seal"
+ },
+ "report": [
+  {
+   "archive": "scope/archives",
+   "kept": null,
+   "keeper": null,
+   "head": "baguqeerabss7d6oon3uonbszd72xry5mtgewxszcpvvxvvtxofihicduxoaq",
+   "events": 1,
+   "files": 2,
+   "writable": [],
+   "root": "bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm",
+   "recorded_root": "bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  }
+ ]
+}
