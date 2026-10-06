@@ -433,11 +433,11 @@ A record staged by write-new leaves it so."
 
 (defun pos-seal--drop-staging (top)
   "Remove each staging directory left empty under TOP, an item.
-Hidden directories are not entered, nor links followed."
+Hidden directories and nested archives are not entered, nor links followed."
   (when (and (file-directory-p top) (not (file-symlink-p top)))
     (dolist (name (pos-ledger--entries top))
       (let ((path (expand-file-name name top)))
-        (cond ((string-prefix-p "." name))
+        (cond ((or (string-prefix-p "." name) (equal name "archives")))
               ((pos-seal--staging-p path) (delete-directory path))
               (t (pos-seal--drop-staging path)))))))
 
@@ -806,32 +806,82 @@ before checkpointing: %s" root))
                  (pos-ledger--refuse 'checkpoint "Checkpoint conflict: %s" file)))))
       home)))
 
+(defun pos-seal--missing-directories (archive known recorded empty)
+  "Return missing directories in ARCHIVE needed by the ledger's EMPTY paths.
+KNOWN entries and EMPTY must fold to RECORDED.  Check every existing
+component before returning paths in parent-before-child order."
+  (when empty
+    (unless (equal recorded (cdr (assoc "." (pos-ledger-fold known empty))))
+      (pos-ledger--refuse 'root "Ledger cannot reconstruct the recorded root: %s" archive))
+    (let (missing)
+      (dolist (name empty)
+        (let ((path archive))
+          (dolist (part (split-string name "/"))
+            (setq path (expand-file-name part path))
+            (cond
+             ((or (file-symlink-p path)
+                  (and (file-exists-p path) (not (file-directory-p path))))
+              (pos-ledger--refuse 'differs "Recorded directory is obstructed: %s" path))
+             ((not (file-exists-p path))
+              (unless (member path missing) (push path missing)))))))
+      (nreverse missing))))
+
+(defun pos-seal--read-bits-only-p (file entry)
+  "Return non-nil if FILE differs from recorded ENTRY only in read or write bits."
+  (let ((actual (if (assq 'cid entry) (pos-seal--entry file)
+                  (pos-ledger-record file))))
+    (seq-every-p
+     (lambda (pair)
+       (let ((now (alist-get (car pair) actual)))
+         (if (eq (car pair) 'mode)
+             (equal (logand now (lognot #o444)) (logand (cdr pair) (lognot #o444)))
+           (equal now (cdr pair)))))
+     entry)))
+
 (defun pos-seal-repair (root)
-  "Remove write bits from the verified evidence under ROOT.
-Enrolled files, ledger events and checkpoints; never enrols.  Refused if
-any enrolled file changed or is missing.  Return an alist: repaired, the
-files changed, and unregistered, the files the ledgers do not know."
-  (let ((report (pos-ledger-check root)) (count 0))
-    (when (seq-some (lambda (a) (or (> (length (alist-get 'changed a)) 0)
-                                    (> (length (alist-get 'missing a)) 0)))
-                    report)
+  "Restore recorded empty directories and protect verified evidence under ROOT.
+Never enrols or rewrites a ledger.  Restores recorded read bits, but refuses
+changed bytes or other mode bits, and missing files.
+Return an alist: repaired, the files protected; restored,
+the directories created; and unregistered, the files the ledgers do not know."
+  (let ((report (pos-ledger-check root)) (count 0) (restored 0) directories)
+    (when (seq-some (lambda (a) (> (length (alist-get 'missing a)) 0)) report)
       (pos-ledger--refuse 'differs "Evidence changed or is missing; repair refused: %s"
                           root))
-    (let ((protect (lambda (file)
-                     (when (pos-ledger--writable-p file)
-                       (set-file-modes file (logand (pos-ledger--mode file) (lognot #o222))
-                                       'nofollow)
-                       (setq count (1+ count))))))
+    ;; Validate every archive and destination before changing any of them.
+    (dolist (a report)
+      (when (eq (alist-get 'kept a) :null)
+        (let* ((archive (alist-get 'archive a))
+               (history (pos-ledger-history archive)))
+          (seq-doseq (name (alist-get 'changed a))
+            (unless (pos-seal--read-bits-only-p
+                     (expand-file-name name archive) (cdr (assoc name (nth 0 history))))
+              (pos-ledger--refuse 'differs "Evidence changed; repair refused: %s" archive)))
+          (setq directories
+                (append directories
+                        (pos-seal--missing-directories
+                         archive (nth 0 history) (nth 4 history) (nth 7 history)))))))
+    (dolist (directory directories)
+      (make-directory directory)
+      (setq restored (1+ restored)))
+    (let ((protect (lambda (file &optional recorded-mode)
+                     (pos-ledger--regular file)
+                     (let* ((mode (pos-ledger--mode file))
+                            (target (or recorded-mode (logand mode (lognot #o222)))))
+                       (unless (= mode target)
+                         (set-file-modes file target 'nofollow)
+                         (setq count (1+ count)))))))
       (dolist (a report)
         (let ((archive (alist-get 'archive a)))
           (pcase-let ((`(,known ,_ ,_ ,files) (pos-ledger-history archive)))
             ;; A keeper holds a kept archive's files; only its ledger is here.
             (when (eq (alist-get 'kept a) :null)
               (dolist (pair known)
-                (funcall protect (expand-file-name (car pair) archive))))
+                (funcall protect (expand-file-name (car pair) archive)
+                         (alist-get 'mode (cdr pair)))))
             (mapc protect files))))
       (mapc protect (pos-ledger--checkpoint-files root (pos-ledger-roots root))))
-    `((repaired . ,count)
+    `((repaired . ,count) (restored . ,restored)
       (unregistered . ,(apply #'+ (mapcar (lambda (a) (length (alist-get 'new a))) report))))))
 
 ;;;; Conversion
@@ -1034,7 +1084,7 @@ reason."
   checkpoint ROOT
       record the ledger heads under ROOT, once the check is clean
   repair ROOT
-      remove write bits from verified evidence; never enrols
+      restore recorded directories and read bits; remove write bits; never enrols
   convert ROOT
       bring each schema 2 ledger under ROOT to schema 3, once it is clean
   keep ROOT

@@ -485,12 +485,82 @@ a sealed file's bytes have changed."
     (let* ((archive (pos-seal-test-sealed scope))
            (file (expand-file-name "trial/result.md" archive)))
       (set-file-modes file #o644)
-      (should (equal '((repaired . 1) (unregistered . 0)) (pos-seal-repair scope)))
+      (should (equal '((repaired . 1) (restored . 0) (unregistered . 0)) (pos-seal-repair scope)))
       (should (zerop (logand (file-modes file) #o222)))
       (set-file-modes file #o644)
       (pos-fixture-write file "changed" #o644)
       (should-error (pos-seal-repair scope) :type 'pos-ledger-refused)
       (should (/= 0 (logand (file-modes file) #o222))))))
+
+(ert-deftest pos-seal/retirement-preserves-nested-archives ()
+  "Staging cleanup must not change the CID of an archive inside the item."
+  (pos-seal-test-with-scope
+    (let ((archive (expand-file-name "trial/archives" scope)))
+      (make-directory (expand-file-name "old/_seal" archive) t)
+      (pos-fixture-write (expand-file-name "old/record.txt" archive) "recorded")
+      (let ((before (pos-cid-directory archive)))
+        (pos-seal-test-sealed scope)
+        (should (equal before (pos-cid-directory
+                               (expand-file-name "archives/trial/archives" scope))))
+        (should (file-directory-p
+                 (expand-file-name "archives/trial/archives/old/_seal" scope)))))))
+
+(ert-deftest pos-seal/repair-restores-recorded-directories ()
+  "Restore empty directories lost on checkout without rewriting ledger events."
+  (pos-seal-test-with-scope
+    (make-directory (expand-file-name "trial/empty/leaf" scope) t)
+    (let* ((archive (pos-seal-test-sealed scope))
+           (history (pos-ledger-history archive))
+           (events (mapcar #'pos-ledger--read (nth 3 history)))
+           (folder (expand-file-name "trial/empty" archive)))
+      (delete-directory folder t)
+      (should (pos-seal-findings-p (pos-ledger-check scope)))
+      (should (equal '((repaired . 0) (restored . 2) (unregistered . 0))
+                     (pos-seal-repair scope)))
+      (should-not (pos-seal-findings-p (pos-ledger-check scope)))
+      (should (equal history (pos-ledger-history archive)))
+      (should (equal events (mapcar #'pos-ledger--read (nth 3 history))))
+      (should (equal '((repaired . 0) (restored . 0) (unregistered . 0))
+                     (pos-seal-repair scope))))))
+
+(ert-deftest pos-seal/repair-restores-recorded-read-bits ()
+  "Git loses restrictive read permissions; restore them after verifying bytes."
+  (pos-seal-test-with-scope
+    (set-file-modes (expand-file-name "trial/result.md" scope) #o600)
+    (let* ((archive (pos-seal-test-sealed scope))
+           (file (expand-file-name "trial/result.md" archive)))
+      (set-file-modes file #o644)
+      (should (equal '((repaired . 1) (restored . 0) (unregistered . 0))
+                     (pos-seal-repair scope)))
+      (should (= #o400 (pos-ledger--mode file)))
+      (should-not (pos-seal-findings-p (pos-ledger-check scope))))))
+
+(ert-deftest pos-seal/repair-validates-directories-before-writing ()
+  "An obstruction or damaged file refuses restoration before any mutation."
+  (dolist (obstruction '(file symlink changed missing executable))
+    (ert-info ((symbol-name obstruction))
+      (pos-seal-test-with-scope
+        (dolist (name '("a" "z/leaf"))
+          (make-directory (expand-file-name (concat "trial/" name) scope) t))
+        (let* ((archive (pos-seal-test-sealed scope))
+               (item (expand-file-name "trial" archive))
+               (file (expand-file-name "result.md" item)))
+          (delete-directory (expand-file-name "a" item))
+          (delete-directory (expand-file-name "z" item) t)
+          (pcase obstruction
+            ('file (pos-fixture-write (expand-file-name "z" item) "obstruction"))
+            ('symlink
+             (make-directory (expand-file-name "outside" scope))
+             (make-symbolic-link (expand-file-name "outside" scope)
+                                (expand-file-name "z" item)))
+            ('changed
+             (set-file-modes file #o644)
+             (pos-fixture-write file "changed"))
+            ('executable (set-file-modes file #o744))
+            ('missing (delete-file file)))
+          (should-error (pos-seal-repair scope) :type 'pos-ledger-refused)
+          (should-not (file-exists-p (expand-file-name "a" item)))
+          (should-not (file-exists-p (expand-file-name "z/leaf" item))))))))
 
 (ert-deftest pos-seal/a-kept-archive-is-checkpointed-and-repaired-by-its-ledger ()
   "Its files are with its keeper: a checkpoint records its head, and
@@ -501,7 +571,7 @@ repair protects its ledger's events and looks for nothing else."
       (should (equal (expand-file-name "archive-integrity/checkpoints" scope)
                      (pos-seal-checkpoint scope)))
       (set-file-modes event #o644)
-      (should (equal '((repaired . 1) (unregistered . 0)) (pos-seal-repair scope)))
+      (should (equal '((repaired . 1) (restored . 0) (unregistered . 0)) (pos-seal-repair scope)))
       (should (zerop (logand (file-modes event) #o222))))))
 
 ;;;; Sealing to a keeper
