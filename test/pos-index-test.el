@@ -141,6 +141,69 @@ with the caller's token, and shown read-only in the mode its name gives."
                              asked)))
           (kill-buffer))))))
 
+(ert-deftest pos-index/a-link-s-bytes-are-read-from-disk ()
+  "The bytes of the file a link names, by its item's CID and its path or
+by its own CID, from a directory beneath the scope, an Org search after
+:: left aside.  A directory, a CID no archive has and text that is no
+link are refused as absent."
+  (pos-index-test-with-sealed
+    (let ((default-directory (file-name-as-directory (expand-file-name "trial" scope))))
+      (make-directory default-directory t)
+      (should (equal "result" (pos-index-bytes (concat "ipfs://" trial-cid "/result.md"))))
+      (should (equal "result" (pos-index-bytes
+                               (concat "ipfs://" trial-cid "/result.md::*A heading"))))
+      (should (equal "note" (pos-index-bytes (concat "ipfs://" note-cid))))
+      (should (equal "note" (pos-index-bytes (concat "ipfs://" note-cid "::a search"))))
+      (should (equal "note" (pos-index-bytes (concat "ipfs://" note-cid) scope)))
+      (dolist (uri (list (concat "ipfs://" trial-cid) "ipfs://bafkreiaaaa"
+                         (concat "ipfs://" trial-cid "/other.md") "result.md"))
+        (should (equal 'absent
+                       (cadr (should-error (pos-index-bytes uri)
+                                           :type 'pos-ledger-refused))))))))
+
+(ert-deftest pos-index/a-link-s-bytes-are-read-from-its-keeper ()
+  "The bytes of a file a keeper keeps are read from the keeper, with the
+caller's token, by the CID the ledger enrols the file under.  Bytes that
+are not that CID's are refused as entry."
+  (pos-index-test-with-kept
+    (let ((file-cid (cdr (assoc "trial/result.txt" cids))))
+      (should (equal "result" (pos-index-bytes
+                               (concat "ipfs://" (cdr (assoc "trial" cids)) "/result.txt")
+                               scope)))
+      (should (equal `(("GET" ,(concat url "/ipfs/" file-cid) "Bearer a-token")) asked))
+      (let ((pos-remote-send-function (lambda (&rest _) (cons 200 "another"))))
+        (should (equal 'entry
+                       (cadr (should-error (pos-index-bytes (concat "ipfs://" file-cid) scope)
+                                           :type 'pos-ledger-refused))))))))
+
+(ert-deftest pos-index/a-program-prints-a-link-s-bytes ()
+  "fetch LINK prints the file's bytes as they are, whatever they are; a
+link to no archived file exits 2 and prints nothing."
+  (pos-seal-test-with-scope
+    (let ((bytes (concat (apply #'unibyte-string (number-sequence 0 255)) "\r\n\303\251")))
+      (let ((coding-system-for-write 'binary))
+        (write-region bytes nil (expand-file-name "trial/bytes.bin" scope) nil 'silent))
+      (let* ((archive (pos-seal-test-sealed scope))
+             (cid (cdr (assoc "trial" (pos-ledger-fold-cids archive))))
+             (default-directory (file-name-as-directory scope))
+             (run (lambda (link)
+                    (with-temp-buffer
+                      (set-buffer-multibyte nil)
+                      (let ((coding-system-for-read 'binary))
+                        (list (call-process
+                               (expand-file-name invocation-name invocation-directory)
+                               nil '(t nil) nil "-Q" "--batch"
+                               "-L" (file-name-directory
+                                     (expand-file-name (locate-library "markdown-mode")))
+                               "-L" (file-name-directory
+                                     (expand-file-name (locate-library "yaml")))
+                               "-L" (file-name-directory
+                                     (expand-file-name (locate-library "pos-seal")))
+                               "-l" "pos-seal" "-f" "pos-seal-batch" "fetch" link)
+                              (buffer-string)))))))
+        (should (equal (list 0 bytes) (funcall run (concat "ipfs://" cid "/bytes.bin"))))
+        (should (equal '(2 "") (funcall run (concat "ipfs://" cid "/other.bin"))))))))
+
 (ert-deftest pos-index/org-follows-ipfs-links ()
   "An ipfs: link in canon opens the archived file it names."
   (pos-index-test-with-sealed
