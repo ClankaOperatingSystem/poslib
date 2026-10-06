@@ -434,6 +434,18 @@ item's link to it is rewritten: =ipfs://=, the CID and the path within
 it, on one line. A path never sealed, or in no archive, is refused
 (=unsealed=). It reads the archive and writes nothing.
 
+=fetch LINK= prints the bytes of the file LINK names, =ipfs://CID= or
+=ipfs://CID/PATH=, and nothing else. PATH ends where an Org search
+begins, at =::=. Each scope above the current directory that has an
+archive is tried, nearest first: the file is the one at PATH beneath
+whatever the scope's archives hold under CID, or that itself. A file on
+disk is read as it lies, which a check and not this command holds to
+its ledger. A file a keeper keeps is read from the keeper
+(=doc/remote-archive-protocol.txt=) by the CID its ledger enrols, and
+bytes that are not that CID's are refused (=entry=); what the keeper
+refuses is refused by its kind. A directory, a CID no such archive
+holds, and text that is no link are refused (=absent=).
+
 A rumour lies at =rumours/DATE-HASH.org= in the archive, HASH the first 12
 hex digits of the SHA-256 of its text, DATE the plan's; one rumour serves
 every link to its target from the item, and rumours of one target that

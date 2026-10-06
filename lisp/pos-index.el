@@ -28,6 +28,7 @@
 ;; - `pos-index-build': rebuild and save a scope's index.
 ;; - `pos-index-resolve': where the file an ipfs:// link names is.
 ;; - `pos-index-fetch': a buffer of a file fetched from its keeper.
+;; - `pos-index-bytes': the bytes of the file a link names, wherever it is.
 ;; - Org follows ipfs: links through it.
 
 ;;; Code:
@@ -129,26 +130,35 @@ at.  The index is rebuilt if it does not have it."
         (funcall kept (pos-index--load scope))
         (error "No archived file for %s under %s" uri scope))))
 
-(defun pos-index-fetch (scope uri)
-  "Return a buffer holding the file URI names, fetched from its keeper.
-SCOPE's index says which keeper has it; nil if none does.  The buffer
-is read-only, visits no file, and is in the mode the file's name
-gives."
+(defun pos-index--kept-read (scope uri)
+  "Return what a keeper has of the file URI names, from SCOPE's index.
+As (BYTES FILE-CID NAME): the bytes the keeper answers with, the CID
+the ledger enrols the file under, and the file's name; or nil if no
+keeper keeps such a file."
   (pcase-let* ((scope (file-name-as-directory (file-truename scope)))
                (`(,cid . ,path) (pos-index--parse uri)))
     (pcase (or (pos-index--kept scope (pos-index--load scope) cid path)
                (pos-index--kept scope (pos-index-build scope) cid path))
       (`(,url ,file-cid ,name)
-       (let ((bytes (pos-remote-read (funcall pos-remote-keeper-function url) file-cid))
-             (buffer (generate-new-buffer name)))
-         (with-current-buffer buffer
-           (insert (decode-coding-string bytes 'utf-8))
-           (goto-char (point-min))
-           (let ((buffer-file-name (expand-file-name name scope)))
-             (set-auto-mode))
-           (set-buffer-modified-p nil)
-           (setq buffer-read-only t))
-         buffer)))))
+       (list (pos-remote-read (funcall pos-remote-keeper-function url) file-cid)
+             file-cid name)))))
+
+(defun pos-index-fetch (scope uri)
+  "Return a buffer holding the file URI names, fetched from its keeper.
+SCOPE's index says which keeper has it; nil if none does.  The buffer
+is read-only, visits no file, and is in the mode the file's name
+gives."
+  (pcase (pos-index--kept-read scope uri)
+    (`(,bytes ,_ ,name)
+     (let ((buffer (generate-new-buffer name)))
+       (with-current-buffer buffer
+         (insert (decode-coding-string bytes 'utf-8))
+         (goto-char (point-min))
+         (let ((buffer-file-name (expand-file-name name scope)))
+           (set-auto-mode))
+         (set-buffer-modified-p nil)
+         (setq buffer-read-only t))
+       buffer))))
 
 (defun pos-index--scopes (directory)
   "Return the scopes above DIRECTORY that have archives, nearest first.
@@ -181,6 +191,33 @@ keeper keeps is fetched from it and shown read-only."
                          buffer))
                      scopes))
           (t (user-error "No archived file for %s" uri)))))
+
+(defun pos-index-bytes (uri &optional directory)
+  "Return the bytes of the archived file URI names, a unibyte string.
+URI is ipfs://CID or ipfs://CID/PATH.  Each scope above DIRECTORY, by
+default the current one, is tried, nearest first.  A file on disk is
+read as it lies.  A file a keeper keeps is read from the keeper and
+must have the CID its ledger enrols it under, else `entry'.  Refuse
+`absent' if URI is no such link or no scope has such a file; a
+directory is not a file."
+  (unless (string-match-p "\\`ipfs://[^/?#:]" uri)
+    (pos-ledger--refuse 'absent "Not an ipfs:// link: %s" uri))
+  (let* ((scopes (pos-index--scopes (or directory default-directory)))
+         (file (seq-some (lambda (scope)
+                           (let ((found (ignore-errors (pos-index-resolve scope uri))))
+                             (and found (file-name-absolute-p found)
+                                  (file-regular-p found) found)))
+                         scopes)))
+    (or (and file (pos-ledger--read file))
+        (seq-some (lambda (scope)
+                    (pcase (pos-index--kept-read scope uri)
+                      (`(,bytes ,file-cid ,_)
+                       (unless (equal file-cid (pos-cid-bytes bytes))
+                         (pos-ledger--refuse
+                          'entry "The keeper's bytes are not those of %s" file-cid))
+                       bytes)))
+                  scopes)
+        (pos-ledger--refuse 'absent "No archived file for %s" uri))))
 
 (org-link-set-parameters "ipfs" :follow #'pos-index-follow)
 

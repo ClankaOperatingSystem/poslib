@@ -47,6 +47,8 @@
 (require 'pos-links)
 (require 'pos-remote)
 
+(declare-function pos-index-bytes "pos-index" (uri &optional directory))
+
 ;;;; Items
 
 (defun pos-seal--outermost-archive (path)
@@ -1091,6 +1093,9 @@ reason."
       move to its keeper each archive under ROOT a keeper is to keep
   link PATH
       print the ipfs:// link to PATH, a sealed path in an archive
+  fetch LINK
+      print the bytes of the archived file LINK names, an ipfs:// link,
+      from a scope above the current directory: on disk or its keeper's
   sign-in URL
       sign in to the keeper at URL, in a browser, and keep the token
 
@@ -1158,6 +1163,10 @@ Exit 0 done or clean, 1 findings, 2 refused.
         (`("link" ,path)
          (princ (pos-links-link path))
          (terpri))
+        (`("fetch" ,link)
+         (require 'pos-index)
+         ;; The file's bytes as they are: `princ' would encode them.
+         (send-string-to-terminal (pos-index-bytes link)))
         (`("sign-in" ,url)
          (princ (json-serialize (pos-signin url) :false-object :false))
          (terpri))
