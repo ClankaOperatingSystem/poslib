@@ -47,7 +47,7 @@
 ;;;; Fixtures
 
 (defmacro pos-test-configured (&rest body)
-  "Evaluate BODY with the configuration test/pos-config.el shows in force.
+  "Evaluate BODY with the configuration of test/pos-config.el in force.
 Pillars life, sport, people, work, body and meta; prose directories
 under meta; a refile rule each for work and body."
   (declare (indent 0))
@@ -779,7 +779,7 @@ a heading."
 ;;;; Dedupe
 
 (defun pos-test-copy (file line &optional body parent)
-  "Return the entry `pos--task-entries' makes for a copy of \"Fix the gate\".
+  "Return the `pos--task-entries' entry for a copy of \"Fix the gate\".
 The copy is in FILE under /repo/, at LINE, with BODY, default empty,
 under PARENT, default none, and has no ID."
   (list :key "fix the gate" :heading "Fix the gate"
