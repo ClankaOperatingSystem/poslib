@@ -96,8 +96,9 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
 (defvar pos-startup--root nil
   "The root being read, while a view is made.")
 
-(defvar pos-startup--configured nil
-  "The configured responsibilities found, as (ROOT . PATHS), or nil.
+(defvar pos-startup--scopes nil
+  "The configured responsibilities beneath `pos-startup--root', sorted.
+Relative to the root, as `pos-startup--configured' returns them.
 Bound while a view is made, so that the tree is walked once for it.")
 
 ;;;; Files and scopes
@@ -129,41 +130,40 @@ Excluded directories are not entered."
                  (lambda (directory) (not (pos-startup--excluded-p directory)))
                  t))))
 
+(defun pos-startup--kind (directory)
+  "Return the kind DIRECTORY's configuration gives it, or nil.
+The kind as `pos-tree-read-config' returns it.  Nil for a directory
+with no configuration, and for one whose configuration is refused,
+which `pos-tree-refused' signals; any other error is signalled."
+  (condition-case nil
+      (when-let* ((file (pos-tree-config-file directory)))
+        (alist-get 'kind
+                   (pos-tree-read-config
+                    (with-temp-buffer
+                      (insert-file-contents (expand-file-name file directory))
+                      (buffer-string)))))
+    (pos-tree-refused nil)))
+
 (defun pos-startup--configured (root)
   "Return the path of each configured responsibility beneath ROOT.
 A directory whose configuration says where its projects belong, as
 doc/pos-directory.txt has it.  Relative to ROOT, which is not one of
 them, sorted.  A configuration that is refused makes nothing a
 responsibility."
-  (if (equal (car pos-startup--configured) root)
-      (cdr pos-startup--configured)
-    (let (found)
-      (dolist (directory (pos-startup--directories root))
-        (when (equal "responsibility"
-                     (ignore-errors
-                       (when-let* ((file (pos-tree-config-file directory)))
-                         (alist-get
-                          'kind
-                          (pos-tree-read-config
-                           (with-temp-buffer
-                             (insert-file-contents
-                              (expand-file-name file directory))
-                             (buffer-string)))))))
-          (push (file-relative-name directory root) found)))
-      (setq found (sort found #'string<))
-      ;; Kept for the length of a view only: the tree may change after.
-      (when pos-startup--root
-        (setq pos-startup--configured (cons root found)))
-      found)))
+  (let (found)
+    (dolist (directory (pos-startup--directories root))
+      (when (equal "responsibility" (pos-startup--kind directory))
+        (push (file-relative-name directory root) found)))
+    (sort found #'string<)))
 
-(defun pos-startup--owner (file root)
+(defun pos-startup--owner (file root configured)
   "Return (KIND . PATH) for the scope under ROOT that FILE belongs to.
 KIND is the symbol project or responsibility, and PATH is relative to
-ROOT.  The scope is the deepest on FILE's path: a configured
-responsibility, or what a directory named projects or responsibilities
-holds.  Nil for a file that belongs to ROOT itself."
+ROOT.  The scope is the deepest on FILE's path: one of CONFIGURED,
+the paths of the configured responsibilities relative to ROOT, or
+what a directory named projects or responsibilities holds.  Nil for a
+file that belongs to ROOT itself."
   (let* ((parts (split-string (file-relative-name file root) "/" t))
-         (configured (pos-startup--configured root))
          (owner nil) (index 0))
     (while (< (1+ index) (length parts))
       (let ((here (mapconcat #'identity (seq-take parts (1+ index)) "/"))
@@ -181,8 +181,10 @@ holds.  Nil for a file that belongs to ROOT itself."
     owner))
 
 (defun pos-startup--files-of-kind (kind root)
-  "Return the files under ROOT that belong to a scope of KIND."
-  (seq-filter (lambda (file) (eq (car (pos-startup--owner file root)) kind))
+  "Return the files under ROOT that belong to a scope of KIND.
+The configured responsibilities are `pos-startup--scopes'."
+  (seq-filter (lambda (file)
+                (eq (car (pos-startup--owner file root pos-startup--scopes)) kind))
               (pos-startup-files root)))
 
 (defun pos-startup--label ()
@@ -210,10 +212,11 @@ projects.  A file not named project.org adds its own base name."
 (defun pos-startup--reviewed-scopes (root)
   "Return the paths of the scopes under ROOT with a review scheduled.
 That is, holding an open, scheduled heading tagged
-`pos-startup-review-tag'."
+`pos-startup-review-tag'.  The configured responsibilities are
+`pos-startup--scopes'."
   (let (scopes)
     (dolist (file (pos-startup-files root))
-      (let ((owner (pos-startup--owner file root)))
+      (let ((owner (pos-startup--owner file root pos-startup--scopes)))
         (when owner
           (with-current-buffer (pos-visit file)
             (org-map-entries
@@ -227,9 +230,9 @@ That is, holding an open, scheduled heading tagged
 
 (defun pos-startup--responsibilities (root)
   "Return the path of each responsibility beneath ROOT.
-Each configured one, and each directory directly within a
-responsibilities/.  Relative to ROOT, sorted."
-  (let ((found (copy-sequence (pos-startup--configured root))))
+Each of `pos-startup--scopes', the configured ones, and each directory
+directly within a responsibilities/.  Relative to ROOT, sorted."
+  (let ((found (copy-sequence pos-startup--scopes)))
     (dolist (entry (pos-startup--directories root))
       (when (string= "responsibilities"
                      (file-name-nondirectory
@@ -297,7 +300,7 @@ Active projects, by `pos-startup-active-statuses', and responsibilities."
         projects)
     (dolist (file (pos-startup--files-of-kind 'project root))
       (let ((status (pos-startup--file-status file))
-            (scope (cdr (pos-startup--owner file root))))
+            (scope (cdr (pos-startup--owner file root pos-startup--scopes))))
         (when (and (member status pos-startup-active-statuses)
                    (not (member scope reviewed)))
           (push (format "%-54s %s" scope status) projects))))
@@ -334,7 +337,7 @@ been captured and not yet placed."
 Text: a title, then one line for each item, labelled by its scope."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (pos-startup--root root)
-         (pos-startup--configured nil)
+         (pos-startup--scopes (pos-startup--configured root))
          (org-agenda-files (pos-startup-files root))
          (org-todo-keywords pos-todo-keywords)
          ;; Label each line by its scope: the default is the file's
