@@ -984,8 +984,12 @@ are still on disk.  The keeper is sent the events it lacks, in order,
 each with the files it enrolled.  A keeper that holds earlier events is
 taken to hold their files; if it refuses the first schema 3 event for
 want of them, that event is sent again with every file enrolled before
-it, since it is where a keeper requires them.  Once the keeper holds
-the ledger's head and its root, the archive is removed from disk.
+it, since it is where a keeper requires them.  A first event that names
+no ledger, as those of a ledger begun before events carried a
+ledger_id, is sent with the events after it up to the first that names
+one, by which the keeper knows whose it is (`pos-remote-following').
+Once the keeper holds the ledger's head and its root, the archive is
+removed from disk.
 Refused unless
 every such archive is as its ledger says, with a ledger of schema 3
 beside it and nothing hidden, before anything is sent.  Interrupted, it
@@ -1039,6 +1043,8 @@ reason."
              (described (pos-remote-describe keeper))
              (held (alist-get 'events described))
              (names (mapcar #'file-name-nondirectory files))
+             (events (cl-mapcar (lambda (name file) (cons name (pos-ledger--read file)))
+                                names files))
              sent)
         (when (or (> held (length files))
                   (and (> held 0)
@@ -1060,16 +1066,17 @@ reason."
           (dotimes (i (length files))
             (when (>= i held)
               (let ((batch (funcall batch-of (nth i added)))
-                    (event (pos-ledger--read (nth i files))))
+                    (event (cdr (nth i events)))
+                    (vouching (pos-remote-following events (1+ i))))
                 (condition-case err
-                    (pos-remote-append keeper (nth i names) event batch claims)
+                    (pos-remote-append keeper (nth i names) event batch claims vouching)
                   (pos-ledger-refused
                    ;; The keeper took an earlier event without its files:
                    ;; they go with the event at which it requires them.
                    (unless (and (eq (cadr err) 'entry) (eql i first) (> held 0))
                      (signal (car err) (cdr err)))
                    (setq batch (funcall batch-of (apply #'append (seq-take added (1+ i)))))
-                   (pos-remote-append keeper (nth i names) event batch claims)))
+                   (pos-remote-append keeper (nth i names) event batch claims vouching)))
                 (setq sent (append (mapcar #'car batch) sent))))))
         (let ((now (pos-remote-describe keeper)))
           (unless (and (equal head (alist-get 'head now))

@@ -1,7 +1,7 @@
 #+TITLE: Formats
 
 The byte-level formats poslib and [[https://github.com/ClankaOperatingSystem/pyposlib][pyposlib]] share. Both implement
-this document, version 19, in lockstep; the fixtures in =fixtures/= are its
+this document, version 20, in lockstep; the fixtures in =fixtures/= are its
 examples, and both test suites run all of them. Org interpretation is not
 shared: it has one implementation, poslib's.
 
@@ -593,14 +593,20 @@ Then, for each archive:
    have renamed or removed what an earlier event enrolled, and each is
    named by the CID the ledger enrols it under. No file is sent twice in
    one run.
-3. A keeper that already holds earlier events is taken to hold their
+3. A first event that names no ledger, as those of a ledger begun
+   before events carried a =ledger_id=, is sent with the events after it
+   in the ledger, up to and including the first that has one. By them
+   the keeper knows whose the event is
+   (=doc/remote-archive-protocol.txt=, section 3). An event that has a
+   =ledger_id=, or follows one that has, is sent alone.
+4. A keeper that already holds earlier events is taken to hold their
    files, sent with them by the run that sent the events. If it refuses
    the first schema 3 event as =entry=, the event at which a keeper
    requires every file enrolled before it, that event is sent once more
    with all of them.
-4. The keeper is asked again, and must describe the ledger's head, its
+5. The keeper is asked again, and must describe the ledger's head, its
    number of events and its recorded root; else =chain=.
-5. The archive is removed from disk, its empty directories with it. The
+6. The archive is removed from disk, its empty directories with it. The
    ledger and its checkpoints are unchanged.
 
 The claims sent with each event are a seal's, without =plan=. What the

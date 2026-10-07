@@ -1,0 +1,185 @@
+{
+ "kind": "keep",
+ "description": "A ledger begun before events carried a ledger_id, whose first two events name no ledger: its keeper, told which ledger it keeps, is sent each of them with the events after it up to the first that names the ledger, and the rest alone.",
+ "tree": [
+  {
+   "path": "scope/.git/HEAD",
+   "text": "ref: refs/heads/master\n"
+  },
+  {
+   "path": "scope/.pos/config.yaml",
+   "text": "pos: 2\nprojects: projects/\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  },
+  {
+   "path": "scope/archive-integrity/checkpoints/a8250c0bb9afd90dde6f411ad50d6e78584269572639e0fbba5e1b4f0cfb60bf.json",
+   "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeeraofvoy5yy2l5wkhmipdjcfczalfb4mrnhka4bchrsvptgnrbodteq\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000001-dd6f7c8641095e829d223be436fe0172b739ebdc02607361defae6f8ccb49c22.json",
+   "text": "{\"add\":{\"2026-01-01-first.md\":{\"mode\":292,\"sha256\":\"b640e840b19d378660b32fb51ae18d67dccb4a8596a29e7bd72c1b2ae5928f41\",\"size\":6}},\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000002-95939c5332295d09034e947cb55199cc9918be457f09b749179c6f9d717edf02.json",
+   "text": "{\"add\":{\"2026-02-01-second.md\":{\"mode\":292,\"sha256\":\"480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4\",\"size\":7}},\"previous\":\"dd6f7c8641095e829d223be436fe0172b739ebdc02607361defae6f8ccb49c22\",\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000003-f8fd8255bf14d7a48ae38eff8529808cd8cb729a8494094f9e72d8390eb99cc7.json",
+   "text": "{\"add\":{\"2026-03-01-third.md\":{\"mode\":292,\"sha256\":\"5eef8098ed6ec0a16249fc7c12422027fc9fd75b16130cc9382cf09102014796\",\"size\":6}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"95939c5332295d09034e947cb55199cc9918be457f09b749179c6f9d717edf02\",\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000004-87587b16ff109216b0b1d0fedafdf6e1fabbb7090e1f04e87f2693215e193ae1.json",
+   "text": "{\"add\":{},\"collections\":[],\"convert\":{\"2026-01-01-first.md\":{\"cid\":\"bafkreifwiduebmm5g6dgbmzpwunoddlh3tfuvbmwukphxvzmdmvoleupie\",\"from\":\"b640e840b19d378660b32fb51ae18d67dccb4a8596a29e7bd72c1b2ae5928f41\",\"mode\":292,\"sha256\":\"b640e840b19d378660b32fb51ae18d67dccb4a8596a29e7bd72c1b2ae5928f41\",\"size\":6},\"2026-02-01-second.md\":{\"cid\":\"bafkreicibqrtnnaq6gwv7c7rwkeuisickwaewzjvbrjhpb7hj265kepduq\",\"from\":\"480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4\",\"mode\":292,\"sha256\":\"480c2336b410f1ad5f8bf1b28944490255804b65350c527787e74ebdd511e3a4\",\"size\":7},\"2026-03-01-third.md\":{\"cid\":\"bafkreic656ajr3loycqwesp4pqjeeibh7sp5owywcmgmsobm6ciqeakhsy\",\"from\":\"5eef8098ed6ec0a16249fc7c12422027fc9fd75b16130cc9382cf09102014796\",\"mode\":292,\"sha256\":\"5eef8098ed6ec0a16249fc7c12422027fc9fd75b16130cc9382cf09102014796\",\"size\":6}},\"kind\":\"conversion\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":\"f8fd8255bf14d7a48ae38eff8529808cd8cb729a8494094f9e72d8390eb99cc7\",\"remove\":[],\"rename\":{},\"root\":\"bafybeifpmhontrsnvqsqgmgkob3z3ajkeg25sthpmxeuq5kysiyavkun3q\",\"schema\":2}\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archive-integrity/ledger/00000005-baguqeeraofvoy5yy2l5wkhmipdjcfczalfb4mrnhka4bchrsvptgnrbodteq.json",
+   "text": "{\"empty\":[],\"from\":\"87587b16ff109216b0b1d0fedafdf6e1fabbb7090e1f04e87f2693215e193ae1\",\"kind\":\"conversion\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":{\"/\":\"baguqeeraganit6l6kdeu27xat5fqbtudpn2cgenjd72um654mabzoptjgirq\"},\"root\":\"bafybeifpmhontrsnvqsqgmgkob3z3ajkeg25sthpmxeuq5kysiyavkun3q\",\"schema\":3}",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/2026-01-01-first.md",
+   "text": "first\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/2026-02-01-second.md",
+   "text": "second\n",
+   "mode": 292
+  },
+  {
+   "path": "scope/archives/2026-03-01-third.md",
+   "text": "third\n",
+   "mode": 292
+  }
+ ],
+ "root": "scope",
+ "claims": {
+  "scope": ".",
+  "tool": "a fixture"
+ },
+ "keeper": {
+  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "token": "tape-token",
+  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+  "exchanges": [
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"erased\":[],\"events\":0,\"head\":null,\"ledger_id\":null,\"protocol\":1,\"root\":null}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-238c04b59eba882f5a5cf0acc9932c4952ab458144cecd6edc7f6773ec7bacd8",
+     "body_sha256": "5b249815eaa375f2f5103d243847b0620dae22fc8e7fda727bfdef6dd84fd71d"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":1,\"head\":\"dd6f7c8641095e829d223be436fe0172b739ebdc02607361defae6f8ccb49c22\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":null}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-08c5fe622f1e4684dc586ed29449bd7f0506b2da325d08c9a8463e355130d2df",
+     "body_sha256": "c9a6d731922ffb228c8ab045729d6285589904e28d9aa9b6a0c42ac0ea86e9db"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":2,\"head\":\"95939c5332295d09034e947cb55199cc9918be457f09b749179c6f9d717edf02\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":null}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-a8d1c7cc0b68a03eb0dac9eab8bab492ee6b558477064975452634964e371e33",
+     "body_sha256": "ce0798cfeca0430b51f6295e3c877d1b85f6bfb55827d505add8058f0e77304b"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":3,\"head\":\"f8fd8255bf14d7a48ae38eff8529808cd8cb729a8494094f9e72d8390eb99cc7\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":null}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-8bedef38f98373bb4769977cda19b8a48f0f2642ac3e66f9f49c3c87df6c445c",
+     "body_sha256": "4dbd5a46eb4af49be4e7c4b94e91c42597669f62e336638eab3fa70b4a750825"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":4,\"head\":\"87587b16ff109216b0b1d0fedafdf6e1fabbb7090e1f04e87f2693215e193ae1\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeifpmhontrsnvqsqgmgkob3z3ajkeg25sthpmxeuq5kysiyavkun3q\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "POST",
+     "path": "/events",
+     "authorization": "Bearer tape-token",
+     "content_type": "multipart/form-data; boundary=pos-76e08271d49b0331c55aa8bb39d6c5c618390931e015adee9f3e7bb3c96d236d",
+     "body_sha256": "6599f28d83eff9b975790f228ae181c45e6d00297b7204fdb836c1eb06fbcd67"
+    },
+    "response": {
+     "status": 201,
+     "body": "{\"erased\":[],\"events\":5,\"head\":\"baguqeeraofvoy5yy2l5wkhmipdjcfczalfb4mrnhka4bchrsvptgnrbodteq\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeifpmhontrsnvqsqgmgkob3z3ajkeg25sthpmxeuq5kysiyavkun3q\"}\n"
+    }
+   },
+   {
+    "request": {
+     "method": "GET",
+     "path": "/",
+     "authorization": "Bearer tape-token"
+    },
+    "response": {
+     "status": 200,
+     "body": "{\"erased\":[],\"events\":5,\"head\":\"baguqeeraofvoy5yy2l5wkhmipdjcfczalfb4mrnhka4bchrsvptgnrbodteq\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"protocol\":1,\"root\":\"bafybeifpmhontrsnvqsqgmgkob3z3ajkeg25sthpmxeuq5kysiyavkun3q\"}\n"
+    }
+   }
+  ]
+ },
+ "kept": [
+  {
+   "archive": "scope/archives",
+   "keeper": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+   "events": 5,
+   "files": 3
+  }
+ ],
+ "skipped": [],
+ "report": [
+  {
+   "archive": "scope/archives",
+   "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+   "keeper": null,
+   "head": "baguqeeraofvoy5yy2l5wkhmipdjcfczalfb4mrnhka4bchrsvptgnrbodteq",
+   "events": 5,
+   "files": 3,
+   "writable": [],
+   "root": "bafybeifpmhontrsnvqsqgmgkob3z3ajkeg25sthpmxeuq5kysiyavkun3q",
+   "recorded_root": "bafybeifpmhontrsnvqsqgmgkob3z3ajkeg25sthpmxeuq5kysiyavkun3q",
+   "hidden": [],
+   "undeclared": [],
+   "missing": [],
+   "changed": [],
+   "new": []
+  }
+ ]
+}
