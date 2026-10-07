@@ -40,9 +40,7 @@
     (pos-fixture-with fixture dir
       (let ((pos-cid-chunk-size (or .params.chunk pos-cid-chunk-size))
             (pos-cid-file-max-links (or .params.links pos-cid-file-max-links)))
-        (condition-case nil
-            (pos-cid-test-cid (expand-file-name .entry dir))
-          (pos-cid-sharding-unsupported "sharding-unsupported"))))))
+        (pos-cid-test-cid (expand-file-name .entry dir))))))
 
 (defun pos-cid-test-agrees (name)
   "Check that fixture NAME gets the CID IPFS gave it."
@@ -206,6 +204,29 @@ recorded, as pyposlib must also."
                            (pos-cid-test-by-path
                             (pos-cid-inventory (pos-cid-test-entries path)
                                                (pos-cid-test-empty path)))))))))))
+
+(ert-deftest pos-cid/murmur3-x64-64-is-the-multihash-s ()
+  "The first 64 bits of MurmurHash3 x64 128, big-endian, on the usual vectors."
+  (dolist (case '(("" . "0000000000000000")
+                  ("hello" . "cbd8a7b341bd9b02")
+                  ("The quick brown fox jumps over the lazy dog" . "e34bbc7bbc071b6c")))
+    (should (equal (cdr case)
+                   (mapconcat (lambda (b) (format "%02x" b))
+                              (pos-cid-murmur3-x64-64 (car case)) "")))))
+
+(ert-deftest pos-cid/an-inventory-shards-as-the-tree-on-disk-does ()
+  "A sharded directory's CIDs from an inventory are those of the tree on
+disk, the recorded root among them: a fold of a ledger gives the root
+IPFS gives."
+  (let ((fixture (pos-fixture "cid" "sharded-inside-plain")))
+    (pos-fixture-with fixture dir
+      (let* ((path (expand-file-name (alist-get 'entry fixture) dir))
+             (tree (pos-cid-tree path)))
+        (should (equal (alist-get 'cid fixture) (cdr (assoc "." tree))))
+        (should (equal (pos-cid-test-by-path tree)
+                       (pos-cid-test-by-path
+                        (pos-cid-inventory (pos-cid-test-entries path)
+                                           (pos-cid-test-empty path)))))))))
 
 (ert-deftest pos-cid/a-cid-decodes-to-the-bytes-it-encodes ()
   "A CID's text decodes to the bytes it encodes; bad text is refused."

@@ -19,8 +19,17 @@ unixfs-v1-2025 import profile of [[https://specs.ipfs.tech/ipips/ipip-0499/][IPI
 - Names are hashed as stored, in whatever Unicode normalisation.
 - Hidden entries, those whose names begin with =.=, are left out.
 - Symlinks and other special files are refused.
-- A directory node of more than 262144 bytes, which IPFS would shard, is
-  refused (=sharding-unsupported=) until sharding is implemented.
+- A directory whose node would exceed 262144 bytes is a HAMT shard, as
+  IPFS makes it: a dag-pb UnixFS =HAMTShard= node of fanout 256 whose
+  =Data= is the bitfield of occupied slots, big-endian, leading zero
+  bytes dropped, with =hashType= 34 (murmur3-x64-64). Each entry is
+  placed by the bytes of the first 64 bits of MurmurHash3 x64 128 of its
+  name, big-endian, one byte a level. A slot holding one entry links it
+  as the slot's two upper-case hex digits followed by the name; a slot
+  holding several links a sub-shard, placed by the next byte, as the
+  digits alone. Links are in slot order; each link's size is as above.
+  The 262144 bytes are those of the plain node the directory would
+  otherwise be; a subdirectory is judged on its own.
 
 Fixtures: =fixtures/cid/=. Each gives a tree, the entry to hash, and its
 CID or error. =params= overrides the chunk size and link limit, as
@@ -305,8 +314,8 @@ a report:
   or a checkpoint with one is not a finding. Each is named by a hash
   of its bytes, which the check holds it to, and Git keeps no write
   bit, so every clone has them writable;
-- =root=: the archive's CID now, or =null= if IPFS would shard a
-  directory in it; =recorded_root=: the recorded root, or =null=;
+- =root=: the archive's CID now; =recorded_root=: the recorded root, or
+  =null=;
 - =hidden=: files with a hidden component, other than within legacy
   ledger and checkpoint directories, sorted; sealing refuses them;
 - =undeclared=: collections the ledger lists whose =README.org= no longer

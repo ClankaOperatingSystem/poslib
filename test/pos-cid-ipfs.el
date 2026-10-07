@@ -23,8 +23,7 @@
 ;; Run: make check-ipfs IPFS=path/to/ipfs.  Offline: a fresh repository
 ;; with the unixfs-v1-2025 profile, and `ipfs add --only-hash', which
 ;; stores and announces nothing.  For each fixture in fixtures/cid/,
-;; kubo must give its recorded CID and so must we; for one we refuse,
-;; kubo must give the CID the fixture records it giving.  Every block in
+;; kubo must give its recorded CID and so must we.  Every block in
 ;; fixtures/dag-json/, and every schema 3 event in fixtures/ledger/, kubo
 ;; must store unchanged under the CID recorded, with `ipfs dag put'.
 
@@ -150,16 +149,14 @@ fixture holds or expects."
                        (ours (let ((pos-cid-chunk-size (or .params.chunk pos-cid-chunk-size))
                                    (pos-cid-file-max-links
                                     (or .params.links pos-cid-file-max-links)))
-                               (condition-case nil
-                                   (if (file-directory-p path)
-                                       (pos-cid-directory path)
-                                     (pos-cid-file path))
-                                 (pos-cid-sharding-unsupported "sharding-unsupported")))))
-                  (if (and (equal kubo (or .cid .ipfs)) (equal ours (or .cid .error)))
+                               (if (file-directory-p path)
+                                   (pos-cid-directory path)
+                                 (pos-cid-file path)))))
+                  (if (and (equal kubo .cid) (equal ours .cid))
                       (message "ok    %s" (car named))
                     (setq failed (1+ failed))
                     (message "FAIL  %s: recorded %s, kubo %s, ours %s"
-                             (car named) (or .cid .ipfs) kubo ours))))))
+                             (car named) .cid kubo ours))))))
           (setq failed (+ failed (pos-cid-ipfs-check-inventory repo)
                           (pos-cid-ipfs-check-blocks repo))))
       (delete-directory repo t))

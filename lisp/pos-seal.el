@@ -943,10 +943,7 @@ with the reason."
                            "legacy entries"))))
         (if reason
             (push `((archive . ,archive) (reason . ,reason)) skipped)
-          (let* ((cids (condition-case err
-                           (pos-cid-tree archive)
-                         (pos-cid-sharding-unsupported
-                          (pos-ledger--refuse 'sharding-unsupported "%S" (cdr err)))))
+          (let* ((cids (pos-cid-tree archive))
                  (actual (pos-ledger--with-cids
                           entries (pos-ledger-inventory archive) cids)))
             (pcase-let ((`(,missing ,changed ,new)
@@ -1049,10 +1046,7 @@ reason."
           (when (string-prefix-p (file-name-as-directory archive) (car files))
             (pos-ledger--refuse
              'ledger "A kept archive's ledger lies beside it, not inside: %s" archive))
-          (let* ((cids (condition-case err
-                           (pos-cid-tree archive)
-                         (pos-cid-sharding-unsupported
-                          (pos-ledger--refuse 'sharding-unsupported "%S" (cdr err)))))
+          (let* ((cids (pos-cid-tree archive))
                  (actual (pos-ledger--with-cids
                           entries (pos-ledger-inventory archive) cids)))
             (pcase-let ((`(,missing ,changed ,new)
@@ -1157,10 +1151,7 @@ and skipped, each an archive with the reason."
             (pos-ledger--refuse
              'root "The ledger does not fold to its recorded root: %s" archive))
           (let* ((cids (and (file-directory-p archive)
-                            (condition-case err
-                                (pos-cid-tree archive)
-                              (pos-cid-sharding-unsupported
-                               (pos-ledger--refuse 'sharding-unsupported "%S" (cdr err))))))
+                            (pos-cid-tree archive)))
                  (actual (pos-ledger--with-cids
                           entries (pos-ledger-inventory archive) cids)))
             (pcase-let ((`(,missing ,changed ,new)

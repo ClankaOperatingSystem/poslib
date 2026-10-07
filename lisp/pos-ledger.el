@@ -765,10 +765,8 @@ within are known by the names their events are enrolled under."
 
 (defun pos-ledger--cids (archive)
   "Return the CIDs of ARCHIVE and everything in it, as `pos-cid-tree'.
-Nil if IPFS would shard a directory in it, or ARCHIVE is not yet made."
-  (condition-case nil
-      (and (file-exists-p archive) (pos-cid-tree archive))
-    (pos-cid-sharding-unsupported nil)))
+Nil if ARCHIVE is not yet made."
+  (and (file-exists-p archive) (pos-cid-tree archive)))
 
 (defun pos-ledger-fold (entries &optional empty)
   "Return the CIDs the enrolled ENTRIES and the EMPTY directories give.

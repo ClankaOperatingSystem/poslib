@@ -1,0 +1,20 @@
+{
+ "description": "A sharded directory inside a plain one: the parent links the shard's root as it would any directory.",
+ "tree": [
+  {
+   "path": "t/a.txt",
+   "text": "a"
+  },
+  {
+   "path": "t/big/f%04dxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "series": 1100,
+   "text": "z"
+  },
+  {
+   "path": "t/big/sub/c.txt",
+   "text": "c"
+  }
+ ],
+ "entry": "t",
+ "cid": "bafybeiclb5vc4ti2ptsq5h7vkdozf3jlqhrt2nxak6yinptdfazlqywwse"
+}

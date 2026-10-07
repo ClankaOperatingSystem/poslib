@@ -34,8 +34,9 @@
 ;; - `pos-cid-decode': the bytes of a CID written in base32.
 ;; - `pos-cid-block': the CID of one block under a codec.
 ;;
-;; A directory large enough to need HAMT sharding signals
-;; `pos-cid-sharding-unsupported' rather than return a wrong CID.
+;; A directory whose node would exceed 256 KiB is a HAMT shard, as IPFS
+;; makes it: entries placed by the bytes of the murmur3-x64-64 hash of
+;; their names, 256 slots a level.
 
 ;;; Code:
 
@@ -51,8 +52,8 @@
 (defvar pos-cid-sharding-threshold 262144
   "Largest directory block, in bytes, before IPFS shards it.")
 
-(define-error 'pos-cid-sharding-unsupported
-  "Directory needs HAMT sharding, which is not implemented")
+(defconst pos-cid--hamt-fanout 256 "Slots in each HAMT shard.")
+(defconst pos-cid--murmur3-x64-64 #x22 "Multihash code of the HAMT's hash.")
 
 ;;;; Encoding
 
@@ -143,6 +144,111 @@ Each link is (CID NAME TSIZE)."
   (let ((block (pos-cid--pb-node links data)))
     (list (pos-cid--cid pos-cid--dag-pb block)
           (apply #'+ (length block) (mapcar (lambda (l) (nth 2 l)) links)))))
+
+(defconst pos-cid--mask64 (1- (ash 1 64)) "The low 64 bits.")
+
+(defun pos-cid--rotl64 (x r)
+  "Return the 64-bit X rotated left by R bits."
+  (logand (logior (ash x r) (ash x (- r 64))) pos-cid--mask64))
+
+(defun pos-cid--fmix64 (k)
+  "Return the MurmurHash3 finalisation mix of the 64-bit K."
+  (setq k (logxor k (ash k -33)))
+  (setq k (logand (* k #xff51afd7ed558ccd) pos-cid--mask64))
+  (setq k (logxor k (ash k -33)))
+  (setq k (logand (* k #xc4ceb9fe1a85ec53) pos-cid--mask64))
+  (logxor k (ash k -33)))
+
+(defun pos-cid--le64 (bytes start end)
+  "Return the little-endian integer in BYTES from START below END."
+  (let ((n 0))
+    (while (> end start)
+      (setq end (1- end)
+            n (logior (ash n 8) (aref bytes end))))
+    n))
+
+(defun pos-cid-murmur3-x64-64 (bytes)
+  "Return the first 64 bits of MurmurHash3 x64 128 of BYTES, seed 0.
+An 8-byte big-endian string: the multihash murmur3-x64-64, by which a
+HAMT places a name."
+  (let* ((mask pos-cid--mask64)
+         (c1 #x87c37b91114253d5) (c2 #x4cf5ad432745937f)
+         (h1 0) (h2 0)
+         (n (length bytes))
+         (blocks (- n (% n 16)))
+         (i 0))
+    (while (< i blocks)
+      (let ((k1 (pos-cid--le64 bytes i (+ i 8)))
+            (k2 (pos-cid--le64 bytes (+ i 8) (+ i 16))))
+        (setq h1 (logxor h1 (logand (* (pos-cid--rotl64 (logand (* k1 c1) mask) 31) c2) mask))
+              h1 (logand (+ (pos-cid--rotl64 h1 27) h2) mask)
+              h1 (logand (+ (* h1 5) #x52dce729) mask)
+              h2 (logxor h2 (logand (* (pos-cid--rotl64 (logand (* k2 c2) mask) 33) c1) mask))
+              h2 (logand (+ (pos-cid--rotl64 h2 31) h1) mask)
+              h2 (logand (+ (* h2 5) #x38495ab5) mask)))
+      (setq i (+ i 16)))
+    (when (> (- n blocks) 8)
+      (let ((k2 (pos-cid--le64 bytes (+ blocks 8) n)))
+        (setq h2 (logxor h2 (logand (* (pos-cid--rotl64 (logand (* k2 c2) mask) 33) c1) mask)))))
+    (when (> n blocks)
+      (let ((k1 (pos-cid--le64 bytes blocks (min n (+ blocks 8)))))
+        (setq h1 (logxor h1 (logand (* (pos-cid--rotl64 (logand (* k1 c1) mask) 31) c2) mask)))))
+    (setq h1 (logxor h1 n) h2 (logxor h2 n)
+          h1 (logand (+ h1 h2) mask) h2 (logand (+ h2 h1) mask)
+          h1 (pos-cid--fmix64 h1) h2 (pos-cid--fmix64 h2)
+          h1 (logand (+ h1 h2) mask))
+    (apply #'unibyte-string
+           (mapcar (lambda (shift) (logand (ash h1 (- shift)) 255))
+                   '(56 48 40 32 24 16 8 0)))))
+
+(defun pos-cid--trim-zeros (bytes)
+  "Return BYTES without its leading zero bytes, as a HAMT's bitfield is stored."
+  (let ((i 0))
+    (while (and (< i (length bytes)) (zerop (aref bytes i)))
+      (setq i (1+ i)))
+    (substring bytes i)))
+
+(defun pos-cid--shard (entries level)
+  "Return the HAMT shard node over ENTRIES, placed by byte LEVEL of their hashes.
+Each entry is (HASH . LINK), LINK as `pos-cid--pb-node' takes it.  A lone
+entry in a slot is linked under the slot's two hex digits and its name;
+several are linked under the digits alone, as a sub-shard placed by the
+next byte."
+  (let ((slots (make-vector pos-cid--hamt-fanout nil))
+        (bitfield (make-string (/ pos-cid--hamt-fanout 8) 0))
+        links)
+    (dolist (entry entries)
+      (let ((index (aref (car entry) level)))
+        (aset slots index (cons entry (aref slots index)))))
+    (dotimes (index pos-cid--hamt-fanout)
+      (let ((slot (aref slots index)))
+        (when slot
+          (let ((at (- (length bitfield) 1 (/ index 8))))
+            (aset bitfield at (logior (aref bitfield at) (ash 1 (% index 8)))))
+          (let ((prefix (format "%02X" index)))
+            (push (if (cdr slot)
+                      (let ((sub (pos-cid--shard (nreverse slot) (1+ level))))
+                        (list (nth 0 sub) prefix (nth 1 sub)))
+                    (let ((link (cdar slot)))
+                      (list (nth 0 link) (concat prefix (nth 1 link)) (nth 2 link))))
+                  links)))))
+    (pos-cid--pb (nreverse links)
+                 (concat (pos-cid--varint-field 1 5)
+                         (pos-cid--bytes-field 2 (pos-cid--trim-zeros bitfield))
+                         (pos-cid--varint-field 5 pos-cid--murmur3-x64-64)
+                         (pos-cid--varint-field 6 pos-cid--hamt-fanout)))))
+
+(defun pos-cid--directory-node (links)
+  "Return the node of a directory linking LINKS, each (CID NAME TSIZE).
+A plain directory node, or a HAMT shard where that node would exceed
+`pos-cid-sharding-threshold' bytes."
+  (let ((data (pos-cid--varint-field 1 1)))
+    (if (> (length (pos-cid--pb-node links data)) pos-cid-sharding-threshold)
+        (pos-cid--shard (mapcar (lambda (link)
+                                  (cons (pos-cid-murmur3-x64-64 (nth 1 link)) link))
+                                links)
+                        0)
+      (pos-cid--pb links data))))
 
 (defun pos-cid--leaf (bytes)
   "Return the raw leaf node of BYTES."
@@ -244,13 +350,9 @@ VISIT receives a relative path and a node."
                            (t (error "Not a regular file: %s" path)))))
                (list (nth 0 node) (car entry) (nth 1 node))))
            (pos-cid--entries dir)))
-         (data (pos-cid--varint-field 1 1))
-         (block (pos-cid--pb-node links data)))
-    (when (> (length block) pos-cid-sharding-threshold)
-      (signal 'pos-cid-sharding-unsupported (list dir (length block))))
-    (let ((node (pos-cid--pb links data)))
-      (funcall visit (if (string-empty-p rel) "." rel) node)
-      node)))
+         (node (pos-cid--directory-node links)))
+    (funcall visit (if (string-empty-p rel) "." rel) node)
+    node))
 
 ;;;; Interface
 
@@ -303,13 +405,9 @@ receives a relative path and a CID as text, files as given."
                                child)))
                      (list (nth 0 n) (encode-coding-string name 'utf-8) (nth 1 n))))
                  names))
-         (data (pos-cid--varint-field 1 1))
-         (block (pos-cid--pb-node links data)))
-    (when (> (length block) pos-cid-sharding-threshold)
-      (signal 'pos-cid-sharding-unsupported (list rel (length block))))
-    (let ((n (pos-cid--pb links data)))
-      (funcall visit (if (string-empty-p rel) "." rel) (pos-cid--text (car n)))
-      n)))
+         (n (pos-cid--directory-node links)))
+    (funcall visit (if (string-empty-p rel) "." rel) (pos-cid--text (car n)))
+    n))
 
 (defun pos-cid-block (codec block)
   "Return the CID of BLOCK, a unibyte string, under the multicodec CODEC.
@@ -323,8 +421,7 @@ CID as text and the size in bytes.  Directories are derived from the
 paths as `pos-cid-tree' finds them on disk; one that holds nothing has
 no file to derive it from and is listed in EMPTY, by its path.  A hidden
 component is refused since IPFS would leave it out.  An alist of
-relative path and CID, files as given, the root \".\".  Signals
-`pos-cid-sharding-unsupported' as `pos-cid-directory' does."
+relative path and CID, files as given, the root \".\"."
   (let ((tree (make-hash-table :test #'equal)) cids)
     (dolist (entry entries)
       (let* ((path (nth 0 entry))
