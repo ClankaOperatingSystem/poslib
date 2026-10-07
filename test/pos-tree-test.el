@@ -148,7 +148,7 @@ Return that last plan.  Fail if ten rounds do not settle it."
     (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
                                           "README" "root\n")))
       (should (equal (pos-tree-plan root)
-                     '((pos . 2) (actions . []) (findings . [])))))))
+                     '((pos . 2) (actions . []) (findings . []) (warnings . [])))))))
 
 (ert-deftest pos-tree/only-a-repository-is-planned ()
   "A directory that is not a repository is refused a plan."
@@ -278,11 +278,13 @@ to do, and no repository sees a change to commit."
       (should (equal (pos-tree-test-summary (pos-tree-plan root)) nil)))))
 
 (ert-deftest pos-tree/a-refused-config-is-found-and-nothing-beneath-planned ()
-  "A refused configuration is found, and nothing beneath it is planned."
+  "A refused configuration is found, and nothing beneath it is planned.
+A configuration the reader refuses is a finding; nothing is planned
+in that repository or beneath it."
   (pos-tree-test-with dir
     (let* ((child (apply #'pos-tree-test-repository
                          (expand-file-name "origins/child" dir)
-                         ".pos/config.yaml" "pos: 2\nteam: []\n"
+                         ".pos/config.yaml" "pos: 2\nprojects: p/\nmethodologies: m/\n"
                          (pos-tree-test-skill "c")))
            (root (apply #'pos-tree-test-repository (expand-file-name "root" dir)
                         (pos-tree-test-skill "r"))))
@@ -292,9 +294,25 @@ to do, and no repository sees a change to commit."
       (should (equal (seq-filter (lambda (line) (string-match-p "child" line))
                                  (pos-tree-test-summary (pos-tree-test-settle root)))
                      '("config-refused projects/child")))
-      (pos-tree-test-write root ".pos/config.yaml" "pos: 2\nteam: []\n")
+      (pos-tree-test-write root ".pos/config.yaml" "pos: 2\nprojects: p/\nmethodologies: m/\n")
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
                      '("config-refused ."))))))
+
+(ert-deftest pos-tree/an-unknown-key-is-a-warning-the-plan-carries ()
+  "A key the reader does not know refuses nothing.
+The configuration is read without it, and the plan names the node and
+the key."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".pos/config.yaml" "pos: 2\nprojects: projects/\ncolour: blue\n"
+                 "work/.clanka/config.yml" "pos: 2\nprojects: projects/\nsweep: weekly\n")))
+      (pos-tree-test-write root ".pos/config.yaml"
+                           "pos: 2\nprojects: projects/\ncolour: blue\nchildren:\n  - path: work\n")
+      (let ((plan (pos-tree-plan root)))
+        (should (equal [".: unknown-key: colour" "work: unknown-key: sweep"]
+                       (alist-get 'warnings plan)))
+        (should (seq-empty-p (alist-get 'findings plan)))))))
 
 ;;;; Names, kinds and directories
 
@@ -435,6 +453,40 @@ archive, an attic, or a hidden or underscore directory."
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
                      '("archive-excludes ." "undeclared health/diet" "undeclared stray/deep"
                        "undeclared vendor/lib"))))))
+
+(ert-deftest pos-tree/exclusions-are-inherited-until-a-node-declares-its-own ()
+  "A node's exclude replaces the default beneath it, and is inherited.
+By name, glob or path; a local node without one inherits, and one with
+its own replaces them beneath itself."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".clanka/config.yaml"
+                 (concat "pos: 2\nprojects: projects/\nchildren:\n  - path: work\n"
+                         "  - path: lab\nexclude:\n  - vendor\n  - \"tmp*\"\n  - stray/deep\n")
+                 "work/.clanka/config.yml" "pos: 2\nprojects: projects/\n"
+                 "lab/.clanka/config.yml" "pos: 2\nprojects: projects/\nexclude:\n  - attic\n")))
+      (dolist (path '("vendor/lib" "tmpfiles/lib" "stray/deep/lib" "attic/lib"
+                      "work/vendor/lib" "work/attic/lib"
+                      "lab/vendor/lib" "lab/attic/lib"))
+        (pos-tree-test-repository (expand-file-name path root) "README" "l\n"))
+      (should (equal (seq-filter (lambda (line) (string-prefix-p "undeclared" line))
+                                 (pos-tree-test-summary (pos-tree-plan root)))
+                     '("undeclared attic/lib" "undeclared lab/vendor/lib"
+                       "undeclared work/attic/lib"))))))
+
+(ert-deftest pos-tree/archive-scopes-are-not-looked-for-in-excluded-directories ()
+  "An archives directory beneath an excluded one is no scope of the node.
+One that is not excluded is, as before."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".clanka/config.yaml" "pos: 2\nprojects: projects/\nexclude:\n  - old\n")))
+      (pos-tree-test-write root "old/archives/evidence" "old\n")
+      (pos-tree-test-write root "kept/archives/evidence" "kept\n")
+      (let ((action (seq-find (lambda (a) (equal (alist-get 'do a) "archive-excludes"))
+                              (alist-get 'actions (pos-tree-plan root)))))
+        (should (equal ["archives" "kept/archives"] (alist-get 'paths action)))))))
 
 (ert-deftest pos-tree/a-worktree-of-a-child-is-excluded-and-cloned ()
   "A declared worktree of a child is excluded and cloned on its branch."

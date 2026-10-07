@@ -1,6 +1,6 @@
 {
- "about": "A file that declares nothing.",
- "yaml": "pos: 2\n",
+ "about": "A key at the top level this version does not define is a warning, and the rest is read.",
+ "yaml": "pos: 2\nteam: []\n",
  "config": {
   "kind": null,
   "projects": null,
@@ -11,6 +11,8 @@
   "worktrees": [],
   "archives": [],
   "server": null,
-  "warnings": []
+  "warnings": [
+   "unknown-key: team"
+  ]
  }
 }

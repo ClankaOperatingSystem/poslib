@@ -6,9 +6,11 @@
   "projects": null,
   "methodologies": "methodologies",
   "image": null,
+  "exclude": null,
   "children": [],
   "worktrees": [],
   "archives": [],
-  "server": null
+  "server": null,
+  "warnings": []
  }
 }

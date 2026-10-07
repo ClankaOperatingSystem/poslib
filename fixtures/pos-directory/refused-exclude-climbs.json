@@ -1,0 +1,5 @@
+{
+ "about": "An entry with a slash is a path beneath the node; one that climbs is refused.",
+ "yaml": "pos: 2\nexclude:\n  - ../elsewhere\n",
+ "refused": "bad-path"
+}

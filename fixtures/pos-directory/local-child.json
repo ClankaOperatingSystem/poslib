@@ -6,6 +6,7 @@
   "projects": "projects",
   "methodologies": null,
   "image": null,
+  "exclude": null,
   "children": [
    {
     "path": "health",
@@ -22,6 +23,7 @@
   ],
   "worktrees": [],
   "archives": [],
-  "server": null
+  "server": null,
+  "warnings": []
  }
 }

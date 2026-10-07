@@ -1,0 +1,21 @@
+{
+ "about": "The directories a walk does not enter: names, a glob over a name, and a path beneath the node, its final slash dropped.",
+ "yaml": "pos: 2\nprojects: projects/\nexclude:\n  - archives\n  - attic\n  - \"_*\"\n  - meta/journal/\n",
+ "config": {
+  "kind": "responsibility",
+  "projects": "projects",
+  "methodologies": null,
+  "image": null,
+  "exclude": [
+   "archives",
+   "attic",
+   "_*",
+   "meta/journal"
+  ],
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null,
+  "warnings": []
+ }
+}

@@ -6,9 +6,11 @@
   "projects": "projects",
   "methodologies": null,
   "image": "ghcr.io/example/clankos:v1.2.3",
+  "exclude": null,
   "children": [],
   "worktrees": [],
   "archives": [],
-  "server": null
+  "server": null,
+  "warnings": []
  }
 }

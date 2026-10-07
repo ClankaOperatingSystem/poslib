@@ -155,17 +155,18 @@ The divergences found:
 
 ;;;; The tree tool
 
-(ert-deftest pos-corpus/today-the-tree-tool-has-its-own-exclusion-list ()
-  "The tree tool skips its own list of directories, not start-up's.
-A characterisation of present behaviour, recorded, not endorsed.
-`pos-tree--unwalked' names archives, attic and node_modules, so it
-differs from `pos-startup-excluded-directories' by node_modules alone;
-and `pos-tree--undeclared' further skips a name beginning with a dot or
-an underscore, as start-up and the index do, at any depth."
-  (should (equal '("archives" "attic" "node_modules") pos-tree--unwalked))
-  (should (equal '("node_modules")
-                 (seq-difference pos-tree--unwalked pos-startup-excluded-directories)))
-  (should-not (seq-difference pos-startup-excluded-directories pos-tree--unwalked))
+(ert-deftest pos-corpus/today-start-up-and-the-index-have-their-own-exclusion-lists ()
+  "Start-up and the index skip lists of their own, not the declared ones.
+A characterisation of present behaviour, recorded, not endorsed.  The
+tree tool reads a node's exclusions, `pos-tree-default-exclude' when
+none are declared: archives, attic, node_modules, and names beginning
+with an underscore or a dot.  `pos-startup-excluded-directories' and
+`pos-roam-excluded-directories' are still constants, each the default
+less node_modules, with the underscore and dot rules written in code."
+  (should (equal '("archives" "attic" "node_modules" "_*" ".*") pos-tree-default-exclude))
+  (should (equal '("node_modules" "_*" ".*")
+                 (seq-difference pos-tree-default-exclude pos-startup-excluded-directories)))
+  (should-not (seq-difference pos-startup-excluded-directories pos-tree-default-exclude))
   (should (equal pos-startup-excluded-directories pos-roam-excluded-directories))
   ;; A repository beneath each name: those the tool looks into are
   ;; found undeclared, the rest are passed over without a word.
@@ -179,7 +180,7 @@ an underscore, as start-up and the index do, at any depth."
           (insert "gitdir: nowhere\n")))
       (let ((pos-tree--root root)
             (pos-tree--findings nil))
-        (pos-tree--undeclared root nil nil)
+        (pos-tree--undeclared root nil nil pos-tree-default-exclude)
         (should (equal '("plain" "sub/plain")
                        (sort (mapcar (lambda (finding) (alist-get 'path finding))
                                      pos-tree--findings)
