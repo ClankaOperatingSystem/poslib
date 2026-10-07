@@ -3,11 +3,22 @@
 
 EMACS ?= emacs
 # Dependencies, from Package-Requires, each fetched from its Git repository
-# at one commit into _deps/: markdown-mode 2.8 and yaml 1.2.4.
+# at one commit into _deps/: markdown-mode 2.8, yaml 1.2.4, and org-roam
+# 2.3.1 with what it requires: compat 31.1.0.0, cond-let 1.1.5, llama
+# 1.0.6, dash 2.20.0, emacsql 4.4.2 and magit-section 4.7.1, from magit.
 MARKDOWN_MODE = f5d520b3ee7722dd2231ab586ba51d8eb166e49b
 YAML          = 5546f36bde24a9a8c1934e0f6ce205cd41d72537
-BATCH  = $(EMACS) -Q --batch -L _deps/markdown-mode -L _deps/yaml -L lisp
-SRC    = lisp/pos.el lisp/pos-capture.el lisp/pos-cid.el lisp/pos-ledger.el lisp/pos-links.el lisp/pos-seal.el lisp/pos-index.el lisp/pos-migrate.el lisp/pos-signin.el lisp/pos-remote.el lisp/pos-tree.el lisp/pos-startup.el
+COMPAT        = 90880f81419577e1d3f68424d2a3adf31e6d663e
+COND_LET      = 09292a77001434f59ab55c775dec2b98cb18d028
+LLAMA         = 6850d0c91b629da14fdff2300c222289d1a0029a
+DASH          = b96413794b2fa9e37a17ca0d6fe0d0396006d3ec
+EMACSQL       = 7a4c607912c8fdd1fca4def4915d68f43b12d4da
+MAGIT         = 659f89955cf60fe3d4326d881c412df06c69680d
+ORG_ROAM      = 7ce95a286ba7d0383f2ab16ca4cdbf79901921ff
+DEPS   = -L _deps/markdown-mode -L _deps/yaml -L _deps/compat -L _deps/cond-let \
+         -L _deps/llama -L _deps/dash -L _deps/emacsql -L _deps/magit/lisp -L _deps/org-roam
+BATCH  = $(EMACS) -Q --batch $(DEPS) -L lisp
+SRC    = lisp/pos.el lisp/pos-capture.el lisp/pos-cid.el lisp/pos-ledger.el lisp/pos-links.el lisp/pos-seal.el lisp/pos-index.el lisp/pos-migrate.el lisp/pos-signin.el lisp/pos-remote.el lisp/pos-tree.el lisp/pos-startup.el lisp/pos-roam.el
 IPFS  ?= ipfs
 
 .PHONY: check check-ipfs test lint clean deps
@@ -21,7 +32,7 @@ define fetch
 	     rm -rf _deps/$(1) && git init -q _deps/$(1) \
 	  && git -C _deps/$(1) fetch -q --depth 1 $(2) $(3) \
 	  && git -C _deps/$(1) checkout -q FETCH_HEAD \
-	  && $(EMACS) -Q --batch -f batch-byte-compile _deps/$(1)/$(4) 2>/dev/null \
+	  && $(EMACS) -Q --batch $(DEPS) -f batch-byte-compile _deps/$(1)/$(4) 2>/dev/null \
 	  && echo $(3) > _deps/$(1)/.commit; \
 	 fi
 endef
@@ -29,10 +40,17 @@ endef
 deps:
 	$(call fetch,markdown-mode,https://github.com/jrblevin/markdown-mode.git,$(MARKDOWN_MODE),markdown-mode.el)
 	$(call fetch,yaml,https://github.com/zkry/yaml.el.git,$(YAML),yaml.el)
+	$(call fetch,compat,https://github.com/emacs-compat/compat.git,$(COMPAT),compat.el)
+	$(call fetch,cond-let,https://github.com/tarsius/cond-let.git,$(COND_LET),cond-let.el)
+	$(call fetch,llama,https://github.com/tarsius/llama.git,$(LLAMA),llama.el)
+	$(call fetch,dash,https://github.com/magnars/dash.el.git,$(DASH),dash.el)
+	$(call fetch,emacsql,https://github.com/magit/emacsql.git,$(EMACSQL),emacsql.el)
+	$(call fetch,magit,https://github.com/magit/magit.git,$(MAGIT),lisp/magit-section.el)
+	$(call fetch,org-roam,https://github.com/org-roam/org-roam.git,$(ORG_ROAM),org-roam.el)
 
 test: deps
 	$(BATCH) -l ert -l test/pos-test.el -l test/pos-capture-test.el \
-	         -l test/pos-cid-test.el -l test/pos-ledger-test.el -l test/pos-seal-test.el -l test/pos-index-test.el -l test/pos-migrate-test.el -l test/pos-remote-test.el -l test/pos-signin-test.el -l test/pos-tree-test.el -l test/pos-startup-test.el \
+	         -l test/pos-cid-test.el -l test/pos-ledger-test.el -l test/pos-seal-test.el -l test/pos-index-test.el -l test/pos-migrate-test.el -l test/pos-remote-test.el -l test/pos-signin-test.el -l test/pos-tree-test.el -l test/pos-startup-test.el -l test/pos-roam-test.el \
 	         -f ert-run-tests-batch-and-exit
 
 check-ipfs: deps
@@ -42,7 +60,7 @@ lint: deps
 	$(BATCH) --eval '(setq byte-compile-error-on-warn t)' \
 	         -f batch-byte-compile $(SRC); \
 	 status=$$?; rm -f lisp/*.elc; exit $$status
-	@out=$$($(BATCH) -l checkdoc --eval '(mapc (function checkdoc-file) (list "lisp/pos.el" "lisp/pos-capture.el" "lisp/pos-cid.el" "lisp/pos-ledger.el" "lisp/pos-links.el" "lisp/pos-seal.el" "lisp/pos-index.el" "lisp/pos-migrate.el" "lisp/pos-signin.el" "lisp/pos-remote.el" "lisp/pos-tree.el" "lisp/pos-startup.el"))' 2>&1); \
+	@out=$$($(BATCH) -l checkdoc --eval '(mapc (function checkdoc-file) (list "lisp/pos.el" "lisp/pos-capture.el" "lisp/pos-cid.el" "lisp/pos-ledger.el" "lisp/pos-links.el" "lisp/pos-seal.el" "lisp/pos-index.el" "lisp/pos-migrate.el" "lisp/pos-signin.el" "lisp/pos-remote.el" "lisp/pos-tree.el" "lisp/pos-startup.el" "lisp/pos-roam.el"))' 2>&1); \
 	 echo "$$out"; ! echo "$$out" | grep -q '^Warning'
 
 clean:
