@@ -29,7 +29,7 @@
 (require 'pos-test-support)
 
 (defmacro pos-capture-test-with-intray (contents &rest body)
-  "Evaluate BODY with `root' a directory whose intray.org holds CONTENTS."
+  "Evaluate BODY with `root' a directory with an intray.org of CONTENTS."
   (declare (indent 1))
   `(pos-test-with-files root `(("intray.org" . ,,contents))
      ,@body))

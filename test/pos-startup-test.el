@@ -38,7 +38,7 @@
   (format-time-string "<%Y-%m-%d>" (time-add nil (days-to-time days))))
 
 (defmacro pos-startup-test-with-tree (&rest body)
-  "Evaluate BODY with `root' holding the tree the tests share.
+  "Evaluate BODY with `root' holding the shared tree of cases.
 Each entry is there for a rule, which the docstring of the test that
 pins it names."
   (declare (indent 0))

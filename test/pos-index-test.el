@@ -81,7 +81,7 @@ at the paths the files would have."
       (should (equal ["archives"] (cdr (assoc (cdr (assoc "." cids)) index)))))))
 
 (defmacro pos-index-test-with-kept (&rest body)
-  "Evaluate BODY in a tree whose scope projects/a a keeper keeps.
+  "Evaluate BODY in a tree whose scope projects/a is with a keeper.
 `scope' is the scope, `cids' what its ledger folds to, `url' its
 keeper's URL, and `asked' collects the requests made, each answered
 with the bytes \"result\"."

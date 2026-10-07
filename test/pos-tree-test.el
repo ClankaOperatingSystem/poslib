@@ -65,7 +65,7 @@ FILES is a plist of path and text.  Return DIR."
   dir)
 
 (defun pos-tree-test-skill (name &optional local)
-  "Return the files of a skill NAME, as a plist; LOCAL marks it .pos-local."
+  "Return the files of a skill NAME as a plist, with .pos-local if LOCAL."
   (append (list (format ".agents/skills/%s/SKILL.md" name)
                 (format "---\nname: %s\ndescription: A skill.\n---\n" name))
           (and local (list (format ".agents/skills/%s/.pos-local" name) ""))))
