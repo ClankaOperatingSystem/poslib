@@ -2,7 +2,10 @@
 
 Emacs library for a personal OS in Org files. Package: =pos=.
 
-- =lisp/pos.el= :: sweep, lint, refile, dedupe.
+- =lisp/pos.el= :: sweep, lint, refile, dedupe, over the corpus.
+- =lisp/pos-corpus.el= :: the corpus: every Org file a tree's
+  configurations allow, each with the scope it belongs to, from one
+  walk that every command reads.
 - =lisp/pos-capture.el= :: capture to an intray.
 - =lisp/pos-cid.el= :: IPFS CIDs of files and trees, computed locally.
 - =lisp/pos-ledger.el= :: archive integrity ledgers, read and checked.
@@ -57,8 +60,14 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 
 * Configure
 
+- Which files a command reads is declared in the tree's =.clanka/= or
+  =.pos/= configurations, as =doc/pos-directory.txt= says: every Org
+  file beneath the root but those under =exclude=, and those of a
+  repository with no configuration.
 - =pos-config.el= at the repository root; =pos-load-config= loads it.
-- Sets =pos-pillars=, =pos-prose-directories=, =pos-refile-rules=.
+  Sets =pos-refile-rules=, where a refile plan proposes a heading go,
+  and =pos-prose-directories=, which the stranded-task scan leaves
+  alone. A setting it once set and no longer reads is reported.
 - Example: =test/pos-config.el=.
 
 * Check

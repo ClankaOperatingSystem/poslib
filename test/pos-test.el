@@ -24,14 +24,18 @@
 ;; own, and each test is named by the rule it pins, as a sentence.
 ;;
 ;; The words the rules use.  The "root" is the repository the tools
-;; work on.  A "pillar" is a root subdirectory named in `pos-pillars',
-;; one per area of life.  The "covered" files are the top-level Org
-;; files of the root and of each pillar: the files the sweep visits.
-;; The "uncovered" files are the rest, below those directories.  The
-;; "intray" is the root's intray.org, where new and rescued tasks wait
-;; to be filed.  The "sweep" archives the DONE and CANCELLED entries of
-;; the covered files into the week's archive.  A "stranded" task is a
-;; task keyword in an uncovered file, which no sweep will ever reach.
+;; work on.  The "corpus" is the Org files beneath the root that its
+;; configurations allow, at any depth, as pos-corpus.el walks them:
+;; the files every command reads.  The commands that write, the sweep
+;; and the fixers, write only the corpus files of the root's own
+;; repository, never those of a repository mounted within it.  The
+;; "uncovered" files are the Org files beneath the root the corpus
+;; does not read: in an attic or archives directory, a lock file, a
+;; product's.  The "intray" is the root's intray.org, where new and
+;; rescued tasks wait to be filed.  The "sweep" archives the DONE and
+;; CANCELLED entries of the writable files into the week's archive.  A
+;; "stranded" task is a task keyword in an uncovered file, which no
+;; sweep will ever reach.
 ;;
 ;; Pure rules, such as week names, archive paths, dedupe suggestions
 ;; and excerpts, are tested on values alone; the rest through files in
@@ -40,6 +44,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'ert-x)
 (require 'cl-lib)
 (require 'pos)
 (require 'pos-test-support)
@@ -48,14 +53,19 @@
 
 (defmacro pos-test-configured (&rest body)
   "Evaluate BODY with the configuration of test/pos-config.el in force.
-Pillars life, sport, people, work, body and meta; prose directories
-under meta; a refile rule each for work and body."
+Prose directories under meta; a refile rule each into a work and a
+body projects file."
   (declare (indent 0))
-  `(let ((pos-pillars '("life" "sport" "people" "work" "body" "meta"))
-         (pos-prose-directories '("meta/journal" "meta/specs"))
-         (pos-refile-rules '(("invoice\\|client" . "work")
-                             ("dentist\\|checkup" . "body"))))
+  `(let ((pos-prose-directories '("meta/journal" "meta/specs"))
+         (pos-refile-rules '(("invoice\\|client" . "work/work-projects.org")
+                             ("dentist\\|checkup" . "body/body-projects.org"))))
      ,@body))
+
+(defconst pos-test-git-head "ref: refs/heads/master\n"
+  "The HEAD of a repository; a directory holding one in .git is a repository.")
+
+(defconst pos-test-child-config "pos: 2\nprojects: projects/\n"
+  "The configuration of a child repository: a node of the root's tree.")
 
 (defconst pos-test-week "2026-W36"
   "The week `pos-test-sunday' closes.")
@@ -130,110 +140,87 @@ of zero or less into the month before."
 
 ;;;; Files and paths
 
-(ert-deftest pos/covered-files-are-the-top-of-the-root-and-each-pillar ()
-  "The covered files are the root's top-level Org files and each pillar's.
-Nothing deeper counts: a resources directory below a pillar is not
-covered, nor is anything that is not an Org file."
-  (pos-test-configured
-    (pos-test-with-files root
-        '(("intray.org" . "") ("todo.org" . "") ("notes.txt" . "")
-          ("life/life-areas.org" . "") ("life/life-projects.org" . "")
-          ("life/resources/book.org" . "")
-          ("sport/sport-areas.org" . "")
-          ("sport/resources/zettles/a.org" . "")
-          ("archive/orgmode/2026-W35/intray.org_archive" . ""))
-      (should (equal '("intray.org"
-                       "life/life-areas.org" "life/life-projects.org"
-                       "sport/sport-areas.org" "todo.org")
-                     (pos-test-relative (pos-org-files root) root))))))
-
-(ert-deftest pos/covered-files-are-listed-root-first-then-pillar-by-pillar ()
-  "Covered files are listed root first, then one pillar after another.
-The pillars come in `pos-pillars' order and each directory's files are
-sorted by name within it, but the list as a whole is not sorted, which
-is why the other tests compare through `pos-test-relative', which
-sorts.  Pinned so that a corpus listing its files in one order is a
-deliberate change."
+(ert-deftest pos/every-org-file-beneath-the-root-is-read-and-sorted ()
+  "The files are every Org file beneath the root, at any depth, sorted.
+A book in a resources directory and a zettel deeper still are read
+with the root's own top-level files; a text file is not.  The list
+is sorted by path, so every command visits the tree in one order."
   (pos-test-with-files root
-      '(("todo.org" . "") ("alpha.org" . "")
-        ("life/life-areas.org" . "") ("sport/sport-areas.org" . ""))
-    (let ((pos-pillars '("sport" "life")))
-      (should (equal '("alpha.org" "todo.org"
-                       "sport/sport-areas.org" "life/life-areas.org")
-                     (mapcar (lambda (file) (file-relative-name file root))
-                             (pos-org-files root))))
-      (should (equal '("alpha.org" "life/life-areas.org"
-                       "sport/sport-areas.org" "todo.org")
-                     (pos-test-relative (pos-org-files root) root))))))
+      '(("todo.org" . "") ("alpha.org" . "") ("notes.txt" . "")
+        ("life/life-areas.org" . "") ("life/resources/book.org" . "")
+        ("sport/resources/zettles/a.org" . ""))
+    (should (equal '("alpha.org" "life/life-areas.org"
+                     "life/resources/book.org"
+                     "sport/resources/zettles/a.org" "todo.org")
+                   (mapcar (lambda (file) (file-relative-name file root))
+                           (pos-files root))))))
 
-(ert-deftest pos/a-pillar-named-with-a-trailing-slash-is-still-a-pillar ()
-  "A pillar may be named \"sport/\" as well as \"sport\" in `pos-pillars'.
-`expand-file-name' takes either, so a configuration written with
-directory names is not silently a configuration of no pillars."
+(ert-deftest pos/a-lock-hidden-archive-or-text-file-is-not-read ()
+  "A lock file, a hidden file, an archive and a text file are not read.
+The lock file of an Org file open in Emacs, .#intray.org, is a
+dangling symbolic link, and no link is read, dangling or not; a
+hidden .draft.org and an .org_archive are not Org files of the
+corpus.  Nor is the walk taken into an archives, attic, node_modules,
+underscored or hidden directory, at any depth."
   (pos-test-with-files root
-      '(("intray.org" . "") ("sport/sport-areas.org" . ""))
-    (let ((pos-pillars '("sport/")))
-      (should (equal '("intray.org" "sport/sport-areas.org")
-                     (pos-test-relative (pos-org-files root) root))))))
-
-(ert-deftest pos/a-missing-pillar-is-skipped-not-an-error ()
-  "A pillar named in `pos-pillars' with no directory contributes nothing.
-A fresh repository may not have every area yet; the sweep and lint
-still run."
-  (pos-test-with-files root '(("intray.org" . ""))
-    (let ((pos-pillars '("life" "nowhere")))
-      (should (equal '("intray.org")
-                     (pos-test-relative (pos-org-files root) root))))))
-
-(ert-deftest pos/a-lock-file-in-a-covered-directory-is-covered-today ()
-  "The lock file of an Org file open in Emacs is listed as covered today.
-Editing intray.org leaves a dangling symlink .#intray.org beside it,
-whose name ends in .org like any other; the walker looks no further
-than the name.  This characterises a latent defect: a sweep run while
-a covered file is open would try to visit its lock.  A corpus that
-leaves lock files out changes this on purpose."
-  (pos-test-with-files root '(("intray.org" . ""))
+      '(("intray.org" . "") (".draft.org" . "") ("intray.org_archive" . "")
+        ("notes.txt" . "") ("archives/old.org" . "") ("attic/old.org" . "")
+        ("_tmp/a.org" . "") ("node_modules/m/z.org" . "")
+        ("life/.hidden/h.org" . "") ("life/archives/old.org" . ""))
     (make-symbolic-link "someone@somewhere.1234"
                         (expand-file-name ".#intray.org" root))
-    (should (equal '(".#intray.org" "intray.org")
-                   (pos-test-relative (pos-org-files root) root)))))
+    (make-symbolic-link "intray.org" (expand-file-name "linked.org" root))
+    (should (equal '("intray.org") (pos-test-relative (pos-files root) root)))))
 
-(ert-deftest pos/a-hidden-org-file-in-a-covered-directory-is-covered-today ()
-  "A hidden Org file at the top of the root or a pillar is covered today.
-Only the uncovered walker leaves hidden things out, and only hidden
-directories; the covered walker takes every name ending in .org.
-Pinned so that a corpus treating hidden files alike everywhere
-changes this on purpose."
+(ert-deftest pos/a-repository-within-the-tree-is-a-product-and-not-read ()
+  "A repository within the tree with no configuration is a product.
+Its Org files are nobody's tasks: a library's README is neither read
+nor written."
   (pos-test-with-files root
-      '(("intray.org" . "") (".draft.org" . "") ("life/.draft.org" . ""))
-    (let ((pos-pillars '("life")))
-      (should (equal '(".draft.org" "intray.org" "life/.draft.org")
-                     (pos-test-relative (pos-org-files root) root))))))
+      `(("intray.org" . "")
+        ("vendor/lib/.git/HEAD" . ,pos-test-git-head)
+        ("vendor/lib/README.org" . ""))
+    (should (equal '("intray.org") (pos-test-relative (pos-files root) root)))
+    (should (equal '("intray.org")
+                   (pos-test-relative (pos-files root t) root)))))
 
-(ert-deftest pos/an-archive-file-is-never-covered ()
-  "A file ending in .org_archive is not covered, at the root or in a pillar.
-Archives are what the sweep writes; sweeping them again would archive
-the archive.  Only names ending in .org count."
+(ert-deftest pos/a-configured-child-repository-is-read-and-not-written ()
+  "A repository within the tree with a configuration is read, not written.
+It is a node of the tree, so its tasks are seen by lint and the
+plans; but its own configuration governs its files, so the sweep and
+the fixers, which ask for the writable files, leave it out."
   (pos-test-with-files root
-      '(("intray.org" . "") ("intray.org_archive" . "")
-        ("life/life-areas.org" . "") ("life/life-areas.org_archive" . ""))
-    (let ((pos-pillars '("life")))
-      (should (equal '("intray.org" "life/life-areas.org")
-                     (pos-test-relative (pos-org-files root) root))))))
+      `(("intray.org" . "")
+        ("child/.git/HEAD" . ,pos-test-git-head)
+        ("child/.clanka/config.yml" . ,pos-test-child-config)
+        ("child/intray.org" . "") ("child/projects/p.org" . ""))
+    (should (equal '("child/intray.org" "child/projects/p.org" "intray.org")
+                   (pos-test-relative (pos-files root) root)))
+    (should (equal '("intray.org")
+                   (pos-test-relative (pos-files root t) root)))))
 
-(ert-deftest pos/uncovered-files-lie-below-the-covered-directories ()
-  "The uncovered files are the Org files under the root that are not covered.
-They lie below the root's and the pillars' top levels: a book in a
-pillar's resources, a zettel deeper still, a file in a directory that
-is no pillar.  Archive files are not Org files here either."
+(ert-deftest pos/uncovered-files-are-those-the-corpus-does-not-read ()
+  "The uncovered files are the Org files under the root the corpus leaves out.
+A file in an archives, attic, underscored or node_modules directory,
+and a file of a product repository: the places a task keyword would
+never be swept from.  A file nested below the root is read now, and
+is not uncovered; an archive file is not an Org file; a lock file,
+the dangling link Emacs leaves beside a file being edited, is passed
+over, since visiting it would wait on a question."
   (pos-test-configured
     (pos-test-with-files root
-        '(("intray.org" . "") ("life/life-areas.org" . "")
+        `(("intray.org" . "") ("life/life-areas.org" . "")
           ("life/resources/book.org" . "")
           ("life/resources/book.org_archive" . "")
-          ("sport/resources/zettles/a.org" . "") ("notes/plain.org" . ""))
-      (should (equal '("life/resources/book.org" "notes/plain.org"
-                       "sport/resources/zettles/a.org")
+          ("archives/old.org" . "") ("attic/notes.org" . "")
+          ("_scratch/draft.org" . "") ("node_modules/m/z.org" . "")
+          ("vendor/lib/.git/HEAD" . ,pos-test-git-head)
+          ("vendor/lib/README.org" . ""))
+      (make-symbolic-link "someone@somewhere.1234"
+                          (expand-file-name ".#intray.org" root))
+      (should (equal '("_scratch/draft.org" "archives/old.org"
+                       "attic/notes.org" "node_modules/m/z.org"
+                       "vendor/lib/README.org")
                      (pos-test-relative (pos-uncovered-org-files root)
                                         root))))))
 
@@ -241,34 +228,34 @@ is no pillar.  Archive files are not Org files here either."
   "Files in `pos-archive-directory' and `pos-prose-directories' are left out.
 An archive holds swept tasks, which keep their keywords; prose, such
 as a journal, may use a keyword as a word.  Neither is a place a task
-is stranded.  A prose directory's sibling is not excluded with it."
+is stranded, so a file there that the corpus does not read, one in an
+attic, is not uncovered either.  A prose directory's sibling is not
+excluded with it."
   (pos-test-configured
     (pos-test-with-files root
         '(("intray.org" . "")
           ("archive/orgmode/2026-W35/intray.org_archive" . "")
-          ("archive/orgmode/2026-W35/notes.org" . "")
-          ("meta/journal/review.org" . "") ("meta/specs/spec.org" . "")
-          ("meta/tools/notes.org" . ""))
-      (should (equal '("meta/tools/notes.org")
+          ("archive/orgmode/attic/notes.org" . "")
+          ("meta/journal/attic/review.org" . "")
+          ("meta/specs/attic/spec.org" . "")
+          ("meta/tools/attic/notes.org" . ""))
+      (should (equal '("meta/tools/attic/notes.org")
                      (pos-test-relative (pos-uncovered-org-files root)
                                         root))))))
 
 (ert-deftest pos/hidden-directories-are-not-walked ()
-  "The uncovered walker does not enter a hidden directory.
+  "The uncovered walker does not enter a hidden directory, nor read a hidden file.
 A virtual environment or .git may hold Org files that are nobody's
-tasks.  A hidden file, or a lock file, in a directory it does enter is
-still listed: only the directory's name is looked at.  That much is a
-characterisation, pinned for the corpus to change on purpose."
+tasks; a hidden file or a lock file in a directory it does enter is
+left alone, as the corpus leaves it."
   (pos-test-configured
     (pos-test-with-files root
-        '(("intray.org" . "") ("life/resources/book.org" . "")
-          ("life/resources/.draft.org" . "")
+        '(("intray.org" . "") ("attic/notes.org" . "")
+          ("attic/.draft.org" . "")
           (".venv/lib/site-packages/x.org" . "") (".git/x.org" . ""))
       (make-symbolic-link "someone@somewhere.1234"
-                          (expand-file-name "life/resources/.#book.org" root))
-      (should (equal '("life/resources/.#book.org"
-                       "life/resources/.draft.org"
-                       "life/resources/book.org")
+                          (expand-file-name "attic/.#notes.org" root))
+      (should (equal '("attic/notes.org")
                      (pos-test-relative (pos-uncovered-org-files root)
                                         root))))))
 
@@ -443,40 +430,57 @@ clutter for Git to ignore or a person to delete."
 The test directory holds one of the shape a repository keeps, and
 `pos-load-config' returns non-nil for it.  A root without one is no
 error: the tools run with the defaults, and the result is nil."
-  (let (pos-pillars pos-prose-directories pos-refile-rules)
+  (let (pos-prose-directories pos-refile-rules)
     (should (pos-load-config pos-test-directory))
-    (should (equal '("life" "sport" "people" "work" "body" "meta")
-                   pos-pillars))
     (should (equal '("meta/journal" "meta/specs") pos-prose-directories))
-    (should (equal '(("invoice\\|client" . "work")
-                     ("dentist\\|checkup" . "body"))
+    (should (equal '(("invoice\\|client" . "work/work-projects.org")
+                     ("dentist\\|checkup" . "body/body-projects.org"))
                    pos-refile-rules)))
   (should-not (pos-load-config "/nonexistent/")))
 
-(ert-deftest pos/a-sweep-archives-every-covered-file-and-no-other ()
-  "A sweep archives the done entries of every covered file, and only those.
-Each file's archive is written under the week by the file's own path;
-a done entry in an uncovered file is left where it is, for lint to
-report as stranded.  The counts and skipped headings are totalled."
-  (pos-test-configured
-    (pos-test-with-files root
-        `(("intray.org" . ,pos-test-intray)
-          ("life/life-projects.org" . "* DONE shipped\n* TODO next\n")
-          ("life/resources/book.org" . "* DONE not covered\n"))
-      (let* ((pos-directory root)
-             (result (pos-sweep pos-test-week pos-test-sunday)))
-        (should (equal 4 (plist-get result :archived)))
-        (should (equal '("parent with open child")
-                       (plist-get result :skipped)))
+(ert-deftest pos/a-retired-setting-in-pos-config-el-is-reported ()
+  "A pos-config.el that still sets a retired setting is told so, and loads.
+`pos-pillars' once named the directories the sweep covered; the corpus
+reads every file the configuration allows, so the setting is no
+longer read.  The message names the setting and says as much."
+  (pos-test-with-files root
+      `(("pos-config.el" . ,(pos-test-lines ";;; -*- lexical-binding: t -*-"
+                                            "(setq pos-pillars '(\"life\"))")))
+    (unwind-protect
+        (ert-with-message-capture messages
+          (should (pos-load-config root))
+          (should (string-match-p "pos-pillars" messages))
+          (should (string-match-p "no longer read" messages)))
+      (makunbound 'pos-pillars))))
+
+(ert-deftest pos/a-sweep-archives-every-writable-file-and-no-other ()
+  "A sweep archives the done entries of every writable file, and only those.
+Every Org file of the corpus the root may write, at any depth: a book
+in a resources directory is swept with the top-level files.  Each
+file's archive is written under the week by the file's own path.  A
+done entry in a file the corpus does not read, in archives/ or in a
+product repository, is left where it is, for lint to report as
+stranded.  The counts and skipped headings are totalled."
+  (pos-test-with-files root
+      `(("intray.org" . ,pos-test-intray)
+        ("life/life-projects.org" . "* DONE shipped\n* TODO next\n")
+        ("life/resources/book.org" . "* DONE read\n")
+        ("archives/old.org" . "* DONE kept\n")
+        ("vendor/lib/.git/HEAD" . ,pos-test-git-head)
+        ("vendor/lib/README.org" . "* DONE released\n"))
+    (let* ((pos-directory root)
+           (result (pos-sweep pos-test-week pos-test-sunday)))
+      (should (equal 5 (plist-get result :archived)))
+      (should (equal '("parent with open child")
+                     (plist-get result :skipped)))
+      (dolist (file '("intray.org" "life/life-projects.org"
+                      "life/resources/book.org"))
         (should (file-exists-p
                  (expand-file-name
-                  "archive/orgmode/2026-W36/intray.org_archive" root)))
-        (should (file-exists-p
-                 (expand-file-name
-                  "archive/orgmode/2026-W36/life/life-projects.org_archive"
-                  root)))
-        (should (equal "* DONE not covered\n"
-                       (pos-test-text root "life/resources/book.org")))))))
+                  (concat "archive/orgmode/2026-W36/" file "_archive") root))))
+      (should (equal "* DONE kept\n" (pos-test-text root "archives/old.org")))
+      (should (equal "* DONE released\n"
+                     (pos-test-text root "vendor/lib/README.org"))))))
 
 (ert-deftest pos/a-sweep-without-arguments-finds-its-own-week ()
   "Called with no arguments, a sweep uses the latest boundary at or before now.
@@ -540,20 +544,26 @@ Nothing to count, nothing saved: Git sees no change."
                      (pos-normalise-keywords-in-file file)))
       (should (equal "* TODO open\n" (pos-test-file-string file))))))
 
-(ert-deftest pos/normalising-covers-every-covered-file-and-no-other ()
-  "Normalising runs over the covered files and leaves uncovered ones alone.
-A lower-case #+todo: line counts too.  A book's own keyword line, below
-a pillar, is not the sweep's business."
-  (pos-test-configured
-    (pos-test-with-files root
-        '(("intray.org" . "#+TODO: TODO | DONE\n* TODO a\n")
-          ("life/life-areas.org" . "#+todo: TODO WIP | DONE\n* WIP b\n")
-          ("life/resources/book.org" . "#+TODO: TODO | DONE\n"))
-      (let ((pos-directory root))
-        (should (equal '(:lines-removed 2 :respelled 0)
-                       (pos-normalise-keywords)))
-        (should (equal "#+TODO: TODO | DONE\n"
-                       (pos-test-text root "life/resources/book.org")))))))
+(ert-deftest pos/normalising-runs-over-every-writable-file-and-no-other ()
+  "Normalising runs over the writable files and leaves the rest alone.
+A lower-case #+todo: line counts too, and a book's own keyword line,
+nested below the top level, is now the sweep's business.  A keyword
+line in archives/ or in a product repository is not."
+  (pos-test-with-files root
+      `(("intray.org" . "#+TODO: TODO | DONE\n* TODO a\n")
+        ("life/life-areas.org" . "#+todo: TODO WIP | DONE\n* WIP b\n")
+        ("life/resources/book.org" . "#+TODO: TODO | DONE\n")
+        ("archives/old.org" . "#+TODO: TODO | DONE\n")
+        ("vendor/lib/.git/HEAD" . ,pos-test-git-head)
+        ("vendor/lib/README.org" . "#+TODO: TODO | DONE\n"))
+    (let ((pos-directory root))
+      (should (equal '(:lines-removed 3 :respelled 0)
+                     (pos-normalise-keywords)))
+      (should (equal "" (pos-test-text root "life/resources/book.org")))
+      (should (equal "#+TODO: TODO | DONE\n"
+                     (pos-test-text root "archives/old.org")))
+      (should (equal "#+TODO: TODO | DONE\n"
+                     (pos-test-text root "vendor/lib/README.org"))))))
 
 ;;;; Lint
 
@@ -608,7 +618,7 @@ never in any sequence, like LATER, is just a word."
                      (pos-lint-stale-keyword file))))))
 
 (ert-deftest pos/a-todo-line-in-a-file-is-a-finding ()
-  "A #+TODO line in a covered file is reported, with the fix to run.
+  "A #+TODO line in a file of the corpus is reported, with the fix to run.
 It overrides the one sequence for that file; `pos-normalise-keywords'
 removes it.  The match is case-insensitive, as Org's is."
   (pos-test-with-files root
@@ -636,70 +646,72 @@ that heading; the finding keeps it from being forgotten there."
                      (pos-lint-merged-copy file))))))
 
 (ert-deftest pos/a-task-keyword-in-an-uncovered-file-is-stranded ()
-  "A task keyword in an uncovered file is stranded, and lint reports it.
-The sweep never visits the file, so DONE there would never archive
-and TODO never reach an agenda.  Archive files are not uncovered, so
-the swept tasks in them are not stranded."
+  "A task keyword in a file the corpus does not read is stranded.
+Lint reports it: the sweep never visits an attic or an underscored
+scratch directory, so DONE there would never archive and TODO never
+reach an agenda.  Archive files are not uncovered, so the swept tasks
+in them are not stranded; and a stray Org file in the archive
+directory is read by the corpus, so it is not stranded either."
   (pos-test-configured
     (pos-test-with-files root
-        '(("intray.org" . "* TODO covered\n")
-          ("life/resources/book.org" . "* Chapter\n** TODO write it\n")
-          ("sport/resources/zettles/x.org" . "* DONE old\n")
+        '(("intray.org" . "* TODO read\n")
+          ("_scratch/old.org" . "* DONE old\n")
+          ("attic/notes.org" . "* Chapter\n** TODO write it\n")
           ("archive/orgmode/2026-W35/intray.org_archive" . "* DONE swept\n")
-          ("archive/orgmode/2026-W35/notes.org" . "* TODO ignored\n"))
-      (let ((book (expand-file-name "life/resources/book.org" root))
-            (zettel (expand-file-name "sport/resources/zettles/x.org" root))
+          ("archive/orgmode/2026-W35/notes.org" . "* TODO stray\n"))
+      (let ((old (expand-file-name "_scratch/old.org" root))
+            (notes (expand-file-name "attic/notes.org" root))
             (outside "task keyword outside the agenda files (%s)"))
-        (should (equal (list (list book 2 (format outside "TODO"))
-                             (list zettel 1 (format outside "DONE")))
+        (should (equal (list (list old 1 (format outside "DONE"))
+                             (list notes 2 (format outside "TODO")))
                        (pos-lint-stranded-tasks root)))))))
 
-(ert-deftest pos/copies-of-one-task-in-two-covered-files-name-each-other ()
-  "Copies of one task heading in two covered files each report the other.
+(ert-deftest pos/copies-of-one-task-in-two-files-name-each-other ()
+  "Copies of one task heading in two corpus files each report the other.
 Headings compare lower-cased and trimmed, so Fix the gate and fix the
-gate are one task.  A plain heading, Finances, is no task and is not
-compared."
-  (pos-test-configured
-    (pos-test-with-files root
-        '(("intray.org" . "* TODO fix the gate\n* Finances\n")
-          ("life/life-areas.org" . "* Finances\n** BACKLOG Fix the gate\n"))
-      (should (equal (list (list (expand-file-name "intray.org" root) 1
-                                 "duplicate task (also life/life-areas.org:2)")
-                           (list (expand-file-name "life/life-areas.org" root) 2
-                                 "duplicate task (also intray.org:1)"))
-                     (pos-lint-duplicate-tasks root))))))
+gate are one task.  A copy nested below the top level is seen like
+any other.  A plain heading, Finances, is no task and is not compared."
+  (pos-test-with-files root
+      '(("intray.org" . "* TODO fix the gate\n* Finances\n")
+        ("life/home/areas.org" . "* Finances\n** BACKLOG Fix the gate\n"))
+    (should (equal (list (list (expand-file-name "intray.org" root) 1
+                               "duplicate task (also life/home/areas.org:2)")
+                         (list (expand-file-name "life/home/areas.org" root) 2
+                               "duplicate task (also intray.org:1)"))
+                   (pos-lint-duplicate-tasks root)))))
 
 ;;;; Stranded tasks
 
 (ert-deftest pos/only-the-topmost-open-task-of-a-nest-is-rescued ()
   "A stranded open task is listed once, at the top of its nest.
+Stranded means in a file the corpus does not read, an attic here.
 Rescue lists open tasks only: a done one stays where it is, for lint
 to report, while an open one's subtasks will move with it and are not
 listed again."
   (pos-test-configured
     (pos-test-with-files root
         `(("intray.org" . "* Unsorted\n")
-          ("life/resources/notes.org" . ,(pos-test-lines "* Seminar"
-                                                         "** TODO follow up"
-                                                         "*** TODO nested"
-                                                         "** DONE said hello")))
-      (should (equal (list (list (expand-file-name "life/resources/notes.org"
-                                                   root)
+          ("attic/notes.org" . ,(pos-test-lines "* Seminar"
+                                                "** TODO follow up"
+                                                "*** TODO nested"
+                                                "** DONE said hello")))
+      (should (equal (list (list (expand-file-name "attic/notes.org" root)
                                  2 "follow up"))
                      (pos-stranded-open-tasks root))))))
 
 (ert-deftest pos/a-rescued-task-lands-under-unsorted-linked-back ()
   "A rescued task is moved under the intray's Unsorted, with a link back.
-The link names the file and the parent heading it came from, relative
-to the root, and goes after the planning line so Org still reads the
-schedule.  Nested open tasks move with it; the file keeps the rest."
+The task is open in a file the corpus does not read.  The link names
+the file and the parent heading it came from, relative to the root,
+and goes after the planning line so Org still reads the schedule.
+Nested open tasks move with it; the file keeps the rest."
   (pos-test-configured
     (pos-test-with-files root
         `(("intray.org" . ,(pos-test-lines "* Zettles"
                                            "* Unsorted"
                                            "** TODO already here"
                                            "* Sorted"))
-          ("life/resources/notes.org"
+          ("attic/notes.org"
            . ,(pos-test-lines "* Seminar"
                               "** TODO follow up"
                               "SCHEDULED: <2026-09-14 Mon>"
@@ -709,16 +721,15 @@ schedule.  Nested open tasks move with it; the file keeps the rest."
       (let ((pos-directory root))
         (pos-refile-stranded)
         (should (equal "* Seminar\n** DONE said hello\n"
-                       (pos-test-text root "life/resources/notes.org")))
+                       (pos-test-text root "attic/notes.org")))
         (should (equal (pos-test-lines
                         "* Zettles"
                         "* Unsorted"
                         "** TODO already here"
                         "** TODO follow up"
                         "SCHEDULED: <2026-09-14 Mon>"
-                        (concat "From "
-                                "[[file:life/resources/notes.org::*Seminar]"
-                                "[life/resources/notes.org: Seminar]]")
+                        (concat "From [[file:attic/notes.org::*Seminar]"
+                                "[attic/notes.org: Seminar]]")
                         "some notes"
                         "*** TODO nested"
                         "* Sorted")
@@ -731,15 +742,14 @@ names the file alone."
   (pos-test-configured
     (pos-test-with-files root
         '(("intray.org" . "* Sorted\n")
-          ("life/resources/notes.org" . "* TODO top level task\n"))
+          ("attic/notes.org" . "* TODO top level task\n"))
       (let ((pos-directory root))
         (pos-refile-stranded)
         (should (equal (pos-test-lines
                         "* Sorted"
                         "* Unsorted"
                         "** TODO top level task"
-                        (concat "From [[file:life/resources/notes.org]"
-                                "[life/resources/notes.org]]"))
+                        "From [[file:attic/notes.org][attic/notes.org]]")
                        (pos-test-text root "intray.org")))))))
 
 (ert-deftest pos/a-dry-run-rescue-lists-the-tasks-and-moves-none ()
@@ -747,11 +757,11 @@ names the file alone."
   (pos-test-configured
     (pos-test-with-files root
         '(("intray.org" . "* Unsorted\n")
-          ("life/resources/notes.org" . "* TODO a task\n"))
+          ("attic/notes.org" . "* TODO a task\n"))
       (let ((pos-directory root))
         (should (equal 1 (length (pos-refile-stranded t))))
         (should (equal "* TODO a task\n"
-                       (pos-test-text root "life/resources/notes.org")))
+                       (pos-test-text root "attic/notes.org")))
         (should (equal "* Unsorted\n" (pos-test-text root "intray.org")))))))
 
 (ert-deftest pos/unsorted-ends-before-the-next-top-heading ()
@@ -894,7 +904,7 @@ files are saved.  The table's header row is not a copy."
              "| keep | life/life-areas.org | 2 | Household | 1 |")))
     (let ((plan (expand-file-name "dedupe.org" root)))
       (should (equal (list :resolved 1 :merged 0 :relinked 0
-                           :skipped 0 :vanished 0 :stale 0)
+                           :skipped 0 :unwritable 0 :vanished 0 :stale 0)
                      (pos-dedupe-apply root plan)))
       (should (equal "* Unsorted\n** TODO other\n"
                      (pos-test-text root "intray.org")))
@@ -920,7 +930,7 @@ reports it until a person reconciles it.  The intray is left empty."
              "| keep | life/life-areas.org | 2 | Household | 1 |")))
     (let ((plan (expand-file-name "dedupe.org" root)))
       (should (equal (list :resolved 1 :merged 1 :relinked 0
-                           :skipped 0 :vanished 0 :stale 0)
+                           :skipped 0 :unwritable 0 :vanished 0 :stale 0)
                      (pos-dedupe-apply root plan)))
       (should (equal "" (pos-test-text root "intray.org")))
       (should (equal (pos-test-lines "* Household"
@@ -949,7 +959,7 @@ it would be, and the files are as they were."
                             "| keep | life/life-areas.org | 2 | | 0 |")))
     (let ((plan (expand-file-name "dedupe.org" root)))
       (should (equal (list :resolved 1 :merged 0 :relinked 0
-                           :skipped 1 :vanished 0 :stale 0)
+                           :skipped 1 :unwritable 0 :vanished 0 :stale 0)
                      (pos-dedupe-apply root plan t)))
       (should (equal "* TODO fix the gate\n* TODO paint\n"
                      (pos-test-text root "intray.org"))))))
@@ -972,7 +982,7 @@ back empty."
                             "| keep | sport/sport-areas.org | 1 | | 0 |")))
     (let ((plan (expand-file-name "dedupe.org" root)))
       (should (equal (list :resolved 2 :merged 0 :relinked 0
-                           :skipped 0 :vanished 0 :stale 0)
+                           :skipped 0 :unwritable 0 :vanished 0 :stale 0)
                      (pos-dedupe-apply root plan)))
       (should (equal "" (pos-test-text root "intray.org")))
       (should (equal "" (pos-test-text root "people/people-areas.org"))))))
@@ -994,7 +1004,7 @@ moved into its place."
                             "| keep | life/life-areas.org | 2 | shed | 0 |")))
     (let ((plan (expand-file-name "dedupe.org" root)))
       (should (equal (list :resolved 2 :merged 0 :relinked 0
-                           :skipped 0 :vanished 1 :stale 0)
+                           :skipped 0 :unwritable 0 :vanished 1 :stale 0)
                      (pos-dedupe-apply root plan)))
       (should (equal "* TODO unrelated\n" (pos-test-text root "intray.org"))))))
 
@@ -1033,7 +1043,7 @@ link lands on the note."
                "| keep | life/life-areas.org | 2 | Household | 1 |")))
       (let ((plan (expand-file-name "dedupe.org" root))
             (counts (list :resolved 1 :merged 1 :relinked 2
-                          :skipped 0 :vanished 0 :stale 0)))
+                          :skipped 0 :unwritable 0 :vanished 0 :stale 0)))
         (should (string-match-p
                  "^- Links to intray.org:4 from notes.org:4, notes.org:4$"
                  (pos-dedupe-plan root)))
@@ -1086,7 +1096,7 @@ ID property is written as Org writes one, padded to its column."
              "| keep | life/life-areas.org | 2 | Household | 0 |")))
     (let ((plan (expand-file-name "dedupe.org" root)))
       (should (equal (list :resolved 1 :merged 0 :relinked 1
-                           :skipped 0 :vanished 0 :stale 0)
+                           :skipped 0 :unwritable 0 :vanished 0 :stale 0)
                      (pos-dedupe-apply root plan)))
       (should (equal (pos-test-lines ":PROPERTIES:"
                                      ":ID: file-n"
@@ -1117,28 +1127,54 @@ half applied."
              "| keep | life/life-areas.org | 3 | Household | 0 |")))
     (let ((plan (expand-file-name "dedupe.org" root)))
       (should (equal (list :resolved 0 :merged 0 :relinked 0
-                           :skipped 0 :vanished 0 :stale 1)
+                           :skipped 0 :unwritable 0 :vanished 0 :stale 1)
                      (pos-dedupe-apply root plan)))
       (should (equal "* TODO fix the gate\n"
                      (pos-test-text root "intray.org"))))))
 
+(ert-deftest pos/a-group-with-a-copy-in-a-child-repository-is-unwritable ()
+  "A group with a copy in a configured child repository is left as it is.
+The child's files are read, so the copy is a duplicate the plan lists;
+but the root may not write them, so neither copy is cut and the group
+is counted unwritable rather than resolved."
+  (pos-test-with-files root
+      `(("intray.org" . "* TODO fix the gate\n")
+        ("child/.git/HEAD" . ,pos-test-git-head)
+        ("child/.clanka/config.yml" . ,pos-test-child-config)
+        ("child/intray.org" . "* TODO fix the gate\n")
+        ("dedupe.org"
+         . ,(pos-test-lines "* fix the gate"
+                            "| drop | intray.org | 1 | | 0 |"
+                            "| keep | child/intray.org | 1 | | 0 |")))
+    (let ((plan (expand-file-name "dedupe.org" root)))
+      (should (string-match-p "| child/intray.org " (pos-dedupe-plan root)))
+      (should (equal (list :resolved 0 :merged 0 :relinked 0
+                           :skipped 0 :unwritable 1 :vanished 0 :stale 0)
+                     (pos-dedupe-apply root plan)))
+      (should (equal "* TODO fix the gate\n" (pos-test-text root "intray.org")))
+      (should (equal "* TODO fix the gate\n"
+                     (pos-test-text root "child/intray.org"))))))
+
 ;;;; Refile
 
 (ert-deftest pos/the-first-matching-refile-rule-wins ()
-  "A heading is suggested the pillar of the first rule it matches, or none.
+  "A heading is suggested the file of the first rule it matches, or none.
 Rules match without regard to case; a heading no rule matches has no
 suggestion, and is left for a person."
   (pos-test-configured
-    (should (equal "work" (pos-refile-suggest "Client invoice query")))
-    (should (equal "body" (pos-refile-suggest "Dentist checkup")))
+    (should (equal "work/work-projects.org"
+                   (pos-refile-suggest "Client invoice query")))
+    (should (equal "body/body-projects.org"
+                   (pos-refile-suggest "Dentist checkup")))
     (should-not (pos-refile-suggest "Visitor arrives"))))
 
 (ert-deftest pos/the-refile-plan-has-one-row-per-intray-entry ()
   "The refile plan has a row per level-two intray entry, with a suggestion.
-A matched entry is a move to its pillar's projects file; the rest are
-questions.  Each entry is quoted whole below the table in an example
-block, its headings escaped, so the plan, a covered file while it
-sits in the root, is not itself a file of duplicate tasks."
+A matched entry is a move to the file its rule names, written as the
+rule has it; the rest are questions.  Each entry is quoted whole below
+the table in an example block, its headings escaped, so the plan, a
+file of the corpus while it sits in the root, is not itself a file of
+duplicate tasks."
   (pos-test-configured
     (pos-test-with-files root
         `(("intray.org" . ,(pos-test-lines "* Unsorted"
@@ -1187,7 +1223,7 @@ row marked skip is left in place and counted."
              "| move | 5 | Invoice query | work/work-projects.org | |"
              "| skip | 6 | keep me | | |")))
     (let ((plan (expand-file-name "refile.org" root)))
-      (should (equal '(:moved 2 :left 1 :missing 0 :vanished 0)
+      (should (equal '(:moved 2 :left 1 :missing 0 :unwritable 0 :vanished 0)
                      (pos-refile-apply root plan)))
       (should (equal "* Unsorted\n** keep me\n"
                      (pos-test-text root "intray.org")))
@@ -1218,7 +1254,7 @@ Operations."
              (concat "| move | 2 | Invoicing | work/work-areas.org"
                      " | Operations/Housekeeping |"))))
     (let ((plan (expand-file-name "refile.org" root)))
-      (should (equal '(:moved 1 :left 0 :missing 0 :vanished 0)
+      (should (equal '(:moved 1 :left 0 :missing 0 :unwritable 0 :vanished 0)
                      (pos-refile-apply root plan)))
       (should (equal (pos-test-lines "* Operations"
                                      "** Housekeeping"
@@ -1242,10 +1278,29 @@ Nothing moves, and the intray is unchanged."
              "| move | 3 | b | body/body-projects.org | Surgery |"
              "| move | 4 | zzz | body/body-projects.org | |")))
     (let ((plan (expand-file-name "refile.org" root)))
-      (should (equal '(:moved 0 :left 0 :missing 2 :vanished 1)
+      (should (equal '(:moved 0 :left 0 :missing 2 :unwritable 0 :vanished 1)
                      (pos-refile-apply root plan)))
       (should (equal "* Unsorted\n** TODO a\n** TODO b\n** TODO c\n"
                      (pos-test-text root "intray.org"))))))
+
+(ert-deftest pos/a-target-in-a-child-repository-is-unwritable-and-left ()
+  "A row whose target is in a child repository is left and counted.
+The child is configured, so its file is read and is no missing
+target; but the root may not write it, so the entry stays in the
+intray and the row counts as unwritable."
+  (pos-test-with-files root
+      `(("intray.org" . "* Unsorted\n** TODO a\n")
+        ("child/.git/HEAD" . ,pos-test-git-head)
+        ("child/.clanka/config.yml" . ,pos-test-child-config)
+        ("child/projects/p.org" . "* Inbox\n")
+        ("refile.org" . "| move | 2 | a | child/projects/p.org | Inbox |\n"))
+    (let ((plan (expand-file-name "refile.org" root)))
+      (should (equal '(:moved 0 :left 0 :missing 0 :unwritable 1 :vanished 0)
+                     (pos-refile-apply root plan)))
+      (should (equal "* Unsorted\n** TODO a\n"
+                     (pos-test-text root "intray.org")))
+      (should (equal "* Inbox\n"
+                     (pos-test-text root "child/projects/p.org"))))))
 
 (ert-deftest pos/a-dry-run-refile-moves-nothing ()
   "A dry run counts what it would move and changes no file."
@@ -1255,7 +1310,7 @@ Nothing moves, and the intray is unchanged."
         ("refile.org"
          . "| move | 2 | a | body/body-projects.org | Appointments |\n"))
     (let ((plan (expand-file-name "refile.org" root)))
-      (should (equal '(:moved 1 :left 0 :missing 0 :vanished 0)
+      (should (equal '(:moved 1 :left 0 :missing 0 :unwritable 0 :vanished 0)
                      (pos-refile-apply root plan t)))
       (should (equal "* Unsorted\n** TODO a\n"
                      (pos-test-text root "intray.org"))))))
