@@ -50,7 +50,11 @@ As the tape writes it: an object, or for bytes an object holding them."
                   (cons (symbol-name (car file))
                         (encode-coding-string (cdr file) 'utf-8 t)))
                 .files)
-        .claims)))))
+        .claims
+        (seq-map (lambda (later)
+                   (let-alist later
+                     (cons .name (encode-coding-string .event 'utf-8 t))))
+                 .following))))))
 
 (ert-deftest pos-remote/the-client-makes-each-tape-s-requests ()
   "Every tape in fixtures/remote/: for each call the request recorded is
@@ -96,6 +100,58 @@ and one that means nothing here, as remote."
                                         (500 . "remote")))
       (let ((pos-remote-send-function (lambda (&rest _) (cons status "<html>"))))
         (pos-ledger-test-refused kind (pos-remote-describe archive))))))
+
+(defun pos-remote-test-begun (unnamed named)
+  "Return the first events of a ledger begun before events had a ledger_id.
+An alist of name and bytes: UNNAMED schema 1 events that name no
+ledger, then NAMED that name one."
+  (let (events previous)
+    (dotimes (i (+ unnamed named))
+      (let* ((event (pos-ledger-json
+                     `((schema . 1) (previous . ,(or previous :null)) (add . ((,(format "%d.md" (1+ i)) . ((mode . 292) (size . 0)))))
+                       ,@(when (>= i unnamed)
+                           '((ledger_id . "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1"))))))
+             (hash (pos-ledger--sha event)))
+        (push (cons (format "%08d-%s.json" (1+ i) hash) event) events)
+        (setq previous hash)))
+    (nreverse events)))
+
+(ert-deftest pos-remote/an-event-that-names-no-ledger-is-followed-to-the-first-that-does ()
+  "Each of the first events that name none is followed by the rest of
+them and the first that names the ledger, and by no more; an event that
+names the ledger, or comes after one, by nothing."
+  (let ((events (pos-remote-test-begun 3 2)))
+    (should (equal (list (seq-subseq events 1 4) (seq-subseq events 2 4)
+                         (seq-subseq events 3 4) nil nil)
+                   (mapcar (lambda (number) (pos-remote-following events number))
+                           '(1 2 3 4 5))))))
+
+(ert-deftest pos-remote/a-ledger-no-event-names-is-followed-by-nothing ()
+  "Where no event names a ledger, nothing vouches for the first events."
+  (let ((events (pos-remote-test-begun 3 0)))
+    (should (equal '(nil nil nil)
+                   (mapcar (lambda (number) (pos-remote-following events number))
+                           '(1 2 3))))))
+
+(ert-deftest pos-remote/later-events-travel-after-the-claims-and-before-the-files ()
+  "The parts of an append: name, event, claims, the events after it in
+order, then the files by CID."
+  (let* ((events (pos-remote-test-begun 2 1))
+         sent
+         (pos-remote-send-function
+          (lambda (_method _url _headers body)
+            (let ((start 0) names)
+              (while (string-match "name=\"\\([^\"]*\\)\"" body start)
+                (push (match-string 1 body) names)
+                (setq start (match-end 0)))
+              (setq sent (nreverse names)))
+            (cons 201 "{}"))))
+    (pos-remote-append (pos-remote-http-create :url "https://keeper.example/ledger" :token "t")
+                       (car (car events)) (cdr (car events))
+                       '(("bafkb" . "b") ("bafka" . "a")) nil (cdr events))
+    (should (equal (list "name" "event" "claims" (car (nth 1 events)) (car (nth 2 events))
+                         "bafka" "bafkb")
+                   sent))))
 
 (cl-defstruct pos-remote-test-memory
   "A keeper that is not HTTP: its events, in a list."

@@ -31,6 +31,9 @@
 ;; - `pos-remote-append': an event, with files and the client's claims.
 ;; - `pos-remote-read': the bytes under a CID, or at a path beneath it.
 ;;
+;; `pos-remote-following' is what a client sends after an event that
+;; names no ledger, so that a keeper can tell whose it is.
+;;
 ;; `pos-remote-http' is the protocol's wire.  A refusal signals
 ;; `pos-ledger-refused' with the kind the keeper names.  Nothing here
 ;; seals: `pos-seal' does not yet call it.
@@ -56,17 +59,55 @@ An alist: protocol, ledger_id, head, events, root and erased.")
 (cl-defgeneric pos-remote-event (archive number)
   "Return the bytes of event NUMBER of ARCHIVE's ledger, as its file has them.")
 
-(cl-defgeneric pos-remote-append (archive name event files claims)
+(cl-defgeneric pos-remote-append (archive name event files claims &optional following)
   "Append to ARCHIVE the event of bytes EVENT, which the ledger file NAME is.
 FILES is an alist of CID and bytes: the files it or earlier events
 enrol.  CLAIMS is an alist of what the client says of itself, strings
-by name.  Return the description after it, as `pos-remote-describe'.
-The same event again at the same number changes nothing.")
+by name.  FOLLOWING is the events after it, an alist of name and bytes
+in order, by which an event that names no ledger is known for this
+ledger's (`pos-remote-following').  Return the description after it,
+as `pos-remote-describe'.  The same event again at the same number
+changes nothing.")
 
 (cl-defgeneric pos-remote-read (archive cid &optional path)
   "Return the bytes ARCHIVE's ledger enrols under CID.
 A file or an event; or with PATH, the file at that path beneath a
 directory.")
+
+;;;; Whose an event is
+
+(defun pos-remote--named (events)
+  "Return the ledger_id EVENTS name, or nil.
+EVENTS is an alist of name and bytes, in order.  It is the ledger_id of
+the last of them that has one: in a valid chain every event that has
+one has the same, and none follows one that has."
+  (seq-some (lambda (event)
+              (let ((id (alist-get 'ledger_id (pos-ledger--parse (cdr event)))))
+                (and (stringp id) id)))
+            (reverse events)))
+
+(defun pos-remote-following (events number)
+  "Return what a client sends after event NUMBER of EVENTS.
+EVENTS is a ledger's events, an alist of name and bytes in order, and
+what is returned is some of them, by which a keeper can tell whose the
+event is.
+
+An event's ledger is named by the event or by one before it.  A ledger
+begun before events carried a ledger_id has first events that name
+none, and for one of those the client sends the events after it, up to
+and including the first that does name the ledger: each event's
+previous is the hash of the one before, so that event vouches for all
+before it.  For any other event this is nil; and it is nil where no
+event names a ledger, since nothing then vouches."
+  (unless (pos-remote--named (seq-take events number))
+    (let ((rest (seq-drop events number))
+          found)
+      (while (and rest (not found))
+        (when (pos-remote--named (list (car rest)))
+          (setq found t))
+        (setq rest (cdr rest)))
+      (when found
+        (seq-subseq events number (- (length events) (length rest)))))))
 
 ;;;; The wire
 
@@ -200,12 +241,15 @@ is asked once more with a token already kept that it takes."
   "Return the bytes of event NUMBER of ARCHIVE's ledger, over HTTP."
   (pos-remote--call archive "GET" (format "/events/%d" number)))
 
-(cl-defmethod pos-remote-append ((archive pos-remote-http) name event files claims)
-  "Append to ARCHIVE the event EVENT named NAME, with FILES and CLAIMS, over HTTP."
+(cl-defmethod pos-remote-append ((archive pos-remote-http) name event files claims
+                                 &optional following)
+  "Append to ARCHIVE the event EVENT named NAME, with FILES and CLAIMS, over HTTP.
+FOLLOWING, the events after it, goes after the claims and before the files."
   (let ((sent (pos-remote--multipart
                (append (list (cons "name" (encode-coding-string name 'utf-8))
                              (cons "event" event)
                              (cons "claims" (pos-ledger-json claims)))
+                       following
                        (sort (copy-sequence files)
                              (lambda (a b) (string< (car a) (car b))))))))
     (pos-ledger--parse
