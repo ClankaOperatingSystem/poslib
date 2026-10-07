@@ -1,0 +1,5 @@
+{
+ "about": "Done items are swept weekly or sealed; another word is refused.",
+ "yaml": "pos: 2\narchives:\n  - scope: \".\"\n    kept: committed\n    sweep: monthly\n",
+ "refused": "bad-value"
+}

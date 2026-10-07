@@ -1,0 +1,5 @@
+{
+ "about": "A sweep's path lies beneath its scope.",
+ "yaml": "pos: 2\narchives:\n  - scope: \".\"\n    kept: committed\n    sweep: weekly\n    path: ../elsewhere\n",
+ "refused": "bad-path"
+}

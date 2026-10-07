@@ -1,6 +1,6 @@
 {
  "about": "Warnings name each unknown key by its place, in the order met; keys this version defines are read as ever.",
- "yaml": "pos: 2\nprojects: projects/\ncolour: blue\narchives:\n  - scope: \".\"\n    kept: committed\n    sweep: weekly\nserver:\n  name: example\n  mcp: https://pos.example.org/mcp\n  port: 1\n",
+ "yaml": "pos: 2\nprojects: projects/\ncolour: blue\narchives:\n  - scope: \".\"\n    kept: committed\n    tint: blue\nserver:\n  name: example\n  mcp: https://pos.example.org/mcp\n  port: 1\n",
  "config": {
   "kind": "responsibility",
   "projects": "projects",
@@ -21,7 +21,7 @@
   },
   "warnings": [
    "unknown-key: colour",
-   "unknown-key: archives[0].sweep",
+   "unknown-key: archives[0].tint",
    "unknown-key: server.port"
   ]
  }

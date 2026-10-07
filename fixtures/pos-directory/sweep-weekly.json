@@ -1,0 +1,28 @@
+{
+ "about": "An archive entry says how its scope's done items are retired: weekly, into Org archive files beneath the scope at path, whose final slash is dropped.",
+ "yaml": "pos: 2\nprojects: projects/\narchives:\n  - scope: \".\"\n    kept: committed\n    sweep: weekly\n    path: history/weeks/\n  - scope: projects/fix\n    kept: uncommitted\n    sweep: weekly\n",
+ "config": {
+  "kind": "responsibility",
+  "projects": "projects",
+  "methodologies": null,
+  "image": null,
+  "exclude": null,
+  "children": [],
+  "worktrees": [],
+  "archives": [
+   {
+    "scope": ".",
+    "kept": "committed",
+    "sweep": "weekly",
+    "path": "history/weeks"
+   },
+   {
+    "scope": "projects/fix",
+    "kept": "uncommitted",
+    "sweep": "weekly"
+   }
+  ],
+  "server": null,
+  "warnings": []
+ }
+}
