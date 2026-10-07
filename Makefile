@@ -1,4 +1,5 @@
-# make check: lint, then test.
+# make check: lint, then test. Every lisp/*.el and test/*-test.el is
+# taken up; a new file needs no entry here.
 # make check-ipfs IPFS=path/to/ipfs: CID fixtures against kubo, offline.
 
 EMACS ?= emacs
@@ -20,8 +21,10 @@ ORG_ROAM      = 7ce95a286ba7d0383f2ab16ca4cdbf79901921ff
 DEPS   = -L _deps/markdown-mode -L _deps/yaml -L _deps/compat -L _deps/cond-let \
          -L _deps/llama -L _deps/dash -L _deps/emacsql -L _deps/transient/lisp \
          -L _deps/magit/lisp -L _deps/org-roam
-BATCH  = $(EMACS) -Q --batch $(DEPS) -L lisp
-SRC    = lisp/pos.el lisp/pos-capture.el lisp/pos-cid.el lisp/pos-ledger.el lisp/pos-links.el lisp/pos-seal.el lisp/pos-index.el lisp/pos-migrate.el lisp/pos-signin.el lisp/pos-remote.el lisp/pos-tree.el lisp/pos-startup.el lisp/pos-roam.el
+BATCH  = $(EMACS) -Q --batch $(DEPS) -L lisp -L test
+SRC    = $(wildcard lisp/*.el)
+TESTS  = $(wildcard test/*-test.el)
+SUPPORT = test/pos-test-support.el test/pos-fixtures.el
 IPFS  ?= ipfs
 
 .PHONY: check check-ipfs test lint clean deps
@@ -53,9 +56,7 @@ deps:
 	$(call fetch,org-roam,https://github.com/org-roam/org-roam.git,$(ORG_ROAM),org-roam.el)
 
 test: deps
-	$(BATCH) -l ert -l test/pos-test.el -l test/pos-capture-test.el \
-	         -l test/pos-cid-test.el -l test/pos-ledger-test.el -l test/pos-seal-test.el -l test/pos-index-test.el -l test/pos-migrate-test.el -l test/pos-remote-test.el -l test/pos-signin-test.el -l test/pos-tree-test.el -l test/pos-startup-test.el -l test/pos-roam-test.el \
-	         -f ert-run-tests-batch-and-exit
+	$(BATCH) -l ert $(addprefix -l ,$(TESTS)) -f ert-run-tests-batch-and-exit
 
 check-ipfs: deps
 	IPFS=$(IPFS) $(BATCH) -l test/pos-cid-ipfs.el -f pos-cid-ipfs-check
@@ -64,8 +65,12 @@ lint: deps
 	$(BATCH) --eval '(setq byte-compile-error-on-warn t)' \
 	         -f batch-byte-compile $(SRC); \
 	 status=$$?; rm -f lisp/*.elc; exit $$status
-	@out=$$($(BATCH) -l checkdoc --eval '(mapc (function checkdoc-file) (list "lisp/pos.el" "lisp/pos-capture.el" "lisp/pos-cid.el" "lisp/pos-ledger.el" "lisp/pos-links.el" "lisp/pos-seal.el" "lisp/pos-index.el" "lisp/pos-migrate.el" "lisp/pos-signin.el" "lisp/pos-remote.el" "lisp/pos-tree.el" "lisp/pos-startup.el" "lisp/pos-roam.el"))' 2>&1); \
+	$(BATCH) --eval '(setq byte-compile-error-on-warn t)' \
+	         -f batch-byte-compile $(SUPPORT) $(TESTS); \
+	 status=$$?; rm -f test/*.elc; exit $$status
+	@out=$$($(BATCH) -l checkdoc \
+	         --eval '(mapc (function checkdoc-file) (list $(patsubst %,"%",$(SRC) $(SUPPORT))))' 2>&1); \
 	 echo "$$out"; ! echo "$$out" | grep -q '^Warning'
 
 clean:
-	rm -f lisp/*.elc
+	rm -f lisp/*.elc test/*.elc
