@@ -45,6 +45,7 @@
 (require 'seq)
 (require 'pos)
 (require 'pos-tree)
+(require 'pos-roam)
 
 (defcustom pos-startup-excluded-directories '("archives" "attic")
   "Names of directories whose Org files are not read.
@@ -416,6 +417,9 @@ place of the default ones.  Exit 2 on any other argument."
             (push (pop command-line-args-left) views)
           (message "Usage: [--view %s] ..." (string-join pos-startup-views "|"))
           (kill-emacs 2))))
+    ;; Each session opens here: the index is kept current as a matter
+    ;; of course, so that a later command finds it ready.
+    (pos-roam-sync pos-directory)
     (princ (pos-startup-report pos-directory (nreverse views)))))
 
 (provide 'pos-startup)
