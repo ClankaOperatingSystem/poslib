@@ -86,7 +86,9 @@ The whole of an inline link is all of it; of a reference definition, its URL."
           (unless (or (null beg)
                       (markdown-code-block-at-pos (match-beginning 0))
                       (markdown-inline-code-at-pos-p (match-beginning 0)))
-            (let ((path (pos-links--markdown-path url))
+            ;; Decoding the URL searches strings, which would take the
+            ;; match data the fields below are read from.
+            (let ((path (save-match-data (pos-links--markdown-path url)))
                   (inline (eq (car spec) markdown-regex-link-inline)))
               (when path
                 (push (list (pos-links--byte beg) url (car path) (cdr path)
