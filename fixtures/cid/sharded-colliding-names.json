@@ -1,0 +1,32 @@
+{
+ "description": "Names whose murmur3 hashes share leading bytes: three share two, so their slot's sub-shard holds a sub-shard of its own; two share three, three levels down. Among enough entries to shard.",
+ "tree": [
+  {
+   "path": "t/f%04dxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "series": 1100,
+   "text": "z"
+  },
+  {
+   "path": "t/collide-1800",
+   "text": "collide-1800"
+  },
+  {
+   "path": "t/collide-1942",
+   "text": "collide-1942"
+  },
+  {
+   "path": "t/collide-2234",
+   "text": "collide-2234"
+  },
+  {
+   "path": "t/collide-598",
+   "text": "collide-598"
+  },
+  {
+   "path": "t/collide-6757",
+   "text": "collide-6757"
+  }
+ ],
+ "entry": "t",
+ "cid": "bafybeihszda2f7gtf2nrlia7y5xrvr4fu5ludcby6ljbidfgugrswa2f4y"
+}

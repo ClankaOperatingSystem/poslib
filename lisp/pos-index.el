@@ -47,15 +47,13 @@ An alist of CID and the paths, relative to SCOPE, that have it."
   (let* ((scope (file-name-as-directory (file-truename scope)))
          (table (make-hash-table :test #'equal)))
     (dolist (archive (pos-ledger-roots scope))
-      (condition-case nil
-          (dolist (pair (if (pos-ledger-kept archive)
-                            (pos-ledger-fold-cids archive)
-                          (pos-cid-tree archive)))
-            (push (file-relative-name
-                   (expand-file-name (if (equal (car pair) ".") "" (car pair)) archive)
-                   scope)
-                  (gethash (cdr pair) table)))
-        (pos-cid-sharding-unsupported nil)))
+      (dolist (pair (if (pos-ledger-kept archive)
+                        (pos-ledger-fold-cids archive)
+                      (pos-cid-tree archive)))
+        (push (file-relative-name
+               (expand-file-name (if (equal (car pair) ".") "" (car pair)) archive)
+               scope)
+              (gethash (cdr pair) table))))
     (let (index)
       (maphash (lambda (cid paths)
                  (push (cons cid (vconcat (sort (mapcar #'directory-file-name paths)
