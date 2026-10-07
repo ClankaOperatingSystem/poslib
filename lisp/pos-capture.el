@@ -47,7 +47,7 @@ Refuse bad titles, symlinks, unsaved or stale buffers and foreign locks."
       (user-error "Intray must be an existing regular file, not a symlink"))
     (when (stringp (file-locked-p file))
       (user-error "Intray is locked by another editor; save it there first"))
-    (with-current-buffer (find-file-noselect file)
+    (with-current-buffer (pos-visit file)
       (when (buffer-modified-p)
         (user-error "Save the intray's modified buffer before capturing"))
       (unless (verify-visited-file-modtime (current-buffer))

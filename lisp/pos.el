@@ -29,6 +29,17 @@
 
 ;;; Code:
 
+(require 'org)
+(require 'org-archive)
+(require 'seq)
+(require 'cl-lib)
+(require 'pos-roam)
+
+(defgroup pos nil
+  "A personal operating system in Org files."
+  :group 'org
+  :prefix "pos-")
+
 ;;;; Weeks
 
 (defun pos-week-name (time)
@@ -54,11 +65,6 @@
            (decoded-time-month d)
            (decoded-time-year d)
            nil -1 nil))))
-
-(defgroup pos nil
-  "A personal operating system in Org files."
-  :group 'org
-  :prefix "pos-")
 
 ;;;; Files and paths
 
@@ -102,15 +108,15 @@ Keeps FILE's path relative to ROOT; suffix _archive."
   "Return the done keywords of `pos-todo-keywords'."
   (cdr (member "|" (cdr (car pos-todo-keywords)))))
 
+(defun pos-visit (file)
+  "Return a buffer visiting FILE, with the one TODO sequence in force.
+Org reads `org-todo-keywords' when a buffer enters Org mode, so the
+sequence is bound for that moment and the user's own setting is left
+as it is.  A buffer already visiting FILE is returned as it is."
+  (let ((org-todo-keywords pos-todo-keywords))
+    (find-file-noselect file)))
+
 ;;;; Archiving
-
-(require 'org)
-(require 'org-archive)
-(require 'seq)
-(require 'cl-lib)
-(require 'pos-roam)
-
-(setq org-todo-keywords pos-todo-keywords)
 
 (defun pos--open-descendant-p ()
   "Return non-nil if the entry at point has an open TODO below it."
@@ -147,7 +153,7 @@ Return (:archived COUNT :skipped HEADINGS)."
          (org-archive-file-header-format
           (format "\nArchived entries from file %s\n\n" relative-file)))
     (make-directory (file-name-directory archive-file) t)
-    (with-current-buffer (find-file-noselect file)
+    (with-current-buffer (pos-visit file)
       (org-map-entries
        (lambda ()
          (when (org-entry-is-done-p)
@@ -157,13 +163,13 @@ Return (:archived COUNT :skipped HEADINGS)."
              (setq org-map-continue-from (point))
              (org-archive-subtree)
              (pos--fix-last-archived
-              (find-file-noselect archive-file) relative-file time)
+              (pos-visit archive-file) relative-file time)
              (setq archived (1+ archived)))))
        nil 'file)
       (save-buffer))
     ;; org-archive-subtree saves the archive only from the agenda.
     (when (> archived 0)
-      (with-current-buffer (find-file-noselect archive-file)
+      (with-current-buffer (pos-visit archive-file)
         (save-buffer)))
     (list :archived archived :skipped (nreverse skipped))))
 
@@ -229,7 +235,7 @@ Return (:lines-removed N :respelled N)."
   (let ((lines-removed 0)
         (respelled 0)
         (make-backup-files nil))
-    (with-current-buffer (find-file-noselect file)
+    (with-current-buffer (pos-visit file)
       (save-excursion
         (goto-char (point-min))
         (let ((case-fold-search t))
@@ -262,7 +268,7 @@ Return (:lines-removed N :respelled N)."
 
 (defun pos--map-headings (file function)
   "Call FUNCTION at each heading of FILE; collect non-nil results."
-  (with-current-buffer (find-file-noselect file)
+  (with-current-buffer (pos-visit file)
     (delq nil (org-map-entries function nil 'file))))
 
 (defun pos--finding (file message)
@@ -292,7 +298,7 @@ Return (:lines-removed N :respelled N)."
 
 (defun pos-lint-todo-line (file)
   "Report #+TODO lines in FILE."
-  (with-current-buffer (find-file-noselect file)
+  (with-current-buffer (pos-visit file)
     (save-excursion
       (goto-char (point-min))
       (let ((case-fold-search t)
@@ -468,7 +474,7 @@ The link is relative to ROOT."
 Links are relative to ROOT.  Return the headings moved."
   (let ((moved nil)
         (make-backup-files nil))
-    (with-current-buffer (find-file-noselect file)
+    (with-current-buffer (pos-visit file)
       (org-map-entries
        (lambda ()
          (when (and (org-get-todo-state) (not (org-entry-is-done-p)))
@@ -508,7 +514,7 @@ Return (FILE LINE HEADING) for each."
   (let* ((root (file-name-as-directory pos-directory))
          (tasks (pos-stranded-open-tasks root)))
     (unless dry-run
-      (let ((intray (find-file-noselect (expand-file-name "intray.org" root)))
+      (let ((intray (pos-visit (expand-file-name "intray.org" root)))
             (make-backup-files nil))
         (dolist (file (delete-dups (mapcar #'car tasks)))
           (pos-refile-stranded-in-file root file intray))
@@ -665,7 +671,7 @@ table, the \"id:\" links the index records to each copy that has an ID."
 
 (defun pos--marker-at (root file line key)
   "Return a marker at LINE of FILE under ROOT if KEY's heading is there."
-  (with-current-buffer (find-file-noselect (expand-file-name file root))
+  (with-current-buffer (pos-visit (expand-file-name file root))
     (save-excursion
       (goto-char (point-min))
       (forward-line (1- line))
@@ -826,7 +832,7 @@ The index is brought up to date with what was written."
 
 (defun pos-refile-candidates (root)
   "Return (LINE HEADING SECTION SUBTREE) per level-two entry in ROOT's intray."
-  (with-current-buffer (find-file-noselect (expand-file-name "intray.org" root))
+  (with-current-buffer (pos-visit (expand-file-name "intray.org" root))
     (delq nil
           (org-map-entries
            (lambda ()
@@ -925,7 +931,7 @@ Return nil if the path is absent."
 Return (:moved :left :missing :vanished) counts."
   (let ((moved 0) (left 0) (missing 0) (vanished 0)
         (make-backup-files nil)
-        (intray (find-file-noselect (expand-file-name "intray.org" root)))
+        (intray (pos-visit (expand-file-name "intray.org" root)))
         (jobs nil))
     (dolist (row (pos-refile-read-plan plan))
       (pcase-let ((`(,act ,line ,heading ,target ,under) row))
@@ -942,7 +948,7 @@ Return (:moved :left :missing :vanished) counts."
         (let ((target-file (expand-file-name target root)))
           (if (not (file-exists-p target-file))
               (setq missing (1+ missing))
-            (with-current-buffer (find-file-noselect target-file)
+            (with-current-buffer (pos-visit target-file)
               (let ((level (save-excursion (pos--goto-refile-target under))))
                 (if (null level)
                     (setq missing (1+ missing))
@@ -956,7 +962,7 @@ Return (:moved :left :missing :vanished) counts."
     (unless dry-run
       (with-current-buffer intray (when (buffer-modified-p) (save-buffer)))
       (dolist (job jobs)
-        (with-current-buffer (find-file-noselect (expand-file-name (nth 1 job) root))
+        (with-current-buffer (pos-visit (expand-file-name (nth 1 job) root))
           (when (buffer-modified-p) (save-buffer)))))
     (list :moved moved :left left :missing missing :vanished vanished)))
 
