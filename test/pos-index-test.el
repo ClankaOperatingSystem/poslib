@@ -20,34 +20,29 @@
 
 ;;; Commentary:
 
-;; Run: make test.  The seal fixtures in fixtures/ledger/ are shared
-;; with pyposlib, which must seal the same bytes.
-;;; Commentary:
-
-;; Run: make test.
+;; The CID index of a scope: built from sealed archives, rebuilt when
+;; it is gone, and the ipfs: links it resolves, on disk or at a keeper.
 
 ;;; Code:
 
 (require 'ert)
 (require 'org)
 (require 'pos-index)
-(require 'pos-seal-test
-         (expand-file-name "pos-seal-test"
-                           (file-name-directory (or load-file-name
-                                                    buffer-file-name))))
+(require 'pos-fixtures)
 
 (defmacro pos-index-test-with-sealed (&rest body)
   "Evaluate BODY with `scope' holding a sealed trial/ and a sealed note.md,
 `trial-cid' and `note-cid' their CIDs."
   (declare (indent 0))
-  `(pos-seal-test-with-scope
-     (pos-fixture-write (expand-file-name "note.md" scope) "note")
+  `(pos-test-with-scope
+     (pos-test-write-bytes (expand-file-name "note.md" scope) "note")
      (dolist (item '("trial" "note.md"))
        (let ((plan (pos-seal-plan (expand-file-name item scope)
                                   (expand-file-name (concat "archives/" item) scope))))
-         (pos-seal-apply plan (pos-ledger--sha (pos-ledger-json plan)))))
+         (pos-test-approve plan)))
      (let ((trial-cid (pos-cid-directory (expand-file-name "archives/trial" scope)))
            (note-cid (pos-cid-file (expand-file-name "archives/note.md" scope))))
+       (ignore trial-cid note-cid)
        ,@body)))
 
 (ert-deftest pos-index/a-cid-and-a-path-name-a-file-in-an-item ()
@@ -66,10 +61,10 @@ byte for byte as it was."
   (pos-index-test-with-sealed
     (pos-index-build scope)
     (let* ((file (expand-file-name pos-index-file scope))
-           (saved (pos-ledger--read file)))
+           (saved (pos-ledger-read file)))
       (delete-directory (file-name-directory file) t)
       (should (pos-index-resolve scope (concat "ipfs://" note-cid)))
-      (should (equal saved (pos-ledger--read file))))))
+      (should (equal saved (pos-ledger-read file))))))
 
 (ert-deftest pos-index/a-kept-archive-is-indexed-from-its-ledger ()
   "What a keeper keeps is not on disk to hash, so the index of a kept
@@ -123,8 +118,8 @@ with the caller's token, and shown read-only in the mode its name gives."
   (pos-index-test-with-kept
     (let ((canon (expand-file-name "notes.org" scope))
           (file-cid (cdr (assoc "trial/result.txt" cids))))
-      (pos-fixture-write canon (concat "[[ipfs://" (cdr (assoc "trial" cids))
-                                       "/result.txt][the result]]\n"))
+      (pos-test-write-bytes canon (concat "[[ipfs://" (cdr (assoc "trial" cids))
+                                          "/result.txt][the result]]\n"))
       (with-current-buffer (find-file-noselect canon)
         (unwind-protect
             (progn
@@ -179,11 +174,11 @@ are not that CID's are refused as entry."
 (ert-deftest pos-index/a-program-prints-a-link-s-bytes ()
   "fetch LINK prints the file's bytes as they are, whatever they are; a
 link to no archived file exits 2 and prints nothing."
-  (pos-seal-test-with-scope
+  (pos-test-with-scope
     (let ((bytes (concat (apply #'unibyte-string (number-sequence 0 255)) "\r\n\303\251")))
       (let ((coding-system-for-write 'binary))
         (write-region bytes nil (expand-file-name "trial/bytes.bin" scope) nil 'silent))
-      (let* ((archive (pos-seal-test-sealed scope))
+      (let* ((archive (pos-test-scope-sealed scope))
              (cid (cdr (assoc "trial" (pos-ledger-fold-cids archive))))
              (default-directory (file-name-as-directory scope))
              (run (lambda (link)
@@ -231,7 +226,7 @@ would read as UTF-8.  UTF-8 text is still text."
   "An ipfs: link in canon opens the archived file it names."
   (pos-index-test-with-sealed
     (let ((canon (expand-file-name "notes.org" scope)))
-      (pos-fixture-write canon (concat "[[ipfs://" trial-cid "/result.md][the result]]\n"))
+      (pos-test-write-bytes canon (concat "[[ipfs://" trial-cid "/result.md][the result]]\n"))
       (with-current-buffer (find-file-noselect canon)
         (unwind-protect
             (progn
@@ -246,7 +241,7 @@ would read as UTF-8.  UTF-8 text is still text."
   "An ipfs: link written with an Org search after :: opens the file."
   (pos-index-test-with-sealed
     (let ((canon (expand-file-name "notes.org" scope)))
-      (pos-fixture-write canon (concat "[[ipfs://" trial-cid "/result.md::result][the result]]\n"))
+      (pos-test-write-bytes canon (concat "[[ipfs://" trial-cid "/result.md::result][the result]]\n"))
       (with-current-buffer (find-file-noselect canon)
         (unwind-protect
             (progn

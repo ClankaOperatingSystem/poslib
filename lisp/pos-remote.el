@@ -82,7 +82,7 @@ EVENTS is an alist of name and bytes, in order.  It is the ledger_id of
 the last of them that has one: in a valid chain every event that has
 one has the same, and none follows one that has."
   (seq-some (lambda (event)
-              (let ((id (alist-get 'ledger_id (pos-ledger--parse (cdr event)))))
+              (let ((id (alist-get 'ledger_id (pos-ledger-parse (cdr event)))))
                 (and (stringp id) id)))
             (reverse events)))
 
@@ -187,7 +187,7 @@ The boundary is taken from the bytes, so equal parts are equal bodies."
                           (cons (encode-coding-string (car part) 'utf-8)
                                 (string-to-unibyte (cdr part))))
                         parts))
-         (boundary (concat "pos-" (pos-ledger--sha (mapconcat #'cdr parts "")))))
+         (boundary (concat "pos-" (pos-ledger-sha (mapconcat #'cdr parts "")))))
     (cons (string-to-unibyte
            (concat (mapconcat
                     (lambda (part)
@@ -224,7 +224,7 @@ is asked once more with a token already kept that it takes."
       (if (memq status '(200 201))
           (cdr answer)
         (let ((named (ignore-errors
-                       (alist-get 'refused (pos-ledger--parse (cdr answer))))))
+                       (alist-get 'refused (pos-ledger-parse (cdr answer))))))
           (if (and (eql status 401) (null given))
               (pos-ledger--refuse
                'access "Not signed in to this keeper; sign in with: sign-in %s" url)
@@ -235,7 +235,7 @@ is asked once more with a token already kept that it takes."
 
 (cl-defmethod pos-remote-describe ((archive pos-remote-http))
   "Return what the keeper of ARCHIVE has of its ledger, over HTTP."
-  (pos-ledger--parse (pos-remote--call archive "GET" "/")))
+  (pos-ledger-parse (pos-remote--call archive "GET" "/")))
 
 (cl-defmethod pos-remote-event ((archive pos-remote-http) number)
   "Return the bytes of event NUMBER of ARCHIVE's ledger, over HTTP."
@@ -252,7 +252,7 @@ FOLLOWING, the events after it, goes after the claims and before the files."
                        following
                        (sort (copy-sequence files)
                              (lambda (a b) (string< (car a) (car b))))))))
-    (pos-ledger--parse
+    (pos-ledger-parse
      (pos-remote--call archive "POST" "/events" (car sent) (cdr sent)))))
 
 (cl-defmethod pos-remote-read ((archive pos-remote-http) cid &optional path)

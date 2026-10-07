@@ -25,14 +25,12 @@
 
 ;;; Code:
 
+(require 'pos-test-support)
+
 (defconst pos-fixtures-directory
   (expand-file-name "../fixtures/"
                     (file-name-directory (or load-file-name buffer-file-name)))
   "The shared fixtures.")
-
-;; No test reads or writes the tokens a person has kept by signing in.
-(setenv "XDG_CONFIG_HOME" (make-temp-file "pos-config" t))
-(setenv "POS_ARCHIVE_TOKEN" nil)
 
 (defun pos-fixtures (kind)
   "Return the fixtures of KIND, a subdirectory, as (NAME . FIXTURE)."
@@ -49,15 +47,6 @@
   "Return fixture NAME of KIND."
   (or (cdr (assoc name (pos-fixtures kind)))
       (error "No fixture %s/%s" kind name)))
-
-(defun pos-fixture-write (file bytes &optional mode)
-  "Write the unibyte string BYTES to FILE, with MODE, default #o644."
-  (make-directory (file-name-directory file) t)
-  (let ((coding-system-for-write 'binary))
-    (with-temp-file file
-      (set-buffer-multibyte nil)
-      (insert bytes)))
-  (set-file-modes file (or mode #o644)))
 
 (defun pos-fixture-bytes (entry)
   "Return the bytes a tree ENTRY describes."
@@ -86,24 +75,16 @@ file-name coding would decompose them."
                    (make-symbolic-link .symlink path))
          (.hardlink (add-name-to-file (expand-file-name .hardlink dir) path))
          (.series (dotimes (i .series)
-                    (pos-fixture-write (expand-file-name (format .path i) dir)
-                                       (pos-fixture-bytes entry) .mode)))
-         (t (pos-fixture-write path (pos-fixture-bytes entry) .mode)))))))
+                    (pos-test-write-bytes (expand-file-name (format .path i) dir)
+                                          (pos-fixture-bytes entry) .mode)))
+         (t (pos-test-write-bytes path (pos-fixture-bytes entry) .mode)))))))
 
 (defmacro pos-fixture-with (fixture dir &rest body)
   "Evaluate BODY with DIR bound to a temporary directory holding FIXTURE."
   (declare (indent 2))
-  `(let ((,dir (make-temp-file "pos-fixture" t)))
-     (unwind-protect
-         (progn (pos-fixture-build ,fixture ,dir) ,@body)
-       (pos-fixture-writable ,dir)
-       (delete-directory ,dir t))))
-
-(defun pos-fixture-writable (dir)
-  "Make everything under DIR writable, so it can be deleted."
-  (dolist (file (directory-files-recursively dir "" t))
-    (unless (file-symlink-p file)
-      (set-file-modes file (logior (file-modes file) #o200)))))
+  `(pos-test-with-temp-dir ,dir
+     (pos-fixture-build ,fixture ,dir)
+     ,@body))
 
 (provide 'pos-fixtures)
 ;;; pos-fixtures.el ends here

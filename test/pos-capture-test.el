@@ -26,24 +26,17 @@
 
 (require 'ert)
 (require 'pos-capture)
+(require 'pos-test-support)
 
 (defmacro pos-capture-test-with-intray (contents &rest body)
-  "Evaluate BODY with `root' bound to a directory whose intray holds CONTENTS."
+  "Evaluate BODY with `root' a directory whose intray.org holds CONTENTS."
   (declare (indent 1))
-  `(let ((root (file-name-as-directory (make-temp-file "pos-capture" t))))
-     (unwind-protect
-         (progn
-           (with-temp-file (expand-file-name "intray.org" root) (insert ,contents))
-           ,@body)
-       (let ((buffer (find-buffer-visiting (expand-file-name "intray.org" root))))
-         (when buffer (kill-buffer buffer)))
-       (delete-directory root t))))
+  `(pos-test-with-files root `(("intray.org" . ,,contents))
+     ,@body))
 
 (defun pos-capture-test-intray (root)
   "Return the saved contents of ROOT's intray."
-  (with-temp-buffer
-    (insert-file-contents (expand-file-name "intray.org" root))
-    (buffer-string)))
+  (pos-test-file-string (expand-file-name "intray.org" root)))
 
 (ert-deftest pos-capture/files-the-task-at-the-end-of-unsorted ()
   (pos-capture-test-with-intray "* Unsorted\n** TODO here\n* Sorted\n"
@@ -58,10 +51,8 @@
     (should (equal "* Unsorted\n" (pos-capture-test-intray root)))))
 
 (ert-deftest pos-capture/refuses-a-root-without-an-intray ()
-  (let ((root (make-temp-file "pos-capture" t)))
-    (unwind-protect
-        (should-error (pos-capture root "a task") :type 'user-error)
-      (delete-directory root t))))
+  (pos-test-with-temp-dir root
+    (should-error (pos-capture root "a task") :type 'user-error)))
 
 (ert-deftest pos-capture/refuses-an-intray-with-unsaved-edits ()
   (pos-capture-test-with-intray "* Unsorted\n"
@@ -72,4 +63,5 @@
       (set-buffer-modified-p nil))
     (should (equal "* Unsorted\n" (pos-capture-test-intray root)))))
 
+(provide 'pos-capture-test)
 ;;; pos-capture-test.el ends here

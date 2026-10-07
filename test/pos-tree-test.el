@@ -30,33 +30,18 @@
 
 (require 'ert)
 (require 'pos-tree)
-(require 'pos-fixtures
-         (expand-file-name "pos-fixtures"
-                           (file-name-directory (or load-file-name
-                                                    buffer-file-name))))
+(require 'pos-fixtures)
 
 ;;;; Making trees
 
 (defmacro pos-tree-test-with (dir &rest body)
-  "Evaluate BODY with DIR bound to a new temporary directory.
-Git runs without the person's configuration and with a fixed author."
+  "Evaluate BODY with DIR bound to a new temporary directory's true name.
+Paths git reports are true names, so the tests compare against one."
   (declare (indent 1))
-  `(let ((,dir (file-truename (make-temp-file "pos-tree" t)))
-         (process-environment
-          (append '("GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_SYSTEM=/dev/null"
-                    "GIT_AUTHOR_NAME=Test" "GIT_AUTHOR_EMAIL=test@example.org"
-                    "GIT_COMMITTER_NAME=Test"
-                    "GIT_COMMITTER_EMAIL=test@example.org")
-                  process-environment)))
-     (unwind-protect (progn ,@body)
-       (delete-directory ,dir t))))
-
-(defun pos-tree-test-git (dir &rest args)
-  "Run git in DIR with ARGS, and fail if git does."
-  (with-temp-buffer
-    (let ((default-directory (file-name-as-directory dir)))
-      (unless (eq 0 (apply #'process-file "git" nil t nil args))
-        (error "git %s: %s" args (buffer-string))))))
+  (let ((tmp (make-symbol "tmp")))
+    `(pos-test-with-temp-dir ,tmp
+       (let ((,dir (directory-file-name (file-truename ,tmp))))
+         ,@body))))
 
 (defun pos-tree-test-write (dir path text)
   "Write TEXT to PATH beneath DIR."
@@ -68,14 +53,14 @@ Git runs without the person's configuration and with a fixed author."
   "Write FILES, a plist of path and text, beneath DIR and commit them."
   (cl-loop for (path text) on files by #'cddr
            do (pos-tree-test-write dir path text))
-  (pos-tree-test-git dir "add" "-A")
-  (pos-tree-test-git dir "commit" "-q" "--allow-empty" "-m" "Add files"))
+  (pos-test-git dir "add" "-A")
+  (pos-test-git dir "commit" "-q" "--allow-empty" "-m" "Add files"))
 
 (defun pos-tree-test-repository (dir &rest files)
   "Make a repository at DIR, on master, with FILES committed.
 FILES is a plist of path and text.  Return DIR."
   (make-directory dir t)
-  (pos-tree-test-git dir "init" "-q" "-b" "master")
+  (pos-test-git dir "init" "-q" "-b" "master")
   (apply #'pos-tree-test-commit dir files)
   dir)
 
@@ -124,7 +109,7 @@ Return that last plan.  Fail if ten rounds do not settle it."
 
 (defun pos-tree-test-status (dir)
   "Return what git status reports of the repository at DIR."
-  (pos-tree--git-line dir "status" "--porcelain"))
+  (pos-test-git dir "status" "--porcelain"))
 
 ;;;; The file
 
@@ -232,7 +217,7 @@ to do, and no repository sees a change to commit."
            (in-child (expand-file-name "projects/child" root)))
       (pos-tree-test-settle root)
       (delete-file (expand-file-name ".agents/skills/r" in-child))
-      (pos-tree-test-git in-child "switch" "-q" "-c" "other")
+      (pos-test-git in-child "switch" "-q" "-c" "other")
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
                      '("off-branch projects/child"))))))
 
@@ -250,8 +235,8 @@ to do, and no repository sees a change to commit."
                             (pos-tree-test-child "projects/a" child)
                             (pos-tree-test-child "projects/b" child)
                             (pos-tree-test-child "projects/c" child)))
-      (pos-tree-test-git root "clone" "-q" other
-                         (expand-file-name "projects/a" root))
+      (pos-test-git root "clone" "-q" other
+                    (expand-file-name "projects/a" root))
       (pos-tree-test-write root "projects/b/notes" "not a repository\n")
       (make-symbolic-link "b" (expand-file-name "projects/c" root))
       (should (equal (seq-remove (lambda (line) (string-prefix-p "exclude" line))
@@ -431,10 +416,10 @@ not in an archive, an attic, or a hidden or underscore directory."
                  "_work/x/.clanka/config.yaml" "pos: 2\nprojects: projects/\n")))
       ;; A submodule is tracked, and is not found.
       (let ((process-environment (cons "GIT_ALLOW_PROTOCOL=file" process-environment)))
-        (pos-tree-test-git root "submodule" "--quiet" "add"
-                           (pos-tree-test-repository
-                            (expand-file-name "origins/module" dir) "README" "m\n")
-                           "tests/module")
+        (pos-test-git root "submodule" "--quiet" "add"
+                      (pos-tree-test-repository
+                       (expand-file-name "origins/module" dir) "README" "m\n")
+                      "tests/module")
         (pos-tree-test-commit root))
       (pos-tree-test-repository (expand-file-name "vendor/lib" root) "README" "l\n")
       (pos-tree-test-repository (expand-file-name "attic/lib" root) "README" "l\n")
@@ -462,7 +447,7 @@ not in an archive, an attic, or a hidden or underscore directory."
                        "exclude . projects/fix/_worktrees/do-the-thing"
                        "clone projects/fix/_worktrees/do-the-thing")))
       (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
-      (should (equal (pos-tree--git-line
+      (should (equal (pos-test-git
                       (expand-file-name "projects/fix/_worktrees/do-the-thing" root)
                       "symbolic-ref" "--short" "HEAD")
                      "do-the-thing"))
@@ -496,8 +481,8 @@ not in an archive, an attic, or a hidden or underscore directory."
                    (pos-tree-test-child "projects/child" child))))
            (plan (pos-tree-plan root))
            (before (pos-tree-test-exclude root)))
-      (pos-tree-test-git root "clone" "-q" child
-                         (expand-file-name "projects/child" root))
+      (pos-test-git root "clone" "-q" child
+                    (expand-file-name "projects/child" root))
       (should (eq (pos-tree-test-refusal root plan) 'stale-plan))
       (should (equal (pos-tree-test-exclude root) before)))))
 
@@ -513,7 +498,7 @@ not in an archive, an attic, or a hidden or underscore directory."
                    (pos-tree-test-child "projects/child" child))))
            (printed (pos-ledger-json (pos-tree-plan root))))
       (should (equal (pos-tree-test-summary
-                      (pos-tree-apply root (pos-ledger--parse printed)))
+                      (pos-tree-apply root (pos-ledger-parse printed)))
                      nil))
       (should (file-exists-p (expand-file-name "projects/child/README" root))))))
 
@@ -552,9 +537,9 @@ not in an archive, an attic, or a hidden or underscore directory."
     (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
                                             "README" "child\n"))
            (root (progn
-                   (pos-tree-test-git child "switch" "-q" "-c" "feature")
+                   (pos-test-git child "switch" "-q" "-c" "feature")
                    (pos-tree-test-commit child "FEATURE" "on the branch\n")
-                   (pos-tree-test-git child "switch" "-q" "master")
+                   (pos-test-git child "switch" "-q" "master")
                    (pos-tree-test-repository
                     (expand-file-name "root" dir)
                     ".pos/config.yaml"
@@ -655,8 +640,8 @@ not in an archive, an attic, or a hidden or underscore directory."
                    (pos-tree-test-child "projects/child" child "skills-up: true")))))
       (pos-tree-test-settle root)
       (should (equal (pos-tree-test-skill-names root) '("c")))
-      (pos-tree-test-git (expand-file-name "projects/child" root)
-                         "switch" "-q" "-c" "other")
+      (pos-test-git (expand-file-name "projects/child" root)
+                    "switch" "-q" "-c" "other")
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
                      '("off-branch projects/child"))))))
 
@@ -705,7 +690,7 @@ not in an archive, an attic, or a hidden or underscore directory."
            (elsewhere (expand-file-name "elsewhere/.agents/skills/r" dir))
            (link (expand-file-name "projects/child/.agents/skills/r" root)))
       (pos-tree-test-write elsewhere "SKILL.md" "---\nname: r\n---\n")
-      (pos-tree-test-git root "clone" "-q" child (expand-file-name "projects/child" root))
+      (pos-test-git root "clone" "-q" child (expand-file-name "projects/child" root))
       (make-directory (file-name-directory link) t)
       (make-symbolic-link elsewhere link)
       (pos-tree-test-settle root)

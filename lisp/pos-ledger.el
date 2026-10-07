@@ -117,12 +117,12 @@ The environment's POS_ARCHIVE_OFFLINE, set to anything, says the same.")
   "Return the canonical JSON bytes of VALUE, with its final newline."
   (encode-coding-string (concat (pos-ledger--encode value) "\n") 'utf-8))
 
-(defun pos-ledger--parse (bytes)
+(defun pos-ledger-parse (bytes)
   "Return the JSON value in BYTES."
   (json-parse-string (decode-coding-string bytes 'utf-8) :object-type 'alist
                      :null-object :null :false-object :false))
 
-(defun pos-ledger--sha (bytes)
+(defun pos-ledger-sha (bytes)
   "Return the lower-case hex SHA-256 of BYTES."
   (secure-hash 'sha256 bytes))
 
@@ -148,7 +148,7 @@ that one key and a CID."
   "Return the value of BYTES, refusing unless BYTES is its one DAG-JSON block.
 FILE names what was read, for the refusal."
   (let ((value (condition-case nil
-                   (let ((parsed (pos-ledger--parse bytes)))
+                   (let ((parsed (pos-ledger-parse bytes)))
                      (and (pos-ledger--plain-p parsed)
                           (equal (pos-ledger-block parsed) bytes)
                           (list parsed)))
@@ -177,7 +177,7 @@ FILE names what was read, for the refusal."
 
 ;;;; Files
 
-(defun pos-ledger--read (file)
+(defun pos-ledger-read (file)
   "Return FILE's bytes."
   (with-temp-buffer
     (set-buffer-multibyte nil)
@@ -204,7 +204,7 @@ FILE names what was read, for the refusal."
 (defun pos-ledger-record (file)
   "Return FILE's entry: its SHA-256, size and mode less write bits."
   (let* ((before (pos-ledger--regular file))
-         (bytes (pos-ledger--read file))
+         (bytes (pos-ledger-read file))
          (after (pos-ledger--regular file)))
     (unless (and (equal (file-attribute-inode-number before)
                         (file-attribute-inode-number after))
@@ -213,7 +213,7 @@ FILE names what was read, for the refusal."
                         (file-attribute-modification-time after)))
       (pos-ledger--refuse 'changed "File changed while reading: %s" file))
     (list (cons 'mode (logand (pos-ledger--mode file) (lognot #o222)))
-          (cons 'sha256 (pos-ledger--sha bytes))
+          (cons 'sha256 (pos-ledger-sha bytes))
           (cons 'size (length bytes)))))
 
 (defun pos-ledger--entries (dir)
@@ -375,17 +375,17 @@ nil nil)."
       (dolist (name (pos-ledger--entries folder))
         (let* ((path (expand-file-name name folder))
                (_ (pos-ledger--regular path))
-               (bytes (pos-ledger--read path))
+               (bytes (pos-ledger-read path))
                (id (and (string-match pos-ledger--event-name name)
                         (= (1+ number) (string-to-number (match-string 1 name)))
                         (match-string 2 name)))
                (blocked (pos-ledger--event-cid-p id)))
           (setq number (1+ number))
           (unless (and id (equal id (if blocked (pos-ledger--event-cid bytes)
-                                      (pos-ledger--sha bytes))))
+                                      (pos-ledger-sha bytes))))
             (pos-ledger--refuse 'sequence "Ledger sequence/hash failure: %s" path))
           (let* ((event (if blocked (pos-ledger--strict bytes path)
-                          (pos-ledger--parse bytes)))
+                          (pos-ledger-parse bytes)))
                  (keys (and (listp event) (pos-ledger--keys event)))
                  (version (and (listp event) (alist-get 'schema event)))
                  (legacy (seq-some (lambda (e) (not (assq 'cid (cdr e)))) entries))
@@ -497,7 +497,7 @@ ADD is an alist of path and entry; PREVIOUS a hash or nil."
   (let ((bytes (pos-ledger-json
                 `((schema . 1) (previous . ,(or previous :null)) (add . ,add)
                   ,@(when ledger-id `((ledger_id . ,ledger-id)))))))
-    (cons (format "%08d-%s.json" number (pos-ledger--sha bytes)) bytes)))
+    (cons (format "%08d-%s.json" number (pos-ledger-sha bytes)) bytes)))
 
 ;;;; Configuration
 
@@ -543,7 +543,7 @@ configuration that is refused, and for two in one node."
              (config
               (condition-case err
                   (pos-tree-read-config
-                   (decode-coding-string (pos-ledger--read file) 'utf-8))
+                   (decode-coding-string (pos-ledger-read file) 'utf-8))
                 (pos-tree-refused
                  (pos-ledger--refuse 'config "Configuration refused (%s): %s"
                                      (cadr err) file))))
@@ -570,7 +570,7 @@ ledger has an event, so the entry says what the id is."
 (defun pos-ledger-identity (files)
   "Return the ledger_id of the last of the event FILES that has one."
   (seq-some (lambda (file)
-              (alist-get 'ledger_id (pos-ledger--parse (pos-ledger--read file))))
+              (alist-get 'ledger_id (pos-ledger-parse (pos-ledger-read file))))
             (reverse files)))
 
 (defun pos-ledger--as-named (archive files)
@@ -707,8 +707,8 @@ within are known by the names their events are enrolled under."
     (append
      (mapcan (lambda (file)
                (pos-ledger--regular file)
-               (let ((bytes (pos-ledger--read file)))
-                 (list (pos-ledger--sha bytes) (pos-ledger--event-cid bytes))))
+               (let ((bytes (pos-ledger-read file)))
+                 (list (pos-ledger-sha bytes) (pos-ledger--event-cid bytes))))
              (append
               (when (file-directory-p folder)
                 (directory-files folder t "\\.json\\'"))
@@ -736,10 +736,10 @@ within are known by the names their events are enrolled under."
         required present)
     (dolist (file (pos-ledger--checkpoint-files root archives))
       (pos-ledger--regular file)
-      (let* ((bytes (pos-ledger--read file))
+      (let* ((bytes (pos-ledger-read file))
              (value (and (equal (file-name-nondirectory file)
-                                (concat (pos-ledger--sha bytes) ".json"))
-                         (pos-ledger--parse bytes))))
+                                (concat (pos-ledger-sha bytes) ".json"))
+                         (pos-ledger-parse bytes))))
         (unless value
           (pos-ledger--refuse 'checkpoint "Checkpoint hash failure: %s" file))
         (unless (and (listp value)
@@ -823,7 +823,7 @@ A capsule is a frozen snapshot, kept byte for byte: its manifest.json
 has schema_version 1, entries and an entrypoint."
   (let ((manifest (expand-file-name "manifest.json" directory)))
     (and (file-regular-p manifest)
-         (let ((value (ignore-errors (pos-ledger--parse (pos-ledger--read manifest)))))
+         (let ((value (ignore-errors (pos-ledger-parse (pos-ledger-read manifest)))))
            (and (listp value) value
                 (eql 1 (alist-get 'schema_version value))
                 (assq 'entries value) (assq 'entrypoint value))))))
@@ -834,7 +834,7 @@ Its README.org has the declaration line, or it is a capsule."
   (let ((readme (expand-file-name "README.org" directory)))
     (or (and (file-regular-p readme)
              (member (encode-coding-string pos-ledger-declaration 'utf-8)
-                     (split-string (pos-ledger--read readme) "\n")))
+                     (split-string (pos-ledger-read readme) "\n")))
         (pos-ledger-capsule-p directory))))
 
 (defun pos-ledger--undeclared (archive collections)

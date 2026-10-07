@@ -103,7 +103,7 @@ in bytes: TEXT the target, WHOLE what an annotation replaces."
   (let ((org (string-suffix-p ".org" file)) (md (string-suffix-p ".md" file)))
     (when (or org md)
       (with-temp-buffer
-        (insert (decode-coding-string (pos-ledger--read file) 'utf-8))
+        (insert (decode-coding-string (pos-ledger-read file) 'utf-8))
         ;; Read this file alone: no #+SETUPFILE, which may name another
         ;; file or a URL, and no mode hooks.
         (cl-letf (((symbol-function 'org-file-contents) (lambda (&rest _) "")))
@@ -199,16 +199,16 @@ Nothing outside the garden is read: only that it lies there is said."
   (cond
    ((pos-links-outside-garden-p target scope) "outside the garden, and was not read")
    ((file-directory-p target) "a directory")
-   (t (let ((bytes (pos-ledger--read target))
+   (t (let ((bytes (pos-ledger-read target))
             (title (pos-links--title target)))
-        (format "a file of %d bytes, SHA-256 =%s=%s" (length bytes) (pos-ledger--sha bytes)
+        (format "a file of %d bytes, SHA-256 =%s=%s" (length bytes) (pos-ledger-sha bytes)
                 (if title (format ", titled \"%s\"" title) ""))))))
 
 (defun pos-links--title (file)
   "Return FILE's title, from an Org #+TITLE or a Markdown heading, or nil."
   (when (file-regular-p file)
     (with-temp-buffer
-      (insert (decode-coding-string (pos-ledger--read file) 'utf-8))
+      (insert (decode-coding-string (pos-ledger-read file) 'utf-8))
       (goto-char (point-min))
       (when (re-search-forward (if (string-suffix-p ".md" file) "^# +\\(.+\\)$"
                                  "^#\\+TITLE: *\\(.+\\)$")
