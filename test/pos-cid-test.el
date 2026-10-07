@@ -27,10 +27,8 @@
 
 (require 'ert)
 (require 'pos-cid)
-(require 'pos-fixtures
-         (expand-file-name "pos-fixtures"
-                           (file-name-directory (or load-file-name
-                                                    buffer-file-name))))
+(require 'pos-test-support)
+(require 'pos-fixtures)
 
 (defun pos-cid-test-cid (path)
   "Return the CID of PATH, a file or a directory."
@@ -77,29 +75,25 @@
 (ert-deftest pos-cid/content-alone-decides-a-file-cid ()
   "Name, place, permissions and times do not enter a file's CID.
 Sealing removes write bits without changing any CID."
-  (let ((dir (make-temp-file "pos-cid" t)))
-    (unwind-protect
-        (let ((a (expand-file-name "a.org" dir))
-              (b (expand-file-name "deep/er/b.txt" dir)))
-          (pos-fixture-write a "same")
-          (pos-fixture-write b "same")
-          (let ((before (pos-cid-file a)))
-            (set-file-modes a #o444)
-            (set-file-times a 0)
-            (should (equal before (pos-cid-file a)))
-            (should (equal before (pos-cid-file b)))))
-      (delete-directory dir t))))
+  (pos-test-with-temp-dir dir
+    (let ((a (expand-file-name "a.org" dir))
+          (b (expand-file-name "deep/er/b.txt" dir)))
+      (pos-test-write-bytes a "same")
+      (pos-test-write-bytes b "same")
+      (let ((before (pos-cid-file a)))
+        (set-file-modes a #o444)
+        (set-file-times a 0)
+        (should (equal before (pos-cid-file a)))
+        (should (equal before (pos-cid-file b)))))))
 
 (ert-deftest pos-cid/bytes-and-their-file-share-a-cid ()
   (let ((bytes (pos-fixture-bytes '((pattern . 3000))))
         (pos-cid-chunk-size 256)
-        (pos-cid-file-max-links 4)
-        (dir (make-temp-file "pos-cid" t)))
-    (unwind-protect
-        (let ((file (expand-file-name "f" dir)))
-          (pos-fixture-write file bytes)
-          (should (equal (pos-cid-file file) (pos-cid-bytes bytes))))
-      (delete-directory dir t))))
+        (pos-cid-file-max-links 4))
+    (pos-test-with-temp-dir dir
+      (let ((file (expand-file-name "f" dir)))
+        (pos-test-write-bytes file bytes)
+        (should (equal (pos-cid-file file) (pos-cid-bytes bytes)))))))
 
 ;;;; Directories
 
@@ -137,13 +131,10 @@ different CIDs, each as IPFS computes it."
   (pos-cid-test-agrees "past-sharding-threshold"))
 
 (ert-deftest pos-cid/symlinks-are-refused ()
-  (let ((dir (make-temp-file "pos-cid" t)))
-    (unwind-protect
-        (progn
-          (pos-fixture-write (expand-file-name "target" dir) "t")
-          (make-symbolic-link "target" (expand-file-name "link" dir))
-          (should-error (pos-cid-directory dir)))
-      (delete-directory dir t))))
+  (pos-test-with-temp-dir dir
+    (pos-test-write-bytes (expand-file-name "target" dir) "t")
+    (make-symbolic-link "target" (expand-file-name "link" dir))
+    (should-error (pos-cid-directory dir))))
 
 ;;;; Trees
 
@@ -222,15 +213,13 @@ inventory of its files give every CID recorded, as pyposlib must also."
   "With 256-byte chunks and 4 links a node, sizes across every shape of
 DAG give the size the file's real DAG has."
   (let ((pos-cid-chunk-size 256)
-        (pos-cid-file-max-links 4)
-        (dir (make-temp-file "pos-cid" t)))
-    (unwind-protect
-        (dolist (size '(0 1 255 256 257 1024 1025 3000 5000))
-          (let ((file (expand-file-name "f" dir)))
-            (pos-fixture-write file (pos-fixture-bytes `((pattern . ,size))))
-            (should (equal (nth 1 (pos-cid--file file))
-                           (pos-cid--file-tsize size)))))
-      (delete-directory dir t))))
+        (pos-cid-file-max-links 4))
+    (pos-test-with-temp-dir dir
+      (dolist (size '(0 1 255 256 257 1024 1025 3000 5000))
+        (let ((file (expand-file-name "f" dir)))
+          (pos-test-write-bytes file (pos-fixture-bytes `((pattern . ,size))))
+          (should (equal (nth 1 (pos-cid--file file))
+                         (pos-cid--file-tsize size))))))))
 
 (ert-deftest pos-cid/an-inventory-refuses-what-ipfs-would-leave-out ()
   "A hidden or empty path component, and a file where a directory is."

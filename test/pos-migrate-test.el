@@ -20,21 +20,14 @@
 
 ;;; Commentary:
 
-;; Run: make test.  The seal fixtures in fixtures/ledger/ are shared
-;; with pyposlib, which must seal the same bytes.
-;;; Commentary:
-
-;; Run: make test.  A legacy archive holding each thing the migration
-;; must deal with is migrated, checked, and migrated again, idle.
+;; A legacy archive holding each thing the migration must deal with is
+;; migrated, checked, and migrated again, idle.
 
 ;;; Code:
 
 (require 'ert)
 (require 'pos-migrate)
-(require 'pos-seal-test
-         (expand-file-name "pos-seal-test"
-                           (file-name-directory (or load-file-name
-                                                    buffer-file-name))))
+(require 'pos-fixtures)
 
 (defun pos-migrate-test-enrol (archive)
   "Enrol everything in ARCHIVE in a legacy, schema 1 ledger, write-protected."
@@ -43,38 +36,34 @@
     (pos-seal--write-new (expand-file-name (concat pos-ledger-directory "/" (car event)) archive)
                          (cdr event))
     (pos-migrate--protect archive)
-    (pos-ledger--sha (cdr event))))
+    (pos-ledger-sha (cdr event))))
 
 (defmacro pos-migrate-test-with-legacy (&rest body)
   "Evaluate BODY with `scope' holding a legacy archive of every kind of case."
   (declare (indent 0))
-  `(let* ((dir (make-temp-file "pos-migrate" t))
-          (scope (expand-file-name "scope" dir))
-          (archive (expand-file-name "archives" scope)))
-     (unwind-protect
-         (progn
-           (dolist (f '(("plan.org" . "#+TITLE: The plan\n")
-                        ("canon.org" . "See [[file:archives/receipt/source/.gitignore][it]].\n")
-                        ("archives/2026-01-01-first.md" . "# First\n\nThen [second](2026-02-01-second.md).\n")
-                        ("archives/2026-02-01-second.md" . "# Second\n\nAfter [first](2026-01-01-first.md), see [the plan](../plan.org) and [gone](gone.md).\n")
-                        ("archives/receipt/manifest.json" . "{}\n")
-                        ("archives/receipt/README.md" . "# Receipt\n\n[source](source/notes.org)\n")
-                        ("archives/receipt/source/notes.org" . "#+TITLE: Notes\n\n[[file:../README.md][back]]\n")
-                        ("archives/receipt/source/.gitignore" . "*.pyc\n")
-                        ("archives/.DS_Store" . "finder\n")
-                        ("archives/old/archives/r.md" . "retired\n")))
-             (pos-fixture-write (expand-file-name (car f) scope) (cdr f)))
-           ;; A retired scope carries its own legacy ledger.
-           (pos-migrate-test-enrol (expand-file-name "archives/old/archives" scope))
-           (pos-migrate-test-enrol archive)
-           ,@body)
-       (pos-fixture-writable dir)
-       (delete-directory dir t))))
+  `(pos-test-with-temp-dir dir
+     (let* ((scope (expand-file-name "scope" dir))
+            (archive (expand-file-name "archives" scope)))
+       (dolist (f '(("plan.org" . "#+TITLE: The plan\n")
+                    ("canon.org" . "See [[file:archives/receipt/source/.gitignore][it]].\n")
+                    ("archives/2026-01-01-first.md" . "# First\n\nThen [second](2026-02-01-second.md).\n")
+                    ("archives/2026-02-01-second.md" . "# Second\n\nAfter [first](2026-01-01-first.md), see [the plan](../plan.org) and [gone](gone.md).\n")
+                    ("archives/receipt/manifest.json" . "{}\n")
+                    ("archives/receipt/README.md" . "# Receipt\n\n[source](source/notes.org)\n")
+                    ("archives/receipt/source/notes.org" . "#+TITLE: Notes\n\n[[file:../README.md][back]]\n")
+                    ("archives/receipt/source/.gitignore" . "*.pyc\n")
+                    ("archives/.DS_Store" . "finder\n")
+                    ("archives/old/archives/r.md" . "retired\n")))
+         (pos-test-write-bytes (expand-file-name (car f) scope) (cdr f)))
+       ;; A retired scope carries its own legacy ledger.
+       (pos-migrate-test-enrol (expand-file-name "archives/old/archives" scope))
+       (pos-migrate-test-enrol archive)
+       ,@body)))
 
 (defun pos-migrate-test-run (scope)
   "Plan and apply the migration of SCOPE's archive; return the plan."
   (let ((plan (pos-migrate-plan (expand-file-name "archives" scope) scope nil "2026-09-28")))
-    (pos-migrate-apply plan (pos-ledger--sha (pos-ledger-json plan)))
+    (pos-migrate-apply plan (pos-ledger-sha (pos-ledger-json plan)))
     plan))
 
 (ert-deftest pos-migrate/a-migrated-archive-checks-clean ()
@@ -94,13 +83,13 @@ Finder's junk goes; a retired scope's ledger moves beside its archive;
 canon's link to the renamed file follows it."
   (pos-migrate-test-with-legacy
     (pos-migrate-test-run scope)
-    (should (equal "*.pyc\n" (pos-ledger--read (expand-file-name
-                                                  "archives/receipt/source/dot.gitignore" scope))))
+    (should (equal "*.pyc\n" (pos-ledger-read (expand-file-name
+                                               "archives/receipt/source/dot.gitignore" scope))))
     (should-not (file-exists-p (expand-file-name "archives/.DS_Store" scope)))
     (should (directory-files (expand-file-name "archives/old/archive-integrity/ledger" scope)
                              nil "\\.json\\'"))
     (should (string-match-p "archives/receipt/source/dot.gitignore"
-                            (pos-ledger--read (expand-file-name "canon.org" scope))))))
+                            (pos-ledger-read (expand-file-name "canon.org" scope))))))
 
 (ert-deftest pos-migrate/links-become-cids-rumours-or-annotations ()
   "Within the receipt, a collection, links stay; the later record cites
@@ -108,11 +97,11 @@ the earlier by CID, and the earlier's link forward is annotated; canon
 gets a rumour; a broken link is annotated."
   (pos-migrate-test-with-legacy
     (let* ((plan (pos-migrate-test-run scope))
-           (first (pos-ledger--read (expand-file-name "archives/2026-01-01-first.md" scope)))
-           (second (pos-ledger--read (expand-file-name "archives/2026-02-01-second.md" scope))))
+           (first (pos-ledger-read (expand-file-name "archives/2026-01-01-first.md" scope)))
+           (second (pos-ledger-read (expand-file-name "archives/2026-02-01-second.md" scope))))
       (should (member "receipt" (append (alist-get 'collections plan) nil)))
       (should (string-match-p "#\\+COLLECTION: t"
-                              (pos-ledger--read (expand-file-name "archives/receipt/README.org" scope))))
+                              (pos-ledger-read (expand-file-name "archives/receipt/README.org" scope))))
       (should (string-match-p "\\[later record: 2026-02-01-second.md\\]" first))
       (should (string-match-p "(ipfs://bafk" second))
       (should (string-match-p "\\[broken link: gone.md\\]" second))
@@ -123,7 +112,7 @@ gets a rumour; a broken link is annotated."
   (pos-migrate-test-with-legacy
     (let* ((plan (pos-migrate-test-run scope))
            (before (pos-ledger-json (vconcat (pos-ledger-check scope)))))
-      (pos-migrate-apply plan (pos-ledger--sha (pos-ledger-json plan)))
+      (pos-migrate-apply plan (pos-ledger-sha (pos-ledger-json plan)))
       (should (equal before (pos-ledger-json (vconcat (pos-ledger-check scope)))))
       (should-error (pos-migrate-plan (expand-file-name "archives" scope)) :type 'pos-ledger-refused))))
 
@@ -132,8 +121,8 @@ gets a rumour; a broken link is annotated."
 children migrate before their containers and nothing waits on a cycle."
   (pos-migrate-test-with-legacy
     (let ((child (expand-file-name "projects/child" scope)))
-      (pos-fixture-write (expand-file-name "archives/up.md" child)
-                         "# Up\n\nSee [the plan](../../../archives/2026-01-01-first.md).\n")
+      (pos-test-write-bytes (expand-file-name "archives/up.md" child)
+                            "# Up\n\nSee [the plan](../../../archives/2026-01-01-first.md).\n")
       (pos-migrate-test-enrol (expand-file-name "archives" child))
       (let ((plan (pos-migrate-plan (expand-file-name "archives" child) scope nil "2026-09-28")))
         (should (equal '("rumour")
@@ -147,21 +136,21 @@ links, broken or not, are left as written, so its own verification holds."
     (let ((cap (expand-file-name "archives/capsules/snap" scope))
           (text "# A\n\nSee [what was](../../gone.md).\n"))
       (pos-migrate--writable archive)
-      (pos-fixture-write (expand-file-name "manifest.json" cap)
-                         "{\"schema_version\":1,\"entrypoint\":\"a.md\",\"entries\":[]}\n")
-      (pos-fixture-write (expand-file-name "a.md" cap) text)
+      (pos-test-write-bytes (expand-file-name "manifest.json" cap)
+                            "{\"schema_version\":1,\"entrypoint\":\"a.md\",\"entries\":[]}\n")
+      (pos-test-write-bytes (expand-file-name "a.md" cap) text)
       (let* ((ledger (expand-file-name pos-ledger-directory archive))
              (previous (car (last (directory-files ledger t "\\.json\\'"))))
              (add (seq-filter (lambda (e) (string-prefix-p "capsules/" (car e)))
                               (pos-ledger-inventory archive)))
-             (event (pos-ledger-event add (pos-ledger--sha (pos-ledger--read previous)) 2
+             (event (pos-ledger-event add (pos-ledger-sha (pos-ledger-read previous)) 2
                                       "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1")))
         (pos-seal--write-new (expand-file-name (car event) ledger) (cdr event)))
       (pos-migrate--protect archive)
       (let ((plan (pos-migrate-test-run scope)))
         (should (member "capsules/snap" (append (alist-get 'collections plan) nil)))
         (should-not (file-exists-p (expand-file-name "README.org" cap)))
-        (should (equal text (decode-coding-string (pos-ledger--read (expand-file-name "a.md" cap))
+        (should (equal text (decode-coding-string (pos-ledger-read (expand-file-name "a.md" cap))
                                                   'utf-8)))))))
 
 (ert-deftest pos-migrate/a-link-to-a-withdrawn-record-cites-a-rumour ()
@@ -169,9 +158,9 @@ links, broken or not, are left as written, so its own verification holds."
 link: the link cites a rumour of the canon file."
   (pos-migrate-test-with-legacy
     (pos-migrate--writable archive)
-    (pos-fixture-write (expand-file-name "archives/notes.md" scope)
-                       "# Notes\n\nSee [progress](progress.md).\n")
-    (pos-fixture-write (expand-file-name "archives/progress.md" scope) "# Progress\n")
+    (pos-test-write-bytes (expand-file-name "archives/notes.md" scope)
+                          "# Notes\n\nSee [progress](progress.md).\n")
+    (pos-test-write-bytes (expand-file-name "archives/progress.md" scope) "# Progress\n")
     (delete-directory (expand-file-name pos-ledger-directory archive) t)
     (pos-migrate-test-enrol archive)
     (pos-migrate--writable archive)
@@ -192,7 +181,7 @@ link: the link cites a rumour of the canon file."
       ;; Within a candidate already, it is not declared twice.
       (should-not (member "receipt/source" (append (alist-get 'collections plan) nil))))
     (pos-migrate--writable archive)
-    (pos-fixture-write (expand-file-name "archives/2026-03-01-run/log.md" scope) "# Log\n")
+    (pos-test-write-bytes (expand-file-name "archives/2026-03-01-run/log.md" scope) "# Log\n")
     (delete-directory (expand-file-name pos-ledger-directory archive) t)
     (pos-migrate-test-enrol archive)
     (let ((plan (pos-migrate-plan archive scope nil "2026-09-28" nil '("2026-03-01-run"))))

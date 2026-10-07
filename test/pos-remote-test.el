@@ -28,10 +28,7 @@
 
 (require 'ert)
 (require 'pos-remote)
-(require 'pos-ledger-test
-         (expand-file-name "pos-ledger-test"
-                           (file-name-directory (or load-file-name
-                                                    buffer-file-name))))
+(require 'pos-fixtures)
 
 (defun pos-remote-test-call (archive call)
   "Make the CALL a tape's exchange describes of ARCHIVE; return its result.
@@ -76,15 +73,15 @@ recorded."
                             (authorization . ,(cdr (assoc "Authorization" headers)))
                             ,@(when body
                                 `((content_type . ,(cdr (assoc "Content-Type" headers)))
-                                  (body_sha256 . ,(pos-ledger--sha body))))))
+                                  (body_sha256 . ,(pos-ledger-sha body))))))
                     (let-alist (alist-get 'response exchange)
                       (cons .status (encode-coding-string .body 'utf-8 t)))))
                  (got (condition-case err
                           `((result . ,(pos-remote-test-call
                                         archive (alist-get 'call exchange))))
                         (pos-ledger-refused `((refused . ,(symbol-name (cadr err))))))))
-            (pos-ledger-test-same (alist-get 'request exchange) sent)
-            (pos-ledger-test-same
+            (pos-test-same-json (alist-get 'request exchange) sent)
+            (pos-test-same-json
              (if (assq 'refused exchange)
                  `((refused . ,(alist-get 'refused exchange)))
                `((result . ,(alist-get 'result exchange))))
@@ -99,7 +96,7 @@ and one that means nothing here, as remote."
                                         (409 . "chain") (410 . "erased") (413 . "size")
                                         (500 . "remote")))
       (let ((pos-remote-send-function (lambda (&rest _) (cons status "<html>"))))
-        (pos-ledger-test-refused kind (pos-remote-describe archive))))))
+        (pos-test-refused pos-ledger-refused kind (pos-remote-describe archive))))))
 
 (defun pos-remote-test-begun (unnamed named)
   "Return the first events of a ledger begun before events had a ledger_id.
@@ -111,7 +108,7 @@ ledger, then NAMED that name one."
                      `((schema . 1) (previous . ,(or previous :null)) (add . ((,(format "%d.md" (1+ i)) . ((mode . 292) (size . 0)))))
                        ,@(when (>= i unnamed)
                            '((ledger_id . "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1"))))))
-             (hash (pos-ledger--sha event)))
+             (hash (pos-ledger-sha event)))
         (push (cons (format "%08d-%s.json" (1+ i) hash) event) events)
         (setq previous hash)))
     (nreverse events)))
@@ -185,8 +182,8 @@ server process."
   "A 401 to a request with no token is the caller's, whatever it challenges.
 Emacs would otherwise ask at the terminal, or wait without end."
   (dolist (challenge '(nil "Bearer"
-                       "Bearer resource_metadata=\"http://127.0.0.1/told\""
-                       "Basic realm=\"keeper\""))
+                           "Bearer resource_metadata=\"http://127.0.0.1/told\""
+                           "Basic realm=\"keeper\""))
     (let ((server (pos-remote-test-refusing challenge)))
       (unwind-protect
           (should (equal (with-timeout (10 'waited)

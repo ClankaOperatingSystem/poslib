@@ -93,7 +93,7 @@ The file pos/tokens.json under $XDG_CONFIG_HOME, or under ~/.config."
   "Return what is kept, as (TOKENS . KEEPERS).
 Each an alist by string: TOKENS by \"ISSUER CLIENT\", KEEPERS by origin."
   (let ((kept (ignore-errors
-                (pos-ledger--parse (pos-ledger--read (pos-signin-file))))))
+                (pos-ledger-parse (pos-ledger-read (pos-signin-file))))))
     (cons (pos-signin--object (and (listp kept) (alist-get 'tokens kept)))
           (pos-signin--object (and (listp kept) (alist-get 'keepers kept))))))
 
@@ -125,7 +125,7 @@ Each an alist by string: TOKENS by \"ISSUER CLIENT\", KEEPERS by origin."
 (defun pos-signin--json (answer)
   "Return the JSON object in ANSWER, a (STATUS . BYTES), if it is a 200."
   (and (eql (car answer) 200)
-       (ignore-errors (pos-ledger--parse (cdr answer)))))
+       (ignore-errors (pos-ledger-parse (cdr answer)))))
 
 (defun pos-signin--told (url)
   "Return how to sign in to the keeper at URL, or refuse `access'.

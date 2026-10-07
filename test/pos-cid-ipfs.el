@@ -32,10 +32,7 @@
 
 (require 'pos-cid)
 (require 'pos-ledger)
-(require 'pos-fixtures
-         (expand-file-name "pos-fixtures"
-                           (file-name-directory (or load-file-name
-                                                    buffer-file-name))))
+(require 'pos-fixtures)
 
 (defvar pos-cid-ipfs-program
   (let ((program (or (getenv "IPFS") "ipfs")))

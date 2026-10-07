@@ -28,78 +28,7 @@
 (require 'ert)
 (require 'pos-ledger)
 (require 'pos-remote)
-(require 'pos-fixtures
-         (expand-file-name "pos-fixtures"
-                           (file-name-directory (or load-file-name
-                                                    buffer-file-name))))
-
-;; A test asks no keeper but one a fixture has recorded.
-(setq pos-ledger-offline t)
-
-(defun pos-ledger-test-tape (recorded)
-  "Return a function to send requests with that plays RECORDED, a keeper's.
-Each request must be the next one recorded, and is answered as it was.
-Called with no argument, it gives the exchanges not yet played."
-  (let ((left (append (alist-get 'exchanges recorded) nil))
-        (base (alist-get 'url recorded)))
-    (lambda (&optional method url headers body)
-      (if (null method)
-          left
-        (let* ((exchange (or (pop left)
-                             (error "A request the recording does not have: %s %s"
-                                    method url)))
-               (sent `((method . ,method)
-                       (path . ,(substring url (length base)))
-                       (authorization . ,(or (cdr (assoc "Authorization" headers)) :null))
-                       ,@(when body
-                           `((content_type . ,(cdr (assoc "Content-Type" headers)))
-                             (body_sha256 . ,(pos-ledger--sha body)))))))
-          (unless (equal (pos-ledger-json sent)
-                         (pos-ledger-json (alist-get 'request exchange)))
-            (error "Not the request recorded: %S" sent))
-          (cons (alist-get 'status (alist-get 'response exchange))
-                (encode-coding-string (alist-get 'body (alist-get 'response exchange))
-                                      'utf-8)))))))
-
-(defmacro pos-ledger-test-with-keeper (recorded &rest body)
-  "Evaluate BODY with RECORDED, a fixture's keeper, answering if there is one.
-With one, checks ask it, and it must be played out; with none, they
-ask nobody."
-  (declare (indent 1))
-  `(let* ((recorded ,recorded)
-          (tape (and recorded (pos-ledger-test-tape recorded)))
-          (pos-ledger-offline (not tape))
-          (pos-remote-send-function (or tape pos-remote-send-function))
-          (pos-remote-keeper-function
-           (if tape
-               (lambda (url)
-                 (pos-remote-http-create :url url :token (alist-get 'token recorded)))
-             pos-remote-keeper-function)))
-     (prog1 (progn ,@body)
-       (when (and tape (funcall tape))
-         (error "The recording was not played out")))))
-
-(defun pos-ledger-test-same (expected actual)
-  "Check that EXPECTED and ACTUAL are the same JSON value."
-  (should (equal (pos-ledger-json expected) (pos-ledger-json actual))))
-
-(defmacro pos-ledger-test-refused (kind &rest body)
-  "Check that BODY is refused with KIND, a string."
-  (declare (indent 1))
-  `(should (equal ,kind (condition-case err (progn ,@body nil)
-                          (pos-ledger-refused (symbol-name (cadr err)))))))
-
-(defun pos-ledger-test-relative (report dir)
-  "Return REPORT with its absolute paths made relative to DIR."
-  (let ((root (file-name-as-directory (file-truename dir))))
-    (vconcat
-     (mapcar (lambda (entry)
-               (mapcar (lambda (pair)
-                         (pcase (car pair)
-                           ('archive (cons 'archive (file-relative-name (cdr pair) root)))
-                           (_ pair)))
-                       entry))
-             report))))
+(require 'pos-fixtures)
 
 ;;;; Canonical JSON
 
@@ -118,12 +47,12 @@ bytes that are not the one block of their value, refused."
     (ert-info ((car named))
       (let-alist (cdr named)
         (if .error
-            (pos-ledger-test-refused .error
+            (pos-test-refused pos-ledger-refused .error
               (pos-ledger--strict (encode-coding-string .bytes 'utf-8 t) (car named)))
           (let ((block (encode-coding-string .encoded 'utf-8 t)))
             (should (equal block (pos-ledger-block .value)))
             (should (equal .cid (pos-ledger--event-cid block)))
-            (pos-ledger-test-same .value (pos-ledger--strict block (car named)))))))))
+            (pos-test-same-json .value (pos-ledger--strict block (car named)))))))))
 
 ;;;; Inventories and events
 
@@ -137,9 +66,9 @@ the first event enrols them all under the ledger's identity."
           (pos-fixture-with (cdr named) dir
             (let ((archive (expand-file-name .archive dir)))
               (if .error
-                  (pos-ledger-test-refused .error (pos-ledger-inventory archive))
+                  (pos-test-refused pos-ledger-refused .error (pos-ledger-inventory archive))
                 (let ((inventory (pos-ledger-inventory archive)))
-                  (pos-ledger-test-same .inventory inventory)
+                  (pos-test-same-json .inventory inventory)
                   (let ((event (pos-ledger-event inventory nil 1 .ledger_id)))
                     (should (equal .event.name (car event)))
                     (should (equal (encode-coding-string .event.encoded 'utf-8 t)
@@ -158,7 +87,7 @@ archive-integrity/ledger/, or in the legacy folder inside it, not both."
           (pos-fixture-with (cdr named) dir
             (let ((archive (expand-file-name .archive dir)))
               (if .error
-                  (pos-ledger-test-refused .error (pos-ledger-history archive))
+                  (pos-test-refused pos-ledger-refused .error (pos-ledger-history archive))
                 (pcase-let ((`(,entries ,head ,events ,_ ,root ,collections ,items ,empty)
                              (pos-ledger-history archive)))
                   (should (equal (or .empty []) (vconcat empty)))
@@ -167,7 +96,7 @@ archive-integrity/ledger/, or in the legacy folder inside it, not both."
                   (should (equal .events events))
                   (should (equal .root (or root :null)))
                   (should (equal .collections (vconcat collections)))
-                  (pos-ledger-test-same .entries entries))))))))))
+                  (pos-test-same-json .entries entries))))))))))
 
 ;;;; Checks
 
@@ -182,19 +111,19 @@ and where a fixture has recorded its keeper, with what the keeper holds."
       (when (equal .kind "report")
         (ert-info ((car named))
           (pos-fixture-with (cdr named) dir
-            (pos-ledger-test-with-keeper .keeper
+            (pos-test-with-keeper .keeper nil
               (if .error
-                  (pos-ledger-test-refused .error (pos-ledger-check dir))
-                (pos-ledger-test-same
-                 .report (pos-ledger-test-relative (pos-ledger-check dir) dir))))))))))
+                  (pos-test-refused pos-ledger-refused .error (pos-ledger-check dir))
+                (pos-test-same-json
+                 .report (pos-test-report-relative (pos-ledger-check dir) dir))))))))))
 
 (ert-deftest pos-ledger/a-vanished-archive-is-detected ()
   "A checkpoint names ledger heads; removing an archive leaves one unmatched."
   (pos-fixture-with (pos-fixture "ledger" "report-clean") dir
     (let ((archive (expand-file-name "projects/A/archives" dir)))
-      (pos-fixture-writable archive)
+      (pos-test-writable archive)
       (delete-directory archive t)
-      (pos-ledger-test-refused "anchor" (pos-ledger-check dir)))))
+      (pos-test-refused pos-ledger-refused "anchor" (pos-ledger-check dir)))))
 
 ;;;; Kept archives
 
@@ -202,50 +131,48 @@ and where a fixture has recorded its keeper, with what the keeper holds."
   "The nearest repository at or above a scope decides, by the scope's path
 in it: a keeper's URL for a remote archive, and disk for every other.  A
 repository mounted beneath another is not its container's to configure."
-  (let ((dir (file-truename (make-temp-file "pos-kept" t))))
-    (unwind-protect
-        (let ((kept (lambda (scope)
-                      (pos-ledger-kept (expand-file-name (concat scope "archives") dir)))))
-          (make-directory (expand-file-name ".git" dir))
-          (make-directory (expand-file-name "projects/c/.git" dir) t)
-          (pos-fixture-write
-           (expand-file-name ".pos/config.yaml" dir)
-           (concat "pos: 2\nprojects: projects/\narchives:\n"
-                   "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/root\n"
-                   "  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/a\n"
-                   "  - scope: projects/b\n    kept: uncommitted\n"))
-          (should (equal "https://keeper.example/root" (funcall kept "")))
-          (should (equal "https://keeper.example/a" (funcall kept "projects/a/")))
-          (should-not (funcall kept "projects/b/"))
-          (should-not (funcall kept "projects/a/projects/d/"))
-          (should-not (funcall kept "projects/c/")))
-      (delete-directory dir t))))
+  (pos-test-with-temp-dir tmp
+    (let ((dir (file-truename tmp)))
+      (let ((kept (lambda (scope)
+                    (pos-ledger-kept (expand-file-name (concat scope "archives") dir)))))
+        (make-directory (expand-file-name ".git" dir))
+        (make-directory (expand-file-name "projects/c/.git" dir) t)
+        (pos-test-write-bytes
+         (expand-file-name ".pos/config.yaml" dir)
+         (concat "pos: 2\nprojects: projects/\narchives:\n"
+                 "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/root\n"
+                 "  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/a\n"
+                 "  - scope: projects/b\n    kept: uncommitted\n"))
+        (should (equal "https://keeper.example/root" (funcall kept "")))
+        (should (equal "https://keeper.example/a" (funcall kept "projects/a/")))
+        (should-not (funcall kept "projects/b/"))
+        (should-not (funcall kept "projects/a/projects/d/"))
+        (should-not (funcall kept "projects/c/"))))))
 
 (ert-deftest pos-ledger/an-archive-s-entry-is-in-its-nearest-node ()
   "The node is the nearest directory with a configuration, of either
 name, whether or not it is a repository; two in one node are refused."
-  (let ((dir (file-truename (make-temp-file "pos-kept" t))))
-    (unwind-protect
-        (let ((kept (lambda (scope)
-                      (pos-ledger-kept (expand-file-name (concat scope "archives") dir)))))
-          (pos-fixture-write
-           (expand-file-name ".clanka/config.yml" dir)
-           (concat "pos: 2\nprojects: projects/\narchives:\n"
-                   "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/root\n"
-                   "  - scope: health\n    kept: remote\n    url: https://keeper.example/wrong\n"))
-          (pos-fixture-write
-           (expand-file-name "health/.pos/config.yaml" dir)
-           (concat "pos: 2\nprojects: projects/\narchives:\n"
-                   "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/health\n"))
-          (should (equal "https://keeper.example/root" (funcall kept "")))
-          (should (equal "https://keeper.example/health" (funcall kept "health/")))
-          (should-not (funcall kept "health/diet/"))
-          (pos-fixture-write (expand-file-name "health/.clanka/config.yaml" dir)
-                             "pos: 2\nprojects: projects/\n")
-          (should (eq 'config
-                      (condition-case err (funcall kept "health/")
-                        (pos-ledger-refused (nth 1 err))))))
-      (delete-directory dir t))))
+  (pos-test-with-temp-dir tmp
+    (let ((dir (file-truename tmp)))
+      (let ((kept (lambda (scope)
+                    (pos-ledger-kept (expand-file-name (concat scope "archives") dir)))))
+        (pos-test-write-bytes
+         (expand-file-name ".clanka/config.yml" dir)
+         (concat "pos: 2\nprojects: projects/\narchives:\n"
+                 "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/root\n"
+                 "  - scope: health\n    kept: remote\n    url: https://keeper.example/wrong\n"))
+        (pos-test-write-bytes
+         (expand-file-name "health/.pos/config.yaml" dir)
+         (concat "pos: 2\nprojects: projects/\narchives:\n"
+                 "  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/health\n"))
+        (should (equal "https://keeper.example/root" (funcall kept "")))
+        (should (equal "https://keeper.example/health" (funcall kept "health/")))
+        (should-not (funcall kept "health/diet/"))
+        (pos-test-write-bytes (expand-file-name "health/.clanka/config.yaml" dir)
+                              "pos: 2\nprojects: projects/\n")
+        (should (eq 'config
+                    (condition-case err (funcall kept "health/")
+                      (pos-ledger-refused (nth 1 err)))))))))
 
 (ert-deftest pos-ledger/a-kept-archive-is-checked-by-its-own-path ()
   "Named as the root, an archive a keeper keeps is checked though no
@@ -260,9 +187,9 @@ directory is there."
 is found there and the head is unmatched."
   (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
     (let ((integrity (expand-file-name "projects/a/archive-integrity" dir)))
-      (pos-fixture-writable integrity)
+      (pos-test-writable integrity)
       (delete-directory integrity t)
-      (pos-ledger-test-refused "anchor" (pos-ledger-check dir)))))
+      (pos-test-refused pos-ledger-refused "anchor" (pos-ledger-check dir)))))
 
 (provide 'pos-ledger-test)
 ;;; pos-ledger-test.el ends here

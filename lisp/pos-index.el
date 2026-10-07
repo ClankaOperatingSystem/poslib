@@ -76,7 +76,7 @@ An alist of CID and the paths, relative to SCOPE, that have it."
   (let ((file (expand-file-name pos-index-file scope)))
     (when (file-exists-p file)
       (mapcar (lambda (pair) (cons (pos-ledger--key (car pair)) (cdr pair)))
-              (alist-get 'cids (pos-ledger--parse (pos-ledger--read file)))))))
+              (alist-get 'cids (pos-ledger-parse (pos-ledger-read file)))))))
 
 (defun pos-index--parse (uri)
   "Return (CID . PATH) from URI, ipfs://CID or ipfs://CID/PATH.
@@ -212,7 +212,7 @@ directory is not a file."
                              (and found (file-name-absolute-p found)
                                   (file-regular-p found) found)))
                          scopes)))
-    (or (and file (pos-ledger--read file))
+    (or (and file (pos-ledger-read file))
         (seq-some (lambda (scope)
                     (pcase (pos-index--kept-read scope uri)
                       (`(,bytes ,file-cid ,_)

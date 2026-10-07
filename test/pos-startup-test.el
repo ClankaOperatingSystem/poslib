@@ -26,6 +26,7 @@
 
 (require 'ert)
 (require 'pos-startup)
+(require 'pos-test-support)
 
 (defun pos-startup-test-day (days)
   "Return the Org date DAYS from today, as <YYYY-MM-DD>."
@@ -34,56 +35,46 @@
 (defmacro pos-startup-test-with-tree (&rest body)
   "Evaluate BODY with `root' holding a tree of every kind of case."
   (declare (indent 0))
-  `(let ((root (file-name-as-directory (make-temp-file "pos-startup" t))))
-     (unwind-protect
-         (progn
-           (dolist (f `(("intray.org" . "* Unsorted\n** NEXT Answer the letter\n** TODO Sort the shelf\n")
-                        ("projects/alpha/project.org"
-                         . ,(concat ":PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n#+TITLE: Alpha\n\n"
-                                    "* NEXT Draft the outline\n"
-                                    "* TODO Review Alpha :review:\nSCHEDULED: "
-                                    (pos-startup-test-day -3) "\n"))
-                        ("projects/alpha/notes.org" . "* NEXT Read [[https://example.org][the paper]]\n")
-                        ("projects/beta/project.org"
-                         . ,(concat ":PROPERTIES:\n:STATUS:   WIP\n:END:\n#+TITLE: Beta\n\n"
-                                    "* TODO Book the room\nSCHEDULED: " (pos-startup-test-day 5) "\n"
-                                    "* TODO File the return\nDEADLINE: "
-                                    (substring (pos-startup-test-day 40) 0 -1) " -3d>\n"
-                                    "* DONE Old review :review:\nSCHEDULED: "
-                                    (pos-startup-test-day 2) "\n"))
-                        ("projects/gamma/project.org"
-                         . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n#+TITLE: Gamma\n")
-                        ("responsibilities/home/index.org"
-                         . ,(concat "* TODO Review the home :review:\nSCHEDULED: "
-                                    (pos-startup-test-day 3) "\n"))
-                        ("responsibilities/garden/index.org" . "* TODO Prune the hedge\n")
-                        ("responsibilities/home/projects/roof/project.org"
-                         . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Call the roofer\n")
-                        ("health/.clanka/config.yml" . "pos: 2\nprojects: projects/\n")
-                        ("health/intray.org"
-                         . ,(concat "* Unsorted\n** TODO Book [[https://example.org][the dentist]]\n"
-                                    "** DONE Buy floss\n"
-                                    "* TODO Review health :review:\nSCHEDULED: "
-                                    (pos-startup-test-day 2) "\n"))
-                        ("health/projects/checkup.org"
-                         . ":PROPERTIES:\n:STATUS: COMMITTED\n:END:\n* TODO Find the card\n")
-                        ("health/teeth/.pos/config.yaml" . "pos: 2\nprojects: projects/\n")
-                        ("health/teeth/intray.org" . "* Unsorted\n")
-                        ("tools/widget/.clanka/config.yml" . "pos: 2\nmethodologies: methodologies/\n")
-                        ("tools/widget/notes.org" . "* TODO Oil the widget\n")
-                        ("archives/old.org" . "* NEXT Archived\n")
-                        ("projects/alpha/attic/draft.org" . "* NEXT In the attic\n")
-                        ("_tmp/scratch.org" . "* NEXT Generated\n")
-                        (".hidden/secret.org" . "* NEXT Hidden\n")))
-             (let ((file (expand-file-name (car f) root)))
-               (make-directory (file-name-directory file) t)
-               (with-temp-file file (insert (cdr f)))))
-           ,@body)
-       (dolist (buffer (buffer-list))
-         (when (and (buffer-file-name buffer)
-                    (string-prefix-p root (buffer-file-name buffer)))
-           (kill-buffer buffer)))
-       (delete-directory root t))))
+  `(pos-test-with-files root
+       `(("intray.org" . "* Unsorted\n** NEXT Answer the letter\n** TODO Sort the shelf\n")
+         ("projects/alpha/project.org"
+          . ,(concat ":PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n#+TITLE: Alpha\n\n"
+                     "* NEXT Draft the outline\n"
+                     "* TODO Review Alpha :review:\nSCHEDULED: "
+                     (pos-startup-test-day -3) "\n"))
+         ("projects/alpha/notes.org" . "* NEXT Read [[https://example.org][the paper]]\n")
+         ("projects/beta/project.org"
+          . ,(concat ":PROPERTIES:\n:STATUS:   WIP\n:END:\n#+TITLE: Beta\n\n"
+                     "* TODO Book the room\nSCHEDULED: " (pos-startup-test-day 5) "\n"
+                     "* TODO File the return\nDEADLINE: "
+                     (substring (pos-startup-test-day 40) 0 -1) " -3d>\n"
+                     "* DONE Old review :review:\nSCHEDULED: "
+                     (pos-startup-test-day 2) "\n"))
+         ("projects/gamma/project.org"
+          . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n#+TITLE: Gamma\n")
+         ("responsibilities/home/index.org"
+          . ,(concat "* TODO Review the home :review:\nSCHEDULED: "
+                     (pos-startup-test-day 3) "\n"))
+         ("responsibilities/garden/index.org" . "* TODO Prune the hedge\n")
+         ("responsibilities/home/projects/roof/project.org"
+          . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Call the roofer\n")
+         ("health/.clanka/config.yml" . "pos: 2\nprojects: projects/\n")
+         ("health/intray.org"
+          . ,(concat "* Unsorted\n** TODO Book [[https://example.org][the dentist]]\n"
+                     "** DONE Buy floss\n"
+                     "* TODO Review health :review:\nSCHEDULED: "
+                     (pos-startup-test-day 2) "\n"))
+         ("health/projects/checkup.org"
+          . ":PROPERTIES:\n:STATUS: COMMITTED\n:END:\n* TODO Find the card\n")
+         ("health/teeth/.pos/config.yaml" . "pos: 2\nprojects: projects/\n")
+         ("health/teeth/intray.org" . "* Unsorted\n")
+         ("tools/widget/.clanka/config.yml" . "pos: 2\nmethodologies: methodologies/\n")
+         ("tools/widget/notes.org" . "* TODO Oil the widget\n")
+         ("archives/old.org" . "* NEXT Archived\n")
+         ("projects/alpha/attic/draft.org" . "* NEXT In the attic\n")
+         ("_tmp/scratch.org" . "* NEXT Generated\n")
+         (".hidden/secret.org" . "* NEXT Hidden\n"))
+     ,@body))
 
 (defun pos-startup-test-lines (text)
   "Return the item lines of TEXT, each as (LABEL . REST), trimmed."
@@ -201,19 +192,13 @@
 
 (ert-deftest pos-startup-view/an-empty-view-says-none ()
   "A view with no item, and each empty list of a view, says so."
-  (let ((root (file-name-as-directory (make-temp-file "pos-startup" t))))
-    (unwind-protect
-        (progn
-          (with-temp-file (expand-file-name "intray.org" root) (insert "* Unsorted\n"))
-          (dolist (view '("next" "scheduled" "deadlines" "intray" "all"))
-            (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view))))
-          (should (= 2 (length (split-string (pos-startup-view root "reviews")
-                                             "  (none)\n" t))))
-          (should (= 2 (length (split-string (pos-startup-view root "reviews-to-schedule")
-                                             "  (none)\n" t)))))
-      (let ((buffer (find-buffer-visiting (expand-file-name "intray.org" root))))
-        (when buffer (kill-buffer buffer)))
-      (delete-directory root t))))
+  (pos-test-with-files root '(("intray.org" . "* Unsorted\n"))
+    (dolist (view '("next" "scheduled" "deadlines" "intray" "all"))
+      (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view))))
+    (should (= 2 (length (split-string (pos-startup-view root "reviews")
+                                       "  (none)\n" t))))
+    (should (= 2 (length (split-string (pos-startup-view root "reviews-to-schedule")
+                                       "  (none)\n" t))))))
 
 (ert-deftest pos-startup-report/prompts-then-the-default-views ()
   "The prompts come first; every TODO item is listed only when asked for."

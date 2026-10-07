@@ -943,8 +943,8 @@ Exit 0 nothing to do, 1 something to do or to report, 2 refused.
          (pos-tree--print
           (pos-tree-apply
            root
-           (pos-ledger--parse
-            (pos-ledger--read (if (equal file "-") "/dev/stdin" file))))))
+           (pos-ledger-parse
+            (pos-ledger-read (if (equal file "-") "/dev/stdin" file))))))
         (`(,(or "help" "-h" "--help")) (princ pos-tree-usage))
         (_ (message "%s" pos-tree-usage)
            (kill-emacs 2)))

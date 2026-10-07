@@ -32,10 +32,7 @@
 (require 'ert)
 (require 'pos-signin)
 (require 'pos-remote)
-(require 'pos-fixtures
-         (expand-file-name "pos-fixtures"
-                           (file-name-directory (or load-file-name
-                                                    buffer-file-name))))
+(require 'pos-fixtures)
 
 (defconst pos-signin-test-issuer "https://issuer.example")
 
@@ -129,12 +126,6 @@
          (pos-signin-test-lifetime 3600) (pos-signin-test-state nil))
      ,@body))
 
-(defmacro pos-signin-test-refused (kind &rest body)
-  "Check that BODY is refused with KIND, a string."
-  (declare (indent 1))
-  `(should (equal ,kind (condition-case err (progn ,@body nil)
-                          (pos-ledger-refused (symbol-name (cadr err)))))))
-
 (ert-deftest pos-signin/signing-in-keeps-a-token-only-its-owner-can-read ()
   "The browser is sent to the issuer with the keeper's client, the scopes
 it names and one for a refresh token, and a challenge; the code that
@@ -197,13 +188,13 @@ the token after its first refusal."
   "The state that comes back must be the state that was sent."
   (pos-signin-test-with-issuer
     (setq pos-signin-test-state "another")
-    (pos-signin-test-refused "access" (pos-signin "https://one.keeper.example" 10))
+    (pos-test-refused pos-ledger-refused "access" (pos-signin "https://one.keeper.example" 10))
     (should-not (file-exists-p (pos-signin-file)))))
 
 (ert-deftest pos-signin/nobody-signing-in-is-refused-when-the-wait-runs-out ()
   (pos-signin-test-with-issuer
     (let ((pos-signin-browse-function #'ignore))
-      (pos-signin-test-refused "access" (pos-signin "https://one.keeper.example" 0.3)))))
+      (pos-test-refused pos-ledger-refused "access" (pos-signin "https://one.keeper.example" 0.3)))))
 
 (ert-deftest pos-signin/a-request-without-a-token-says-to-sign-in ()
   "Refused for want of a token, with none kept, a request says how to get
@@ -225,7 +216,7 @@ then carry."
     (pos-signin-test-with-issuer
       (let-alist (cdr named)
         (make-directory (file-name-directory (pos-signin-file)) t)
-        (pos-fixture-write (pos-signin-file) (pos-ledger-json .file) #o600)
+        (pos-test-write-bytes (pos-signin-file) (pos-ledger-json .file) #o600)
         (seq-doseq (carried .carried)
           (ert-info ((alist-get 'url carried))
             (should (equal (alist-get 'token carried)
