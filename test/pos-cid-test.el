@@ -215,9 +215,9 @@ recorded, as pyposlib must also."
                               (pos-cid-murmur3-x64-64 (car case)) "")))))
 
 (ert-deftest pos-cid/an-inventory-shards-as-the-tree-on-disk-does ()
-  "A sharded directory's CIDs from an inventory are those of the tree on
-disk, the recorded root among them: a fold of a ledger gives the root
-IPFS gives."
+  "A sharded directory's CIDs from an inventory are the tree's on disk.
+The recorded root is among them: a fold of a ledger gives the root IPFS
+gives."
   (let ((fixture (pos-fixture "cid" "sharded-inside-plain")))
     (pos-fixture-with fixture dir
       (let* ((path (expand-file-name (alist-get 'entry fixture) dir))
