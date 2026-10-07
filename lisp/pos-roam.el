@@ -35,14 +35,16 @@
 ;; The index records a link only where a node holds it: a link in a file
 ;; with no `:ID:' at file level or on an enclosing heading is not in it.
 ;;
-;; Excluded from the index, as from the tree tool, are archives, attics,
-;; and hidden and underscore directories.
+;; The files indexed are the corpus, pos-corpus.el: every Org file the
+;; tree's configurations allow, so the index covers what the commands
+;; read, no more and no less.
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'org-roam)
 (require 'xdg)
+(require 'pos-corpus)
 
 (defcustom pos-roam-cache-directory
   (expand-file-name "pos/org-roam" (xdg-cache-home))
@@ -50,31 +52,9 @@
   :type 'directory
   :group 'pos)
 
-(defcustom pos-roam-excluded-directories '("archives" "attic")
-  "Directory names not indexed, besides hidden and underscore ones."
-  :type '(repeat string)
-  :group 'pos)
-
-(defun pos-roam-exclude-regexp ()
-  "Return the regexp of paths under the root that are not indexed."
-  (concat "\\(?:\\`\\|/\\)\\(?:[._][^/]*\\|"
-          (mapconcat #'regexp-quote pos-roam-excluded-directories "\\|")
-          "\\)/"))
-
-(defun pos-roam-excluded-directory-p (directory)
-  "Return non-nil if DIRECTORY is not indexed: by name, hidden or underscore."
-  (let ((name (file-name-nondirectory (directory-file-name directory))))
-    (or (member name pos-roam-excluded-directories)
-        (string-prefix-p "." name)
-        (string-prefix-p "_" name))))
-
 (defun pos-roam-files (root)
-  "Return the Org files under ROOT that the index covers.
-An excluded directory is never entered."
-  (sort (directory-files-recursively
-         root "\\.org\\'" nil
-         (lambda (directory) (not (pos-roam-excluded-directory-p directory))))
-        #'string<))
+  "Return the Org files under ROOT that the index covers: its corpus."
+  (pos-corpus-files (pos-corpus root)))
 
 (defun pos-roam-own-index-p (root)
   "Return non-nil if ROOT lies in `org-roam-directory', whose index serves."
@@ -101,8 +81,9 @@ tree's, and `org-roam-db-query' answers for it."
           (pos-roam--location (pos-roam-db-location pos-roam--root))
           (org-roam-directory (if pos-roam--own org-roam-directory pos-roam--root))
           (org-roam-db-location pos-roam--location)
+          ;; The tree's own index is given its files outright, below.
           (org-roam-file-exclude-regexp
-           (if pos-roam--own org-roam-file-exclude-regexp (list (pos-roam-exclude-regexp))))
+           (if pos-roam--own org-roam-file-exclude-regexp nil))
           (org-roam-db-update-on-save nil)
           (org-roam-verbose nil))
      (make-directory (file-name-directory org-roam-db-location) t)

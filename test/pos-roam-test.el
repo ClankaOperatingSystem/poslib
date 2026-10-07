@@ -14,13 +14,18 @@
 ;; own, never to a database of the user's.
 (setq pos-roam-cache-directory (make-temp-file "pos-roam-test-" t))
 
-(ert-deftest pos-roam-files/never-enters-an-excluded-directory ()
-  "Excluded directories are not indexed, at any depth.
-Archives, attics, and hidden and underscore directories."
+(ert-deftest pos-roam/the-index-covers-the-corpus-and-no-more ()
+  "The files indexed are the corpus: what the configuration allows.
+Archives, attics, and hidden and underscore directories are left out
+by the default exclusions, a product repository by having no
+configuration, and a lock file by its name."
   (pos-test-with-files root '(("a.org" . "") ("sub/b.org" . "")
                               ("archives/x.org" . "") ("sub/attic/y.org" . "")
                               ("_work/z.org" . "") (".hidden/h.org" . "")
-                              ("sub/_deep/archives/w.org" . ""))
+                              ("sub/_deep/archives/w.org" . "")
+                              ("vendor/lib/.git/HEAD" . "ref: refs/heads/master\n")
+                              ("vendor/lib/README.org" . "")
+                              (".#a.org" . ""))
     (should (equal '("a.org" "sub/b.org")
                    (mapcar (lambda (file) (file-relative-name file root))
                            (pos-roam-files root))))))
