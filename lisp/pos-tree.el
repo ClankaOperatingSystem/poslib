@@ -672,97 +672,118 @@ with its final slash, or nil for REPO."
 (defvar pos-tree--local nil
   "The declared paths of directories in the repository being planned.")
 
+(defun pos-tree--mount-child (repo base child)
+  "Plan CHILD, a declared child with a remote, of the node at BASE in REPO.
+Return (NODE . HELD): NODE is (ENTRY . NODE) for a child mounted as
+declared, else nil; HELD is the child's directory when it is there
+and not planned, because of a finding, else nil."
+  (let-alist child
+    (let* ((path (expand-file-name .path base))
+           (within (file-relative-name path repo))
+           (shown (pos-tree--rel path)))
+      (push within pos-tree--mounted)
+      (pos-tree--exclude repo within)
+      (cond
+       ((pos-tree--through-link-p repo within)
+        (pos-tree--find "path-taken" shown "a symbolic link")
+        nil)
+       ((pos-tree--empty-p path)
+        (pos-tree--act "clone" `(path . ,shown) `(remote . ,.remote)
+                       `(branch . ,.branch))
+        nil)
+       ((not (pos-tree--repository-p path))
+        (pos-tree--find "path-taken" shown "not a repository")
+        nil)
+       ((not (equal (pos-tree--git-line path "config" "--get" "remote.origin.url")
+                    .remote))
+        (pos-tree--find "other-remote" shown)
+        (cons nil path))
+       ((not (equal (pos-tree--git-line path "symbolic-ref" "--short" "-q" "HEAD")
+                    .branch))
+        (pos-tree--find "off-branch" shown (concat "declared " .branch))
+        (cons nil path))
+       (t (condition-case err
+              (cons (cons `((path . ,within) ,@(assq-delete-all 'path (copy-alist child)))
+                          (pos-tree--mounts path (pos-tree--config path .branch)))
+                    nil)
+            (pos-tree-refused
+             (pos-tree--find "config-refused" shown
+                             (format "%s: %s" (nth 1 err) (nth 2 err)))
+             (cons nil path))))))))
+
+(defun pos-tree--declare-local (repo base child)
+  "Plan CHILD, a declared directory of the node at BASE in REPO.
+What its own configuration declares is planned as REPO's.  Return
+\(NODES . HELD) as `pos-tree--declared' does, for what lies beneath."
+  (let-alist child
+    (let* ((path (expand-file-name .path base))
+           (within (file-relative-name path repo))
+           (shown (pos-tree--rel path)))
+      ;; A finding plans nothing beneath: nil.
+      (cond
+       ((pos-tree--through-link-p repo within)
+        (pos-tree--find "path-taken" shown "a symbolic link") nil)
+       ((not (file-exists-p path))
+        (pos-tree--find "missing" shown) nil)
+       ((not (file-directory-p path))
+        (pos-tree--find "path-taken" shown "not a directory") nil)
+       ((pos-tree--repository-p path)
+        (push within pos-tree--mounted)
+        (pos-tree--find "path-taken" shown "a repository, declared with no remote") nil)
+       (t
+        (push within pos-tree--local)
+        (condition-case err
+            (when-let* ((own (pos-tree--config path nil)))
+              (unless (eq (alist-get 'exclude own) :null)
+                (push (cons within (pos-tree-exclusions own)) pos-tree--local-exclusions))
+              (pos-tree--declared repo path own))
+          (pos-tree-refused
+           (setq pos-tree--archive-refused t)
+           (pos-tree--find "config-refused" shown
+                           (format "%s: %s" (nth 1 err) (nth 2 err)))
+           nil)))))))
+
+(defun pos-tree--declare-worktree (repo base worktree)
+  "Plan WORKTREE, a declared working tree of the node at BASE in REPO."
+  (let-alist worktree
+    (let* ((path (expand-file-name .path base))
+           (within (file-relative-name path repo))
+           (shown (pos-tree--rel path)))
+      (push within pos-tree--mounted)
+      (pos-tree--exclude repo within)
+      (cond
+       ((pos-tree--through-link-p repo within)
+        (pos-tree--find "path-taken" shown "a symbolic link"))
+       ((pos-tree--empty-p path)
+        (pos-tree--act "clone" `(path . ,shown)
+                       (if .of
+                           `(of . ,(pos-tree--rel (expand-file-name .of base)))
+                         `(remote . ,.remote))
+                       `(branch . ,.branch)))
+       ((not (pos-tree--repository-p path))
+        (pos-tree--find "path-taken" shown "not a repository"))))))
+
 (defun pos-tree--declared (repo base config)
   "Plan what CONFIG declares, the configuration of the node at BASE.
 BASE is the repository at REPO or a directory of it.  Return
 \(NODES . HELD): a node for each repository mounted as declared, as
 \(ENTRY . NODE) with ENTRY's path relative to REPO, and the directories
 of those that are there and are not planned."
-  (let ((children (sort (append (alist-get 'children config) nil)
-                        (lambda (a b) (string< (alist-get 'path a) (alist-get 'path b)))))
-        (worktrees (sort (append (alist-get 'worktrees config) nil)
-                         (lambda (a b) (string< (alist-get 'path a) (alist-get 'path b)))))
+  (let ((by-path (lambda (a b) (string< (alist-get 'path a) (alist-get 'path b))))
         nodes held)
     (when config (pos-tree--plan-archives repo base config))
     (when (eq (alist-get 'kind config) :null)
       (pos-tree--find "unconfigured" (pos-tree--rel base)))
-    (dolist (child children)
-      (let-alist child
-        (let* ((path (expand-file-name .path base))
-               (within (file-relative-name path repo))
-               (shown (pos-tree--rel path)))
-          (cond
-           ((stringp .remote)
-            (push within pos-tree--mounted)
-            (pos-tree--exclude repo within)
-            (cond
-             ((pos-tree--through-link-p repo within)
-              (pos-tree--find "path-taken" shown "a symbolic link"))
-             ((pos-tree--empty-p path)
-              (pos-tree--act "clone" `(path . ,shown) `(remote . ,.remote)
-                             `(branch . ,.branch)))
-             ((not (pos-tree--repository-p path))
-              (pos-tree--find "path-taken" shown "not a repository"))
-             ((not (equal (pos-tree--git-line path "config" "--get" "remote.origin.url")
-                          .remote))
-              (push path held)
-              (pos-tree--find "other-remote" shown))
-             ((not (equal (pos-tree--git-line path "symbolic-ref" "--short" "-q" "HEAD")
-                          .branch))
-              (push path held)
-              (pos-tree--find "off-branch" shown (concat "declared " .branch)))
-             (t (condition-case err
-                    (push (cons `((path . ,within) ,@(assq-delete-all 'path
-                                                                     (copy-alist child)))
-                                (pos-tree--mounts
-                                 path (pos-tree--config path .branch)))
-                          nodes)
-                  (pos-tree-refused
-                   (push path held)
-                   (pos-tree--find "config-refused" shown
-                                   (format "%s: %s" (nth 1 err) (nth 2 err))))))))
-           ;; A directory of this repository: what it declares is
-           ;; planned as this repository's.
-           ((pos-tree--through-link-p repo within)
-            (pos-tree--find "path-taken" shown "a symbolic link"))
-           ((not (file-exists-p path))
-            (pos-tree--find "missing" shown))
-           ((not (file-directory-p path))
-            (pos-tree--find "path-taken" shown "not a directory"))
-           ((pos-tree--repository-p path)
-            (push within pos-tree--mounted)
-            (pos-tree--find "path-taken" shown "a repository, declared with no remote"))
-           (t
-            (push within pos-tree--local)
-            (condition-case err
-                (when-let* ((own (pos-tree--config path nil)))
-                  (unless (eq (alist-get 'exclude own) :null)
-                    (push (cons within (pos-tree-exclusions own)) pos-tree--local-exclusions))
-                  (let ((below (pos-tree--declared repo path own)))
-                    (setq nodes (append (reverse (car below)) nodes)
-                          held (append (cdr below) held))))
-              (pos-tree-refused
-               (setq pos-tree--archive-refused t)
-               (pos-tree--find "config-refused" shown
-                               (format "%s: %s" (nth 1 err) (nth 2 err))))))))))
-    (dolist (worktree worktrees)
-      (let-alist worktree
-        (let* ((path (expand-file-name .path base))
-               (within (file-relative-name path repo))
-               (shown (pos-tree--rel path)))
-          (push within pos-tree--mounted)
-          (pos-tree--exclude repo within)
-          (cond
-           ((pos-tree--through-link-p repo within)
-            (pos-tree--find "path-taken" shown "a symbolic link"))
-           ((pos-tree--empty-p path)
-            (pos-tree--act "clone" `(path . ,shown)
-                           (if .of
-                               `(of . ,(pos-tree--rel (expand-file-name .of base)))
-                             `(remote . ,.remote))
-                           `(branch . ,.branch)))
-           ((not (pos-tree--repository-p path))
-            (pos-tree--find "path-taken" shown "not a repository"))))))
+    (dolist (child (sort (append (alist-get 'children config) nil) by-path))
+      (if (stringp (alist-get 'remote child))
+          (pcase-let ((`(,node . ,taken) (pos-tree--mount-child repo base child)))
+            (when node (push node nodes))
+            (when taken (push taken held)))
+        (pcase-let ((`(,below . ,taken) (pos-tree--declare-local repo base child)))
+          (setq nodes (append (reverse below) nodes)
+                held (append taken held)))))
+    (dolist (worktree (sort (append (alist-get 'worktrees config) nil) by-path))
+      (pos-tree--declare-worktree repo base worktree))
     (cons (nreverse nodes) held)))
 
 (defun pos-tree--mounts (dir config)
