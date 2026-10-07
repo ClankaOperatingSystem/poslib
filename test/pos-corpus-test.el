@@ -20,33 +20,275 @@
 
 ;;; Commentary:
 
-;; A characterisation, not a specification.  poslib has four functions
-;; that decide which Org files a tree holds, each with rules of its
-;; own: `pos-org-files' for the sweep, `pos-uncovered-org-files' for
-;; the stranded-task lint, `pos-startup-files' for the start-up views
-;; and `pos-roam-files' for the index; and the tree tool keeps a fifth
-;; list of directories it does not look into.  They are to be replaced
-;; by one corpus the configuration describes.  Before that change,
-;; these tests record what each does today, over one tree, cell by
-;; cell, so that each cell the change moves is moved on purpose and
-;; each it keeps is kept on purpose.
-;;
-;; Where the walkers disagree, the disagreement is recorded, not
-;; endorsed.  A cell here is what the code does, not what it should.
+;; The rules of the corpus, pos-corpus.el, each shown on a listing
+;; given to the walk in place of the disk: which files are read, which
+;; scope owns each, what is not entered and what may be written.  One
+;; test gives the walk a real directory, to show the disk is listed as
+;; the rules expect; and one records, over the tree the four former
+;; walkers were characterised on, what the one corpus reads and which
+;; cells moved when they were replaced.
 
 ;;; Code:
 
 (require 'ert)
 (require 'seq)
-(require 'pos)
-(require 'pos-startup)
-(require 'pos-roam)
-(require 'pos-tree)
+(require 'pos-corpus)
 (require 'pos-test-support)
 
-;;;; The tree
+;;;; A listing in place of the disk
 
-(defconst pos-corpus-test-files
+(defun pos-corpus-test-lister (spec)
+  "Return a lister over SPEC, a tree described as a list of entries.
+Each entry is (PATH KIND . PROPERTIES): PATH relative to the root,
+KIND file, dir or link, and PROPERTIES :repository or :config as
+`pos-corpus--walk' asks for.  A directory a path passes through
+need not be listed; it is a plain directory."
+  (let ((entries (make-hash-table :test #'equal)))
+    (dolist (entry spec)
+      (puthash (car entry) (cdr entry) entries)
+      (let ((parent (file-name-directory (car entry))))
+        (while (and parent (not (gethash (directory-file-name parent) entries)))
+          (puthash (directory-file-name parent) '(dir) entries)
+          (setq parent (file-name-directory (directory-file-name parent))))))
+    (lambda (path)
+      (let ((entry (or (gethash path entries) (and (equal path "") '(dir)))))
+        (pcase (car entry)
+          ('file '(:kind file))
+          ('link '(:kind link))
+          ('dir
+           (let ((prefix (if (equal path "") "" (concat path "/"))) names)
+             (maphash (lambda (other _)
+                        (when (and (string-prefix-p prefix other)
+                                   (not (equal other path))
+                                   (not (string-match-p "/" (substring other (length prefix)))))
+                          (push (substring other (length prefix)) names)))
+                      entries)
+             (list :kind 'dir
+                   :repository (plist-get (cdr entry) :repository)
+                   :config (plist-get (cdr entry) :config)
+                   :names (sort names #'string<)))))))))
+
+(defun pos-corpus-test-walk (spec)
+  "Return the corpus of SPEC, as `pos-corpus-test-lister' describes it, at /r/."
+  (pos-corpus--walk "/r/" (pos-corpus-test-lister spec)))
+
+(defun pos-corpus-test-files (corpus)
+  "Return the files of CORPUS relative to its root, with each owner's path."
+  (mapcar (lambda (entry)
+            (cons (file-relative-name (car entry) "/r/") (pos-scope-path (cdr entry))))
+          (pos-corpus-entries corpus)))
+
+(defun pos-corpus-test-scopes (corpus)
+  "Return the scopes of CORPUS as (KIND . PATH), the root left out."
+  (mapcar (lambda (scope) (cons (pos-scope-kind scope) (pos-scope-path scope)))
+          (cdr (pos-corpus-scopes corpus))))
+
+(defconst pos-corpus-test-responsibility "pos: 2\nprojects: projects/\n"
+  "The configuration of a responsibility whose projects lie in projects/.")
+
+;;;; Files and the root
+
+(ert-deftest pos-corpus/the-root-owns-every-file-no-scope-claims ()
+  "An Org file at the root or in a plain directory belongs to the root."
+  (let ((corpus (pos-corpus-test-walk '(("intray.org" file)
+                                        ("notes/a.org" file)
+                                        ("notes/deep/b.org" file)))))
+    (should (equal '(("intray.org" . ".") ("notes/a.org" . ".") ("notes/deep/b.org" . "."))
+                   (pos-corpus-test-files corpus)))
+    (should (equal 'root (pos-scope-kind (car (pos-corpus-scopes corpus)))))
+    (should-not (pos-corpus-test-scopes corpus))))
+
+(ert-deftest pos-corpus/only-org-files-that-are-not-hidden-or-locks-are-read ()
+  "A file is read if it is an Org file whose name begins with no dot.
+A lock file begins with .#, a hidden one with a dot; an archive file, a
+text file and a symbolic link are not read either."
+  (should (equal '(("a.org" . "."))
+                 (pos-corpus-test-files
+                  (pos-corpus-test-walk '(("a.org" file) ("notes.txt" file)
+                                          (".#a.org" file) (".secret.org" file)
+                                          ("a.org_archive" file) ("linked.org" link)))))))
+
+;;;; Exclusions
+
+(ert-deftest pos-corpus/the-default-exclusions-keep-the-walk-out ()
+  "With no exclude declared, the default list keeps the walk out.
+Archives, attics, node_modules and names beginning with an underscore
+or a dot are not entered, at any depth."
+  (should (equal '(("a.org" . ".") ("sub/b.org" . "."))
+                 (pos-corpus-test-files
+                  (pos-corpus-test-walk '(("a.org" file) ("sub/b.org" file)
+                                          ("archives/x.org" file) ("sub/attic/y.org" file)
+                                          ("node_modules/m/z.org" file)
+                                          ("_work/w.org" file) (".hidden/h.org" file)
+                                          ("sub/_deep/archives/v.org" file)))))))
+
+(ert-deftest pos-corpus/a-declared-exclude-replaces-the-default-beneath-its-node ()
+  "A node's exclude replaces the default beneath it, and is inherited.
+A node that declares its own replaces it beneath itself; one that
+declares none inherits."
+  (let ((corpus (pos-corpus-test-walk
+                 `(("" dir :config "pos: 2\nprojects: projects/\nexclude:\n  - vendor\n  - \"tmp*\"\n  - stray/deep\n")
+                   ("archives/now-read.org" file) ("vendor/v.org" file)
+                   ("tmpfiles/t.org" file) ("stray/deep/s.org" file) ("stray/kept.org" file)
+                   ("work" dir :config ,pos-corpus-test-responsibility)
+                   ("work/vendor/w.org" file) ("work/attic/a.org" file)
+                   ("lab" dir :config "pos: 2\nprojects: projects/\nexclude:\n  - attic\n")
+                   ("lab/vendor/l.org" file) ("lab/attic/a.org" file)))))
+    (should (equal '(("archives/now-read.org" . ".") ("lab/vendor/l.org" . "lab")
+                     ("stray/kept.org" . ".") ("work/attic/a.org" . "work"))
+                   (pos-corpus-test-files corpus)))))
+
+;;;; Scopes
+
+(ert-deftest pos-corpus/a-configured-directory-is-a-responsibility-that-owns-what-lies-beneath ()
+  "A configured directory is a responsibility and owns its files.
+Its configuration says where its projects belong; a responsibility
+within it is a scope of its own."
+  (let ((corpus (pos-corpus-test-walk
+                 `(("intray.org" file)
+                   ("health" dir :config ,pos-corpus-test-responsibility)
+                   ("health/intray.org" file) ("health/notes/n.org" file)
+                   ("health/teeth" dir :config ,pos-corpus-test-responsibility)
+                   ("health/teeth/intray.org" file)))))
+    (should (equal '(("health/intray.org" . "health") ("health/notes/n.org" . "health")
+                     ("health/teeth/intray.org" . "health/teeth") ("intray.org" . "."))
+                   (pos-corpus-test-files corpus)))
+    (should (equal '((responsibility . "health") (responsibility . "health/teeth"))
+                   (pos-corpus-test-scopes corpus)))
+    (let ((teeth (pos-corpus-owner corpus "/r/health/teeth/intray.org")))
+      (should (equal "health" (pos-scope-path (pos-scope-node teeth)))))))
+
+(ert-deftest pos-corpus/what-lies-in-a-projects-directory-is-a-project ()
+  "What lies directly in a node's projects directory is a project.
+A directory or a single Org file, named by its path; a project's files
+are its own, and a project may hold a configuration of its own kind."
+  (let ((corpus (pos-corpus-test-walk
+                 `(("" dir :config ,pos-corpus-test-responsibility)
+                   ("projects/alpha/project.org" file) ("projects/alpha/notes/n.org" file)
+                   ("projects/solo.org" file)
+                   ("projects/beta" dir :config "pos: 2\nmethodologies: methodologies/\n")
+                   ("projects/beta/project.org" file)
+                   ("health" dir :config ,pos-corpus-test-responsibility)
+                   ("health/projects/checkup.org" file)))))
+    (should (equal '(("health/projects/checkup.org" . "health/projects/checkup")
+                     ("projects/alpha/notes/n.org" . "projects/alpha")
+                     ("projects/alpha/project.org" . "projects/alpha")
+                     ("projects/beta/project.org" . "projects/beta")
+                     ("projects/solo.org" . "projects/solo"))
+                   (pos-corpus-test-files corpus)))
+    (should (equal '((responsibility . "health") (project . "health/projects/checkup")
+                     (project . "projects/alpha") (project . "projects/beta")
+                     (project . "projects/solo"))
+                   (pos-corpus-test-scopes corpus)))
+    (should (equal "health" (pos-scope-path
+                             (pos-scope-node
+                              (pos-corpus-owner corpus "/r/health/projects/checkup.org")))))))
+
+(ert-deftest pos-corpus/a-directorys-name-carries-no-meaning-by-itself ()
+  "A directory named projects or responsibilities is plain without a configuration.
+Its files belong to the scope above, and nothing in it is a scope."
+  (let ((corpus (pos-corpus-test-walk '(("projects/alpha/project.org" file)
+                                        ("responsibilities/home/index.org" file)))))
+    (should (equal '(("projects/alpha/project.org" . ".")
+                     ("responsibilities/home/index.org" . "."))
+                   (pos-corpus-test-files corpus)))
+    (should-not (pos-corpus-test-scopes corpus))))
+
+(ert-deftest pos-corpus/an-unconfigured-node-is-entered-and-has-no-kind ()
+  "A node yet to be configured is read and is a scope of no kind.
+Its configuration says neither where its projects belong nor its
+methodologies."
+  (let ((corpus (pos-corpus-test-walk '(("new" dir :config "pos: 2\n")
+                                        ("new/a.org" file)))))
+    (should (equal '(("new/a.org" . "new")) (pos-corpus-test-files corpus)))
+    (should (equal '((nil . "new")) (pos-corpus-test-scopes corpus)))))
+
+;;;; Repositories and writing
+
+(ert-deftest pos-corpus/a-repository-with-no-configuration-is-a-product-and-not-entered ()
+  "A repository within the tree is a product unless it has a configuration.
+A product's files are not read."
+  (should (equal '(("a.org" . "."))
+                 (pos-corpus-test-files
+                  (pos-corpus-test-walk '(("a.org" file)
+                                          ("vendor/lib" dir :repository t)
+                                          ("vendor/lib/README.org" file)))))))
+
+(ert-deftest pos-corpus/a-configured-repository-is-read-and-not-written ()
+  "A repository with a configuration is read and not written.
+It is a node of the tree: its files are read and owned by it, and no
+command of this root writes them; the root's own files may be written."
+  (let ((corpus (pos-corpus-test-walk
+                 `(("a.org" file)
+                   ("child" dir :repository t :config ,pos-corpus-test-responsibility)
+                   ("child/intray.org" file) ("child/projects/p.org" file)))))
+    (should (equal '(("a.org" . ".") ("child/intray.org" . "child")
+                     ("child/projects/p.org" . "child/projects/p"))
+                   (pos-corpus-test-files corpus)))
+    (should (pos-corpus-writable-p corpus "/r/a.org"))
+    (should-not (pos-corpus-writable-p corpus "/r/child/intray.org"))
+    (should-not (pos-corpus-writable-p corpus "/r/child/projects/p.org"))
+    (should-not (pos-corpus-writable-p corpus "/r/not-read.org"))))
+
+;;;; Refusals
+
+(ert-deftest pos-corpus/a-refused-configuration-is-a-finding-and-a-leaf ()
+  "A refused configuration, or a node with two, is a finding and a leaf.
+It is reported and not entered; the rest of the tree is read."
+  (let ((corpus (pos-corpus-test-walk
+                 '(("a.org" file)
+                   ("bad" dir :config "pos: 2\nprojects: p/\nmethodologies: m/\n")
+                   ("bad/b.org" file)
+                   ("twice" dir :config two-configurations)
+                   ("twice/t.org" file)))))
+    (should (equal '(("a.org" . ".")) (pos-corpus-test-files corpus)))
+    (should (equal '(("bad" . "config-refused: bad-value: A node says where its projects belong or its methodologies, not both")
+                     ("twice" . "config-refused: two-configurations: The node has two configurations"))
+                   (pos-corpus-findings corpus)))))
+
+(ert-deftest pos-corpus/a-refused-root-reads-nothing ()
+  "When the root's own configuration is refused, no file is read.
+The finding names the root."
+  (let ((corpus (pos-corpus-test-walk '(("" dir :config "pos: 3\n") ("a.org" file)))))
+    (should-not (pos-corpus-files corpus))
+    (should (equal '(".") (mapcar #'car (pos-corpus-findings corpus))))))
+
+;;;; The disk
+
+(ert-deftest pos-corpus/the-disk-is-listed-as-the-rules-expect ()
+  "Given a real directory, the walk finds what the rules say.
+Files and owners, a product left out, a link not read, and two
+configurations refused."
+  (pos-test-with-files root
+      `(("intray.org" . "")
+        ("projects/alpha/project.org" . "")
+        ("health/.clanka/config.yml" . ,pos-corpus-test-responsibility)
+        ("health/intray.org" . "")
+        ("health/projects/checkup.org" . "")
+        ("archives/old.org" . "")
+        ("vendor/lib/.git/HEAD" . "ref: refs/heads/master\n")
+        ("vendor/lib/README.org" . "")
+        ("twice/.pos/config.yaml" . "pos: 2\n")
+        ("twice/.clanka/config.yml" . "pos: 2\n")
+        ("twice/t.org" . ""))
+    (make-symbolic-link "intray.org" (expand-file-name "linked.org" root))
+    (let ((corpus (pos-corpus root)))
+      (should (equal '(("health/intray.org" . "health")
+                       ("health/projects/checkup.org" . "health/projects/checkup")
+                       ("intray.org" . ".")
+                       ("projects/alpha/project.org" . "."))
+                     (mapcar (lambda (entry)
+                               (cons (file-relative-name (car entry) root)
+                                     (pos-scope-path (cdr entry))))
+                             (pos-corpus-entries corpus))))
+      (should (equal '("twice") (mapcar #'car (pos-corpus-findings corpus))))
+      (should (equal '("vendor/lib") (pos-corpus-unwritable corpus)))
+      (should (equal (file-name-as-directory (expand-file-name "health" root))
+                     (pos-scope-dir (pos-corpus-owner corpus (expand-file-name "health/intray.org" root))))))))
+
+;;;; The tree the four walkers were characterised on
+
+(defconst pos-corpus-test-tree
   '(("intray.org" . "")
     ("life/x.org" . "")
     ("life/sub/y.org" . "")
@@ -63,128 +305,60 @@
     ("sub/archives/f.org" . "")
     ("sub/_deep/g.org" . "")
     ("life/x.org_archive" . ""))
-  "The files of the tree the walkers are read over, each empty.
+  "The files of the tree the former walkers were read over, each empty.
 A symbolic link linked.org -> intray.org is added after they are written.")
 
-(defmacro pos-corpus-test-with-tree (dir &rest body)
-  "Evaluate BODY with DIR a tree of `pos-corpus-test-files' and the link.
-The pillar is life/ and the prose directory meta/journal/."
-  (declare (indent 1) (debug (symbolp body)))
-  `(pos-test-with-files ,dir pos-corpus-test-files
-     (make-symbolic-link "intray.org" (expand-file-name "linked.org" ,dir))
-     (let ((pos-pillars '("life"))
-           (pos-prose-directories '("meta/journal")))
-       ,@body)))
+(ert-deftest pos-corpus/the-one-corpus-replaces-four-walkers-cell-by-cell ()
+  "Over the characterised tree, the corpus reads one set of files.
+Before it, four walkers read four sets: pos-org-files for the sweep,
+pos-uncovered-org-files for the stranded lint, pos-startup-files for
+the start-up views and pos-roam-files for the index.  Each cell below
+is what the corpus reads; the cells that moved, and from where:
 
-;;;; The four walkers
-
-(ert-deftest pos-corpus/today-each-walker-reads-a-different-set-of-files ()
-  "Each walker reads its own set of files from one tree; this is the table.
-A characterisation of present behaviour: every cell is what the code
-does today, found by running it, and the divergences between the
-columns are deliberate records, not desired rules.  The columns are
-`pos-org-files', `pos-uncovered-org-files', `pos-startup-files' and
-`pos-roam-files', with life/ the pillar and meta/journal/ the prose
-directory.
-
-The divergences found:
-
-- Lock files: the sweep and the index read .#lock.org; start-up does
-  not, its file-name regexp refusing names that begin with a dot or
-  a hash; the lint does not list it only because the sweep covers it.
-
-- node_modules: the three recursive walkers all read beneath it; only
-  the tree tool, below, skips it.
-
-- archive and archives: the lint alone skips the sweep's archive,
-  archive/orgmode/; start-up and the index read the Org files kept
-  there.  Start-up and the index skip archives/ and attic/ at any
-  depth; the lint lists what they hold as uncovered.
-
-- Underscore directories: start-up and the index skip _tmp/ and
-  sub/_deep/; the lint lists what they hold.
-
-- Prose directories: the lint alone honours `pos-prose-directories';
-  start-up and the index read meta/journal/j.org.
-
-- Pillar depth: the sweep reads a pillar's top level only, so
-  life/sub/y.org is uncovered to the lint and read by the other two.
-
-- Hidden directories: all four skip .hidden/.  Symbolic links to Org
-  files are read by all, as the file they name.  Names that do not end
-  in .org, including an archive's intray.org_archive, are read by none."
-  (pos-corpus-test-with-tree dir
-    (let ((org-files (pos-test-relative (pos-org-files dir) dir))
-          (uncovered (pos-test-relative (pos-uncovered-org-files dir) dir))
-          (startup (pos-test-relative (pos-startup-files dir) dir))
-          (roam (pos-test-relative (pos-roam-files dir) dir))
+- .#lock.org: the sweep and the index read lock files; the corpus does
+  not, as start-up did not.
+- node_modules/d.org: every walker but the tree tool read beneath
+  node_modules; the corpus does not, as the default exclusions name it.
+- life/sub/y.org and meta/journal/j.org: the sweep read a pillar's top
+  level only, and the lint skipped the prose directories; the corpus
+  reads every directory the exclusions allow, so a garden that wants
+  meta/journal left alone declares it under exclude.
+- archive/orgmode/2026-W35/e.org: the lint alone skipped the sweep's
+  archive directory; the corpus reads a stray Org file there, as
+  start-up did.  The archive files themselves end in _archive and are
+  never read.
+- linked.org: every walker read a symbolic link as the file it names;
+  the corpus reads no link, since nothing may be written through one.
+- archives/, attic/, _tmp/, sub/_deep/, .hidden/: the lint listed what
+  the first four held as uncovered; the corpus enters none of them, as
+  start-up and the index did not."
+  (pos-test-with-files dir pos-corpus-test-tree
+    (make-symbolic-link "intray.org" (expand-file-name "linked.org" dir))
+    (let ((read (pos-test-relative (pos-corpus-files (pos-corpus dir)) dir))
           (table
-           ;; PATH                                        ORG-FILES UNCOVERED STARTUP ROAM
-           '(("intray.org"                                 t     nil   t     t)
-             ("life/x.org"                                 t     nil   t     t)
-             ("life/sub/y.org"                             nil   t     t     t)
-             (".#lock.org"                                 t     nil   nil   t)
-             (".hidden/z.org"                              nil   nil   nil   nil)
-             ("_tmp/a.org"                                 nil   t     nil   nil)
-             ("archives/b.org"                             nil   t     nil   nil)
-             ("attic/c.org"                                nil   t     nil   nil)
-             ("node_modules/d.org"                         nil   t     t     t)
-             ("notes.txt"                                  nil   nil   nil   nil)
-             ("archive/orgmode/2026-W35/e.org"             nil   nil   t     t)
-             ("archive/orgmode/2026-W35/intray.org_archive" nil  nil   nil   nil)
-             ("meta/journal/j.org"                         nil   nil   t     t)
-             ("sub/archives/f.org"                         nil   t     nil   nil)
-             ("sub/_deep/g.org"                            nil   t     nil   nil)
-             ("life/x.org_archive"                         nil   nil   nil   nil)
-             ("linked.org"                                 t     nil   t     t))))
-      (pcase-dolist (`(,path ,in-org-files ,in-uncovered ,in-startup ,in-roam) table)
-        (ert-info ((format "%s in pos-org-files" path))
-          (should (eq in-org-files (and (member path org-files) t))))
-        (ert-info ((format "%s in pos-uncovered-org-files" path))
-          (should (eq in-uncovered (and (member path uncovered) t))))
-        (ert-info ((format "%s in pos-startup-files" path))
-          (should (eq in-startup (and (member path startup) t))))
-        (ert-info ((format "%s in pos-roam-files" path))
-          (should (eq in-roam (and (member path roam) t)))))
-      ;; The table names every file a walker found; nothing is read
-      ;; that the table does not have a row for.
-      (let ((rows (mapcar #'car table)))
-        (dolist (found (append org-files uncovered startup roam))
-          (ert-info ((format "%s has a row" found))
-            (should (member found rows))))))))
-
-;;;; The tree tool
-
-(ert-deftest pos-corpus/today-start-up-and-the-index-have-their-own-exclusion-lists ()
-  "Start-up and the index skip lists of their own, not the declared ones.
-A characterisation of present behaviour, recorded, not endorsed.  The
-tree tool reads a node's exclusions, `pos-tree-default-exclude' when
-none are declared: archives, attic, node_modules, and names beginning
-with an underscore or a dot.  `pos-startup-excluded-directories' and
-`pos-roam-excluded-directories' are still constants, each the default
-less node_modules, with the underscore and dot rules written in code."
-  (should (equal '("archives" "attic" "node_modules" "_*" ".*") pos-tree-default-exclude))
-  (should (equal '("node_modules" "_*" ".*")
-                 (seq-difference pos-tree-default-exclude pos-startup-excluded-directories)))
-  (should-not (seq-difference pos-startup-excluded-directories pos-tree-default-exclude))
-  (should (equal pos-startup-excluded-directories pos-roam-excluded-directories))
-  ;; A repository beneath each name: those the tool looks into are
-  ;; found undeclared, the rest are passed over without a word.
-  (pos-test-with-temp-dir tmp
-    (let ((root (file-truename tmp)))
-      (pos-test-git-init root)
-      (dolist (path '("plain" "sub/plain" "_tmp" "sub/_deep" ".hidden"
-                      "node_modules" "archives" "attic"))
-        (make-directory (expand-file-name path root) t)
-        (with-temp-file (expand-file-name ".git" (expand-file-name path root))
-          (insert "gitdir: nowhere\n")))
-      (let ((pos-tree--root root)
-            (pos-tree--findings nil))
-        (pos-tree--undeclared root nil nil pos-tree-default-exclude)
-        (should (equal '("plain" "sub/plain")
-                       (sort (mapcar (lambda (finding) (alist-get 'path finding))
-                                     pos-tree--findings)
-                             #'string<)))))))
+           '(("intray.org" . t)
+             ("life/x.org" . t)
+             ("life/sub/y.org" . t)
+             (".#lock.org" . nil)
+             (".hidden/z.org" . nil)
+             ("_tmp/a.org" . nil)
+             ("archives/b.org" . nil)
+             ("attic/c.org" . nil)
+             ("node_modules/d.org" . nil)
+             ("notes.txt" . nil)
+             ("archive/orgmode/2026-W35/e.org" . t)
+             ("archive/orgmode/2026-W35/intray.org_archive" . nil)
+             ("meta/journal/j.org" . t)
+             ("sub/archives/f.org" . nil)
+             ("sub/_deep/g.org" . nil)
+             ("life/x.org_archive" . nil)
+             ("linked.org" . nil))))
+      (pcase-dolist (`(,path . ,in-corpus) table)
+        (ert-info ((format "%s in the corpus" path))
+          (should (eq in-corpus (and (member path read) t)))))
+      (dolist (found read)
+        (ert-info ((format "%s has a row" found))
+          (should (assoc found table)))))))
 
 (provide 'pos-corpus-test)
 ;;; pos-corpus-test.el ends here
