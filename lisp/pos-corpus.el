@@ -84,7 +84,7 @@ repositories within the tree, beneath which a command may not write."
 Not a hidden file, nor a lock file, which begins with .#.")
 
 (defun pos-corpus--org-file-p (name)
-  "Return non-nil if NAME is the name of an Org file the corpus reads."
+  "Return non-nil if NAME names an Org file read into the corpus."
   (string-match-p pos-corpus--org-regexp name))
 
 (defun pos-corpus--kind (config)
@@ -193,7 +193,7 @@ two-configurations, and :names, the names in it, sorted."
          :unwritable (nreverse unwritable))))))
 
 (defun pos-corpus--list (root)
-  "Return a lister for the tree at ROOT that looks at the disk.
+  "Return a lister over the disk for the tree at ROOT.
 As `pos-corpus--walk' asks: for a path, what is there."
   (lambda (path)
     (let* ((full (if (equal path "") root (expand-file-name path root)))
