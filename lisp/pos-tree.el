@@ -234,7 +234,8 @@ CHILDREN are the repository's children, already checked."
             (let-alist (pos-tree--mapping
                         entry "An archive"
                         '(("scope" string t) ("kept" string t)
-                          ("ledger" string nil) ("url" string nil))
+                          ("ledger" string nil) ("url" string nil)
+                          ("sweep" string nil) ("path" string nil))
                         (format "archives[%d]" index))
               (unless (equal .scope ".")
                 (unless (pos-tree--path-p .scope)
@@ -246,14 +247,21 @@ CHILDREN are the repository's children, already checked."
                          (not (let ((case-fold-search nil))
                                 (string-match-p pos-tree--uuid-regexp .ledger))))
                 (pos-tree--refuse 'bad-value "Not a ledger's id: %s" .ledger))
-              (let ((ledger (and .ledger `((ledger . ,.ledger)))))
+              (when (and .sweep (not (member .sweep '("weekly" "sealed"))))
+                (pos-tree--refuse 'bad-value "Done items are swept weekly or sealed, not %s"
+                                  .sweep))
+              (when (and .path (not (equal .sweep "weekly")))
+                (pos-tree--refuse 'bad-value "Only a weekly sweep has a path: %s" .scope))
+              (let ((ledger (and .ledger `((ledger . ,.ledger))))
+                    (sweep (append (and .sweep `((sweep . ,.sweep)))
+                                   (and .path `((path . ,(pos-tree--location .path "path")))))))
                 (cond
                  ((not (equal .kept "remote"))
                   (when .url
                     (pos-tree--refuse 'bad-value "Only a remote archive has a url: %s"
                                       .scope))
-                  `((scope . ,.scope) (kept . ,.kept) ,@ledger))
-                 (.url `((scope . ,.scope) (kept . ,.kept) ,@ledger (url . ,.url)))
+                  `((scope . ,.scope) (kept . ,.kept) ,@ledger ,@sweep))
+                 (.url `((scope . ,.scope) (kept . ,.kept) ,@ledger (url . ,.url) ,@sweep))
                  (t (pos-tree--refuse 'missing-key "A remote archive lacks url"))))))
           entries)))
     (pos-tree--distinct (mapcar (lambda (a) (alist-get 'scope a)) archives)

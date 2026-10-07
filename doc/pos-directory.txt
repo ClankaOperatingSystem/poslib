@@ -211,9 +211,29 @@ mapping:
                 ledger
     ledger      the id of the scope's ledger, a UUID in canonical form
                 with lower-case letters; optional, with any kept
+    sweep       how the scope's done items are retired (below):
+                weekly or sealed; optional
+    path        with weekly, where the weekly archive files are written,
+                a path beneath the scope; default archive/orgmode
 
 A scope no entry names keeps its archive uncommitted. In every case the
 ledger stays with the scope and is committed.
+
+The sweep retires the done items of a scope's Org files each week. An
+entry's sweep says how: weekly writes them into Org archive files
+beneath the scope, at path, one directory for each ISO week and
+within it one file for each source, named by the source's path within
+the scope with _archive appended; sealed writes the week's files the
+same way beneath _sweep/ in the scope and, once the week has closed,
+seals that week's directory into the scope's archive at sweep/WEEK,
+on disk or with the scope's keeper as kept says, so that finished
+work has the same standing as any sealed item. A file is retired by
+the nearest entry with sweep at or above the scope it belongs to,
+within the same repository; when none has one, it is retired weekly
+beneath the root of its repository, at the default path, as before
+there was a choice. A sweep that is not weekly or sealed is refused
+(bad-value); a path with any sweep but weekly is refused (bad-value),
+as is one that climbs (bad-path).
 
 The entry for an archive is looked for in the nearest node at or above
 its scope: the nearest directory with a configuration.
@@ -427,6 +447,6 @@ kind of refusal. config has kind, which is responsibility, project or null;
 projects, methodologies and image, each a string or null; exclude, an
 array of strings or null; children, worktrees and archives, each an
 array with every default filled in, a child with no remote having null
-for its remote and branch; server, an object or null; and warnings, an
-array of strings, empty when the file holds no key the reader does not
-know.
+for its remote and branch, and an archive carrying sweep and path only
+when written; server, an object or null; and warnings, an array of
+strings, empty when the file holds no key the reader does not know.

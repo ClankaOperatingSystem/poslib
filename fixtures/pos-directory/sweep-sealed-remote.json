@@ -1,0 +1,23 @@
+{
+ "about": "A scope kept by a keeper may have its swept weeks sealed into its archive, and so sent to the keeper.",
+ "yaml": "pos: 2\nprojects: projects/\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://ledger.example.org/\n    sweep: sealed\n",
+ "config": {
+  "kind": "responsibility",
+  "projects": "projects",
+  "methodologies": null,
+  "image": null,
+  "exclude": null,
+  "children": [],
+  "worktrees": [],
+  "archives": [
+   {
+    "scope": ".",
+    "kept": "remote",
+    "url": "https://ledger.example.org/",
+    "sweep": "sealed"
+   }
+  ],
+  "server": null,
+  "warnings": []
+ }
+}

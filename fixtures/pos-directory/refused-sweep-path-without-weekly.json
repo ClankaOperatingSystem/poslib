@@ -1,0 +1,5 @@
+{
+ "about": "Only a weekly sweep writes to a path; a sealed one writes beneath _sweep/ and then into the archive.",
+ "yaml": "pos: 2\narchives:\n  - scope: \".\"\n    kept: committed\n    sweep: sealed\n    path: history/\n",
+ "refused": "bad-value"
+}
