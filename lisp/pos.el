@@ -616,21 +616,15 @@ over."
           (cl-pushnew buffer buffers))))
     (cons count buffers)))
 
-(defun pos-dedupe-apply (root plan &optional dry-run)
-  "Apply dedupe PLAN to ROOT; with DRY-RUN change nothing.
-Return (:resolved :merged :relinked :skipped :unwritable :vanished
-:stale) counts.  A group with a copy in a file a command of ROOT may
-not write, one of another repository's, is left as it is and counted
-unwritable.  A dropped copy's ID passes to the kept copy where it has
-none; else each \"id:\" link to it that the index records is pointed
-at the kept copy's, and :relinked counts them."
-  (pos-roam-with-index root
-  (let ((resolved 0) (merged 0) (relinked 0) (skipped 0) (unwritable 0)
-        (vanished 0) (stale 0)
-        (corpus (pos-corpus root))
-        (make-backup-files nil)
-        (jobs nil) (touched nil))
-    ;; Resolve all markers before any edit.
+(defun pos-dedupe--jobs (root plan corpus)
+  "Read PLAN's groups for ROOT into jobs, each with its copies' markers.
+A job is (KEY KEEP . DROPS): KEEP the kept copy's marker, each of
+DROPS (MARKER . LABEL) with the label its merged body is filed
+under.  A group without one keep and a drop is skipped; one with a
+copy in a file CORPUS says ROOT may not write is unwritable; one
+whose copies are not at their lines is stale.  Return (JOBS :skipped
+N :unwritable N :stale N), JOBS in the plan's order."
+  (let ((skipped 0) (unwritable 0) (stale 0) jobs)
     (dolist (group (pos-dedupe-read-plan plan))
       (let* ((key (car group))
              (copies (cdr group))
@@ -655,47 +649,83 @@ at the kept copy's, and :relinked counts them."
                                                                   (nth 1 d) (nth 2 d))))
                                            (cdr markers) drops)))
                     jobs)))))))
-    (setq jobs (nreverse jobs))
-    (dolist (job jobs)
-      (pcase-let ((`(,key ,keep . ,drops) job))
-        (if (not (pos--marker-still-at-p keep key))
-            (setq vanished (1+ vanished))
-          (let ((keep-body (with-current-buffer (marker-buffer keep)
-                             (goto-char keep) (pos--subtree-body)))
-                (keep-id (org-entry-get keep "ID")))
-            (dolist (pair drops)
-              (pcase-let ((`(,drop . ,label) pair))
-                (if (not (pos--marker-still-at-p drop key))
-                    (setq vanished (1+ vanished))
-                  (let ((drop-body (with-current-buffer (marker-buffer drop)
-                                     (goto-char drop) (pos--subtree-body)))
-                        (drop-id (org-entry-get drop "ID")))
-                    (when drop-id
-                      (if keep-id
-                          (pcase-let ((`(,count . ,buffers)
-                                       (pos-dedupe--relink drop-id keep-id dry-run)))
-                            (setq relinked (+ relinked count))
-                            (dolist (buffer buffers) (cl-pushnew buffer touched)))
-                        (setq keep-id drop-id)
-                        (unless dry-run (org-entry-put keep "ID" drop-id))))
-                    (when (and (not (string-empty-p drop-body))
-                               (not (string= drop-body keep-body)))
-                      (setq merged (1+ merged))
-                      (unless dry-run (pos--merge-under drop keep label)))
-                    (unless dry-run
-                      (with-current-buffer (marker-buffer drop)
-                        (goto-char drop)
-                        (org-cut-subtree))))))))
-          (setq resolved (1+ resolved)))))
-    (unless dry-run
-      (dolist (job jobs)
-        (dolist (marker (cons (cadr job) (mapcar #'car (cddr job))))
-          (cl-pushnew (marker-buffer marker) touched)))
-      (dolist (buffer touched)
-        (with-current-buffer buffer
-          (when (buffer-modified-p) (save-buffer)))))
-    (list :resolved resolved :merged merged :relinked relinked :skipped skipped
-          :unwritable unwritable :vanished vanished :stale stale))))
+    (list (nreverse jobs) :skipped skipped :unwritable unwritable :stale stale)))
+
+(defun pos-dedupe--resolve (job dry-run)
+  "Resolve JOB, a group with its markers, as `pos-dedupe--jobs' gives it.
+Each dropped copy whose body differs from the kept one's is merged
+beneath it under the drop's label, then cut; a dropped ID passes to
+the kept copy where it has none, else the links to it are pointed at
+the kept copy's.  With DRY-RUN count only.  Return (:resolved 0 or 1
+:merged N :relinked N :vanished N :touched BUFFERS): vanished counts
+copies no longer at their marker, touched the buffers relinking
+wrote."
+  (pcase-let ((`(,key ,keep . ,drops) job)
+              (resolved 0) (merged 0) (relinked 0) (vanished 0) (touched nil))
+    (if (not (pos--marker-still-at-p keep key))
+        (setq vanished (1+ vanished))
+      (setq resolved 1)
+      (let ((keep-body (with-current-buffer (marker-buffer keep)
+                         (goto-char keep) (pos--subtree-body)))
+            (keep-id (org-entry-get keep "ID")))
+        (pcase-dolist (`(,drop . ,label) drops)
+          (if (not (pos--marker-still-at-p drop key))
+              (setq vanished (1+ vanished))
+            (let ((drop-body (with-current-buffer (marker-buffer drop)
+                               (goto-char drop) (pos--subtree-body)))
+                  (drop-id (org-entry-get drop "ID")))
+              (when drop-id
+                (if keep-id
+                    (pcase-let ((`(,count . ,buffers)
+                                 (pos-dedupe--relink drop-id keep-id dry-run)))
+                      (setq relinked (+ relinked count))
+                      (dolist (buffer buffers) (cl-pushnew buffer touched)))
+                  (setq keep-id drop-id)
+                  (unless dry-run (org-entry-put keep "ID" drop-id))))
+              (when (and (not (string-empty-p drop-body))
+                         (not (string= drop-body keep-body)))
+                (setq merged (1+ merged))
+                (unless dry-run (pos--merge-under drop keep label)))
+              (unless dry-run
+                (with-current-buffer (marker-buffer drop)
+                  (goto-char drop)
+                  (org-cut-subtree))))))))
+    (list :resolved resolved :merged merged :relinked relinked
+          :vanished vanished :touched touched)))
+
+(defun pos-dedupe-apply (root plan &optional dry-run)
+  "Apply dedupe PLAN to ROOT; with DRY-RUN change nothing.
+Return (:resolved :merged :relinked :skipped :unwritable :vanished
+:stale) counts.  A group with a copy in a file a command of ROOT may
+not write, one of another repository's, is left as it is and counted
+unwritable.  A dropped copy's ID passes to the kept copy where it has
+none; else each \"id:\" link to it that the index records is pointed
+at the kept copy's, and :relinked counts them."
+  (pos-roam-with-index root
+    (let ((resolved 0) (merged 0) (relinked 0) (vanished 0)
+          (make-backup-files nil)
+          (touched nil))
+      ;; Every marker is resolved before any edit, so that a plan whose
+      ;; lines have moved is found stale as a whole.
+      (pcase-let ((`(,jobs . ,counts) (pos-dedupe--jobs root plan (pos-corpus root))))
+        (dolist (job jobs)
+          (let ((result (pos-dedupe--resolve job dry-run)))
+            (setq resolved (+ resolved (plist-get result :resolved))
+                  merged (+ merged (plist-get result :merged))
+                  relinked (+ relinked (plist-get result :relinked))
+                  vanished (+ vanished (plist-get result :vanished)))
+            (dolist (buffer (plist-get result :touched)) (cl-pushnew buffer touched))))
+        (unless dry-run
+          (dolist (job jobs)
+            (dolist (marker (cons (cadr job) (mapcar #'car (cddr job))))
+              (cl-pushnew (marker-buffer marker) touched)))
+          (dolist (buffer touched)
+            (with-current-buffer buffer
+              (when (buffer-modified-p) (save-buffer)))))
+        (list :resolved resolved :merged merged :relinked relinked
+              :skipped (plist-get counts :skipped)
+              :unwritable (plist-get counts :unwritable)
+              :vanished vanished :stale (plist-get counts :stale))))))
 
 (defun pos-dedupe-report (result dry-run)
   "Return a report of RESULT from `pos-dedupe-apply'; DRY-RUN words it."
