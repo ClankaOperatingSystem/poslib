@@ -711,13 +711,36 @@ not in an archive, an attic, or a hidden or underscore directory."
       (pos-tree-test-settle root)
       (should (equal (file-symlink-p link) elsewhere)))))
 
-(ert-deftest pos-tree/skills-beneath-claude-are-found ()
+(ert-deftest pos-tree/skills-beneath-claude-are-preserved ()
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository
                  (expand-file-name "root" dir)
                  ".claude/skills/old/SKILL.md" "---\nname: old\n---\n")))
-      (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("claude-skills .claude/skills"))))))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
+      (should (file-directory-p (expand-file-name ".claude/skills" root)))
+      (should-not (file-symlink-p (expand-file-name ".claude/skills" root)))
+      (should (equal (pos-tree-test-status root) "")))))
+
+(ert-deftest pos-tree/existing-claude-layouts-survive-skill-linking ()
+  (dolist (path '(".claude" ".claude/skills"))
+    (dolist (kind '(file directory link dangling))
+      (pos-tree-test-with dir
+        (let* ((root (apply #'pos-tree-test-repository
+                            (expand-file-name "root" dir)
+                            (pos-tree-test-skill "own")))
+               (at (expand-file-name path root)))
+          (make-directory (file-name-directory at) t)
+          (pcase kind
+            ('file (pos-tree-test-write root path "existing\n"))
+            ('directory (pos-tree-test-write root (concat path "/kept.md") "existing\n"))
+            ((or 'link 'dangling)
+             (when (eq kind 'link)
+               (pos-tree-test-write root "foreign/kept.md" "existing\n"))
+             (make-symbolic-link (expand-file-name "foreign" root) at)))
+          (pos-tree-test-commit root)
+          (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
+          (should (equal (pos-tree-test-status root) ""))
+          (should (equal (pos-tree-test-summary (pos-tree-plan root)) nil)))))))
 
 (ert-deftest pos-tree/archives-follow-each-scope-and-policy-changes ()
   (pos-tree-test-with dir
