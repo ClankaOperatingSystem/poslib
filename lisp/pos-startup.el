@@ -52,28 +52,28 @@
 Hidden directories and those beginning with an underscore are never
 read."
   :type '(repeat string)
-  :group 'org-archive)
+  :group 'pos)
 
 (defcustom pos-startup-scheduled-days 14
   "Days, from today, that the scheduled view covers."
   :type 'integer
-  :group 'org-archive)
+  :group 'pos)
 
 (defcustom pos-startup-review-days 7
   "Days, from today, that the reviews view covers."
   :type 'integer
-  :group 'org-archive)
+  :group 'pos)
 
 (defcustom pos-startup-review-tag "review"
   "The tag of a heading that schedules a review of its scope."
   :type 'string
-  :group 'org-archive)
+  :group 'pos)
 
 (defcustom pos-startup-active-statuses '("COMMITTED" "WIP")
   "Values of a project file's STATUS property that make it active.
 An active project is expected to have a review scheduled."
   :type '(repeat string)
-  :group 'org-archive)
+  :group 'pos)
 
 (defconst pos-startup-prompts
   "START-UP PROMPTS
