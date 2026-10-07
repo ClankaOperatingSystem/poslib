@@ -48,12 +48,12 @@
   (expand-file-name "pos/org-roam" (xdg-cache-home))
   "Where a tree's own org-roam index is kept, one database per root."
   :type 'directory
-  :group 'org-archive)
+  :group 'pos)
 
 (defcustom pos-roam-excluded-directories '("archives" "attic")
   "Directory names not indexed, besides hidden and underscore ones."
   :type '(repeat string)
-  :group 'org-archive)
+  :group 'pos)
 
 (defun pos-roam-exclude-regexp ()
   "Return the regexp of paths under the root that are not indexed."

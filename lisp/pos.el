@@ -55,12 +55,17 @@
            (decoded-time-year d)
            nil -1 nil))))
 
+(defgroup pos nil
+  "A personal operating system in Org files."
+  :group 'org
+  :prefix "pos-")
+
 ;;;; Files and paths
 
 (defcustom pos-pillars nil
   "Root subdirectories, one per area."
   :type '(repeat string)
-  :group 'org-archive)
+  :group 'pos)
 
 (defun pos-org-files (root)
   "Return the Org files the sweep covers under ROOT.
@@ -76,7 +81,7 @@ Top level of ROOT and of each of `pos-pillars'; missing ones skipped."
 (defcustom pos-archive-directory "archive/orgmode"
   "Archive directory, relative to the root; one subdirectory per week."
   :type 'string
-  :group 'org-archive)
+  :group 'pos)
 
 (defun pos-archive-file (root file week)
   "Return the WEEK archive for FILE under ROOT.
@@ -171,12 +176,12 @@ Return (:archived COUNT :skipped HEADINGS)."
                                                   default-directory)))
   "Root of the repository the tools operate on."
   :type 'directory
-  :group 'org-archive)
+  :group 'pos)
 
 (defcustom pos-config-file "pos-config.el"
   "Per-repository configuration, relative to `pos-directory'."
   :type 'string
-  :group 'org-archive)
+  :group 'pos)
 
 (defun pos-load-config (&optional root)
   "Load the `pos-config-file' of ROOT, default `pos-directory', if present.
@@ -315,7 +320,7 @@ Return (:lines-removed N :respelled N)."
 (defcustom pos-prose-directories nil
   "Root subdirectories of prose; not scanned for stranded tasks."
   :type '(repeat string)
-  :group 'org-archive)
+  :group 'pos)
 
 (defun pos-uncovered-org-files (root)
   "Return Org files under ROOT the sweep does not cover.
@@ -811,7 +816,7 @@ The index is brought up to date with what was written."
 (defcustom pos-refile-rules nil
   "Heading to pillar rules, (REGEXP . PILLAR); first match wins."
   :type '(alist :key-type regexp :value-type string)
-  :group 'org-archive)
+  :group 'pos)
 
 (defun pos-refile-suggest (heading)
   "Return the pillar `pos-refile-rules' suggests for HEADING, or nil."
