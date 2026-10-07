@@ -33,13 +33,14 @@
 ;; does not read: in an attic or archives directory, a lock file, a
 ;; product's.  The "intray" is the root's intray.org, where new and
 ;; rescued tasks wait to be filed.  The "sweep" archives the DONE and
-;; CANCELLED entries of the writable files into the week's archive.  A
-;; "stranded" task is a task keyword in an uncovered file, which no
-;; sweep will ever reach.
+;; CANCELLED entries of the writable files into the week's archive; it
+;; is pos-sweep.el's, specified in pos-sweep-test.el.  A "stranded"
+;; task is a task keyword in an uncovered file, which no sweep will
+;; ever reach.
 ;;
-;; Pure rules, such as week names, archive paths, dedupe suggestions
-;; and excerpts, are tested on values alone; the rest through files in
-;; a temporary root.  Run: make test.
+;; Pure rules, such as dedupe suggestions and excerpts, are tested on
+;; values alone; the rest through files in a temporary root.  Run:
+;; make test.
 
 ;;; Code:
 
@@ -67,9 +68,6 @@ body projects file."
 (defconst pos-test-child-config "pos: 2\nprojects: projects/\n"
   "The configuration of a child repository: a node of the root's tree.")
 
-(defconst pos-test-week "2026-W36"
-  "The week `pos-test-sunday' closes.")
-
 (defun pos-test-lines (&rest lines)
   "Return LINES as the text of a file: each ended by a newline."
   (mapconcat (lambda (line) (concat line "\n")) lines ""))
@@ -77,66 +75,6 @@ body projects file."
 (defun pos-test-text (root file)
   "Return the text of FILE, named relative to ROOT."
   (pos-test-file-string (expand-file-name file root)))
-
-(defconst pos-test-intray
-  "#+TODO: TODO | DONE CANCELLED
-* TODO open task
-* DONE finished task
-* CANCELLED dropped task
-* DONE parent with open child
-** TODO still open
-* Container
-** DONE nested finished
-** TODO nested open
-"
-  "An intray with every shape the sweep must handle.")
-
-;;;; Weeks
-
-(ert-deftest pos/sunday-night-belongs-to-its-iso-week ()
-  "A week is named by its ISO year and week number, as 2026-W36.
-Sunday is the last day of an ISO week, so the sweep boundary, Sunday
-night, names the week it closes."
-  (should (equal "2026-W36" (pos-week-name (pos-test-time 2026 9 6 23 0)))))
-
-(ert-deftest pos/the-iso-year-can-differ-from-the-calendar-year ()
-  "The week's year is the ISO year, which need not be the calendar year.
-2027-01-01 is a Friday in the last week of 2026, so it is 2026-W53,
-while 2026-01-01 is 2026-W01."
-  (should (equal "2026-W01" (pos-week-name (pos-test-time 2026 1 1 12 0))))
-  (should (equal "2026-W53" (pos-week-name (pos-test-time 2027 1 1 12 0)))))
-
-(ert-deftest pos/the-boundary-itself-is-the-boundary ()
-  "A sweep run at the boundary, Sunday 23:00, finds that very moment.
-The boundary is the latest Sunday 23:00 at or before now; at, so a run
-the clock fires on time is not pushed back a week."
-  (should (time-equal-p (pos-test-time 2026 9 6 23 0)
-                        (pos-sweep-boundary (pos-test-time 2026 9 6 23 0)))))
-
-(ert-deftest pos/the-boundary-a-minute-early-is-last-week ()
-  "On Sunday before 23:00 the latest boundary is the previous Sunday's.
-The week is not over until the hour strikes."
-  (should (time-equal-p (pos-test-time 2026 8 30 23 0)
-                        (pos-sweep-boundary (pos-test-time 2026 9 6 22 59)))))
-
-(ert-deftest pos/a-late-run-on-monday-still-finds-sunday ()
-  "A run on Monday morning sweeps the week that ended on Sunday night.
-The sweep need not run on time; whenever it runs it archives into the
-week most recently closed."
-  (should (time-equal-p (pos-test-time 2026 9 6 23 0)
-                        (pos-sweep-boundary (pos-test-time 2026 9 7 8 15)))))
-
-(ert-deftest pos/midweek-finds-the-previous-sunday ()
-  "A run in the middle of the week finds the Sunday before it."
-  (should (time-equal-p (pos-test-time 2026 9 6 23 0)
-                        (pos-sweep-boundary (pos-test-time 2026 9 9 12 0)))))
-
-(ert-deftest pos/the-boundary-may-fall-in-the-previous-month ()
-  "The boundary before Tuesday 2026-09-01 is Sunday 2026-08-30.
-Going back by days can cross a month; `encode-time' normalises a day
-of zero or less into the month before."
-  (should (time-equal-p (pos-test-time 2026 8 30 23 0)
-                        (pos-sweep-boundary (pos-test-time 2026 9 1 9 0)))))
 
 ;;;; Files and paths
 
@@ -225,7 +163,7 @@ over, since visiting it would wait on a question."
                                         root))))))
 
 (ert-deftest pos/the-archive-and-prose-directories-are-never-uncovered ()
-  "Files in `pos-archive-directory' and `pos-prose-directories' are left out.
+  "Files in the archive directory and `pos-prose-directories' are left out.
 An archive holds swept tasks, which keep their keywords; prose, such
 as a journal, may use a keyword as a word.  Neither is a place a task
 is stranded, so a file there that the corpus does not read, one in an
@@ -259,42 +197,6 @@ left alone, as the corpus leaves it."
                      (pos-test-relative (pos-uncovered-org-files root)
                                         root))))))
 
-(ert-deftest pos/a-file-archives-under-the-week-by-its-path-from-the-root ()
-  "A file archives under the week by its path relative to the root.
-With _archive appended: intray.org and life/life-areas.org archive
-apart, and a week's directory mirrors the tree it was swept from."
-  (should (equal "/repo/archive/orgmode/2026-W36/intray.org_archive"
-                 (pos-archive-file "/repo" "/repo/intray.org" "2026-W36")))
-  (should (equal "/repo/archive/orgmode/2026-W36/life/life-areas.org_archive"
-                 (pos-archive-file "/repo" "/repo/life/life-areas.org"
-                                   "2026-W36"))))
-
-(ert-deftest pos/the-root-may-be-named-with-a-trailing-slash ()
-  "The root may be given as \"/repo/\" or \"/repo\" with the same result.
-`pos-directory' is a directory name; the sweep passes it with its
-slash, a caller at the keyboard may not."
-  (should (equal "/repo/archive/orgmode/2026-W36/intray.org_archive"
-                 (pos-archive-file "/repo/" "/repo/intray.org" "2026-W36"))))
-
-(ert-deftest pos/the-archive-directory-is-the-configured-one ()
-  "Archives go under `pos-archive-directory', whatever it is set to.
-The default is archive/orgmode; a repository that keeps its archive
-elsewhere binds the variable, and the week directories follow."
-  (let ((pos-archive-directory "attic"))
-    (should (equal "/repo/attic/2026-W36/life/life-areas.org_archive"
-                   (pos-archive-file "/repo" "/repo/life/life-areas.org"
-                                     "2026-W36")))))
-
-(ert-deftest pos/a-file-outside-the-root-escapes-the-week-directory ()
-  "A file outside the root is given an archive path outside its week.
-This characterises a latent defect.  Such a file's name relative to
-the root begins with \"..\", which `expand-file-name' resolves, so the
-archive lands in `pos-archive-directory' beside the weeks, not within
-one.  Nothing passes such a file today, since the sweep walks under
-the root; when the sweep gets its plan, this is to become a refusal."
-  (should (equal "/repo/archive/orgmode/elsewhere/notes.org_archive"
-                 (pos-archive-file "/repo" "/elsewhere/notes.org" "2026-W36"))))
-
 ;;;; Keywords
 
 (ert-deftest pos/the-done-keywords-are-those-after-the-bar ()
@@ -318,112 +220,18 @@ changed."
       (should (eq before org-todo-keywords)))))
 
 (ert-deftest pos/the-one-sequence-is-in-force-without-a-file-line ()
-  "A file with no #+TODO line still archives by the one sequence.
-CANCELLED is done, so it goes; WIP is open under the sequence, though
-no line in the file says so, so it stays."
+  "A file with no #+TODO line is read by the one sequence.
+CANCELLED is done, so an entry in that state is done and the sweep
+would take it; WIP is open under the sequence, though no line in the
+file says so, so an entry in that state is not."
   (pos-test-with-files root
       '(("intray.org" . "* CANCELLED dropped\n* WIP busy\n* TODO open\n"))
-    (let* ((file (expand-file-name "intray.org" root))
-           (archive (pos-archive-file root file pos-test-week))
-           (result (pos-archive-done-in-file root file pos-test-week
-                                             pos-test-sunday)))
-      (should (equal 1 (plist-get result :archived)))
-      (should (string-search "* CANCELLED dropped"
-                             (pos-test-file-string archive)))
-      (should (string-search "* WIP busy" (pos-test-file-string file))))))
+    (with-current-buffer (pos-visit (expand-file-name "intray.org" root))
+      (should (equal '(t nil nil)
+                     (org-map-entries (lambda () (and (org-entry-is-done-p) t))
+                                      nil 'file))))))
 
-;;;; Archiving
-
-(ert-deftest pos/done-entries-move-to-the-archive-and-open-ones-stay ()
-  "Archiving a file moves its DONE and CANCELLED entries, however nested.
-An open entry stays, and so does a done entry with an open task below
-it, which is reported as skipped rather than taking the open task
-with it.  Each archived entry is stamped with the sweep's time, and a
-nested one records the outline path it came from."
-  (pos-test-with-files root `(("intray.org" . ,pos-test-intray))
-    (let* ((file (expand-file-name "intray.org" root))
-           (archive (pos-archive-file root file pos-test-week))
-           (result (pos-archive-done-in-file root file pos-test-week
-                                             pos-test-sunday))
-           (archived (pos-test-file-string archive)))
-      (should (equal 3 (plist-get result :archived)))
-      (should (equal '("parent with open child") (plist-get result :skipped)))
-      (should (equal (pos-test-lines "#+TODO: TODO | DONE CANCELLED"
-                                     "* TODO open task"
-                                     "* DONE parent with open child"
-                                     "** TODO still open"
-                                     "* Container"
-                                     "** TODO nested open")
-                     (pos-test-file-string file)))
-      (should (string-search "* DONE finished task" archived))
-      (should (string-search "* CANCELLED dropped task" archived))
-      (should (string-search "* DONE nested finished" archived))
-      (should (string-search ":ARCHIVE_OLPATH: Container" archived))
-      (should (equal 3 (cl-count-if
-                        (lambda (line)
-                          (string-search "ARCHIVE_TIME: 2026-09-06 Sun 23:00"
-                                         line))
-                        (split-string archived "\n")))))))
-
-(ert-deftest pos/nothing-done-means-no-archive-file ()
-  "A file with nothing done leaves no archive behind.
-An empty week directory, or a header with no entries under it, would
-be noise in the archive tree."
-  (pos-test-with-files root '(("todo.org" . "* TODO only open\n"))
-    (let* ((file (expand-file-name "todo.org" root))
-           (result (pos-archive-done-in-file root file pos-test-week
-                                             pos-test-sunday)))
-      (should (equal 0 (plist-get result :archived)))
-      (should-not (file-exists-p (pos-archive-file root file pos-test-week))))))
-
-(ert-deftest pos/the-archive-names-its-source-relative-to-the-root ()
-  "An archive names its source file relative to the root, never absolutely.
-Org would record the absolute path and the wall clock; both are
-replaced, so that any checkout on any machine writes the same bytes."
-  (pos-test-with-files root '(("life/life-areas.org" . "* DONE finished\n"))
-    (let ((file (expand-file-name "life/life-areas.org" root)))
-      (pos-archive-done-in-file root file pos-test-week pos-test-sunday)
-      (let ((archived (pos-test-file-string
-                       (pos-archive-file root file pos-test-week))))
-        (should (string-search ":ARCHIVE_FILE: life/life-areas.org" archived))
-        (should (string-search "Archived entries from file life/life-areas.org"
-                               archived))
-        (should-not (string-search root archived))))))
-
-(ert-deftest pos/the-stamp-goes-on-the-archived-entry-not-its-last-child ()
-  "ARCHIVE_FILE and ARCHIVE_TIME are set on the entry archived, not below it.
-Org leaves point at the end of the pasted subtree, in its last child;
-the stamp climbs back to the entry itself, so a parent with done
-children is stamped once, on the parent."
-  (pos-test-with-files root
-      `(("intray.org" . ,(pos-test-lines "* DONE parent"
-                                         "** DONE child one"
-                                         "** DONE child two")))
-    (let ((file (expand-file-name "intray.org" root)))
-      (pos-archive-done-in-file root file pos-test-week pos-test-sunday)
-      (with-temp-buffer
-        (insert-file-contents (pos-archive-file root file pos-test-week))
-        (org-mode)
-        (goto-char (point-min))
-        (re-search-forward "^\\* DONE parent")
-        (should (equal "2026-09-06 Sun 23:00"
-                       (org-entry-get (point) "ARCHIVE_TIME")))
-        (should (equal "intray.org" (org-entry-get (point) "ARCHIVE_FILE")))
-        (re-search-forward "^\\*\\* DONE child two")
-        (should-not (org-entry-get (point) "ARCHIVE_TIME"))
-        (should-not (org-entry-get (point) "ARCHIVE_FILE"))))))
-
-(ert-deftest pos/archiving-writes-no-backup-files ()
-  "Archiving saves the source and the archive without backup files.
-The repository is the history; a stray intray.org~ beside the file is
-clutter for Git to ignore or a person to delete."
-  (pos-test-with-files root `(("intray.org" . ,pos-test-intray))
-    (let ((file (expand-file-name "intray.org" root))
-          (backup-enable-predicate (lambda (_name) t)))
-      (pos-archive-done-in-file root file pos-test-week pos-test-sunday)
-      (should-not (directory-files-recursively root "~\\'")))))
-
-;;;; The sweep
+;;;; The root and its settings
 
 (ert-deftest pos/a-repository-s-pos-config-el-sets-what-it-names ()
   "Loading a root's pos-config.el sets the settings it names and says so.
@@ -452,67 +260,6 @@ longer read.  The message names the setting and says as much."
           (should (string-match-p "pos-pillars" messages))
           (should (string-match-p "no longer read" messages)))
       (makunbound 'pos-pillars))))
-
-(ert-deftest pos/a-sweep-archives-every-writable-file-and-no-other ()
-  "A sweep archives the done entries of every writable file, and only those.
-Every Org file of the corpus the root may write, at any depth: a book
-in a resources directory is swept with the top-level files.  Each
-file's archive is written under the week by the file's own path.  A
-done entry in a file the corpus does not read, in archives/ or in a
-product repository, is left where it is, for lint to report as
-stranded.  The counts and skipped headings are totalled."
-  (pos-test-with-files root
-      `(("intray.org" . ,pos-test-intray)
-        ("life/life-projects.org" . "* DONE shipped\n* TODO next\n")
-        ("life/resources/book.org" . "* DONE read\n")
-        ("archives/old.org" . "* DONE kept\n")
-        ("vendor/lib/.git/HEAD" . ,pos-test-git-head)
-        ("vendor/lib/README.org" . "* DONE released\n"))
-    (let* ((pos-directory root)
-           (result (pos-sweep pos-test-week pos-test-sunday)))
-      (should (equal 5 (plist-get result :archived)))
-      (should (equal '("parent with open child")
-                     (plist-get result :skipped)))
-      (dolist (file '("intray.org" "life/life-projects.org"
-                      "life/resources/book.org"))
-        (should (file-exists-p
-                 (expand-file-name
-                  (concat "archive/orgmode/2026-W36/" file "_archive") root))))
-      (should (equal "* DONE kept\n" (pos-test-text root "archives/old.org")))
-      (should (equal "* DONE released\n"
-                     (pos-test-text root "vendor/lib/README.org"))))))
-
-(ert-deftest pos/a-sweep-without-arguments-finds-its-own-week ()
-  "Called with no arguments, a sweep uses the latest boundary at or before now.
-That is what a scheduled run does: the week directory is named from
-the boundary, not from the moment the run began, and the entries are
-stamped with the boundary too."
-  (pos-test-with-files root '(("intray.org" . "* DONE finished\n"))
-    (let* ((pos-directory root)
-           (boundary (pos-sweep-boundary (current-time)))
-           (archive (concat "archive/orgmode/" (pos-week-name boundary)
-                            "/intray.org_archive")))
-      (pos-sweep)
-      (should (string-search
-               (concat "ARCHIVE_TIME: "
-                       (format-time-string "%F %a %H:%M" boundary))
-               (pos-test-text root archive))))))
-
-(ert-deftest pos/the-report-names-each-skipped-entry ()
-  "The sweep's report gives the counts, then each skipped heading by name.
-A done entry with open children is the one thing the sweep leaves for
-a person to resolve, so the report says which."
-  (let ((result '(:archived 194 :skipped ("call the plumber" "renew licence"))))
-    (should (equal (pos-test-lines "Sweep 2026-W36: archived 194, skipped 2"
-                                   "  skipped (done, but has open children):"
-                                   "    call the plumber"
-                                   "    renew licence")
-                   (concat (pos-report "2026-W36" result) "\n")))))
-
-(ert-deftest pos/the-report-says-nothing-of-skipping-when-there-is-none ()
-  "With nothing skipped, the report is its one line of counts."
-  (should (equal "Sweep 2026-W36: archived 3, skipped 0"
-                 (pos-report "2026-W36" '(:archived 3 :skipped nil)))))
 
 ;;;; Normalising keywords
 
