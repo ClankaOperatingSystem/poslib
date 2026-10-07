@@ -25,13 +25,12 @@
 ;; open each file to find what is next, scheduled, due or to be
 ;; reviewed.
 ;;
-;; The files are every Org file under the root outside archives, attics
-;; and directories that are hidden or begin with an underscore.  A file
-;; belongs to the deepest scope on its path, else the root.  A scope is
-;; a responsibility, which is a directory whose configuration says
-;; where its projects belong, as doc/pos-directory.txt has it, or a
-;; directory within one named responsibilities; or a project, which is
-;; what is directly within a directory named projects.
+;; The files are the corpus, pos-corpus.el: every Org file the tree's
+;; configurations allow, each belonging to a scope.  A scope is the
+;; root; a responsibility, a directory whose configuration says where
+;; its projects belong, as doc/pos-directory.txt has it; or a project,
+;; what lies in that place.  A directory's name alone makes nothing a
+;; scope.  The tree is walked once for a report.
 ;;
 ;; - `pos-startup-report': the prompts and the views, as text.
 ;; - `pos-startup-view': one view, as text.
@@ -44,15 +43,8 @@
 (require 'org-agenda)
 (require 'seq)
 (require 'pos)
-(require 'pos-tree)
+(require 'pos-corpus)
 (require 'pos-roam)
-
-(defcustom pos-startup-excluded-directories '("archives" "attic")
-  "Names of directories whose Org files are not read.
-Hidden directories and those beginning with an underscore are never
-read."
-  :type '(repeat string)
-  :group 'pos)
 
 (defcustom pos-startup-scheduled-days 14
   "Days, from today, that the scheduled view covers."
@@ -96,96 +88,22 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
 (defvar pos-startup--root nil
   "The root being read, while a view is made.")
 
-(defvar pos-startup--scopes nil
-  "The configured responsibilities beneath `pos-startup--root', sorted.
-Relative to the root, as `pos-startup--configured' returns them.
-Bound while a view is made, so that the tree is walked once for it.")
+(defvar pos-startup--corpus nil
+  "The corpus of `pos-startup--root', bound while a view or report is made.
+The tree is walked once for it; `pos-startup-view' walks when nothing
+has bound this.")
 
 ;;;; Files and scopes
 
-(defun pos-startup--excluded-p (directory)
-  "Return non-nil if the Org files in DIRECTORY are not read."
-  (let ((name (file-name-nondirectory (directory-file-name directory))))
-    (or (member name pos-startup-excluded-directories)
-        (string-prefix-p "_" name)
-        (string-prefix-p "." name))))
+(defun pos-startup--corpus (root)
+  "Return the corpus of ROOT: the one bound for this view, else a fresh walk."
+  (or pos-startup--corpus (pos-corpus root)))
 
-(defun pos-startup-files (root)
-  "Return the Org files read under ROOT, sorted.
-Excluded directories are not entered."
-  (sort (directory-files-recursively
-         root "\\`[^.#].*\\.org\\'" nil
-         (lambda (directory) (not (pos-startup--excluded-p directory)))
-         t)
-        #'string<))
-
-(defun pos-startup--directories (root)
-  "Return the directories under ROOT whose Org files are read."
-  (when (file-directory-p root)
-    (seq-filter (lambda (entry)
-                  (and (file-directory-p entry)
-                       (not (pos-startup--excluded-p entry))))
-                (directory-files-recursively
-                 root "" t
-                 (lambda (directory) (not (pos-startup--excluded-p directory)))
-                 t))))
-
-(defun pos-startup--kind (directory)
-  "Return the kind DIRECTORY's configuration gives it, or nil.
-The kind as `pos-tree-read-config' returns it.  Nil for a directory
-with no configuration, and for one whose configuration is refused,
-which `pos-tree-refused' signals; any other error is signalled."
-  (condition-case nil
-      (when-let* ((file (pos-tree-config-file directory)))
-        (alist-get 'kind
-                   (pos-tree-read-config
-                    (with-temp-buffer
-                      (insert-file-contents (expand-file-name file directory))
-                      (buffer-string)))))
-    (pos-tree-refused nil)))
-
-(defun pos-startup--configured (root)
-  "Return the path of each configured responsibility beneath ROOT.
-A directory whose configuration says where its projects belong, as
-doc/pos-directory.txt has it.  Relative to ROOT, which is not one of
-them, sorted.  A configuration that is refused makes nothing a
-responsibility."
-  (let (found)
-    (dolist (directory (pos-startup--directories root))
-      (when (equal "responsibility" (pos-startup--kind directory))
-        (push (file-relative-name directory root) found)))
-    (sort found #'string<)))
-
-(defun pos-startup--owner (file root configured)
-  "Return (KIND . PATH) for the scope under ROOT that FILE belongs to.
-KIND is the symbol project or responsibility, and PATH is relative to
-ROOT.  The scope is the deepest on FILE's path: one of CONFIGURED,
-the paths of the configured responsibilities relative to ROOT, or
-what a directory named projects or responsibilities holds.  Nil for a
-file that belongs to ROOT itself."
-  (let* ((parts (split-string (file-relative-name file root) "/" t))
-         (owner nil) (index 0))
-    (while (< (1+ index) (length parts))
-      (let ((here (mapconcat #'identity (seq-take parts (1+ index)) "/"))
-            (kind (pcase (nth index parts)
-                    ("projects" 'project)
-                    ("responsibilities" 'responsibility))))
-        (when (member here configured)
-          (setq owner (cons 'responsibility here)))
-        (when kind
-          (setq owner (cons kind (mapconcat #'identity
-                                            (seq-take parts (+ index 2)) "/")))))
-      (setq index (1+ index)))
-    (when (and owner (string-suffix-p ".org" (cdr owner)))
-      (setcdr owner (file-name-sans-extension (cdr owner))))
-    owner))
-
-(defun pos-startup--files-of-kind (kind root)
-  "Return the files under ROOT that belong to a scope of KIND.
-The configured responsibilities are `pos-startup--scopes'."
-  (seq-filter (lambda (file)
-                (eq (car (pos-startup--owner file root pos-startup--scopes)) kind))
-              (pos-startup-files root)))
+(defun pos-startup--files-of-kind (kind)
+  "Return the files of `pos-startup--corpus' that belong to a scope of KIND."
+  (mapcar #'car
+          (seq-filter (lambda (entry) (eq (pos-scope-kind (cdr entry)) kind))
+                      (pos-corpus-entries pos-startup--corpus))))
 
 (defun pos-startup--label ()
   "Return a label naming the scope of the current Org file.
@@ -209,36 +127,28 @@ projects.  A file not named project.org adds its own base name."
        (when (re-search-forward "^:STATUS:[ \t]+\\(\\S-+\\)" end t)
          (match-string-no-properties 1))))))
 
-(defun pos-startup--reviewed-scopes (root)
-  "Return the paths of the scopes under ROOT with a review scheduled.
-That is, holding an open, scheduled heading tagged
-`pos-startup-review-tag'.  The configured responsibilities are
-`pos-startup--scopes'."
+(defun pos-startup--reviewed-scopes ()
+  "Return the paths of the scopes of `pos-startup--corpus' with a review scheduled.
+That is, a project or responsibility holding an open, scheduled
+heading tagged `pos-startup-review-tag'."
   (let (scopes)
-    (dolist (file (pos-startup-files root))
-      (let ((owner (pos-startup--owner file root pos-startup--scopes)))
-        (when owner
-          (with-current-buffer (pos-visit file)
-            (org-map-entries
-             (lambda ()
-               (when (and (member pos-startup-review-tag (org-get-tags nil t))
-                          (org-entry-is-todo-p)
-                          (org-get-scheduled-time (point)))
-                 (cl-pushnew (cdr owner) scopes :test #'string=)))
-             nil 'file)))))
+    (pcase-dolist (`(,file . ,scope) (pos-corpus-entries pos-startup--corpus))
+      (when (memq (pos-scope-kind scope) '(project responsibility))
+        (with-current-buffer (pos-visit file)
+          (org-map-entries
+           (lambda ()
+             (when (and (member pos-startup-review-tag (org-get-tags nil t))
+                        (org-entry-is-todo-p)
+                        (org-get-scheduled-time (point)))
+               (cl-pushnew (pos-scope-path scope) scopes :test #'string=)))
+           nil 'file))))
     scopes))
 
-(defun pos-startup--responsibilities (root)
-  "Return the path of each responsibility beneath ROOT.
-Each of `pos-startup--scopes', the configured ones, and each directory
-directly within a responsibilities/.  Relative to ROOT, sorted."
-  (let ((found (copy-sequence pos-startup--scopes)))
-    (dolist (entry (pos-startup--directories root))
-      (when (string= "responsibilities"
-                     (file-name-nondirectory
-                      (directory-file-name (file-name-directory entry))))
-        (cl-pushnew (file-relative-name entry root) found :test #'string=)))
-    (sort found #'string<)))
+(defun pos-startup--responsibilities ()
+  "Return the path of each responsibility of `pos-startup--corpus', sorted."
+  (sort (mapcar #'pos-scope-path
+                (pos-corpus-scopes-of-kind pos-startup--corpus 'responsibility))
+        #'string<))
 
 ;;;; Views
 
@@ -268,14 +178,14 @@ A link is given as its description."
   (pos-startup--or-none
    (concat title "\n" (mapconcat (lambda (line) (concat "  " line "\n")) lines ""))))
 
-(defun pos-startup--reviews (root)
-  "Return the reviews view of ROOT.
+(defun pos-startup--reviews ()
+  "Return the reviews view of `pos-startup--corpus'.
 Headings tagged `pos-startup-review-tag' that are late or scheduled
 within `pos-startup-review-days', projects' and responsibilities'
 apart."
   (mapconcat
    (lambda (pair)
-     (let* ((org-agenda-files (pos-startup--files-of-kind (car pair) root))
+     (let* ((org-agenda-files (pos-startup--files-of-kind (car pair)))
             (title (format "%s reviews, late or due in the next %d days"
                            (cdr pair) pos-startup-review-days))
             (org-agenda-overriding-header title)
@@ -293,14 +203,14 @@ apart."
    '((project . "Project") (responsibility . "Responsibility"))
    "\n"))
 
-(defun pos-startup--reviews-to-schedule (root)
-  "Return the view of ROOT's scopes that have no review scheduled.
+(defun pos-startup--reviews-to-schedule ()
+  "Return the view of the scopes of `pos-startup--corpus' with no review scheduled.
 Active projects, by `pos-startup-active-statuses', and responsibilities."
-  (let ((reviewed (pos-startup--reviewed-scopes root))
+  (let ((reviewed (pos-startup--reviewed-scopes))
         projects)
-    (dolist (file (pos-startup--files-of-kind 'project root))
+    (dolist (file (pos-startup--files-of-kind 'project))
       (let ((status (pos-startup--file-status file))
-            (scope (cdr (pos-startup--owner file root pos-startup--scopes))))
+            (scope (pos-scope-path (pos-corpus-owner pos-startup--corpus file))))
         (when (and (member status pos-startup-active-statuses)
                    (not (member scope reviewed)))
           (push (format "%-54s %s" scope status) projects))))
@@ -310,14 +220,14 @@ Active projects, by `pos-startup-active-statuses', and responsibilities."
      "\n"
      (pos-startup--list "Responsibilities with a review to be scheduled"
                         (seq-remove (lambda (scope) (member scope reviewed))
-                                    (pos-startup--responsibilities root))))))
+                                    (pos-startup--responsibilities))))))
 
-(defun pos-startup--intray (root)
-  "Return the intray view of ROOT.
+(defun pos-startup--intray ()
+  "Return the intray view of `pos-startup--corpus'.
 Each open item under Unsorted in a file named intray.org: what has
 been captured and not yet placed."
   (let (lines)
-    (dolist (file (pos-startup-files root))
+    (dolist (file (pos-corpus-files pos-startup--corpus))
       (when (string= "intray.org" (file-name-nondirectory file))
         (with-current-buffer (pos-visit file)
           (org-map-entries
@@ -337,8 +247,8 @@ been captured and not yet placed."
 Text: a title, then one line for each item, labelled by its scope."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (pos-startup--root root)
-         (pos-startup--scopes (pos-startup--configured root))
-         (org-agenda-files (pos-startup-files root))
+         (pos-startup--corpus (pos-startup--corpus root))
+         (org-agenda-files (pos-corpus-files pos-startup--corpus))
          (org-todo-keywords pos-todo-keywords)
          ;; Label each line by its scope: the default is the file's
          ;; name, and most are project.org.
@@ -386,9 +296,9 @@ Text: a title, then one line for each item, labelled by its scope."
               '("Due today:        " "Due in %3d days:  " "%3d days overdue: ")))
          (pos-startup--or-none
           (pos-startup--agenda (lambda () (org-agenda-list nil nil 1))))))
-      ("reviews" (pos-startup--reviews root))
-      ("reviews-to-schedule" (pos-startup--reviews-to-schedule root))
-      ("intray" (pos-startup--intray root))
+      ("reviews" (pos-startup--reviews))
+      ("reviews-to-schedule" (pos-startup--reviews-to-schedule))
+      ("intray" (pos-startup--intray))
       ("all"
        (let ((org-agenda-overriding-header "All TODO items"))
          (pos-startup--or-none (pos-startup--agenda #'org-todo-list))))
@@ -403,10 +313,15 @@ VIEWS defaults to `pos-startup-default-views'."
       (unless (member view pos-startup-views)
         (user-error "Unknown view: %s (one of %s)"
                     view (string-join pos-startup-views ", "))))
-    (concat pos-startup-prompts
-            (format "Files read: %d\n" (length (pos-startup-files root)))
-            (mapconcat (lambda (view) (concat "\n" (pos-startup-view root view)))
-                       views ""))))
+    (let* ((root (file-name-as-directory (expand-file-name root)))
+           (pos-startup--corpus (pos-corpus root)))
+      (concat pos-startup-prompts
+              (format "Files read: %d\n" (length (pos-corpus-files pos-startup--corpus)))
+              (mapconcat (lambda (finding)
+                           (format "Not read: %s (%s)\n" (car finding) (cdr finding)))
+                         (pos-corpus-findings pos-startup--corpus) "")
+              (mapconcat (lambda (view) (concat "\n" (pos-startup-view root view)))
+                         views "")))))
 
 (defun pos-startup-batch ()
   "Print the start-up report of `pos-directory'.

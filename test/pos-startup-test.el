@@ -23,9 +23,11 @@
 ;; Run: make test.
 ;;
 ;; Each test is named for the rule it pins, and its docstring says
-;; which entry of the shared tree is there for that rule.  Dates are
-;; relative to today, so the windows the views cover are tested as
-;; they fall.
+;; which entry of the shared tree is there for that rule.  The files
+;; the views read are the corpus, pos-corpus.el, whose rules have tests
+;; of their own; here the tree is on disk and the scopes follow from
+;; its configurations.  Dates are relative to today, so the windows the
+;; views cover are tested as they fall.
 
 ;;; Code:
 
@@ -37,18 +39,26 @@
   "Return the Org date DAYS from today, as <YYYY-MM-DD>."
   (format-time-string "<%Y-%m-%d>" (time-add nil (days-to-time days))))
 
+(defconst pos-startup-test-responsibility "pos: 2\nprojects: projects/\n"
+  "The configuration of a responsibility whose projects lie in projects/.")
+
 (defmacro pos-startup-test-with-tree (&rest body)
   "Evaluate BODY with `root' holding the shared tree of cases.
 Each entry is there for a rule, which the docstring of the test that
-pins it names."
+pins it names.  A scope is known by its configuration alone: the
+root's places its projects in projects/, and each responsibility has
+one of its own."
   (declare (indent 0))
   `(pos-test-with-files root
-       `(;; The root's own files: an intray, and names that are not read.
+       `(;; The root's configuration, which makes projects/ its projects
+         ;; directory; its own files: an intray, and names that are not
+         ;; read.
+         (".pos/config.yaml" . ,pos-startup-test-responsibility)
          ("intray.org" . "* Unsorted\n** NEXT Answer the letter\n** TODO Sort the shelf\n")
          ("notes.txt" . "Not an Org file.\n")
          (".#lock.org" . "* NEXT Locked\n")
          (".dotfile.org" . "* NEXT Dotted\n")
-         ;; Projects at the root: alpha is active with a late review and
+         ;; Projects of the root: alpha is active with a late review and
          ;; a second file; beta is active with items at the edges of the
          ;; scheduled window, an open deadline and a done one, and a done
          ;; review; gamma is complete; delta's STATUS sits on a heading.
@@ -72,23 +82,32 @@ pins it names."
           . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n#+TITLE: Gamma\n")
          ("projects/delta/project.org"
           . "#+TITLE: Delta\n* TODO Plan the delta\n:PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n")
-         ;; Responsibilities by directory name: home has a review in the
-         ;; window and a project of its own; garden has none; kitchen's
-         ;; and cellar's reviews fall at the edges of the reviews window.
+         ;; Responsibilities under responsibilities/, each by its own
+         ;; configuration: home has a review in the window and a project
+         ;; of its own; garden has none; kitchen's and cellar's reviews
+         ;; fall at the edges of the reviews window.  shed has no
+         ;; configuration, so it is a plain directory of the root.
+         ("responsibilities/home/.clanka/config.yml" . ,pos-startup-test-responsibility)
          ("responsibilities/home/index.org"
           . ,(concat "* TODO Review the home :review:\nSCHEDULED: "
                      (pos-startup-test-day 3) "\n"))
+         ("responsibilities/home/projects/roof/project.org"
+          . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Call the roofer\n")
+         ("responsibilities/garden/.clanka/config.yml" . ,pos-startup-test-responsibility)
          ("responsibilities/garden/index.org" . "* TODO Prune the hedge\n")
+         ("responsibilities/kitchen/.clanka/config.yml" . ,pos-startup-test-responsibility)
          ("responsibilities/kitchen/index.org"
           . ,(concat "* TODO Review the kitchen :review:\nSCHEDULED: "
                      (pos-startup-test-day 6) "\n"))
+         ("responsibilities/cellar/.clanka/config.yml" . ,pos-startup-test-responsibility)
          ("responsibilities/cellar/index.org"
           . ,(concat "* TODO Review the cellar :review:\nSCHEDULED: "
                      (pos-startup-test-day 7) "\n"))
-         ("responsibilities/home/projects/roof/project.org"
-          . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Call the roofer\n")
-         ;; Responsibilities by configuration: health, and teeth within it.
-         ("health/.clanka/config.yml" . "pos: 2\nprojects: projects/\n")
+         ("responsibilities/shed/index.org"
+          . ,(concat "* TODO Review the shed :review:\nSCHEDULED: "
+                     (pos-startup-test-day 0) "\n"))
+         ;; Responsibilities elsewhere: health, and teeth within it.
+         ("health/.clanka/config.yml" . ,pos-startup-test-responsibility)
          ("health/intray.org"
           . ,(concat "* Unsorted\n** TODO Book [[https://example.org][the dentist]]\n"
                      "** DONE Buy floss\n"
@@ -96,22 +115,24 @@ pins it names."
                      (pos-startup-test-day 2) "\n"))
          ("health/projects/checkup.org"
           . ":PROPERTIES:\n:STATUS: COMMITTED\n:END:\n* TODO Find the card\n")
-         ("health/teeth/.pos/config.yaml" . "pos: 2\nprojects: projects/\n")
+         ("health/teeth/.pos/config.yaml" . ,pos-startup-test-responsibility)
          ("health/teeth/intray.org" . "* Unsorted\n")
-         ;; Configured directories that are no responsibility: widget's
-         ;; configuration is a project's; twice has two configurations.
+         ;; A project by configuration: widget's says where its
+         ;; methodologies belong; its file has no STATUS.
          ("tools/widget/.clanka/config.yml" . "pos: 2\nmethodologies: methodologies/\n")
          ("tools/widget/notes.org" . "* TODO Oil the widget\n")
-         ("twice/.pos/config.yaml" . "pos: 2\nprojects: projects/\n")
-         ("twice/.clanka/config.yml" . "pos: 2\nprojects: projects/\n")
+         ;; A directory with two configurations, and a file beneath it.
+         ("twice/.pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("twice/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("twice/notes.org" . "* NEXT Twice over\n")
          ;; Directories that are not read, with Org files and
          ;; configurations inside them.
          ("archives/old.org" . "* NEXT Archived\n")
-         ("archives/kept/.pos/config.yaml" . "pos: 2\nprojects: projects/\n")
+         ("archives/kept/.pos/config.yaml" . ,pos-startup-test-responsibility)
          ("projects/alpha/attic/draft.org" . "* NEXT In the attic\n")
          ("_tmp/scratch.org" . "* NEXT Generated\n")
          (".hidden/secret.org" . "* NEXT Hidden\n")
-         (".hidden/.pos/config.yaml" . "pos: 2\nprojects: projects/\n"))
+         (".hidden/.pos/config.yaml" . ,pos-startup-test-responsibility))
      ,@body))
 
 (defun pos-startup-test-lines (text)
@@ -122,17 +143,25 @@ pins it names."
                     (cons (match-string 1 line) (string-trim (match-string 2 line)))))
                 (split-string text "\n"))))
 
+(defun pos-startup-test-scopes (corpus)
+  "Return the scopes of CORPUS as (KIND . PATH), the root left out, sorted."
+  (sort (mapcar (lambda (scope) (cons (pos-scope-kind scope) (pos-scope-path scope)))
+                (cdr (pos-corpus-scopes corpus)))
+        (lambda (a b) (string< (cdr a) (cdr b)))))
+
 ;;;; Files
 
 (ert-deftest pos-startup/archives-attics-hidden-and-underscore-directories-are-not-read ()
   "The files read are the Org files outside the directories set aside.
-Those are archives/ and attic/, by `pos-startup-excluded-directories',
+The root's configuration declares no exclude, so the default list
+`pos-tree-default-exclude' is in force: archives, attic, node_modules,
 and any directory whose name begins with a dot or an underscore.  In
 the tree, archives/old.org, projects/alpha/attic/draft.org,
 _tmp/scratch.org and .hidden/secret.org are inside such directories;
-every other Org file is read."
+every other Org file is read, but twice/notes.org, which lies beneath
+a refused configuration."
   (pos-startup-test-with-tree
-    (should (equal (pos-test-relative (pos-startup-files root) root)
+    (should (equal (pos-test-relative (pos-corpus-files (pos-corpus root)) root)
                    '("health/intray.org"
                      "health/projects/checkup.org"
                      "health/teeth/intray.org"
@@ -147,105 +176,111 @@ every other Org file is read."
                      "responsibilities/home/index.org"
                      "responsibilities/home/projects/roof/project.org"
                      "responsibilities/kitchen/index.org"
+                     "responsibilities/shed/index.org"
                      "tools/widget/notes.org")))))
 
 (ert-deftest pos-startup/a-file-not-named-as-an-org-file-is-not-read ()
   "Only files named *.org, not beginning with a dot or a hash, are read.
-In the tree, notes.txt is not an Org file, .#lock.org is a lock file
-and .dotfile.org is hidden; none is read."
+A symbolic link is not read either, whatever it names.  In the tree,
+notes.txt is not an Org file, .#lock.org is a lock file and
+.dotfile.org is hidden; linked.org, made here, links to the intray."
   (pos-startup-test-with-tree
-    (let ((files (pos-test-relative (pos-startup-files root) root)))
-      (dolist (name '("notes.txt" ".#lock.org" ".dotfile.org"))
+    (make-symbolic-link "intray.org" (expand-file-name "linked.org" root))
+    (let ((files (pos-test-relative (pos-corpus-files (pos-corpus root)) root)))
+      (dolist (name '("notes.txt" ".#lock.org" ".dotfile.org" "linked.org"))
         (ert-info ((format "%s is not read" name))
           (should-not (member name files)))))))
 
 ;;;; Scopes
 
-(ert-deftest pos-startup/a-configured-directory-is-a-responsibility ()
-  "A responsibility is a directory whose configuration places its projects.
-In the tree, health/.clanka/config.yml and health/teeth/.pos/config.yaml
-each say where projects belong, so health and health/teeth are
-responsibilities, one inside the other.  tools/widget's configuration
-says where methodologies belong, a project's, so it is none.  The root
-itself is never one of them."
+(ert-deftest pos-startup/a-scope-is-known-by-its-configuration-alone ()
+  "A responsibility is a configured directory; a project lies in its projects.
+A directory's name means nothing by itself.  In the tree, health,
+health/teeth and the four under responsibilities/ each hold a
+configuration that says where their projects belong, so each is a
+responsibility; responsibilities/shed holds none, so it is a plain
+directory of the root.  What lies directly in a projects directory is
+a project, as is tools/widget, whose configuration says where its
+methodologies belong."
   (pos-startup-test-with-tree
-    (should (equal (pos-startup--configured root) '("health" "health/teeth")))))
+    (let ((corpus (pos-corpus root)))
+      (should (eq 'root (pos-scope-kind (car (pos-corpus-scopes corpus)))))
+      (should (equal (pos-startup-test-scopes corpus)
+                     '((responsibility . "health")
+                       (project . "health/projects/checkup")
+                       (responsibility . "health/teeth")
+                       (project . "projects/alpha")
+                       (project . "projects/beta")
+                       (project . "projects/delta")
+                       (project . "projects/gamma")
+                       (responsibility . "responsibilities/cellar")
+                       (responsibility . "responsibilities/garden")
+                       (responsibility . "responsibilities/home")
+                       (project . "responsibilities/home/projects/roof")
+                       (responsibility . "responsibilities/kitchen")
+                       (project . "tools/widget")))))))
 
-(ert-deftest pos-startup/a-refused-configuration-makes-no-responsibility ()
-  "A directory whose configuration is refused is no responsibility.
+(ert-deftest pos-startup/a-refused-configuration-is-a-finding-and-a-leaf ()
+  "A directory whose configuration is refused is a finding, and is not entered.
 In the tree, twice/ holds both .pos/config.yaml and .clanka/config.yml,
-which `pos-tree-config-file' refuses as two configurations; the
-refusal is caught and twice is not a responsibility."
+which is refused as two configurations; twice is no scope, its
+notes.org is not read, and the corpus records the refusal."
   (pos-startup-test-with-tree
-    (should (file-directory-p (expand-file-name "twice" root)))
-    (should-not (member "twice" (pos-startup--configured root)))))
+    (let ((corpus (pos-corpus root)))
+      (should-not (member "twice" (mapcar #'pos-scope-path (pos-corpus-scopes corpus))))
+      (should-not (pos-corpus-owner corpus (expand-file-name "twice/notes.org" root)))
+      (should (equal `(("twice" . ,(concat "config-refused: two-configurations: "
+                                           "The node has two configurations")))
+                     (pos-corpus-findings corpus))))))
 
 (ert-deftest pos-startup/an-error-that-is-not-a-refusal-is-signalled ()
   "Only a refusal is caught when configurations are read; the rest propagate.
 A refusal is `pos-tree-refused'.  Here reading any configuration
-signals a plain error instead, and finding the responsibilities
-signals it on."
+signals a plain error instead, and the report signals it on."
   (pos-startup-test-with-tree
     (cl-letf (((symbol-function 'pos-tree-read-config)
                (lambda (_text) (error "The configuration cannot be read"))))
-      (should-error (pos-startup--configured root) :type 'error))))
+      (should (equal '(error "The configuration cannot be read")
+                     (should-error (pos-startup-report root) :type 'error))))))
 
 (ert-deftest pos-startup/a-configuration-in-a-directory-not-read-is-not-seen ()
   "A configuration inside a directory that is not read makes no scope.
 In the tree, archives/kept/.pos/config.yaml and .hidden/.pos/config.yaml
 would each make a responsibility were they read; archives/ and .hidden/
-are not entered, so neither is one."
+are not entered, so neither is one, and neither is a finding."
   (pos-startup-test-with-tree
-    (let ((configured (pos-startup--configured root)))
-      (should-not (member "archives/kept" configured))
-      (should-not (member ".hidden" configured)))))
+    (let* ((corpus (pos-corpus root))
+           (paths (append (mapcar #'pos-scope-path (pos-corpus-scopes corpus))
+                          (mapcar #'car (pos-corpus-findings corpus)))))
+      (should-not (member "archives/kept" paths))
+      (should-not (member ".hidden" paths)))))
 
 (ert-deftest pos-startup/the-owner-is-the-deepest-scope-on-the-path ()
-  "A file belongs to the deepest scope its path names, else to the root.
-A scope is a responsibility, which is a directory whose configuration
-says where its projects belong or, today, a directory directly inside
-one named responsibilities; or a project, which is what lies directly
-inside a directory named projects.  A scope's path is given without
-its .org, so a file directly inside projects/ or responsibilities/ is
-today a scope of its own name.  Where a configured directory is itself
-named projects, today the projects clause wins: what it holds are
-projects, and the configuration is not seen.  No disk is read: the
-configured responsibilities are given, relative to the root."
-  (let ((root "/r/"))
-    (pcase-dolist (`(,path ,configured ,expected)
-                   '(;; The root owns what no scope claims.
-                     ("intray.org" () nil)
-                     ("tools/widget/notes.org" ("health" "health/teeth") nil)
-                     ;; What is directly inside projects/ is a project,
-                     ;; and owns everything beneath it.
-                     ("projects/alpha/project.org" () (project . "projects/alpha"))
-                     ("projects/alpha/notes/more.org" () (project . "projects/alpha"))
-                     ("projects/solo.org" () (project . "projects/solo"))
-                     ;; Today, what is directly inside responsibilities/
-                     ;; is a responsibility.
-                     ("responsibilities/home/index.org"
-                      () (responsibility . "responsibilities/home"))
-                     ("responsibilities/foo.org"
-                      () (responsibility . "responsibilities/foo"))
-                     ("responsibilities/home/projects/roof/project.org"
-                      () (project . "responsibilities/home/projects/roof"))
-                     ;; A configured directory, and one nested in another.
-                     ("health/intray.org" ("health" "health/teeth")
-                      (responsibility . "health"))
-                     ("health/teeth/intray.org" ("health" "health/teeth")
-                      (responsibility . "health/teeth"))
-                     ("health/projects/checkup.org" ("health" "health/teeth")
-                      (project . "health/projects/checkup"))
-                     ;; A configured directory named projects: the
-                     ;; projects clause wins today.
-                     ("projects/alpha/project.org" ("projects")
-                      (project . "projects/alpha"))
-                     ("projects/notes.org" ("projects") (project . "projects/notes"))
-                     ("health/projects/checkup.org" ("health" "health/projects")
-                      (project . "health/projects/checkup"))))
-      (ert-info ((format "%s, with %S configured" path configured))
-        (should (equal (pos-startup--owner (concat root path) root configured)
-                       expected))))))
+  "A file belongs to the deepest scope its path lies in, else to the root.
+The owner is `pos-corpus-owner', whose rules pos-corpus-test.el pins
+on listings; here they are shown on the tree.  A one-file project's
+path is the file's without its .org.  In the tree, roof lies in home's
+projects directory, so its file is roof's, not home's; shed's file is
+the root's, since responsibilities/shed has no configuration; and a
+file that is not read has no owner."
+  (pos-startup-test-with-tree
+    (let ((corpus (pos-corpus root)))
+      (pcase-dolist (`(,path ,kind ,scope)
+                     '(("intray.org" root ".")
+                       ("responsibilities/shed/index.org" root ".")
+                       ("projects/alpha/notes.org" project "projects/alpha")
+                       ("health/projects/checkup.org" project "health/projects/checkup")
+                       ("tools/widget/notes.org" project "tools/widget")
+                       ("responsibilities/home/index.org"
+                        responsibility "responsibilities/home")
+                       ("responsibilities/home/projects/roof/project.org"
+                        project "responsibilities/home/projects/roof")
+                       ("health/teeth/intray.org" responsibility "health/teeth")))
+        (ert-info ((format "the owner of %s" path))
+          (let ((owner (pos-corpus-owner corpus (expand-file-name path root))))
+            (should (eq kind (pos-scope-kind owner)))
+            (should (equal scope (pos-scope-path owner))))))
+      (should-not (pos-corpus-owner corpus (expand-file-name "archives/old.org" root))))))
 
 (ert-deftest pos-startup/a-status-on-a-heading-is-not-the-files-status ()
   "A file's STATUS is the property it has before its first heading.
@@ -278,8 +313,8 @@ its description."
   "The scheduled view lists scheduled items, not reviews or deadlines.
 Reviews and deadlines have views of their own.  In the tree, beta's
 Book the room is scheduled in the window; its deadline, File the
-return, and the reviews of alpha, home, health and kitchen are not
-listed."
+return, and the reviews of alpha, home, health, kitchen and shed are
+not listed."
   (pos-startup-test-with-tree
     (let ((text (pos-startup-view root "scheduled")))
       (should (string-match-p "Book the room" text))
@@ -315,9 +350,11 @@ In the tree, beta's Pay the bill is DONE with a deadline on day 10."
 (ert-deftest pos-startup/reviews-are-listed-late-or-due-and-apart-by-kind ()
   "The reviews view lists open reviews, projects' and responsibilities' apart.
 A review is a heading tagged `pos-startup-review-tag'; it is listed
-when late or scheduled in the window.  In the tree, alpha's review is
-three days late, and home's and health's are in the window; beta's
-Old review is DONE, so not listed."
+when late or scheduled in the window, and when its file belongs to a
+project or a responsibility.  In the tree, alpha's review is three
+days late, and home's and health's are in the window; beta's Old
+review is DONE, so not listed; shed's review is due today, but its
+file is the root's, so it is not listed."
   (pos-startup-test-with-tree
     (let* ((text (pos-startup-view root "reviews"))
            (parts (split-string text "\n\n" t)))
@@ -331,7 +368,8 @@ Old review is DONE, so not listed."
       (should (string-match-p "responsibilities/home/index +Scheduled: +TODO Review the home"
                               (nth 1 parts)))
       (should (string-match-p "health/intray +Scheduled: +TODO Review health"
-                              (nth 1 parts))))))
+                              (nth 1 parts)))
+      (should-not (string-match-p "Review the shed" text)))))
 
 (ert-deftest pos-startup/the-reviews-window-is-today-and-the-days-after-it ()
   "The reviews view covers `pos-startup-review-days' days from today.
@@ -349,9 +387,10 @@ A project is active when its file's STATUS is one of
 `pos-startup-active-statuses'; every responsibility counts.  A review
 scheduled on any date, in the window or beyond it, is a review.  In
 the tree, beta, checkup and roof are active without one; gamma is
-complete and delta has no status.  Of the responsibilities, health/teeth
-and garden have none; home, health and kitchen have one in the window,
-and cellar one beyond it."
+complete, delta has no status and tools/widget's file has none.  Of
+the responsibilities, health/teeth and garden have none; home, health
+and kitchen have one in the window, and cellar one beyond it.  shed
+is no responsibility, so it is not named."
   (pos-startup-test-with-tree
     (let ((parts (split-string (pos-startup-view root "reviews-to-schedule") "\n\n" t)))
       (should (equal (mapcar #'car (pos-startup-test-lines (nth 0 parts)))
@@ -390,12 +429,13 @@ The tree here holds one empty intray and nothing else."
 (ert-deftest pos-startup/the-report-gives-the-prompts-then-the-default-views ()
   "The report is the prompts, the count of files read, then the views asked.
 The default views are `pos-startup-default-views', which leave out
-all; asked for by name, all is given instead.  The tree has 15 files
-that are read."
+all; asked for by name, all is given instead.  The tree has 16 files
+that are read.  In the all view, widget's item is labelled by its
+path, tools/widget/notes."
   (pos-startup-test-with-tree
     (let ((text (pos-startup-report root)))
       (should (string-prefix-p pos-startup-prompts text))
-      (should (string-match-p "^Files read: 15$" text))
+      (should (string-match-p "^Files read: 16$" text))
       (dolist (title '("NEXT items" "Scheduled items, next 14 days" "Deadlines, all open"
                        "Project reviews, late" "Projects with a review to be scheduled"
                        "Intray, to be placed"))
@@ -405,7 +445,33 @@ that are read."
     (let ((text (pos-startup-report root '("all"))))
       (should (string-match-p "^All TODO items" text))
       (should (string-match-p "Prune the hedge" text))
+      (should (string-match-p "^  tools/widget/notes +TODO Oil the widget" text))
       (should-not (string-match-p "^NEXT items" text)))))
+
+(ert-deftest pos-startup/the-report-names-what-was-not-read ()
+  "After the count of files read, the report names each refused configuration.
+One line each: the directory, relative to the root, and the refusal.
+In the tree, twice/ holds two configurations."
+  (pos-startup-test-with-tree
+    (should (string-match-p
+             (concat "^Files read: 16\n"
+                     "Not read: twice (config-refused: two-configurations: "
+                     "The node has two configurations)\n")
+             (pos-startup-report root)))))
+
+(ert-deftest pos-startup/the-report-walks-the-tree-once ()
+  "The report walks the tree once for all its views; a view alone walks itself.
+`pos-startup-report' binds the corpus, and each `pos-startup-view' it
+makes reads that; called by itself, a view walks."
+  (pos-startup-test-with-tree
+    (let* ((walks 0)
+           (walk (symbol-function 'pos-corpus)))
+      (cl-letf (((symbol-function 'pos-corpus)
+                 (lambda (root) (cl-incf walks) (funcall walk root))))
+        (pos-startup-report root)
+        (should (= 1 walks))
+        (pos-startup-view root "next")
+        (should (= 2 walks))))))
 
 (ert-deftest pos-startup/an-unknown-view-is-refused-before-anything-is-read ()
   "A view not in `pos-startup-views' is a user error, before any file is read.
