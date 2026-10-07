@@ -22,12 +22,13 @@
 
 ;;; Commentary:
 
-;; The commands over a tree's Org files: the weekly sweep of done items
-;; to dated archives; the lint for duplicate and malformed tasks; and
-;; the plans, reviewed then applied, that refile the intray and resolve
-;; duplicates.  Each reads the corpus, pos-corpus.el: every Org file
-;; the tree's configurations allow, and writes only the files of the
-;; root's own repository.  The same from M-x and batch Emacs.
+;; The commands over a tree's Org files: the lint for duplicate and
+;; malformed tasks, and the plans, reviewed then applied, that refile
+;; the intray and resolve duplicates; the root and its settings, which
+;; pos-sweep.el and the others share.  Each reads the corpus,
+;; pos-corpus.el: every Org file the tree's configurations allow, and
+;; writes only the files of the root's own repository.  The same from
+;; M-x and batch Emacs.
 
 ;;; Code:
 
@@ -43,33 +44,12 @@
   :group 'org
   :prefix "pos-")
 
-;;;; Weeks
-
-(defun pos-week-name (time)
-  "Return the ISO 8601 week name of TIME, e.g. \"2026-W36\"."
-  (format-time-string "%G-W%V" time))
-
-(defconst pos-sweep-weekday 0
-  "Sweep weekday; 0 is Sunday.")
-
-(defconst pos-sweep-hour 23
-  "Sweep hour, local time.")
-
-(defun pos-sweep-boundary (now)
-  "Return the latest sweep boundary at or before NOW."
-  (let* ((d (decode-time now))
-         (days-since (mod (- (decoded-time-weekday d) pos-sweep-weekday) 7))
-         ;; Boundary day, before the hour: last week's.
-         (too-early (and (= days-since 0)
-                         (< (decoded-time-hour d) pos-sweep-hour))))
-    (encode-time
-     (list 0 0 pos-sweep-hour
-           (- (decoded-time-day d) days-since (if too-early 7 0))
-           (decoded-time-month d)
-           (decoded-time-year d)
-           nil -1 nil))))
-
 ;;;; Files and paths
+
+(defconst pos-sweep-default-path "archive/orgmode"
+  "Where a sweep writes beneath a scope that names no path.
+One directory per week, one archive file per source, as
+doc/pos-directory.txt has it.")
 
 (defun pos-files (root &optional writable)
   "Return the Org files of the tree at ROOT: its corpus, sorted.
@@ -81,18 +61,6 @@ it, which that repository's own configuration governs."
         (seq-filter (lambda (file) (pos-corpus-writable-p corpus file))
                     (pos-corpus-files corpus))
       (pos-corpus-files corpus))))
-
-(defcustom pos-archive-directory "archive/orgmode"
-  "Archive directory, relative to the root; one subdirectory per week."
-  :type 'string
-  :group 'pos)
-
-(defun pos-archive-file (root file week)
-  "Return the WEEK archive for FILE under ROOT.
-Keeps FILE's path relative to ROOT; suffix _archive."
-  (expand-file-name
-   (concat (file-relative-name file root) "_archive")
-   (expand-file-name week (expand-file-name pos-archive-directory root))))
 
 ;;;; Keywords
 
@@ -114,64 +82,7 @@ as it is.  A buffer already visiting FILE is returned as it is."
   (let ((org-todo-keywords pos-todo-keywords))
     (find-file-noselect file)))
 
-;;;; Archiving
-
-(defun pos--open-descendant-p ()
-  "Return non-nil if the entry at point has an open TODO below it."
-  (save-excursion
-    (let ((end (save-excursion (org-end-of-subtree t)))
-          (case-fold-search nil))
-      (re-search-forward org-not-done-heading-regexp end t))))
-
-(defun pos--fix-last-archived (archive-buffer relative-file time)
-  "Stamp the last entry in ARCHIVE-BUFFER with RELATIVE-FILE and TIME.
-Replaces the absolute path and wall clock, so any checkout writes
-the same bytes."
-  (with-current-buffer archive-buffer
-    (save-excursion
-      (goto-char (point-max))
-      (org-back-to-heading t)
-      (while (org-up-heading-safe))
-      (org-entry-put (point) "ARCHIVE_FILE" relative-file)
-      (org-entry-put (point) "ARCHIVE_TIME"
-                     (format-time-string
-                      (org-time-stamp-format 'with-time 'no-brackets)
-                      time)))))
-
-(defun pos-archive-done-in-file (root file week time)
-  "Archive done entries in FILE under ROOT to WEEK's archive, stamped TIME.
-Skip done entries with open children.
-Return (:archived COUNT :skipped HEADINGS)."
-  (let* ((archive-file (pos-archive-file root file week))
-         (relative-file (file-relative-name file root))
-         (archived 0)
-         (skipped nil)
-         (org-archive-location (concat archive-file "::"))
-         (make-backup-files nil)
-         (org-archive-file-header-format
-          (format "\nArchived entries from file %s\n\n" relative-file)))
-    (make-directory (file-name-directory archive-file) t)
-    (with-current-buffer (pos-visit file)
-      (org-map-entries
-       (lambda ()
-         (when (org-entry-is-done-p)
-           (if (pos--open-descendant-p)
-               (push (org-get-heading t t t t) skipped)
-             ;; Subtree gone; resume here.
-             (setq org-map-continue-from (point))
-             (org-archive-subtree)
-             (pos--fix-last-archived
-              (pos-visit archive-file) relative-file time)
-             (setq archived (1+ archived)))))
-       nil 'file)
-      (save-buffer))
-    ;; org-archive-subtree saves the archive only from the agenda.
-    (when (> archived 0)
-      (with-current-buffer (pos-visit archive-file)
-        (save-buffer)))
-    (list :archived archived :skipped (nreverse skipped))))
-
-;;;; The sweep
+;;;; The root and its settings
 
 ;; Default: parent of lisp/.
 (defcustom pos-directory
@@ -190,7 +101,9 @@ Return (:archived COUNT :skipped HEADINGS)."
 (defconst pos-retired-settings
   '((pos-pillars . "the files are every Org file the configuration allows")
     (pos-startup-excluded-directories
-     . "the directories not read are declared under exclude in the configuration"))
+     . "the directories not read are declared under exclude in the configuration")
+    (pos-archive-directory
+     . "where a scope's done items go is declared by its archive entry's sweep and path"))
   "Settings pos-config.el once set, each with what replaced it.")
 
 (defun pos-load-config (&optional root)
@@ -202,40 +115,6 @@ reported, and ignored."
       (when (boundp setting)
         (message "%s sets %s, which is no longer read: %s"
                  pos-config-file setting replacement)))))
-
-(defun pos-report (week result)
-  "Return a report of RESULT, a sweep of WEEK, naming skipped entries."
-  (let ((skipped (plist-get result :skipped)))
-    (concat
-     (format "Sweep %s: archived %d, skipped %d"
-             week (plist-get result :archived) (length skipped))
-     (when skipped
-       (concat "\n  skipped (done, but has open children):\n"
-               (mapconcat (lambda (heading) (concat "    " heading))
-                          skipped "\n"))))))
-
-(defun pos-sweep (&optional week time)
-  "Archive done entries in the tree's files to WEEK's archive, stamped TIME.
-Both default to the latest sweep boundary.  The files are those of
-the corpus a command may write.  Return (:archived COUNT :skipped
-HEADINGS)."
-  (interactive)
-  (let* ((time (or time (pos-sweep-boundary (current-time))))
-         (week (or week (pos-week-name time)))
-         (root (file-name-as-directory pos-directory))
-         (archived 0)
-         (skipped nil))
-    (dolist (file (pos-files root t))
-      (let ((result (pos-archive-done-in-file root file week time)))
-        (setq archived (+ archived (plist-get result :archived)))
-        (setq skipped (append skipped (plist-get result :skipped)))
-        (message "%s: archived %d, skipped %d"
-                 (file-relative-name file root)
-                 (plist-get result :archived)
-                 (length (plist-get result :skipped)))))
-    (let ((result (list :archived archived :skipped skipped)))
-      (message "%s" (pos-report week result))
-      result)))
 
 ;;;; Normalising keywords
 
@@ -276,6 +155,13 @@ The files are those of the corpus a command may write."
     (list :lines-removed lines-removed :respelled respelled)))
 
 ;;;; Lint
+
+(defun pos--open-descendant-p ()
+  "Return non-nil if the entry at point has an open TODO below it."
+  (save-excursion
+    (let ((end (save-excursion (org-end-of-subtree t)))
+          (case-fold-search nil))
+      (re-search-forward org-not-done-heading-regexp end t))))
 
 (defun pos--map-headings (file function)
   "Call FUNCTION at each heading of FILE; collect non-nil results."
@@ -349,7 +235,7 @@ question."
   (let ((covered (pos-files root))
         (excluded (mapcar (lambda (dir)
                             (file-name-as-directory (expand-file-name dir root)))
-                          (cons pos-archive-directory pos-prose-directories))))
+                          (cons pos-sweep-default-path pos-prose-directories))))
     (seq-remove (lambda (file)
                   (or (file-symlink-p file)
                       (seq-some (lambda (dir) (string-prefix-p dir file)) excluded)))
