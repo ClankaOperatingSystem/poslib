@@ -608,16 +608,51 @@ Return (EVENT-FILE . ROOT)."
 (defvar pos-seal-claims-function #'pos-seal-claims
   "The function a seal's claims are made with, given its plan and hash.")
 
+(defvar pos-seal-tool-directory
+  (file-name-directory
+   (directory-file-name
+    (file-name-directory (or load-file-name buffer-file-name default-directory))))
+  "The directory this library is installed in: the parent of its Lisp directory.
+Its COMMIT file, or the repository git reads there, says which commit
+the tool is at.")
+
+(defun pos-seal-tool-commit (&optional directory)
+  "Return the commit the tool installed in DIRECTORY is at, or nil.
+DIRECTORY defaults to `pos-seal-tool-directory'.  It is read from the
+COMMIT file an image writes beside the Lisp directory, else asked of git
+where DIRECTORY is a repository; nil where neither says."
+  (let* ((directory (expand-file-name (or directory pos-seal-tool-directory)))
+         (file (expand-file-name "COMMIT" directory)))
+    (cond
+     ((file-readable-p file)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (let ((commit (string-trim (buffer-string))))
+          (and (string-match-p "\\`[0-9a-f]+\\'" commit) commit))))
+     ((file-directory-p (expand-file-name ".git" directory))
+      (let ((process-environment
+             (cons (concat "GIT_CEILING_DIRECTORIES="
+                           (directory-file-name (file-name-directory (directory-file-name directory))))
+                   process-environment)))
+        (with-temp-buffer
+          (and (eq 0 (ignore-errors
+                       (process-file "git" nil (list t nil) nil "-C" directory
+                                     "rev-parse" "--verify" "-q" "HEAD")))
+               (let ((commit (string-trim-right (buffer-string) "\n")))
+                 (and (not (string-empty-p commit)) commit)))))))))
+
 (defun pos-seal-claims (plan expected)
   "Return the claims of this client about the seal of PLAN.
 An alist of strings by name, for a keeper to record: the plan's hash
-EXPECTED, where there was a plan, and the tool, and of the scope's
-repository, where there is one and git reads it, the scope's path, the
-commit and branch it is at, whether its working tree is dirty, and each
-remote's URL less any user and password."
+EXPECTED, where there was a plan, the tool and the commit it is at, where
+it knows it, and of the scope's repository, where there is one and git
+reads it, the scope's path, the commit and branch it is at, whether its
+working tree is dirty, and each remote's URL less any user and password."
   (let* ((scope (file-name-directory (alist-get 'archive plan)))
          (root (locate-dominating-file scope ".git"))
-         (claims `(,@(when expected `(("plan" . ,expected))) ("tool" . "poslib"))))
+         (tool-commit (pos-seal-tool-commit))
+         (claims `(,@(when expected `(("plan" . ,expected))) ("tool" . "poslib")
+                   ,@(when tool-commit `(("tool_commit" . ,tool-commit))))))
     (when root
       (setq root (directory-file-name (expand-file-name root)))
       (let* ((process-environment

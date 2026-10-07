@@ -547,7 +547,10 @@ as the plan says: by that keeper, or on disk for a plan without the key.
 With each event the client sends its claims, strings by name, which a
 keeper records and does not verify:
 
-- =plan=: the plan's hash; =tool=: =poslib= or =pyposlib=;
+- =plan=: the plan's hash; =tool=: =poslib= or =pyposlib=; =tool_commit=:
+  the commit the tool is at, where it knows it: from the =COMMIT= file an
+  image writes at the tool's root, else from git where the tool is a
+  checkout;
 - of the scope's repository, where there is one and git reads it:
   =scope=, the scope's path in it; =commit= and =branch=, where its
   =HEAD= is; =dirty=, =true= or =false=, whether git reports anything

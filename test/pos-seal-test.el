@@ -699,12 +699,38 @@ ledger and nothing is sent."
         (should (stringp (alist-get 'kept report)))
         (should (eq :null (alist-get 'keeper report)))))))
 
+(ert-deftest pos-seal/the-tool-commit-is-the-image-s-else-git-s-else-unknown ()
+  "An image writes COMMIT beside the lisp directory; a checkout is asked
+of git; a plain copy of the files knows no commit."
+  (let ((dir (make-temp-file "pos-tool" t)))
+    (unwind-protect
+        (let ((git (lambda (&rest args)
+                     (with-temp-buffer
+                       (should (eq 0 (apply #'process-file "git" nil t nil "-C" dir
+                                            "-c" "user.name=A" "-c" "user.email=a@example.org"
+                                            args)))
+                       (string-trim (buffer-string))))))
+          (should-not (pos-seal-tool-commit dir))
+          (funcall git "init" "-q")
+          (should-not (pos-seal-tool-commit dir))
+          (with-temp-file (expand-file-name "README" dir) (insert "pos\n"))
+          (funcall git "add" "README")
+          (funcall git "commit" "-q" "-m" "Begin")
+          (should (equal (funcall git "rev-parse" "HEAD") (pos-seal-tool-commit dir)))
+          (with-temp-file (expand-file-name "COMMIT" dir)
+            (insert "eac849ed9d3162cf11017715f771458b1d4e60b5\n"))
+          (should (equal "eac849ed9d3162cf11017715f771458b1d4e60b5" (pos-seal-tool-commit dir)))
+          (with-temp-file (expand-file-name "COMMIT" dir) (insert "not a commit\n"))
+          (should-not (pos-seal-tool-commit dir)))
+      (delete-directory dir t))))
+
 (ert-deftest pos-seal/the-claims-say-where-a-seal-came-from ()
-  "The plan and the tool, and of a repository git reads: the scope, the
-commit and branch, whether the tree is dirty, and each remote without
-the user and password its URL may hold."
+  "The plan, the tool and its commit, and of a repository git reads: the
+scope, the commit and branch, whether the tree is dirty, and each remote
+without the user and password its URL may hold."
   (pos-fixture-with (pos-fixture "ledger" "seal-kept-first") dir
     (let* ((root (file-truename dir))
+           (pos-seal-tool-directory (expand-file-name "tool" root))
            (git (lambda (&rest args)
                   (with-temp-buffer
                     (should (eq 0 (apply #'process-file "git" nil t nil "-C" root
@@ -717,6 +743,14 @@ the user and password its URL may hold."
       (pos-ledger-test-same
        '(("plan" . "the hash") ("tool" . "poslib") ("scope" . "projects/a"))
        (pos-seal-claims (funcall plan) "the hash"))
+      (make-directory pos-seal-tool-directory)
+      (with-temp-file (expand-file-name "COMMIT" pos-seal-tool-directory)
+        (insert "eac849ed9d3162cf11017715f771458b1d4e60b5\n"))
+      (pos-ledger-test-same
+       '(("plan" . "the hash") ("tool" . "poslib")
+         ("tool_commit" . "eac849ed9d3162cf11017715f771458b1d4e60b5")
+         ("scope" . "projects/a"))
+       (pos-seal-claims (funcall plan) "the hash"))
       (delete-directory (expand-file-name ".git" root) t)
       (funcall git "init" "-q" "-b" "trunk")
       (funcall git "remote" "add" "origin" "https://someone:secret@forge.example/some/one.git")
@@ -724,7 +758,9 @@ the user and password its URL may hold."
       (funcall git "add" ".pos")
       (funcall git "commit" "-q" "-m" "Configure")
       (pos-ledger-test-same
-       `(("plan" . "the hash") ("tool" . "poslib") ("scope" . "projects/a")
+       `(("plan" . "the hash") ("tool" . "poslib")
+         ("tool_commit" . "eac849ed9d3162cf11017715f771458b1d4e60b5")
+         ("scope" . "projects/a")
          ("commit" . ,(funcall git "rev-parse" "HEAD")) ("branch" . "trunk")
          ("dirty" . "true")
          ("remote.origin" . "https://forge.example/some/one.git")
