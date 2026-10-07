@@ -199,7 +199,7 @@ projects.  A file not named project.org adds its own base name."
 
 (defun pos-startup--file-status (file)
   "Return the STATUS property FILE has before its first heading, or nil."
-  (with-current-buffer (find-file-noselect file)
+  (with-current-buffer (pos-visit file)
     (org-with-wide-buffer
      (goto-char (point-min))
      (let ((end (save-excursion
@@ -215,7 +215,7 @@ That is, holding an open, scheduled heading tagged
     (dolist (file (pos-startup-files root))
       (let ((owner (pos-startup--owner file root)))
         (when owner
-          (with-current-buffer (find-file-noselect file)
+          (with-current-buffer (pos-visit file)
             (org-map-entries
              (lambda ()
                (when (and (member pos-startup-review-tag (org-get-tags nil t))
@@ -316,7 +316,7 @@ been captured and not yet placed."
   (let (lines)
     (dolist (file (pos-startup-files root))
       (when (string= "intray.org" (file-name-nondirectory file))
-        (with-current-buffer (find-file-noselect file)
+        (with-current-buffer (pos-visit file)
           (org-map-entries
            (lambda ()
              (when (and (org-entry-is-todo-p)
