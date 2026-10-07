@@ -4,7 +4,7 @@
 
 ;; Author: Chris Gough
 ;; Keywords: outlines, convenience
-;; Package-Requires: ((emacs "29.1") (markdown-mode "2.6") (yaml "1.2.4"))
+;; Package-Requires: ((emacs "29.1") (markdown-mode "2.6") (yaml "1.2.4") (org-roam "2.3.1"))
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
 ;; This program is free software: you can redistribute it and/or modify
@@ -103,6 +103,7 @@ Keeps FILE's path relative to ROOT; suffix _archive."
 (require 'org-archive)
 (require 'seq)
 (require 'cl-lib)
+(require 'pos-roam)
 
 (setq org-todo-keywords pos-todo-keywords)
 
@@ -519,15 +520,23 @@ Return (FILE LINE HEADING) for each."
 ;;;; Duplicate tasks
 
 (defun pos--subtree-body ()
-  "Return the subtree at point below its heading, trimmed."
-  (string-trim
-   (buffer-substring-no-properties
-    (line-beginning-position 2)
-    (save-excursion (org-end-of-subtree t t) (point)))))
+  "Return the subtree at point below its heading, trimmed.
+A property drawer is not body: two copies alike but for their IDs say
+the same thing."
+  (save-excursion
+    (let* ((end (save-excursion (org-end-of-subtree t t) (point)))
+           (start (min end (line-beginning-position 2)))
+           (planning (progn (goto-char start)
+                            (when (looking-at-p org-planning-line-re) (forward-line 1))
+                            (buffer-substring-no-properties start (point))))
+           (rest (progn (when (looking-at org-property-drawer-re)
+                          (goto-char (min end (1+ (match-end 0)))))
+                        (buffer-substring-no-properties (point) end))))
+      (string-trim (concat planning rest)))))
 
 (defun pos--task-entries (root)
   "Return a plist per keyword heading in covered files under ROOT.
-Keys: :key :heading :file :line :parent :body."
+Keys: :key :heading :file :line :parent :body :id."
   (mapcan (lambda (file)
             (pos--map-headings
              file
@@ -539,7 +548,8 @@ Keys: :key :heading :file :line :parent :body."
                          :file file
                          :line (line-number-at-pos)
                          :parent (car (last (org-get-outline-path)))
-                         :body (pos--subtree-body)))))))
+                         :body (pos--subtree-body)
+                         :id (org-entry-get nil "ID")))))))
           (pos-org-files root)))
 
 (defun pos-dedupe-groups (root)
@@ -571,29 +581,56 @@ two pillar files: ?."
                     entry))
             group)))
 
+(defun pos-dedupe--referrer-lines (root)
+  "Return a function of an ID giving \"FILE:LINE\" per link to it under ROOT.
+Call within `pos-roam-with-index'."
+  (lambda (id)
+    (mapcar (lambda (referrer)
+              (pcase-let ((`(,file . ,pos) referrer))
+                ;; The index names files by their true paths.
+                (format "%s:%d" (file-relative-name file (file-truename root))
+                        (with-current-buffer (pos-roam-buffer file)
+                          (line-number-at-pos pos)))))
+            (pos-roam-referrers id))))
+
 (defun pos-dedupe-plan (root &optional groups)
   "Return the dedupe plan for ROOT as Org text.
-GROUPS defaults to `pos-dedupe-groups'."
-  (with-temp-buffer
-    (insert "#+TITLE: Duplicate tasks\n\n"
-            "- Per group: one keep, rest drop; ? skips.\n"
-            "- Differing dropped bodies merge under the keep.\n"
-            "- Then: pos dedupe apply.\n")
-    (dolist (group (or groups (pos-dedupe-groups root)))
-      (insert "\n* " (plist-get (car group) :heading) "\n"
-              "| act | file | line | under | body lines |\n|-\n")
-      (dolist (suggestion (pos-dedupe-suggest group root))
-        (pcase-let ((`(,action . ,entry) suggestion))
-          (insert (format "| %s | %s | %d | %s | %d |\n"
-                          action
-                          (file-relative-name (plist-get entry :file) root)
-                          (plist-get entry :line)
-                          (or (plist-get entry :parent) "")
-                          (if (string-empty-p (plist-get entry :body)) 0
-                            (length (split-string (plist-get entry :body) "\n"))))))))
-    (org-mode)
-    (org-table-map-tables #'org-table-align t)
-    (buffer-string)))
+GROUPS defaults to `pos-dedupe-groups'.  Each group lists, after its
+table, the \"id:\" links the index records to each copy that has an ID."
+  (pos-roam-with-index root
+    (let ((referrers (pos-dedupe--referrer-lines root)))
+      (with-temp-buffer
+        (insert "#+TITLE: Duplicate tasks\n\n"
+                "- Per group: one keep, rest drop; ? skips.\n"
+                "- Differing dropped bodies merge under the keep.\n"
+                "- Links to a dropped copy's ID are pointed at the keep;\n"
+                "  a keep without an ID takes the first dropped one's.\n"
+                "- Then: pos dedupe apply.\n")
+        (dolist (group (or groups (pos-dedupe-groups root)))
+          (insert "\n* " (plist-get (car group) :heading) "\n"
+                  "| act | file | line | under | body lines | id |\n|-\n")
+          (let (links)
+            (dolist (suggestion (pos-dedupe-suggest group root))
+              (pcase-let* ((`(,action . ,entry) suggestion)
+                           (file (file-relative-name (plist-get entry :file) root))
+                           (id (plist-get entry :id)))
+                (insert (format "| %s | %s | %d | %s | %d | %s |\n"
+                                action file
+                                (plist-get entry :line)
+                                (or (plist-get entry :parent) "")
+                                (if (string-empty-p (plist-get entry :body)) 0
+                                  (length (split-string (plist-get entry :body) "\n")))
+                                (or id "")))
+                (when id
+                  (let ((from (funcall referrers id)))
+                    (when from
+                      (push (format "- Links to %s:%d from %s\n" file (plist-get entry :line)
+                                    (string-join from ", "))
+                            links))))))
+            (apply #'insert (nreverse links))))
+        (org-mode)
+        (org-table-map-tables #'org-table-align t)
+        (buffer-string)))))
 
 (defun pos-dedupe-read-plan (file)
   "Read the plan in FILE as (KEY (ACTION FILE LINE)...) groups."
@@ -645,14 +682,37 @@ GROUPS defaults to `pos-dedupe-groups'."
           (org-paste-subtree (1+ level))
           (goto-char start)
           (org-todo 'none)
-          (org-edit-headline origin))))))
+          (org-edit-headline origin)
+          ;; The merged note is not the task: links to the dropped
+          ;; copy's ID go to the kept one, not here.
+          (org-entry-delete nil "ID"))))))
+
+(defun pos-dedupe--relink (from to dry-run)
+  "Point each \"id:\" link to FROM the index records at TO instead.
+With DRY-RUN count only.  Return (COUNT . BUFFERS): the links rewritten,
+or that would be, and the buffers it wrote.  Call within
+`pos-roam-with-index'; a link no longer where the index says is passed
+over."
+  (let ((count 0) buffers)
+    ;; Later links first, so that a rewrite moves no earlier one.
+    (dolist (referrer (reverse (pos-roam-referrers from)))
+      (pcase-let* ((`(,file . ,pos) referrer)
+                   (buffer (pos-roam-rewrite-link file pos from to dry-run)))
+        (when buffer
+          (setq count (1+ count))
+          (cl-pushnew buffer buffers))))
+    (cons count buffers)))
 
 (defun pos-dedupe-apply (root plan &optional dry-run)
   "Apply dedupe PLAN to ROOT; with DRY-RUN change nothing.
-Return (:resolved :merged :skipped :vanished :stale) counts."
-  (let ((resolved 0) (merged 0) (skipped 0) (vanished 0) (stale 0)
+Return (:resolved :merged :relinked :skipped :vanished :stale) counts.
+A dropped copy's ID passes to the kept copy where it has none; else each
+\"id:\" link to it that the index records is pointed at the kept copy's,
+and :relinked counts them."
+  (pos-roam-with-index root
+  (let ((resolved 0) (merged 0) (relinked 0) (skipped 0) (vanished 0) (stale 0)
         (make-backup-files nil)
-        (jobs nil))
+        (jobs nil) (touched nil))
     ;; Resolve all markers before any edit.
     (dolist (group (pos-dedupe-read-plan plan))
       (let* ((key (car group))
@@ -678,13 +738,23 @@ Return (:resolved :merged :skipped :vanished :stale) counts."
         (if (not (pos--marker-still-at-p keep key))
             (setq vanished (1+ vanished))
           (let ((keep-body (with-current-buffer (marker-buffer keep)
-                             (goto-char keep) (pos--subtree-body))))
+                             (goto-char keep) (pos--subtree-body)))
+                (keep-id (org-entry-get keep "ID")))
             (dolist (pair drops)
               (pcase-let ((`(,drop . ,label) pair))
                 (if (not (pos--marker-still-at-p drop key))
                     (setq vanished (1+ vanished))
                   (let ((drop-body (with-current-buffer (marker-buffer drop)
-                                     (goto-char drop) (pos--subtree-body))))
+                                     (goto-char drop) (pos--subtree-body)))
+                        (drop-id (org-entry-get drop "ID")))
+                    (when drop-id
+                      (if keep-id
+                          (pcase-let ((`(,count . ,buffers)
+                                       (pos-dedupe--relink drop-id keep-id dry-run)))
+                            (setq relinked (+ relinked count))
+                            (dolist (buffer buffers) (cl-pushnew buffer touched)))
+                        (setq keep-id drop-id)
+                        (unless dry-run (org-entry-put keep "ID" drop-id))))
                     (when (and (not (string-empty-p drop-body))
                                (not (string= drop-body keep-body)))
                       (setq merged (1+ merged))
@@ -697,18 +767,21 @@ Return (:resolved :merged :skipped :vanished :stale) counts."
     (unless dry-run
       (dolist (job jobs)
         (dolist (marker (cons (cadr job) (mapcar #'car (cddr job))))
-          (with-current-buffer (marker-buffer marker)
-            (when (buffer-modified-p) (save-buffer))))))
-    (list :resolved resolved :merged merged :skipped skipped
-          :vanished vanished :stale stale)))
+          (cl-pushnew (marker-buffer marker) touched)))
+      (dolist (buffer touched)
+        (with-current-buffer buffer
+          (when (buffer-modified-p) (save-buffer)))))
+    (list :resolved resolved :merged merged :relinked relinked :skipped skipped
+          :vanished vanished :stale stale))))
 
 (defun pos-dedupe-report (result dry-run)
   "Return a report of RESULT from `pos-dedupe-apply'; DRY-RUN words it."
-  (format "%s %d duplicate group%s (%d merged, %d skipped as undecided, %d gone with an earlier cut, %d stale)"
+  (format "%s %d duplicate group%s (%d merged, %d links relinked, %d skipped as undecided, %d gone with an earlier cut, %d stale)"
           (if dry-run "Would resolve" "Resolved")
           (plist-get result :resolved)
           (if (= 1 (plist-get result :resolved)) "" "s")
           (plist-get result :merged)
+          (plist-get result :relinked)
           (plist-get result :skipped)
           (plist-get result :vanished)
           (plist-get result :stale)))
@@ -726,10 +799,12 @@ Return (:resolved :merged :skipped :vanished :stale) counts."
                      file)))))
 
 (defun pos-dedupe-apply-batch (file dry-run)
-  "Apply the dedupe plan in FILE with DRY-RUN; print the report."
+  "Apply the dedupe plan in FILE with DRY-RUN; print the report.
+The index is brought up to date with what was written."
   (let ((root (file-name-as-directory pos-directory)))
     (princ (pos-dedupe-report (pos-dedupe-apply root file dry-run) dry-run))
-    (terpri)))
+    (terpri)
+    (unless dry-run (pos-roam-sync root))))
 
 ;;;; Refiling the intray
 

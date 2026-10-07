@@ -30,6 +30,10 @@
 
 (pos-load-config (file-name-directory (or load-file-name buffer-file-name)))
 
+;; The index of each temporary repository goes to a cache of the tests'
+;; own, never to a database of the user's.
+(setq pos-roam-cache-directory (make-temp-file "pos-test-roam-" t))
+
 (defun pos-test-time (year month day hour minute)
   "Return the local time YEAR-MONTH-DAY HOUR:MINUTE as a time value."
   (encode-time (list 0 minute hour day month year nil -1 nil)))
@@ -459,7 +463,7 @@ FILES: (RELATIVE-PATH . CONTENT) pairs."
                         ("life/life-areas.org" . "* Household\n** TODO Fix the gate\nhinge is bent\n")
                         ("dedupe.org" . "* fix the gate\n| act | file | line | under | body lines |\n| drop | intray.org | 2 | Unsorted | 0 |\n| keep | life/life-areas.org | 2 | Household | 1 |\n"))
     (let ((pos-directory root))
-      (should (equal '(:resolved 1 :merged 0 :skipped 0 :vanished 0 :stale 0)
+      (should (equal '(:resolved 1 :merged 0 :relinked 0 :skipped 0 :vanished 0 :stale 0)
                      (pos-dedupe-apply root (expand-file-name "dedupe.org" root))))
       (should (equal "* Unsorted\n** TODO other\n"
                      (pos-test-file-string (expand-file-name "intray.org" root))))
@@ -471,7 +475,7 @@ FILES: (RELATIVE-PATH . CONTENT) pairs."
                         ("life/life-areas.org" . "* Household\n** TODO Fix the gate\nhinge is bent\n** TODO next\n")
                         ("dedupe.org" . "* fix the gate\n| drop | intray.org | 1 | | 2 |\n| keep | life/life-areas.org | 2 | Household | 1 |\n"))
     (let ((pos-directory root))
-      (should (equal '(:resolved 1 :merged 1 :skipped 0 :vanished 0 :stale 0)
+      (should (equal '(:resolved 1 :merged 1 :relinked 0 :skipped 0 :vanished 0 :stale 0)
                      (pos-dedupe-apply root (expand-file-name "dedupe.org" root))))
       (should (equal "" (pos-test-file-string (expand-file-name "intray.org" root))))
       (should (equal (concat "* Household\n** TODO Fix the gate\nhinge is bent\n"
@@ -484,7 +488,7 @@ FILES: (RELATIVE-PATH . CONTENT) pairs."
                         ("life/life-areas.org" . "* TODO fix the gate\n* TODO paint\n")
                         ("dedupe.org" . "* fix the gate\n| ? | intray.org | 1 | | 0 |\n| ? | life/life-areas.org | 1 | | 0 |\n* paint\n| drop | intray.org | 2 | | 0 |\n| keep | life/life-areas.org | 2 | | 0 |\n"))
     (let ((pos-directory root))
-      (should (equal '(:resolved 1 :merged 0 :skipped 1 :vanished 0 :stale 0)
+      (should (equal '(:resolved 1 :merged 0 :relinked 0 :skipped 1 :vanished 0 :stale 0)
                      (pos-dedupe-apply root (expand-file-name "dedupe.org" root) t)))
       (should (equal "* TODO fix the gate\n* TODO paint\n"
                      (pos-test-file-string (expand-file-name "intray.org" root)))))))
@@ -497,7 +501,7 @@ FILES: (RELATIVE-PATH . CONTENT) pairs."
                         ("sport/sport-areas.org" . "* TODO paint\n")
                         ("dedupe.org" . "* fix the gate\n| drop | intray.org | 1 | | 0 |\n| keep | life/life-areas.org | 1 | | 0 |\n* paint\n| drop | people/people-areas.org | 1 | | 0 |\n| keep | sport/sport-areas.org | 1 | | 0 |\n"))
     (let ((pos-directory root))
-      (should (equal '(:resolved 2 :merged 0 :skipped 0 :vanished 0 :stale 0)
+      (should (equal '(:resolved 2 :merged 0 :relinked 0 :skipped 0 :vanished 0 :stale 0)
                      (pos-dedupe-apply root (expand-file-name "dedupe.org" root))))
       (should (equal "" (pos-test-file-string (expand-file-name "intray.org" root))))
       (should (equal "" (pos-test-file-string (expand-file-name "people/people-areas.org" root)))))))
@@ -508,9 +512,48 @@ FILES: (RELATIVE-PATH . CONTENT) pairs."
                         ("life/life-areas.org" . "* TODO shed\n** TODO fix the gate\n")
                         ("dedupe.org" . "* shed\n| drop | intray.org | 1 | | 1 |\n| keep | life/life-areas.org | 1 | | 1 |\n* fix the gate\n| drop | intray.org | 2 | shed | 0 |\n| keep | life/life-areas.org | 2 | shed | 0 |\n"))
     (let ((pos-directory root))
-      (should (equal '(:resolved 2 :merged 0 :skipped 0 :vanished 1 :stale 0)
+      (should (equal '(:resolved 2 :merged 0 :relinked 0 :skipped 0 :vanished 1 :stale 0)
                      (pos-dedupe-apply root (expand-file-name "dedupe.org" root))))
       (should (equal "* TODO unrelated\n"
+                     (pos-test-file-string (expand-file-name "intray.org" root)))))))
+
+(ert-deftest pos-dedupe-apply/points-links-at-the-kept-copy ()
+  "Each id: link to a dropped copy goes to the kept copy's ID; the merged
+note does not keep the dropped ID; a plan lists the links."
+  (pos-test-with-repo '(("intray.org" . ":PROPERTIES:\n:ID: file-i\n:END:\n* TODO fix the gate\n:PROPERTIES:\n:ID: dropped\n:END:\ncall the welder\n")
+                        ("life/life-areas.org" . "* Household\n** TODO Fix the gate\n:PROPERTIES:\n:ID: kept\n:END:\nhinge is bent\n")
+                        ("notes.org" . ":PROPERTIES:\n:ID: file-n\n:END:\nSee [[id:dropped][the gate]], and [[id:dropped]] again.\n")
+                        ("dedupe.org" . "* fix the gate\n| drop | intray.org | 4 | | 1 |\n| keep | life/life-areas.org | 2 | Household | 1 |\n"))
+    (let ((pos-directory root))
+      (should (string-match-p "^- Links to intray.org:4 from notes.org:4, notes.org:4$"
+                              (pos-dedupe-plan root)))
+      (should (string-match-p "| dropped *|" (pos-dedupe-plan root)))
+      (should (equal '(:resolved 1 :merged 1 :relinked 2 :skipped 0 :vanished 0 :stale 0)
+                     (pos-dedupe-apply root (expand-file-name "dedupe.org" root) t)))
+      (should (string-match-p "id:dropped" (pos-test-file-string (expand-file-name "notes.org" root))))
+      (should (equal '(:resolved 1 :merged 1 :relinked 2 :skipped 0 :vanished 0 :stale 0)
+                     (pos-dedupe-apply root (expand-file-name "dedupe.org" root))))
+      (should (equal ":PROPERTIES:\n:ID: file-n\n:END:\nSee [[id:kept][the gate]], and [[id:kept]] again.\n"
+                     (pos-test-file-string (expand-file-name "notes.org" root))))
+      (should (equal (concat "* Household\n** TODO Fix the gate\n:PROPERTIES:\n:ID: kept\n:END:\nhinge is bent\n"
+                             "*** Merged copy from intray.org:4\ncall the welder\n")
+                     (pos-test-file-string (expand-file-name "life/life-areas.org" root)))))))
+
+(ert-deftest pos-dedupe-apply/a-kept-copy-without-an-id-takes-the-dropped-ones ()
+  "The first dropped ID passes to the kept copy, so its links need no
+rewriting; a second dropped ID's links are pointed at it."
+  (pos-test-with-repo '(("intray.org" . ":PROPERTIES:\n:ID: file-i\n:END:\n* TODO fix the gate\n:PROPERTIES:\n:ID: first\n:END:\n* TODO Fix the gate\n:PROPERTIES:\n:ID: second\n:END:\n")
+                        ("life/life-areas.org" . "* Household\n** TODO Fix the gate\n")
+                        ("notes.org" . ":PROPERTIES:\n:ID: file-n\n:END:\n[[id:first]] [[id:second]]\n")
+                        ("dedupe.org" . "* fix the gate\n| drop | intray.org | 4 | | 0 |\n| drop | intray.org | 8 | | 0 |\n| keep | life/life-areas.org | 2 | Household | 0 |\n"))
+    (let ((pos-directory root))
+      (should (equal '(:resolved 1 :merged 0 :relinked 1 :skipped 0 :vanished 0 :stale 0)
+                     (pos-dedupe-apply root (expand-file-name "dedupe.org" root))))
+      (should (equal ":PROPERTIES:\n:ID: file-n\n:END:\n[[id:first]] [[id:first]]\n"
+                     (pos-test-file-string (expand-file-name "notes.org" root))))
+      (should (equal "* Household\n** TODO Fix the gate\n:PROPERTIES:\n:ID:       first\n:END:\n"
+                     (pos-test-file-string (expand-file-name "life/life-areas.org" root))))
+      (should (equal ":PROPERTIES:\n:ID: file-i\n:END:\n"
                      (pos-test-file-string (expand-file-name "intray.org" root)))))))
 
 (ert-deftest pos-dedupe-apply/a-plan-that-predates-an-edit-is-stale-not-fatal ()
@@ -519,7 +562,7 @@ FILES: (RELATIVE-PATH . CONTENT) pairs."
                         ("life/life-areas.org" . "* Household\n** TODO fix the gate\n")
                         ("dedupe.org" . "* fix the gate\n| drop | intray.org | 1 | | 0 |\n| keep | life/life-areas.org | 3 | Household | 0 |\n"))
     (let ((pos-directory root))
-      (should (equal '(:resolved 0 :merged 0 :skipped 0 :vanished 0 :stale 1)
+      (should (equal '(:resolved 0 :merged 0 :relinked 0 :skipped 0 :vanished 0 :stale 1)
                      (pos-dedupe-apply root (expand-file-name "dedupe.org" root))))
       (should (equal "* TODO fix the gate\n"
                      (pos-test-file-string (expand-file-name "intray.org" root)))))))
