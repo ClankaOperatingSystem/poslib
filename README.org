@@ -16,6 +16,11 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-startup.el= :: what a session opens with: prompts, then views
   of what is next, scheduled, due and to be reviewed, each item labelled
   by its scope.
+- =lisp/pos-roam.el= :: the org-roam index of a tree, brought up to date
+  before a command reads it: where the =id:= links to a heading are, for
+  dedupe to point them at the copy it keeps. The user's own index serves
+  where the tree lies in their =org-roam-directory=; elsewhere the tree
+  has one of its own under the XDG cache directory.
 - =doc/formats.org= :: the formats shared with [[https://github.com/ClankaOperatingSystem/pyposlib][pyposlib]], in lockstep.
 - =doc/remote-archive-protocol.txt= :: what passes between a client and
   the keeper of a ledger's archive; =lisp/pos-remote.el= and pyposlib's
@@ -30,7 +35,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 
 * Install
 
-- Clone; load with =-L poslib/lisp=.
+- Clone; load with =-L poslib/lisp=, with org-roam and what it requires
+  on the load path: =make deps= fetches them into =_deps/= at the commits
+  the Makefile names.
 - Or =package-vc=:
 
 #+begin_src emacs-lisp
