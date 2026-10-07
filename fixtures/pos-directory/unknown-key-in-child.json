@@ -1,6 +1,6 @@
 {
- "about": "Quoting changes nothing: a quoted version and a quoted boolean are read as the same text unquoted.",
- "yaml": "pos: \"2\"\nchildren:\n  - path: \"projects/a\"\n    remote: 'git@example.org:a.git'\n    skills-up: \"true\"\n",
+ "about": "A key in a child this version does not define is a warning named by its place; the child is read.",
+ "yaml": "pos: 2\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    pin: abc\n",
  "config": {
   "kind": null,
   "projects": null,
@@ -12,12 +12,14 @@
     "path": "projects/a",
     "remote": "git@example.org:a.git",
     "branch": "master",
-    "skills-up": true
+    "skills-up": false
    }
   ],
   "worktrees": [],
   "archives": [],
   "server": null,
-  "warnings": []
+  "warnings": [
+   "unknown-key: children[0].pin"
+  ]
  }
 }

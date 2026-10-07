@@ -6,6 +6,7 @@
   "projects": "projects",
   "methodologies": null,
   "image": "ghcr.io/example/clankos:latest",
+  "exclude": null,
   "children": [
    {
     "path": "responsibilities/employment",
@@ -46,6 +47,7 @@
   "server": {
    "name": "example",
    "mcp": "https://pos.example.org/mcp"
-  }
+  },
+  "warnings": []
  }
 }

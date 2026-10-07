@@ -54,6 +54,8 @@ The top level is a mapping:
                     beneath it, usually methodologies/. It makes the
                     node a project
     image           the container image this node's commands run in
+    exclude         the directories a walk of this node does not enter
+                    (below)
     children    what is declared beneath this one (section 2)
     worktrees   other working trees (section 3)
     archives    where archives are kept (section 4)
@@ -73,13 +75,39 @@ of the line, with NAME unquoted and holding no space, quotation mark
 or #, so that a tool with no YAML reader finds it by its line. Any
 other way of writing it is refused (bad-value).
 
-A reader refuses the whole file for a key not written here, at any
-level, and for a version it does not know. A refusal has a kind:
+exclude is a sequence of strings. Each is the name of a directory, or
+a glob over one with * for any text, which keeps a walk out of every
+directory of that name beneath this node, however deep; or, when it
+holds a slash, a path beneath this node, which keeps a walk out of
+that directory and what lies beneath it. A final slash is dropped. The
+exclusions in force at a directory are those of the nearest node at or
+above it that has the key, replacing what it would inherit; when no
+node has it, they are
+
+    archives, attic, node_modules, "_*", ".*"
+
+that is, archives and attics, Node's modules, and every name beginning
+with an underscore or a dot. An empty sequence excludes nothing. A
+glob beginning with * is quoted, as YAML asks. What exclude governs is
+reading: a tool that walks a node for its files, its undeclared
+repositories or its archive scopes does not enter an excluded
+directory. A directory named archives is an archive scope wherever it
+lies, whether or not the walk enters it.
+
+A reader reads the keys written here. A key it does not know, at any
+level, is a warning, which names the key by its place in the file, as
+"unknown-key: children[0].pin"; the key is left unread and the rest of
+the file is read. So a file written for a newer version of this
+document is read by an older reader with the newer key's default,
+which is always what the older reader did. The version number changes
+only when a key's meaning changes.
+
+A reader refuses the whole file for a version it does not know, and
+for a value it cannot read. A refusal has a kind:
 
     not-yaml          the text is not readable as YAML
     not-a-mapping     the file, or an entry, is not a mapping
     unknown-version   pos is a number other than 2
-    unknown-key       a key this document does not define
     missing-key       a required key is absent
     wrong-type        a value is not of its key's type
     bad-path          a path this document does not allow
@@ -194,9 +222,9 @@ The tree tool maintains a marked block in each repository's
 .git/info/exclude for its uncommitted archives. It covers each declared
 node, each explicitly named archive scope (even before its directory
 exists), and other scopes found by their archives directories. It
-does not enter archives, attics, hidden or underscore directories,
-node_modules, undeclared nodes, or products. A declared child reads
-its own policy; a parent's default does not override it.
+does not enter the directories the node's exclusions name (section 1),
+undeclared nodes, or products. A declared child reads its own policy;
+a parent's default does not override it.
 
 Patterns are anchored at the repository root, match directories only,
 and quote spaces and Git glob characters. When a policy changes, the
@@ -321,8 +349,9 @@ and findings, which the tool reports and does not act on:
     undeclared      a repository beneath this one, or a directory with
                     a configuration, that no entry declares or whose
                     entry is gone. A git submodule, which its
-                    repository tracks, is not one. Archives, attics, and
-                    hidden and underscore directories are not looked in
+                    repository tracks, is not one. The directories the
+                    exclusions in force name (section 1) are not looked
+                    in
     missing         a child with no remote whose directory is not there
     unconfigured    a node whose configuration says neither where its
                     projects belong nor its methodologies. What it
@@ -334,6 +363,10 @@ A plan is a JSON object:
     pos         2
     actions     an array, in an order they can be done in
     findings    an array
+    warnings    an array of strings: for each configuration read, the
+                node's path and each warning its reader gave, as
+                ".: unknown-key: colour". The tool reports them and
+                acts on none; they do not make a plan non-empty
 
 An action is an object whose do is the action's name. With it:
 
@@ -391,7 +424,9 @@ fixtures/pos-directory/ holds configuration files for both libraries.
 Each fixture is a JSON object: about, what it shows; yaml, the file's
 text; and either config, what a reader makes of it, or refused, the
 kind of refusal. config has kind, which is responsibility, project or null;
-projects, methodologies and image, each a string or null; children,
-worktrees and archives, each an array with every default filled in, a
-child with no remote having null for its remote and branch; and
-server, an object or null.
+projects, methodologies and image, each a string or null; exclude, an
+array of strings or null; children, worktrees and archives, each an
+array with every default filled in, a child with no remote having null
+for its remote and branch; server, an object or null; and warnings, an
+array of strings, empty when the file holds no key the reader does not
+know.

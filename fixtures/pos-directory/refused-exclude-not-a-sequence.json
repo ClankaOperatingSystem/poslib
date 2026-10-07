@@ -1,0 +1,5 @@
+{
+ "about": "exclude is a sequence; one name alone is refused.",
+ "yaml": "pos: 2\nexclude: archives\n",
+ "refused": "wrong-type"
+}

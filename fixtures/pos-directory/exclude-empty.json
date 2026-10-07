@@ -1,12 +1,12 @@
 {
- "about": "A file that declares nothing.",
- "yaml": "pos: 2\n",
+ "about": "A node that declares no exclusion at all: an empty sequence, which is not the default list.",
+ "yaml": "pos: 2\nexclude: []\n",
  "config": {
   "kind": null,
   "projects": null,
   "methodologies": null,
   "image": null,
-  "exclude": null,
+  "exclude": [],
   "children": [],
   "worktrees": [],
   "archives": [],

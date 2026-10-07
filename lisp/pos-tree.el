@@ -32,7 +32,16 @@
 ;; and will not act on.  The agent files of section 5 are not planned:
 ;; a server is read and checked, and nothing is done with it.
 ;;
-;; - `pos-tree-read-config': a config.yaml's text, checked.
+;; A reader warns of a key it does not know and reads the rest, so a
+;; configuration written for a newer reader still works with this one,
+;; with the newer key's default.  Which directories a walk does not
+;; enter is the node's to declare, under exclude, and is inherited by
+;; what lies beneath it until a node declares its own.
+;;
+;; - `pos-tree-read-config': a config.yaml's text, checked, with its
+;;   warnings.
+;; - `pos-tree-exclusions', `pos-tree-unwalked-p': what a walk of a
+;;   node does not enter.
 ;; - `pos-tree-plan': the plan for the tree at a root.
 ;; - `pos-tree-apply': do a plan, and return the plan that remains.
 ;; - `pos-tree-batch': the command line.
@@ -105,17 +114,23 @@ whole number in digits, returned as a number."
     ('sequence (and (vectorp value) (list value)))
     ('mapping (and (pos-tree--mapping-p value) (list value)))))
 
-(defun pos-tree--mapping (value what keys)
+(defvar pos-tree--warnings nil
+  "The warnings of the configuration being read, newest first.")
+
+(defun pos-tree--mapping (value what keys &optional where)
   "Return the mapping VALUE as an alist of symbols, checked against KEYS.
 WHAT names the mapping in a refusal.  KEYS is a list of (NAME TYPE
-REQUIRED): a key not among them, a value not of its TYPE and a
-REQUIRED key that is absent are each refused."
+REQUIRED): a value not of its TYPE and a REQUIRED key that is absent
+are each refused.  A key not among them is a warning, which names it
+after WHERE, the mapping's place in the file, and the key is left
+unread: a file written for a newer reader is read with that key's
+default."
   (unless (pos-tree--mapping-p value)
     (pos-tree--refuse 'not-a-mapping "%s is not a mapping" what))
   (dolist (pair value)
     (unless (assoc (car pair) keys)
-      (pos-tree--refuse 'unknown-key "%s has a key this version does not define: %s"
-                        what (car pair))))
+      (push (format "unknown-key: %s%s" (if where (concat where ".") "") (car pair))
+            pos-tree--warnings)))
   (mapcan (lambda (key)
             (pcase-let* ((`(,name ,type ,required) key)
                          (pair (assoc name value))
@@ -138,12 +153,13 @@ REQUIRED key that is absent are each refused."
 (defun pos-tree--children (entries)
   "Return the children in ENTRIES, a sequence, checked, defaults filled in."
   (let ((children
-         (mapcar
-          (lambda (entry)
+         (seq-map-indexed
+          (lambda (entry index)
             (let-alist (pos-tree--mapping
                         entry "A child"
                         '(("path" string t) ("remote" string nil)
-                          ("branch" string nil) ("skills-up" boolean nil)))
+                          ("branch" string nil) ("skills-up" boolean nil))
+                        (format "children[%d]" index))
               (unless (pos-tree--path-p .path)
                 (pos-tree--refuse 'bad-path "Not a child's path: %s" .path))
               ;; A branch and skills are a repository's: a child with
@@ -175,12 +191,13 @@ REQUIRED key that is absent are each refused."
   "Return the worktrees in ENTRIES, a sequence, checked, defaults filled in.
 CHILDREN are the repository's children, already checked."
   (let ((worktrees
-         (mapcar
-          (lambda (entry)
+         (seq-map-indexed
+          (lambda (entry index)
             (let-alist (pos-tree--mapping
                         entry "A worktree"
                         '(("path" string t) ("of" string nil)
-                          ("remote" string nil) ("branch" string nil)))
+                          ("remote" string nil) ("branch" string nil))
+                        (format "worktrees[%d]" index))
               (unless (and (pos-tree--path-p .path)
                            (string-match "\\`\\(?:\\(.+\\)/\\)?_worktrees/[^/]+\\'"
                                          .path))
@@ -212,12 +229,13 @@ CHILDREN are the repository's children, already checked."
   "Return the archive settings in ENTRIES, a sequence, checked.
 CHILDREN are the repository's children, already checked."
   (let ((archives
-         (mapcar
-          (lambda (entry)
+         (seq-map-indexed
+          (lambda (entry index)
             (let-alist (pos-tree--mapping
                         entry "An archive"
                         '(("scope" string t) ("kept" string t)
-                          ("ledger" string nil) ("url" string nil)))
+                          ("ledger" string nil) ("url" string nil))
+                        (format "archives[%d]" index))
               (unless (equal .scope ".")
                 (unless (pos-tree--path-p .scope)
                   (pos-tree--refuse 'bad-path "Not a scope's path: %s" .scope))
@@ -248,18 +266,63 @@ CHILDREN are the repository's children, already checked."
           (push ledger seen))))
     archives))
 
+(defconst pos-tree-default-exclude '("archives" "attic" "node_modules" "_*" ".*")
+  "The directories a walk does not enter when no node declares exclude.
+Archives and attics, Node's modules, and names beginning with an
+underscore or a dot, as doc/pos-directory.txt has it.")
+
+(defun pos-tree--exclusions (value)
+  "Return VALUE, a configuration's exclude sequence, checked, as a vector.
+Each entry is a directory's name or a glob over one, with * for any
+text, or a path beneath the node when it holds a slash; a final slash
+is dropped.  Nil for nil."
+  (when value
+    (vconcat
+     (seq-map (lambda (entry)
+                (unless (pos-tree--typed entry 'string)
+                  (pos-tree--refuse 'wrong-type "exclude: an entry is not a string"))
+                (if (string-match-p "/" entry)
+                    (pos-tree--location entry "exclude")
+                  entry))
+              value))))
+
+(defun pos-tree-exclusions (config)
+  "Return the exclusions in force at the node whose configuration is CONFIG.
+A list: its exclude entries, or `pos-tree-default-exclude' when it
+declares none, or when CONFIG is nil."
+  (let ((declared (alist-get 'exclude config)))
+    (if (and declared (not (eq declared :null)))
+        (append declared nil)
+      pos-tree-default-exclude)))
+
+(defun pos-tree-unwalked-p (path exclusions)
+  "Return non-nil if PATH is a directory EXCLUSIONS keep a walk out of.
+PATH is relative to the node whose EXCLUSIONS these are, a list as
+`pos-tree-exclusions' gives.  An entry with a slash names a path and
+excludes it and what lies beneath it; any other names a directory,
+with * for any text, wherever it lies beneath the node."
+  (let ((name (file-name-nondirectory path)))
+    (seq-some (lambda (entry)
+                (if (string-match-p "/" entry)
+                    (pos-tree--within-p path entry)
+                  (string-match-p (wildcard-to-regexp entry) name)))
+              exclusions)))
+
 (defun pos-tree-read-config (text)
   "Return the configuration in TEXT, a config.yaml's, checked.
-An alist of kind, projects, methodologies, image, children,
-worktrees, archives and server, with defaults filled in: sequences are
-vectors, an absent value is :null and false is :false.  kind is
+An alist of kind, projects, methodologies, image, exclude, children,
+worktrees, archives, server and warnings, with defaults filled in:
+sequences are vectors, an absent value is :null and false is :false.
+warnings is a vector of strings, one for each key this reader does
+not know, which it leaves unread.  kind is
 \"responsibility\" for a node that says where its projects belong,
 \"project\" for one that says where its methodologies belong, and :null
 for one that says neither, which is yet to be configured.  Every
 scalar is read as the text written, and the keys' types decide what
 it is.  Signal `pos-tree-refused', with the refusal's kind and a
 message, for a file doc/pos-directory.txt does not allow."
-  (let ((parsed (condition-case nil
+  (let ((pos-tree--warnings nil)
+        (parsed (condition-case nil
                     (yaml-parse-string text :object-type 'alist
                                        :object-key-type 'string
                                        :sequence-type 'array
@@ -275,7 +338,7 @@ message, for a file doc/pos-directory.txt does not allow."
                  parsed "The file"
                  '(("pos" integer t) ("projects" string nil)
                    ("methodologies" string nil) ("image" string nil)
-                   ("children" sequence nil)
+                   ("exclude" sequence nil) ("children" sequence nil)
                    ("worktrees" sequence nil) ("archives" sequence nil)
                    ("server" mapping nil))))
            (projects (pos-tree--location (alist-get 'projects top) "projects"))
@@ -301,6 +364,7 @@ message, for a file doc/pos-directory.txt does not allow."
         (projects . ,(or projects :null))
         (methodologies . ,(or methodologies :null))
         (image . ,(or image :null))
+        (exclude . ,(or (pos-tree--exclusions (alist-get 'exclude top)) :null))
         (children . ,(vconcat children))
         (worktrees . ,(vconcat (pos-tree--worktrees (alist-get 'worktrees top)
                                                     children)))
@@ -309,8 +373,9 @@ message, for a file doc/pos-directory.txt does not allow."
         (server . ,(if server
                        (pos-tree--mapping
                         (cdr (assoc "server" parsed)) "The server"
-                        '(("name" string t) ("mcp" string t)))
-                     :null))))))
+                        '(("name" string t) ("mcp" string t)) "server")
+                     :null))
+        (warnings . ,(vconcat (nreverse pos-tree--warnings)))))))
 
 ;;;; Git
 
@@ -365,6 +430,10 @@ Signal `pos-tree-refused' if it has two."
   (pos-tree--one-config
    (pos-ledger-config-files dir)))
 
+(defvar pos-tree--warnings-found nil
+  "The warnings of the configurations read for the plan being made.
+Each names the node, relative to the root, and the warning; newest first.")
+
 (defun pos-tree--config (dir branch)
   "Return the configuration of the node at DIR, or nil if it has none.
 With BRANCH, DIR is a repository and it is read from that branch as
@@ -384,7 +453,10 @@ for a file that is refused, and for two configurations."
                        (with-temp-buffer
                          (insert-file-contents (expand-file-name file dir))
                          (buffer-string))))))
-    (pos-tree-read-config text)))
+    (let ((config (pos-tree-read-config text)))
+      (seq-doseq (warning (alist-get 'warnings config))
+        (push (format "%s: %s" (pos-tree--rel dir) warning) pos-tree--warnings-found))
+      config)))
 
 ;;;; The plan
 
@@ -476,9 +548,12 @@ anchored, directory-only Git patterns."
 (defvar pos-tree--archive-refused nil
   "Whether an invalid node prevents updating this repository's archive rules.")
 
-(defun pos-tree--archive-scopes (dir boundaries &optional prefix)
+(defun pos-tree--archive-scopes (dir boundaries exclusions &optional prefix)
   "Find archive scopes below DIR, stopping at BOUNDARIES and configurations.
-PREFIX is the path relative to the node, or nil at its root."
+EXCLUSIONS are the node's, as `pos-tree-exclusions' gives them: a
+directory they name is not looked into, though one named archives is
+a scope wherever it lies.  PREFIX is the path relative to the node,
+or nil at its root."
   (let (scopes)
     (dolist (name (directory-files dir nil directory-files-no-dot-files-regexp))
       (let ((full (expand-file-name name dir)) (path (concat prefix name)))
@@ -488,10 +563,10 @@ PREFIX is the path relative to the node, or nil at its root."
                                     (string-prefix-p (concat boundary "/") path))) boundaries))
           (cond
            ((equal name "archives") (push (if prefix (directory-file-name prefix) ".") scopes))
-           ((and (not (member name '("attic" "node_modules")))
-                 (not (string-prefix-p "." name)) (not (string-prefix-p "_" name))
+           ((and (not (pos-tree-unwalked-p path exclusions))
                  (not (pos-tree--repository-p full)) (not (pos-ledger-config-files full)))
-            (setq scopes (append (pos-tree--archive-scopes full boundaries (concat path "/"))
+            (setq scopes (append (pos-tree--archive-scopes full boundaries exclusions
+                                                           (concat path "/"))
                                  scopes)))))))
     scopes))
 
@@ -502,7 +577,9 @@ PREFIX is the path relative to the node, or nil at its root."
                              (append (alist-get 'children config) (alist-get 'worktrees config) nil)))
          (scopes (sort (delete-dups
                         (append '(".") (mapcar (lambda (e) (alist-get 'scope e)) entries)
-                                (pos-tree--archive-scopes base boundaries))) #'string<)))
+                                (pos-tree--archive-scopes
+                                 base boundaries (pos-tree-exclusions config))))
+                       #'string<)))
     (dolist (scope scopes)
       (unless (let ((at base) boundary)
                 (dolist (part (unless (equal scope ".") (split-string scope "/")))
@@ -546,16 +623,20 @@ PREFIX is the path relative to the node, or nil at its root."
       (and (file-directory-p path)
            (null (directory-files path nil directory-files-no-dot-files-regexp)))))
 
-(defconst pos-tree--unwalked '("archives" "attic" "node_modules")
-  "Names of directories not looked into for what is undeclared.
-Nor are hidden directories and those beginning with an underscore.")
+(defvar pos-tree--local-exclusions nil
+  "The exclusions each local node of the repository being planned declares.
+An alist of its path relative to the repository and the list; a node
+that declares none is absent, and inherits.")
 
-(defun pos-tree--undeclared (repo mounted local &optional prefix)
+(defun pos-tree--undeclared (repo mounted local exclusions &optional prefix node)
   "Find what is beneath the repository at REPO that no entry declares.
 A repository, and a directory holding a configuration.  MOUNTED are the
 declared paths of repositories, which are not looked into, and LOCAL
-those of directories, which are; both relative to REPO.  PREFIX is the
-directory being looked in, with its final slash, or nil for REPO."
+those of directories, which are; both relative to REPO.  EXCLUSIONS
+are those in force, declared by the node at NODE, a prefix with its
+final slash or nil for REPO; a local node that declares its own
+replaces them beneath it.  PREFIX is the directory being looked in,
+with its final slash, or nil for REPO."
   (dolist (name (directory-files (expand-file-name (or prefix "") repo) nil
                                  directory-files-no-dot-files-regexp))
     (let* ((path (concat prefix name))
@@ -563,17 +644,19 @@ directory being looked in, with its final slash, or nil for REPO."
       (cond
        ((member path mounted))
        ((or (file-symlink-p full) (not (file-directory-p full))))
-       ((or (member name pos-tree--unwalked)
-            (string-prefix-p "." name) (string-prefix-p "_" name)))
+       ((pos-tree-unwalked-p (string-remove-prefix (or node "") path) exclusions))
        ((member path local)
-        (pos-tree--undeclared repo mounted local (concat path "/")))
+        (let ((own (assoc path pos-tree--local-exclusions)))
+          (pos-tree--undeclared repo mounted local (if own (cdr own) exclusions)
+                                (concat path "/") (if own (concat path "/") node))))
        ;; A submodule is the repository's own, tracked and declared by git.
        ((pos-tree--repository-p full)
         (unless (pos-tree--tracked-p repo path)
           (pos-tree--find "undeclared" (pos-tree--rel full))))
        ((pos-ledger-config-files full)
         (pos-tree--find "undeclared" (pos-tree--rel full) "a configuration"))
-       (t (pos-tree--undeclared repo mounted local (concat path "/")))))))
+       (t (pos-tree--undeclared repo mounted local exclusions
+                                (concat path "/") node))))))
 
 (defvar pos-tree--mounted nil
   "The declared paths of repositories in the repository being planned.")
@@ -645,6 +728,8 @@ of those that are there and are not planned."
             (push within pos-tree--local)
             (condition-case err
                 (when-let* ((own (pos-tree--config path nil)))
+                  (unless (eq (alist-get 'exclude own) :null)
+                    (push (cons within (pos-tree-exclusions own)) pos-tree--local-exclusions))
                   (let ((below (pos-tree--declared repo path own)))
                     (setq nodes (append (reverse (car below)) nodes)
                           held (append (cdr below) held))))
@@ -678,10 +763,12 @@ Return its node, with a node for each repository beneath it that is
 mounted as declared, by this repository or by a directory of it."
   (let* ((pos-tree--mounted nil)
          (pos-tree--local nil)
+         (pos-tree--local-exclusions nil)
          (pos-tree--archive-paths nil)
          (pos-tree--archive-refused nil)
          (declared (pos-tree--declared dir dir config)))
-    (pos-tree--undeclared dir pos-tree--mounted pos-tree--local)
+    (pos-tree--undeclared dir pos-tree--mounted pos-tree--local
+                          (pos-tree-exclusions config))
     (when config (pos-tree--archive-excludes dir))
     (pos-tree--node :dir dir :config config :children (car declared)
                     :held (cdr declared))))
@@ -810,14 +897,17 @@ of its linkable skills."
 (defun pos-tree-plan (root)
   "Return the plan for the tree at ROOT, a repository.
 An alist of pos, the version; actions, a vector of what needs to be
-done, in an order it can be done in; and findings, a vector of what
-was found and is not acted on.  Paths in it are relative to ROOT.
+done, in an order it can be done in; findings, a vector of what was
+found and is not acted on; and warnings, a vector of what the
+configurations read said that this reader does not know, each a
+string naming the node.  Paths in it are relative to ROOT.
 Nothing is changed and no network is used.  Signal `pos-tree-refused'
 if ROOT is not a repository."
   (let* ((dir (directory-file-name (expand-file-name root)))
          (pos-tree--root (file-name-as-directory dir))
          (pos-tree--actions nil)
-         (pos-tree--findings nil))
+         (pos-tree--findings nil)
+         (pos-tree--warnings-found nil))
     (unless (pos-tree--repository-p dir)
       (pos-tree--refuse 'not-a-repository "Not a repository: %s" root))
     (condition-case err
@@ -827,7 +917,8 @@ if ROOT is not a repository."
                        (format "%s: %s" (nth 1 err) (nth 2 err)))))
     `((pos . 2)
       (actions . ,(vconcat (nreverse pos-tree--actions)))
-      (findings . ,(vconcat (nreverse pos-tree--findings))))))
+      (findings . ,(vconcat (nreverse pos-tree--findings)))
+      (warnings . ,(vconcat (nreverse pos-tree--warnings-found))))))
 
 ;;;; The second step
 

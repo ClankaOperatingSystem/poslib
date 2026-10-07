@@ -6,6 +6,7 @@
   "projects": null,
   "methodologies": null,
   "image": null,
+  "exclude": null,
   "children": [
    {
     "path": "vendor/a",
@@ -16,6 +17,7 @@
   ],
   "worktrees": [],
   "archives": [],
-  "server": null
+  "server": null,
+  "warnings": []
  }
 }
