@@ -86,8 +86,9 @@ recording must be played out, and the item gone from where it lay."
                 (pos-test-same-json .report (alist-get 'report got))))))))))
 
 (ert-deftest pos-seal/every-shared-fixture-converts-the-same-bytes ()
-  "The conversion events, what was skipped and the report after, or the
-refusal, as fixtures/ledger/ of kind convert."
+  "Each convert fixture in fixtures/ledger/ converts as recorded.
+The conversion events, what was skipped and the report after, or the
+refusal."
   (dolist (named (pos-fixtures "ledger"))
     (let-alist (cdr named)
       (when (equal .kind "convert")
@@ -122,9 +123,10 @@ refusal, as fixtures/ledger/ of kind convert."
                  .report (pos-test-report-relative (pos-ledger-check root) dir))))))))))
 
 (ert-deftest pos-seal/every-shared-fixture-keeps-the-same-way ()
-  "What was moved to a keeper, what was left with its reason and the
-report after, or the refusal, as fixtures/ledger/ of kind keep: each
-request as its keeper recorded it, and a kept archive gone from disk."
+  "Each keep fixture in fixtures/ledger/ keeps as recorded.
+What was moved to a keeper, what was left with its reason and the
+report after, or the refusal: each request as its keeper recorded it,
+and a kept archive gone from disk."
   (dolist (named (pos-fixtures "ledger"))
     (let-alist (cdr named)
       (when (equal .kind "keep")
@@ -158,9 +160,10 @@ request as its keeper recorded it, and a kept archive gone from disk."
                  .report (pos-test-report-relative (pos-ledger-check root) dir))))))))))
 
 (ert-deftest pos-seal/every-shared-fixture-recalls-the-same-way ()
-  "What was brought back from a keeper, what was left with its reason and
-the archive on disk after, or the refusal, as fixtures/ledger/ of kind
-recall: each request as its keeper recorded it."
+  "Each recall fixture in fixtures/ledger/ recalls as recorded.
+What was brought back from a keeper, what was left with its reason and
+the archive on disk after, or the refusal: each request as its keeper
+recorded it."
   (dolist (named (pos-fixtures "ledger"))
     (let-alist (cdr named)
       (when (equal .kind "recall")
@@ -220,8 +223,8 @@ recall: each request as its keeper recorded it."
                      (alist-get 'cid (cdr (assoc "trial/result.md" (alist-get 'add plan)))))))))
 
 (ert-deftest pos-seal/the-ledger-alone-gives-the-archive-s-cids ()
-  "After a seal, the ledger's entries give every CID the archive on disk
-has, root included, without reading the archive."
+  "After a seal, the ledger's entries give every CID the archive has.
+Root included, without reading the archive."
   (pos-test-with-scope
     (let* ((plan (pos-test-scope-plan scope))
            (root (cdr (pos-test-approve plan)))
@@ -235,8 +238,9 @@ has, root included, without reading the archive."
       (should (equal root (cdr (assoc "." folded)))))))
 
 (ert-deftest pos-seal/a-plan-is-applied-only-as-reviewed ()
-  "A plan whose hash differs from the one reviewed is refused, as is a
-plan whose item changed after review; nothing moves."
+  "A plan that is not the one reviewed is refused, and nothing moves.
+One whose hash differs from the one reviewed, or whose item changed
+after review."
   (pos-test-with-scope
     (let ((plan (pos-test-scope-plan scope)))
       (should-error (pos-seal-apply plan (make-string 64 ?0)) :type 'pos-ledger-refused)
@@ -318,7 +322,7 @@ a rumour already sealed word for word is cited, not sealed again."
       (should (equal 4 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
 
 (ert-deftest pos-seal/a-program-applies-its-own-plan-explicitly ()
-  "write-new DESTINATION --apply seals at once; without it, only a plan."
+  "The write-new command with --apply seals at once; without it, a plan."
   (pos-test-with-scope
     (let* ((target (expand-file-name "archives/journal/h.md" scope))
            (run (lambda (&rest args)
@@ -341,7 +345,7 @@ a rumour already sealed word for word is cited, not sealed again."
       (should (equal "handover\n" (pos-ledger-read target))))))
 
 (ert-deftest pos-seal/a-program-seals-an-item-explicitly ()
-  "seal SOURCE DESTINATION --apply moves and seals at once; without it, a plan."
+  "The seal command with --apply moves and seals at once; without it, a plan."
   (pos-test-with-scope
     (let* ((source (expand-file-name "trial" scope))
            (target (expand-file-name "archives/trial" scope))
@@ -359,9 +363,9 @@ a rumour already sealed word for word is cited, not sealed again."
       (should (equal 1 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
 
 (ert-deftest pos-seal/a-staging-directory-left-empty-is-not-sealed ()
-  "An empty _seal in an item, at any depth, is removed and no event records
-it; one that holds something is sealed as it is, and another empty
-directory is recorded.  The check after the seal is clean."
+  "An empty _seal in an item is removed and no event records it.
+At any depth; one that holds something is sealed as it is, and another
+empty directory is recorded.  The check after the seal is clean."
   (pos-test-with-scope
     (dolist (dir '("trial/_seal" "trial/child/_seal" "trial/kept/_seal" "trial/hollow"))
       (make-directory (expand-file-name dir scope) t))
@@ -390,9 +394,9 @@ a _seal that holds something else stays."
       (should (equal '("other.json") (pos-ledger--entries (expand-file-name "_seal" scope)))))))
 
 (ert-deftest pos-seal/a-sealed-path-has-a-link ()
-  "A sealed item's link is ipfs:// and its CID; a path within it adds the
-path, a collection's member included.  A path never sealed, and a path
-in no archive, are refused."
+  "A sealed item's link is ipfs:// and its CID; a path within adds it.
+A collection's member included.  A path never sealed, and a path in no
+archive, are refused."
   (pos-test-with-scope
     (pos-test-write-bytes (expand-file-name "trial/README.org" scope)
                           "#+TITLE: Trial\n#+COLLECTION: t\n")
@@ -412,7 +416,7 @@ in no archive, are refused."
                                          :type 'pos-ledger-refused)))))))
 
 (ert-deftest pos-seal/a-program-prints-a-sealed-path-s-link ()
-  "link PATH prints the link on one line; a path never sealed exits 2."
+  "The link command prints the link on one line; a path never sealed exits 2."
   (pos-test-with-scope
     (let* ((archive (pos-test-scope-sealed scope))
            (run (lambda (path)
@@ -446,8 +450,8 @@ in no archive, are refused."
       (should-not read))))
 
 (ert-deftest pos-seal/a-rumour-reads-nothing-outside-the-garden ()
-  "A link out of the garden's repository gets a rumour naming where it
-pointed; the target is not read."
+  "A link out of the garden's repository gets a rumour, and is not read.
+The rumour names where it pointed; the target is not read."
   (pos-test-with-scope
     (let ((outside (expand-file-name "../elsewhere.md" scope)) read)
       (make-directory (expand-file-name ".git" scope))
@@ -466,9 +470,8 @@ pointed; the target is not read."
 ;;;; Checkpoints and repair
 
 (ert-deftest pos-seal/a-checkpoint-waits-for-a-clean-check ()
-  "An unregistered file refuses a checkpoint; once it is gone, the tree's
-heads are recorded beside the scope, and recording them again is no
-conflict."
+  "An unregistered file refuses a checkpoint; gone, the heads are recorded.
+Beside the scope; and recording them again is no conflict."
   (pos-test-with-scope
     (let ((archive (pos-test-scope-sealed scope)))
       (pos-test-write-bytes (expand-file-name "stray.txt" archive) "stray" #o444)
@@ -485,8 +488,8 @@ conflict."
         (should-not (pos-seal-findings-p (pos-ledger-check scope)))))))
 
 (ert-deftest pos-seal/an-archive-s-checkpoint-covers-the-archive ()
-  "Checkpointing an archive records its head with archive coverage, the
-same bytes sealing records, so no second file appears."
+  "Checkpointing an archive records its head as sealing recorded it.
+With archive coverage, the same bytes, so no second file appears."
   (pos-test-with-scope
     (let* ((archive (pos-test-scope-sealed scope))
            (home (expand-file-name "archive-integrity/checkpoints" (file-truename scope)))
@@ -495,8 +498,9 @@ same bytes sealing records, so no second file appears."
       (should (equal before (directory-files home nil "\\.json\\'"))))))
 
 (ert-deftest pos-seal/repair-protects-only-verified-evidence ()
-  "Repair removes a write bit restored to a sealed file, and refuses once
-a sealed file's bytes have changed."
+  "Repair removes a restored write bit, and refuses changed bytes.
+A write bit restored to a sealed file is removed; once a sealed file's
+bytes have changed, repair refuses."
   (pos-test-with-scope
     (let* ((archive (pos-test-scope-sealed scope))
            (file (expand-file-name "trial/result.md" archive)))
@@ -579,7 +583,8 @@ a sealed file's bytes have changed."
           (should-not (file-exists-p (expand-file-name "z/leaf" item))))))))
 
 (ert-deftest pos-seal/a-kept-archive-is-checkpointed-and-repaired-by-its-ledger ()
-  "Its files are with its keeper: a checkpoint records its head, and
+  "A kept archive is checkpointed and repaired from its ledger alone.
+Its files are with its keeper: a checkpoint records its head, and
 repair protects its ledger's events and looks for nothing else."
   (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
     (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
@@ -613,8 +618,8 @@ the fixture's seal, planned."
            ,@body)))))
 
 (ert-deftest pos-seal/an-item-changed-after-its-keeper-took-it-is-not-removed ()
-  "Resumed after the keeper has the event, a seal removes the item only
-if it is still what was sealed."
+  "A seal resumed after the keeper has the event removes the item.
+Only if it is still what was sealed."
   (pos-seal-test-with-kept "seal-kept-resumed"
     (let ((hash (pos-ledger-sha (pos-ledger-json plan))))
       (pos-test-write-bytes source "changed")
@@ -623,8 +628,9 @@ if it is still what was sealed."
       (should (equal "changed" (pos-ledger-read source))))))
 
 (ert-deftest pos-seal/a-plan-is-applied-only-where-it-was-planned-for ()
-  "A plan says whether its archive is with a keeper, and which: one made
-before the scope's configuration changed is refused, and nothing is sent."
+  "A plan says whether its archive is with a keeper, and which.
+One made before the scope's configuration changed is refused, and
+nothing is sent."
   (pos-seal-test-with-kept "seal-kept-next"
     (should (equal (alist-get 'url (alist-get 'keeper fixture)) (alist-get 'kept plan)))
     (pos-test-write-bytes (expand-file-name ".pos/config.yaml" dir) "pos: 2\nprojects: projects/\n")
@@ -643,8 +649,9 @@ before the scope's configuration changed is refused, and nothing is sent."
       (should (file-exists-p source)))))
 
 (ert-deftest pos-seal/a-keeper-with-another-head-is-a-finding ()
-  "Asked, a keeper that holds what the ledger has is no finding, and one
-ahead of it is; what a keeper has erased is not."
+  "Asked, a keeper ahead of the ledger is a finding; one level is not.
+A keeper that holds what the ledger has is no finding, and one ahead
+of it is; what a keeper has erased is not."
   (dolist (expected '(("report-kept-asked" . nil) ("report-kept-erased" . nil)
                       ("report-kept-keeper-ahead" . t)))
     (let ((fixture (pos-fixture "ledger" (car expected))))
@@ -654,8 +661,8 @@ ahead of it is; what a keeper has erased is not."
                       (and (pos-seal-findings-p (pos-ledger-check dir)) t))))))))
 
 (ert-deftest pos-seal/a-check-told-to-stay-offline-asks-no-keeper ()
-  "With POS_ARCHIVE_OFFLINE set, a kept archive is reported from its
-ledger and nothing is sent."
+  "With POS_ARCHIVE_OFFLINE set, a kept archive is reported from its ledger.
+Nothing is sent."
   (pos-fixture-with (pos-fixture "ledger" "report-kept-asked") dir
     (let ((process-environment (cons "POS_ARCHIVE_OFFLINE=1" process-environment))
           (pos-ledger-offline nil)
@@ -665,8 +672,9 @@ ledger and nothing is sent."
         (should (eq :null (alist-get 'keeper report)))))))
 
 (ert-deftest pos-seal/the-tool-commit-is-the-image-s-else-git-s-else-unknown ()
-  "An image writes COMMIT beside the lisp directory; a checkout is asked
-of git; a plain copy of the files knows no commit."
+  "The tool's commit is read from COMMIT, from git, or is unknown.
+An image writes COMMIT beside the directory of Lisp sources; a checkout
+is asked of git; a plain copy of the files knows no commit."
   (pos-test-with-temp-dir dir
     (should-not (pos-seal-tool-commit dir))
     (pos-test-git-init dir)
@@ -682,9 +690,10 @@ of git; a plain copy of the files knows no commit."
     (should-not (pos-seal-tool-commit dir))))
 
 (ert-deftest pos-seal/the-claims-say-where-a-seal-came-from ()
-  "The plan, the tool and its commit, and of a repository git reads: the
-scope, the commit and branch, whether the tree is dirty, and each remote
-without the user and password its URL may hold."
+  "The claims name the plan, the tool and what git reads of the repository.
+The tool's commit; and the scope, the commit and branch, whether the
+tree is dirty, and each remote without the user and password its URL
+may hold."
   (pos-fixture-with (pos-fixture "ledger" "seal-kept-first") dir
     (let* ((root (file-truename dir))
            (pos-seal-tool-directory (expand-file-name "tool" root))

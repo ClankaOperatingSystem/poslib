@@ -39,22 +39,26 @@
   (pos-test-file-string (expand-file-name "intray.org" root)))
 
 (ert-deftest pos-capture/files-the-task-at-the-end-of-unsorted ()
+  "A captured task is filed at the end of Unsorted, trimmed, as a TODO."
   (pos-capture-test-with-intray "* Unsorted\n** TODO here\n* Sorted\n"
     (should (equal 3 (pos-capture root "  Make time for sketching ")))
     (should (equal "* Unsorted\n** TODO here\n** TODO Make time for sketching\n* Sorted\n"
                    (pos-capture-test-intray root)))))
 
 (ert-deftest pos-capture/refuses-an-empty-or-multi-line-title ()
+  "An empty or multi-line title is refused and the intray is unchanged."
   (pos-capture-test-with-intray "* Unsorted\n"
     (should-error (pos-capture root "   ") :type 'user-error)
     (should-error (pos-capture root "two\nlines") :type 'user-error)
     (should (equal "* Unsorted\n" (pos-capture-test-intray root)))))
 
 (ert-deftest pos-capture/refuses-a-root-without-an-intray ()
+  "A root without an intray.org is refused."
   (pos-test-with-temp-dir root
     (should-error (pos-capture root "a task") :type 'user-error)))
 
 (ert-deftest pos-capture/refuses-an-intray-with-unsaved-edits ()
+  "An intray with unsaved edits in a buffer is refused."
   (pos-capture-test-with-intray "* Unsorted\n"
     (with-current-buffer (find-file-noselect (expand-file-name "intray.org" root))
       (goto-char (point-max))

@@ -31,8 +31,9 @@
 (require 'pos-fixtures)
 
 (defmacro pos-index-test-with-sealed (&rest body)
-  "Evaluate BODY with `scope' holding a sealed trial/ and a sealed note.md,
-`trial-cid' and `note-cid' their CIDs."
+  "Evaluate BODY with `scope' holding two sealed items.
+A sealed trial/ and a sealed note.md, with `trial-cid' and `note-cid'
+their CIDs."
   (declare (indent 0))
   `(pos-test-with-scope
      (pos-test-write-bytes (expand-file-name "note.md" scope) "note")
@@ -46,8 +47,9 @@
        ,@body)))
 
 (ert-deftest pos-index/a-cid-and-a-path-name-a-file-in-an-item ()
-  "ipfs://ITEM-CID/PATH names a file within a sealed directory; a file
-sealed alone is ipfs://ITS-CID."
+  "A link names a file by its item's CID and path, or by its own CID.
+That is ipfs://ITEM-CID/PATH for a file within a sealed directory, and
+ipfs://ITS-CID for a file sealed alone."
   (pos-index-test-with-sealed
     (should (equal (file-truename (expand-file-name "archives/trial/result.md" scope))
                    (pos-index-resolve scope (concat "ipfs://" trial-cid "/result.md"))))
@@ -56,8 +58,8 @@ sealed alone is ipfs://ITS-CID."
     (should-error (pos-index-resolve scope "ipfs://bafkreiaaaa"))))
 
 (ert-deftest pos-index/the-index-is-ephemera ()
-  "Deleted, the index is rebuilt from the sealed archives when needed,
-byte for byte as it was."
+  "A deleted index is rebuilt from the sealed archives when needed.
+It comes back byte for byte as it was."
   (pos-index-test-with-sealed
     (pos-index-build scope)
     (let* ((file (expand-file-name pos-index-file scope))
@@ -67,8 +69,9 @@ byte for byte as it was."
       (should (equal saved (pos-ledger-read file))))))
 
 (ert-deftest pos-index/a-kept-archive-is-indexed-from-its-ledger ()
-  "What a keeper keeps is not on disk to hash, so the index of a kept
-archive holds the CIDs its ledger folds to, at the paths they would have."
+  "The index of a kept archive holds the CIDs its ledger folds to.
+What a keeper keeps is not on disk to hash, so the ledger's CIDs stand
+at the paths the files would have."
   (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
     (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
            (cids (pos-ledger-fold-cids (expand-file-name "archives" scope)))
@@ -99,8 +102,8 @@ with the bytes \"result\"."
          ,@body))))
 
 (ert-deftest pos-index/a-file-a-keeper-keeps-resolves-to-where-the-keeper-has-it ()
-  "By its item's CID and its path, or by its own CID, a file sealed to a
-keeper resolves to the keeper's URL for the file's CID.  A directory
+  "A file sealed to a keeper resolves to the keeper's URL for its CID.
+By its item's CID and its path, or by its own CID.  A directory
 resolves to nothing: the protocol reads files."
   (pos-index-test-with-kept
     (let ((there (concat url "/ipfs/" (cdr (assoc "trial/result.txt" cids)))))
@@ -113,8 +116,9 @@ resolves to nothing: the protocol reads files."
       (should-not asked))))
 
 (ert-deftest pos-index/org-follows-an-ipfs-link-to-its-keeper ()
-  "An ipfs: link to a file a keeper keeps is fetched from the keeper,
-with the caller's token, and shown read-only in the mode its name gives."
+  "A kept file's ipfs: link is fetched from its keeper and shown.
+The request carries the caller's token, and the file is shown read-only
+in the mode its name gives."
   (pos-index-test-with-kept
     (let ((canon (expand-file-name "notes.org" scope))
           (file-cid (cdr (assoc "trial/result.txt" cids))))
@@ -137,8 +141,8 @@ with the caller's token, and shown read-only in the mode its name gives."
           (kill-buffer))))))
 
 (ert-deftest pos-index/a-link-s-bytes-are-read-from-disk ()
-  "The bytes of the file a link names, by its item's CID and its path or
-by its own CID, from a directory beneath the scope, an Org search after
+  "A link's bytes are read from the archive beneath the scope.
+By its item's CID and its path or by its own CID, an Org search after
 :: left aside.  A directory, a CID no archive has and text that is no
 link are refused as absent."
   (pos-index-test-with-sealed
@@ -157,9 +161,10 @@ link are refused as absent."
                                            :type 'pos-ledger-refused))))))))
 
 (ert-deftest pos-index/a-link-s-bytes-are-read-from-its-keeper ()
-  "The bytes of a file a keeper keeps are read from the keeper, with the
-caller's token, by the CID the ledger enrols the file under.  Bytes that
-are not that CID's are refused as entry."
+  "A kept file's bytes are read from the keeper by its ledger CID.
+The request carries the caller's token, and asks for the CID the ledger
+enrols the file under.  Bytes that are not that CID's are refused as
+entry."
   (pos-index-test-with-kept
     (let ((file-cid (cdr (assoc "trial/result.txt" cids))))
       (should (equal "result" (pos-index-bytes
@@ -172,8 +177,9 @@ are not that CID's are refused as entry."
                                            :type 'pos-ledger-refused))))))))
 
 (ert-deftest pos-index/a-program-prints-a-link-s-bytes ()
-  "fetch LINK prints the file's bytes as they are, whatever they are; a
-link to no archived file exits 2 and prints nothing."
+  "The fetch command prints a link's bytes as they are.
+Whatever they are; a link to no archived file exits 2 and prints
+nothing."
   (pos-test-with-scope
     (let ((bytes (concat (apply #'unibyte-string (number-sequence 0 255)) "\r\n\303\251")))
       (let ((coding-system-for-write 'binary))
@@ -200,9 +206,9 @@ link to no archived file exits 2 and prints nothing."
         (should (equal '(2 "") (funcall run (concat "ipfs://" cid "/other.bin"))))))))
 
 (ert-deftest pos-index/a-fetched-file-is-decoded-as-its-bytes-say ()
-  "A kept file of bytes that are not text is shown as visiting it would
-show it: undecoded, one character a byte, though some of its bytes
-would read as UTF-8.  UTF-8 text is still text."
+  "A kept file of bytes that are not text is shown undecoded.
+As visiting it would show it: one character a byte, though some of its
+bytes would read as UTF-8.  UTF-8 text is still text."
   (pos-index-test-with-kept
     (let ((uri (concat "ipfs://" (cdr (assoc "trial/result.txt" cids))))
           (bytes (concat (apply #'unibyte-string (number-sequence 0 255)) "\303\251\377")))

@@ -15,8 +15,8 @@
 (setq pos-roam-cache-directory (make-temp-file "pos-roam-test-" t))
 
 (ert-deftest pos-roam-files/never-enters-an-excluded-directory ()
-  "Archives, attics, and hidden and underscore directories are not
-indexed, at any depth."
+  "Excluded directories are not indexed, at any depth.
+Archives, attics, and hidden and underscore directories."
   (pos-test-with-files root '(("a.org" . "") ("sub/b.org" . "")
                               ("archives/x.org" . "") ("sub/attic/y.org" . "")
                               ("_work/z.org" . "") (".hidden/h.org" . "")
@@ -26,8 +26,9 @@ indexed, at any depth."
                            (pos-roam-files root))))))
 
 (ert-deftest pos-roam-referrers/are-the-id-links-the-index-records ()
-  "A link is recorded where a node holds it: in a file with an ID, or
-under a heading with one.  A link in a file with neither is not."
+  "A link is recorded where a node holds it.
+In a file with an ID, or under a heading with one.  A link in a file
+with neither is not."
   (pos-test-with-files root '(("a.org" . "* Target\n:PROPERTIES:\n:ID: target\n:END:\n")
                               ("b.org" . ":PROPERTIES:\n:ID: file-b\n:END:\nSee [[id:target][it]].\n")
                               ("c.org" . "* Note\n:PROPERTIES:\n:ID: note-c\n:END:\n[[id:target]]\n")
@@ -52,8 +53,9 @@ under a heading with one.  A link in a file with neither is not."
       (should (equal 1 (length (pos-roam-referrers "target")))))))
 
 (ert-deftest pos-roam-rewrite-link/rewrites-the-link-there-and-no-other ()
-  "The link at the recorded place is pointed elsewhere; one that has
-moved is left, and reported; a dry run reports without writing."
+  "The link at the recorded place is pointed elsewhere.
+One that has moved is left, and reported; a dry run reports without
+writing."
   (pos-test-with-files root '(("b.org" . "Lead [[id:old][x]] and [[id:old]].\n"))
     (let ((file (expand-file-name "b.org" root)))
       (should (pos-roam-rewrite-link file 6 "old" "new" t))
@@ -66,8 +68,8 @@ moved is left, and reported; a dry run reports without writing."
                      (pos-test-file-string file))))))
 
 (ert-deftest pos-roam-db-location/is-the-users-only-around-the-root ()
-  "A root within `org-roam-directory' is served by that index; any
-other root has one of its own, named by its path, in the cache."
+  "A root within `org-roam-directory' is served by that index.
+Any other root has one of its own, named by its path, in the cache."
   (pos-test-with-files root '(("a.org" . ""))
     (let ((org-roam-directory (file-name-directory (directory-file-name root)))
           (org-roam-db-location "/nowhere/theirs.db"))
@@ -80,8 +82,8 @@ other root has one of its own, named by its path, in the cache."
                      (pos-roam-db-location root))))))
 
 (ert-deftest pos-roam-with-index/writes-no-database-of-the-users-elsewhere ()
-  "Indexing a tree outside the user's `org-roam-directory' leaves their
-database alone, whatever org-roam's variables are rebound to meanwhile."
+  "Indexing a tree outside `org-roam-directory' leaves its database alone.
+Whatever org-roam's variables are rebound to meanwhile."
   (pos-test-with-files root '(("a.org" . "* Target\n:PROPERTIES:\n:ID: target\n:END:\n"))
     (let* ((theirs (expand-file-name "theirs.db" root))
            (org-roam-directory (expand-file-name "elsewhere" root))

@@ -54,9 +54,9 @@ As the tape writes it: an object, or for bytes an object holding them."
                  .following))))))
 
 (ert-deftest pos-remote/the-client-makes-each-tape-s-requests ()
-  "Every tape in fixtures/remote/: for each call the request recorded is
-sent, byte for byte, and the response gives the result or the refusal
-recorded."
+  "Every tape in fixtures/remote/ plays as recorded.
+For each call the request recorded is sent, byte for byte, and the
+response gives the result or the refusal recorded."
   (dolist (named (pos-fixtures "remote"))
     (let* ((tape (cdr named))
            (base (alist-get 'url tape))
@@ -89,8 +89,8 @@ recorded."
         (setq index (1+ index))))))
 
 (ert-deftest pos-remote/a-status-alone-names-the-refusal ()
-  "An answer with no body to say why is refused by what its status means,
-and one that means nothing here, as remote."
+  "An answer with no body to say why is refused by its status.
+By what the status means; one that means nothing here, as remote."
   (let ((archive (pos-remote-http-create :url "https://keeper.example/ledger")))
     (pcase-dolist (`(,status . ,kind) '((401 . "access") (403 . "access") (404 . "absent")
                                         (409 . "chain") (410 . "erased") (413 . "size")
@@ -114,7 +114,8 @@ ledger, then NAMED that name one."
     (nreverse events)))
 
 (ert-deftest pos-remote/an-event-that-names-no-ledger-is-followed-to-the-first-that-does ()
-  "Each of the first events that name none is followed by the rest of
+  "An event is followed by what must be sent with it, and no more.
+Each of the first events that name none is followed by the rest of
 them and the first that names the ledger, and by no more; an event that
 names the ledger, or comes after one, by nothing."
   (let ((events (pos-remote-test-begun 3 2)))
@@ -131,8 +132,9 @@ names the ledger, or comes after one, by nothing."
                            '(1 2 3))))))
 
 (ert-deftest pos-remote/later-events-travel-after-the-claims-and-before-the-files ()
-  "The parts of an append: name, event, claims, the events after it in
-order, then the files by CID."
+  "An append is sent in parts, in order.
+Name, event, claims, the events after it in order, then the files by
+CID."
   (let* ((events (pos-remote-test-begun 2 1))
          sent
          (pos-remote-send-function

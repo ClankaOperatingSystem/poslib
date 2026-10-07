@@ -46,7 +46,7 @@
                                       process-environment))
            (status (apply #'call-process pos-cid-ipfs-program nil t nil args)))
       (unless (eql status 0)
-        (error "ipfs %s failed: %s" (car args) (buffer-string)))
+        (error "Running ipfs %s failed: %s" (car args) (buffer-string)))
       (string-trim (buffer-string)))))
 
 (defun pos-cid-ipfs-add (repo fixture path)
