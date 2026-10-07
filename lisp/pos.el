@@ -22,10 +22,12 @@
 
 ;;; Commentary:
 
-;; - Weekly sweep: done items to dated archives.
-;; - Lint: stranded, duplicate, malformed tasks.
-;; - Plans: refile the intray, resolve duplicates.
-;; - Same from M-x and batch Emacs.
+;; The commands over a tree's Org files: the weekly sweep of done items
+;; to dated archives; the lint for duplicate and malformed tasks; and
+;; the plans, reviewed then applied, that refile the intray and resolve
+;; duplicates.  Each reads the corpus, pos-corpus.el: every Org file
+;; the tree's configurations allow, and writes only the files of the
+;; root's own repository.  The same from M-x and batch Emacs.
 
 ;;; Code:
 
@@ -34,6 +36,7 @@
 (require 'seq)
 (require 'cl-lib)
 (require 'pos-roam)
+(require 'pos-corpus)
 
 (defgroup pos nil
   "A personal operating system in Org files."
@@ -68,21 +71,16 @@
 
 ;;;; Files and paths
 
-(defcustom pos-pillars nil
-  "Root subdirectories, one per area."
-  :type '(repeat string)
-  :group 'pos)
-
-(defun pos-org-files (root)
-  "Return the Org files the sweep covers under ROOT.
-Top level of ROOT and of each of `pos-pillars'; missing ones skipped."
-  (let ((dirs (cons root
-                    (mapcar (lambda (p) (expand-file-name p root))
-                            pos-pillars))))
-    (mapcan (lambda (dir)
-              (when (file-directory-p dir)
-                (directory-files dir t "\\.org\\'")))
-            dirs)))
+(defun pos-files (root &optional writable)
+  "Return the Org files of the tree at ROOT: its corpus, sorted.
+With WRITABLE, only those a command of ROOT may write: the files of
+the root's own repository, not those of a repository mounted within
+it, which that repository's own configuration governs."
+  (let ((corpus (pos-corpus root)))
+    (if writable
+        (seq-filter (lambda (file) (pos-corpus-writable-p corpus file))
+                    (pos-corpus-files corpus))
+      (pos-corpus-files corpus))))
 
 (defcustom pos-archive-directory "archive/orgmode"
   "Archive directory, relative to the root; one subdirectory per week."
@@ -189,10 +187,21 @@ Return (:archived COUNT :skipped HEADINGS)."
   :type 'string
   :group 'pos)
 
+(defconst pos-retired-settings
+  '((pos-pillars . "the files are every Org file the configuration allows")
+    (pos-startup-excluded-directories
+     . "the directories not read are declared under exclude in the configuration"))
+  "Settings pos-config.el once set, each with what replaced it.")
+
 (defun pos-load-config (&optional root)
   "Load the `pos-config-file' of ROOT, default `pos-directory', if present.
-Return non-nil if loaded."
-  (load (expand-file-name pos-config-file (or root pos-directory)) t t t))
+Return non-nil if loaded.  A retired setting the file still sets is
+reported, and ignored."
+  (prog1 (load (expand-file-name pos-config-file (or root pos-directory)) t t t)
+    (pcase-dolist (`(,setting . ,replacement) pos-retired-settings)
+      (when (boundp setting)
+        (message "%s sets %s, which is no longer read: %s"
+                 pos-config-file setting replacement)))))
 
 (defun pos-report (week result)
   "Return a report of RESULT, a sweep of WEEK, naming skipped entries."
@@ -206,16 +215,17 @@ Return non-nil if loaded."
                           skipped "\n"))))))
 
 (defun pos-sweep (&optional week time)
-  "Archive done entries in covered files to WEEK's archive, stamped TIME.
-Both default to the latest sweep boundary.
-Return (:archived COUNT :skipped HEADINGS)."
+  "Archive done entries in the tree's files to WEEK's archive, stamped TIME.
+Both default to the latest sweep boundary.  The files are those of
+the corpus a command may write.  Return (:archived COUNT :skipped
+HEADINGS)."
   (interactive)
   (let* ((time (or time (pos-sweep-boundary (current-time))))
          (week (or week (pos-week-name time)))
          (root (file-name-as-directory pos-directory))
          (archived 0)
          (skipped nil))
-    (dolist (file (pos-org-files root))
+    (dolist (file (pos-files root t))
       (let ((result (pos-archive-done-in-file root file week time)))
         (setq archived (+ archived (plist-get result :archived)))
         (setq skipped (append skipped (plist-get result :skipped)))
@@ -252,11 +262,12 @@ Return (:lines-removed N :respelled N)."
     (list :lines-removed lines-removed :respelled respelled)))
 
 (defun pos-normalise-keywords ()
-  "Run `pos-normalise-keywords-in-file' on covered files; return totals."
+  "Run `pos-normalise-keywords-in-file' on the tree's files; return totals.
+The files are those of the corpus a command may write."
   (interactive)
   (let ((lines-removed 0)
         (respelled 0))
-    (dolist (file (pos-org-files (file-name-as-directory pos-directory)))
+    (dolist (file (pos-files (file-name-as-directory pos-directory) t))
       (let ((result (pos-normalise-keywords-in-file file)))
         (setq lines-removed (+ lines-removed (plist-get result :lines-removed))
               respelled (+ respelled (plist-get result :respelled)))))
@@ -329,17 +340,22 @@ Return (:lines-removed N :respelled N)."
   :group 'pos)
 
 (defun pos-uncovered-org-files (root)
-  "Return Org files under ROOT the sweep does not cover.
-Excludes archive, prose and hidden directories."
-  (let ((covered (pos-org-files root))
+  "Return Org files under ROOT that are not in its corpus.
+A walk of its own, kept as it was: every Org file beneath ROOT but
+those in the archive, prose and hidden directories, less the files
+the corpus reads.  A lock file, which Emacs leaves as a dangling link
+beside a file being edited, is not one; visiting it would wait on a
+question."
+  (let ((covered (pos-files root))
         (excluded (mapcar (lambda (dir)
                             (file-name-as-directory (expand-file-name dir root)))
                           (cons pos-archive-directory pos-prose-directories))))
     (seq-remove (lambda (file)
-                  (seq-some (lambda (dir) (string-prefix-p dir file)) excluded))
+                  (or (file-symlink-p file)
+                      (seq-some (lambda (dir) (string-prefix-p dir file)) excluded)))
                 (seq-difference
                  (directory-files-recursively
-                  root "\\.org\\'" nil
+                  root "\\`[^.#].*\\.org\\'" nil
                   (lambda (dir)
                     (not (string-prefix-p "." (file-name-nondirectory dir)))))
                  covered))))
@@ -357,7 +373,7 @@ Excludes archive, prose and hidden directories."
           (pos-uncovered-org-files root)))
 
 (defun pos--task-headings (root)
-  "Return (KEY FILE LINE) for keyword headings in covered files under ROOT.
+  "Return (KEY FILE LINE) for keyword headings in the files of ROOT's corpus.
 KEY is the lower-cased heading text."
   (mapcan (lambda (file)
             (pos--map-headings
@@ -366,10 +382,10 @@ KEY is the lower-cased heading text."
                (when (org-get-todo-state)
                  (list (downcase (string-trim (org-get-heading t t t t)))
                        file (line-number-at-pos))))))
-          (pos-org-files root)))
+          (pos-files root)))
 
 (defun pos-lint-duplicate-tasks (root)
-  "Report task headings in more than one covered file under ROOT.
+  "Report task headings in more than one file of ROOT's corpus.
 Each copy names the others."
   (let ((findings nil))
     (dolist (group (seq-group-by #'car (pos--task-headings root)))
@@ -402,7 +418,7 @@ Each copy names the others."
              findings ""))
 
 (defun pos-lint ()
-  "Lint covered files; return findings sorted by file and line.
+  "Lint the files of the corpus; return findings sorted by file and line.
 Interactively, show them in a compilation buffer."
   (interactive)
   (let* ((root (file-name-as-directory pos-directory))
@@ -411,7 +427,7 @@ Interactively, show them in a compilation buffer."
                  (mapcan (lambda (file)
                            (mapcan (lambda (check) (funcall check file))
                                    pos-lint-checks))
-                         (pos-org-files root))
+                         (pos-files root))
                  (mapcan (lambda (check) (funcall check root))
                          pos-lint-repo-checks))
                 (lambda (a b)
@@ -561,7 +577,7 @@ Keys: :key :heading :file :line :parent :body :id."
                          :parent (car (last (org-get-outline-path)))
                          :body (pos--subtree-body)
                          :id (org-entry-get nil "ID")))))))
-          (pos-org-files root)))
+          (pos-files root)))
 
 (defun pos-dedupe-groups (root)
   "Return groups of duplicate tasks under ROOT."
@@ -716,12 +732,16 @@ over."
 
 (defun pos-dedupe-apply (root plan &optional dry-run)
   "Apply dedupe PLAN to ROOT; with DRY-RUN change nothing.
-Return (:resolved :merged :relinked :skipped :vanished :stale) counts.
-A dropped copy's ID passes to the kept copy where it has none; else each
-\"id:\" link to it that the index records is pointed at the kept copy's,
-and :relinked counts them."
+Return (:resolved :merged :relinked :skipped :unwritable :vanished
+:stale) counts.  A group with a copy in a file a command of ROOT may
+not write, one of another repository's, is left as it is and counted
+unwritable.  A dropped copy's ID passes to the kept copy where it has
+none; else each \"id:\" link to it that the index records is pointed
+at the kept copy's, and :relinked counts them."
   (pos-roam-with-index root
-  (let ((resolved 0) (merged 0) (relinked 0) (skipped 0) (vanished 0) (stale 0)
+  (let ((resolved 0) (merged 0) (relinked 0) (skipped 0) (unwritable 0)
+        (vanished 0) (stale 0)
+        (corpus (pos-corpus root))
         (make-backup-files nil)
         (jobs nil) (touched nil))
     ;; Resolve all markers before any edit.
@@ -730,8 +750,14 @@ and :relinked counts them."
              (copies (cdr group))
              (keeps (seq-filter (lambda (c) (equal (car c) "keep")) copies))
              (drops (seq-filter (lambda (c) (equal (car c) "drop")) copies)))
-        (if (not (and (= 1 (length keeps)) drops))
-            (setq skipped (1+ skipped))
+        (cond
+         ((not (and (= 1 (length keeps)) drops))
+          (setq skipped (1+ skipped)))
+         ((seq-some (lambda (c)
+                      (not (pos-corpus-writable-p corpus (expand-file-name (nth 1 c) root))))
+                    copies)
+          (setq unwritable (1+ unwritable)))
+         (t
           (let ((markers (mapcar (lambda (c) (pos--marker-at root (nth 1 c) (nth 2 c) key))
                                  (cons (car keeps) drops))))
             (if (memq nil markers)
@@ -742,7 +768,7 @@ and :relinked counts them."
                                              (cons marker (format "Merged copy from %s:%d"
                                                                   (nth 1 d) (nth 2 d))))
                                            (cdr markers) drops)))
-                    jobs))))))
+                    jobs)))))))
     (setq jobs (nreverse jobs))
     (dolist (job jobs)
       (pcase-let ((`(,key ,keep . ,drops) job))
@@ -783,17 +809,18 @@ and :relinked counts them."
         (with-current-buffer buffer
           (when (buffer-modified-p) (save-buffer)))))
     (list :resolved resolved :merged merged :relinked relinked :skipped skipped
-          :vanished vanished :stale stale))))
+          :unwritable unwritable :vanished vanished :stale stale))))
 
 (defun pos-dedupe-report (result dry-run)
   "Return a report of RESULT from `pos-dedupe-apply'; DRY-RUN words it."
-  (format "%s %d duplicate group%s (%d merged, %d links relinked, %d skipped as undecided, %d gone with an earlier cut, %d stale)"
+  (format "%s %d duplicate group%s (%d merged, %d links relinked, %d skipped as undecided, %d with a copy the root may not write, %d gone with an earlier cut, %d stale)"
           (if dry-run "Would resolve" "Resolved")
           (plist-get result :resolved)
           (if (= 1 (plist-get result :resolved)) "" "s")
           (plist-get result :merged)
           (plist-get result :relinked)
           (plist-get result :skipped)
+          (plist-get result :unwritable)
           (plist-get result :vanished)
           (plist-get result :stale)))
 
@@ -820,12 +847,14 @@ The index is brought up to date with what was written."
 ;;;; Refiling the intray
 
 (defcustom pos-refile-rules nil
-  "Heading to pillar rules, (REGEXP . PILLAR); first match wins."
+  "Where a heading belongs, as (REGEXP . FILE); the first match wins.
+FILE is an Org file relative to the root, which a refile plan proposes
+as the target of a heading REGEXP matches."
   :type '(alist :key-type regexp :value-type string)
   :group 'pos)
 
 (defun pos-refile-suggest (heading)
-  "Return the pillar `pos-refile-rules' suggests for HEADING, or nil."
+  "Return the file `pos-refile-rules' suggests for HEADING, or nil."
   (let ((case-fold-search t))
     (cdr (seq-find (lambda (rule) (string-match-p (car rule) heading))
                    pos-refile-rules))))
@@ -870,12 +899,12 @@ One row per entry; each subtree quoted below."
               "| act | line | heading | file | under | excerpt |\n|-\n")
       (dolist (entry candidates)
         (pcase-let* ((`(,line ,heading ,_section ,subtree) entry)
-                     (pillar (pos-refile-suggest heading)))
+                     (target (pos-refile-suggest heading)))
           (insert (format "| %s | %d | %s | %s | | %s |\n"
-                          (if pillar "move" "?")
+                          (if target "move" "?")
                           line
                           (replace-regexp-in-string "|" "/" heading)
-                          (if pillar (format "%s/%s-projects.org" pillar pillar) "")
+                          (or target "")
                           (pos--excerpt subtree)))))
       (org-mode)
       (org-table-map-tables #'org-table-align t)
@@ -928,9 +957,12 @@ Return nil if the path is absent."
 
 (defun pos-refile-apply (root plan &optional dry-run)
   "Apply refile PLAN to ROOT's intray; with DRY-RUN change nothing.
-Return (:moved :left :missing :vanished) counts."
-  (let ((moved 0) (left 0) (missing 0) (vanished 0)
+Return (:moved :left :missing :unwritable :vanished) counts.  A row
+whose target is a file a command of ROOT may not write, one of another
+repository's, is left and counted unwritable."
+  (let ((moved 0) (left 0) (missing 0) (unwritable 0) (vanished 0)
         (make-backup-files nil)
+        (corpus (pos-corpus root))
         (intray (pos-visit (expand-file-name "intray.org" root)))
         (jobs nil))
     (dolist (row (pos-refile-read-plan plan))
@@ -946,8 +978,12 @@ Return (:moved :left :missing :vanished) counts."
     (dolist (job jobs)
       (pcase-let ((`(,marker ,target ,under) job))
         (let ((target-file (expand-file-name target root)))
-          (if (not (file-exists-p target-file))
-              (setq missing (1+ missing))
+          (cond
+           ((not (file-exists-p target-file))
+            (setq missing (1+ missing)))
+           ((not (pos-corpus-writable-p corpus target-file))
+            (setq unwritable (1+ unwritable)))
+           (t
             (with-current-buffer (pos-visit target-file)
               (let ((level (save-excursion (pos--goto-refile-target under))))
                 (if (null level)
@@ -958,22 +994,24 @@ Return (:moved :left :missing :vanished) counts."
                       (goto-char marker)
                       (org-cut-subtree))
                     (pos--goto-refile-target under)
-                    (org-paste-subtree level)))))))))
+                    (org-paste-subtree level))))))))))
     (unless dry-run
       (with-current-buffer intray (when (buffer-modified-p) (save-buffer)))
       (dolist (job jobs)
         (with-current-buffer (pos-visit (expand-file-name (nth 1 job) root))
           (when (buffer-modified-p) (save-buffer)))))
-    (list :moved moved :left left :missing missing :vanished vanished)))
+    (list :moved moved :left left :missing missing :unwritable unwritable
+          :vanished vanished)))
 
 (defun pos-refile-report (result dry-run)
   "Return a report of RESULT from `pos-refile-apply'; DRY-RUN words it."
-  (format "%s %d intray entr%s (%d left, %d with a missing target, %d no longer at their line)"
+  (format "%s %d intray entr%s (%d left, %d with a missing target, %d with a target the root may not write, %d no longer at their line)"
           (if dry-run "Would refile" "Refiled")
           (plist-get result :moved)
           (if (= 1 (plist-get result :moved)) "y" "ies")
           (plist-get result :left)
           (plist-get result :missing)
+          (plist-get result :unwritable)
           (plist-get result :vanished)))
 
 (defun pos-refile-plan-batch (file)
