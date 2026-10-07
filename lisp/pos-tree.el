@@ -695,7 +695,8 @@ mounted as declared, by this repository or by a directory of it."
 (defun pos-tree--entries (dir)
   "Return the names in the skills directory of the repository at DIR."
   (let ((skills (pos-tree--skills-dir dir)))
-    (and (file-directory-p skills)
+    (and (pos-tree--skill-path-open-p dir ".agents/skills")
+         (file-directory-p skills)
          (directory-files skills nil directory-files-no-dot-files-regexp))))
 
 (defun pos-tree--linkable (dir)
@@ -725,20 +726,28 @@ in another repository of the tree."
          (not (equal (file-name-directory target) skills))
          (not (pos-tree--tracked-p dir (concat ".agents/skills/" name))))))
 
+(defun pos-tree--skill-path-open-p (dir path)
+  "Whether PATH under DIR can hold managed skills without replacing content.
+Existing components must be ordinary directories, never symbolic links."
+  (let ((at dir))
+    (seq-every-p
+     (lambda (part)
+       (setq at (expand-file-name part at))
+       (and (not (file-symlink-p at))
+            (or (not (file-exists-p at)) (file-directory-p at))))
+     (split-string path "/" t))))
+
 (defun pos-tree--claude-link (dir wanted)
   "Plan the .claude/skills link of the repository at DIR.
-It is made only if WANTED, which says the repository has skills."
-  (let* ((link (expand-file-name ".claude/skills" dir))
-         (to (file-symlink-p link)))
-    (cond
-     ((and (stringp to) (equal (directory-file-name to) "../.agents/skills")))
-     (to (pos-tree--find "claude-skills" (pos-tree--rel link) "a link elsewhere"))
-     ((file-exists-p link)
-      (pos-tree--find "claude-skills" (pos-tree--rel link) "not a link"))
-     (wanted
+It is made only if WANTED and absent.  Existing layouts are left alone."
+  (let ((link (expand-file-name ".claude/skills" dir)))
+    (when (and wanted
+               (pos-tree--skill-path-open-p dir ".claude")
+               (not (file-symlink-p link))
+               (not (file-exists-p link)))
       (pos-tree--exclude dir ".claude/skills")
       (pos-tree--act "link" `(path . ,(pos-tree--rel link))
-                     '(target . "../.agents/skills"))))))
+                     '(target . "../.agents/skills")))))
 
 (defun pos-tree--links (node containers)
   "Plan the skill links of NODE and of the repositories beneath it.
@@ -750,49 +759,50 @@ of its linkable skills."
          (made (seq-filter (lambda (name) (pos-tree--tool-link-p dir name)) entries))
          (taken (seq-difference entries made))
          desired offered)
-    ;; Down: each container's own skills, the nearer first.
-    (dolist (container containers)
-      (dolist (skill container)
-        (unless (or (member (car skill) taken) (assoc (car skill) desired))
-          (push skill desired))))
-    ;; Up: the own skills of each child marked for it.
-    (dolist (child (pos-tree--node-children node))
-      (when (eq (alist-get 'skills-up (car child)) t)
-        (dolist (skill (pos-tree--linkable (pos-tree--node-dir (cdr child))))
+    (when (pos-tree--skill-path-open-p dir ".agents/skills")
+      ;; Down: each container's own skills, the nearer first.
+      (dolist (container containers)
+	(dolist (skill container)
           (unless (or (member (car skill) taken) (assoc (car skill) desired))
-            (push skill offered)))))
-    (dolist (skill (reverse offered))
-      (cond
-       ((= 1 (seq-count (lambda (other) (equal (car other) (car skill))) offered))
-        (push skill desired))
-       ((eq skill (seq-find (lambda (other) (equal (car other) (car skill)))
-                            (reverse offered)))
-        (pos-tree--find "name-clash"
-                        (pos-tree--rel (expand-file-name (car skill) skills))))))
-    (setq desired (sort desired (lambda (a b) (string< (car a) (car b)))))
-    (dolist (skill desired)
-      (let* ((name (car skill))
-             (link (expand-file-name name skills))
-             (target (file-relative-name (cdr skill) skills)))
-        (pos-tree--exclude dir (concat ".agents/skills/" name))
-        (cond
-         ((not (member name made))
-          (pos-tree--act "link" `(path . ,(pos-tree--rel link)) `(target . ,target)))
-         ((not (equal (file-symlink-p link) target))
-          (pos-tree--act "unlink" `(path . ,(pos-tree--rel link)))
-          (pos-tree--act "link" `(path . ,(pos-tree--rel link)) `(target . ,target))))))
-    ;; A link into a child that is held is left: nothing is done about a
-    ;; child with a finding, its skills in this repository included.
-    (dolist (name made)
-      (let ((target (expand-file-name
-                     (file-symlink-p (expand-file-name name skills)) skills)))
-        (unless (or (assoc name desired)
-                    (seq-some (lambda (dir)
-                                (string-prefix-p (file-name-as-directory dir) target))
-                              (pos-tree--node-held node)))
-          (pos-tree--act "unlink"
-                         `(path . ,(pos-tree--rel (expand-file-name name skills)))))))
-    (pos-tree--claude-link dir (or desired entries))
+            (push skill desired))))
+      ;; Up: the own skills of each child marked for it.
+      (dolist (child (pos-tree--node-children node))
+	(when (eq (alist-get 'skills-up (car child)) t)
+          (dolist (skill (pos-tree--linkable (pos-tree--node-dir (cdr child))))
+            (unless (or (member (car skill) taken) (assoc (car skill) desired))
+              (push skill offered)))))
+      (dolist (skill (reverse offered))
+	(cond
+	 ((= 1 (seq-count (lambda (other) (equal (car other) (car skill))) offered))
+          (push skill desired))
+	 ((eq skill (seq-find (lambda (other) (equal (car other) (car skill)))
+                              (reverse offered)))
+          (pos-tree--find "name-clash"
+                          (pos-tree--rel (expand-file-name (car skill) skills))))))
+      (setq desired (sort desired (lambda (a b) (string< (car a) (car b)))))
+      (dolist (skill desired)
+	(let* ((name (car skill))
+               (link (expand-file-name name skills))
+               (target (file-relative-name (cdr skill) skills)))
+          (pos-tree--exclude dir (concat ".agents/skills/" name))
+          (cond
+           ((not (member name made))
+            (pos-tree--act "link" `(path . ,(pos-tree--rel link)) `(target . ,target)))
+           ((not (equal (file-symlink-p link) target))
+            (pos-tree--act "unlink" `(path . ,(pos-tree--rel link)))
+            (pos-tree--act "link" `(path . ,(pos-tree--rel link)) `(target . ,target))))))
+      ;; A link into a child that is held is left: nothing is done about a
+      ;; child with a finding, its skills in this repository included.
+      (dolist (name made)
+	(let ((target (expand-file-name
+                       (file-symlink-p (expand-file-name name skills)) skills)))
+          (unless (or (assoc name desired)
+                      (seq-some (lambda (dir)
+                                  (string-prefix-p (file-name-as-directory dir) target))
+				(pos-tree--node-held node)))
+            (pos-tree--act "unlink"
+                           `(path . ,(pos-tree--rel (expand-file-name name skills)))))))
+      (pos-tree--claude-link dir (or desired entries)))
     (let ((below (cons (pos-tree--linkable dir) containers)))
       (dolist (child (pos-tree--node-children node))
         (pos-tree--links (cdr child) below)))))

@@ -239,11 +239,17 @@ Nothing is written outside the tree.
 
 6. Skills
 
-A repository's skills are in .agents/skills/, one directory each,
-holding a SKILL.md. .claude/skills is only ever a symbolic link to
-../.agents/skills. A skill committed beneath .claude/skills is a
-finding, and its repair is to move the skill to .agents/skills and make
-the link.
+ClankOS shares skills from .agents/skills/, one directory each, holding
+a SKILL.md. Repositories may keep other skill layouts. Existing files,
+directories and links at .claude/skills are left alone, without a
+finding or a migration. Discovering and evaluating skills in other
+locations is separate from bringing the tree to its declarations.
+
+If .agents or .agents/skills is a file or symbolic link, that
+repository's skill layout is left alone: no skills are read from it or
+linked into it. An ordinary .agents/skills directory can contain other
+files; they keep their names and are not shared as skills. Processing
+continues in the repositories beneath it.
 
 A coding agent looks for skills from where a session starts up to the
 root of that repository and no further. A repository mounted in place
@@ -263,8 +269,10 @@ therefore sees none of its containers' skills. Links supply them:
   - A link is a relative symbolic link to the skill's directory. It is
     untracked, with its path in .git/info/exclude of the repository it
     is made in.
-  - Where a repository has skills and no .claude/skills, that link is
-    made the same way, untracked and excluded.
+  - Where a repository has skills and no .claude/skills, a link to
+    ../.agents/skills is made the same way, untracked and excluded,
+    provided .claude is absent or an ordinary directory. An existing
+    .claude file or symbolic link is left alone too.
 
 A linked skill calls only what travels with it or is installed: scripts
 within its own directory, which the link carries, and installed
@@ -319,7 +327,6 @@ and findings, which the tool reports and does not act on:
     unconfigured    a node whose configuration says neither where its
                     projects belong nor its methodologies. What it
                     declares is planned all the same
-    claude-skills   a .claude/skills that is not the link
     name-clash      two children's skills of one name
 
 A plan is a JSON object:
