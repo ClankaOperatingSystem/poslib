@@ -41,8 +41,9 @@
                        (pos-ledger-json .value)))))))
 
 (ert-deftest pos-ledger/a-block-is-dag-json-written-one-way ()
-  "Every fixture in fixtures/dag-json/: a value's block and its CID, or
-bytes that are not the one block of their value, refused."
+  "Every fixture in fixtures/dag-json/ encodes, or is refused.
+A value's block and its CID; or bytes that are not the one block of
+their value, refused."
   (dolist (named (pos-fixtures "dag-json"))
     (ert-info ((car named))
       (let-alist (cdr named)
@@ -101,7 +102,8 @@ archive-integrity/ledger/, or in the legacy folder inside it, not both."
 ;;;; Checks
 
 (ert-deftest pos-ledger/a-check-reports-each-archive ()
-  "Archives found outside hidden and underscored directories, checkpoints
+  "A check reports each archive it finds, as the fixtures record.
+Archives found outside hidden and underscored directories, checkpoints
 honoured, and every changed, missing, new, writable and hidden file named;
 the archive's CID beside the one recorded; collections no longer declared.
 An archive a keeper keeps is found by its ledger and reported from it,
@@ -128,9 +130,10 @@ and where a fixture has recorded its keeper, with what the keeper holds."
 ;;;; Kept archives
 
 (ert-deftest pos-ledger/a-scope-s-own-repository-says-how-its-archive-is-kept ()
-  "The nearest repository at or above a scope decides, by the scope's path
-in it: a keeper's URL for a remote archive, and disk for every other.  A
-repository mounted beneath another is not its container's to configure."
+  "The nearest repository at or above a scope decides where it is kept.
+By the scope's path in it: a keeper's URL for a remote archive, and disk
+for every other.  A repository mounted beneath another is not its
+container's to configure."
   (pos-test-with-temp-dir tmp
     (let ((dir (file-truename tmp)))
       (let ((kept (lambda (scope)
@@ -150,8 +153,9 @@ repository mounted beneath another is not its container's to configure."
         (should-not (funcall kept "projects/c/"))))))
 
 (ert-deftest pos-ledger/an-archive-s-entry-is-in-its-nearest-node ()
-  "The node is the nearest directory with a configuration, of either
-name, whether or not it is a repository; two in one node are refused."
+  "The node is the nearest directory with a configuration.
+Of either name, whether or not it is a repository; two in one node are
+refused."
   (pos-test-with-temp-dir tmp
     (let ((dir (file-truename tmp)))
       (let ((kept (lambda (scope)
@@ -175,16 +179,16 @@ name, whether or not it is a repository; two in one node are refused."
                       (pos-ledger-refused (nth 1 err)))))))))
 
 (ert-deftest pos-ledger/a-kept-archive-is-checked-by-its-own-path ()
-  "Named as the root, an archive a keeper keeps is checked though no
-directory is there."
+  "A kept archive named as the root is checked though no directory is there."
   (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
     (let ((report (pos-ledger-check (expand-file-name "projects/a/archives" dir))))
       (should (equal 1 (length report)))
       (should (equal 4 (alist-get 'files (car report)))))))
 
 (ert-deftest pos-ledger/a-kept-archive-s-vanished-ledger-is-detected ()
-  "A checkpoint names a kept archive's head; with its ledger gone, nothing
-is found there and the head is unmatched."
+  "A kept archive's checkpoint is unmatched once its ledger is gone.
+A checkpoint names the archive's head; with the ledger gone, nothing is
+found there and the head is unmatched."
   (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
     (let ((integrity (expand-file-name "projects/a/archive-integrity" dir)))
       (pos-test-writable integrity)

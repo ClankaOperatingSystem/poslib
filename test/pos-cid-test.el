@@ -87,6 +87,7 @@ Sealing removes write bits without changing any CID."
         (should (equal before (pos-cid-file b)))))))
 
 (ert-deftest pos-cid/bytes-and-their-file-share-a-cid ()
+  "Bytes in memory and the same bytes in a file give one CID."
   (let ((bytes (pos-fixture-bytes '((pattern . 3000))))
         (pos-cid-chunk-size 256)
         (pos-cid-file-max-links 4))
@@ -98,10 +99,12 @@ Sealing removes write bits without changing any CID."
 ;;;; Directories
 
 (ert-deftest pos-cid/an-empty-directory-has-a-cid ()
+  "An empty directory has a CID, the one IPFS gives it."
   (pos-cid-test-agrees "empty-directory"))
 
 (ert-deftest pos-cid/a-directory-links-its-entries-in-byte-order ()
-  "Upper case sorts before lower, and UTF-8 after both; subdirectories
+  "A directory's links are in byte order of their names.
+Upper case sorts before lower, and UTF-8 after both; subdirectories
 and chunked files nest."
   (pos-cid-test-agrees "small-tree")
   (pos-cid-test-agrees "names"))
@@ -115,8 +118,8 @@ and chunked files nest."
       (should (equal with (pos-cid-directory path))))))
 
 (ert-deftest pos-cid/names-are-hashed-as-stored ()
-  "The same name composed and decomposed are different bytes, so
-different CIDs, each as IPFS computes it."
+  "Composed and decomposed forms of one name are different bytes.
+So they give different CIDs, each as IPFS computes it."
   (pos-cid-test-agrees "composed-name")
   (pos-cid-test-agrees "decomposed-name")
   (should-not (equal (alist-get 'cid (pos-fixture "cid" "composed-name"))
@@ -131,6 +134,7 @@ different CIDs, each as IPFS computes it."
   (pos-cid-test-agrees "past-sharding-threshold"))
 
 (ert-deftest pos-cid/symlinks-are-refused ()
+  "A directory holding a symbolic link is refused."
   (pos-test-with-temp-dir dir
     (pos-test-write-bytes (expand-file-name "target" dir) "t")
     (make-symbolic-link "target" (expand-file-name "link" dir))
@@ -183,8 +187,9 @@ As paths from REL, the path of DIR itself."
   (sort (copy-sequence cids) (lambda (a b) (string< (car a) (car b)))))
 
 (ert-deftest pos-cid/every-inventory-fixture-agrees ()
-  "Every fixture in fixtures/inventory/: the tree on disk and the
-inventory of its files give every CID recorded, as pyposlib must also."
+  "Every fixture in fixtures/inventory/ gives the CIDs it records.
+The tree on disk and the inventory of its files give every CID
+recorded, as pyposlib must also."
   (dolist (named (pos-fixtures "inventory"))
     (ert-info ((car named))
       (let-alist (cdr named)
@@ -203,6 +208,7 @@ inventory of its files give every CID recorded, as pyposlib must also."
                                                (pos-cid-test-empty path)))))))))))
 
 (ert-deftest pos-cid/a-cid-decodes-to-the-bytes-it-encodes ()
+  "A CID's text decodes to the bytes it encodes; bad text is refused."
   (let ((cid (pos-cid--cid pos-cid--raw "hello")))
     (should (= 36 (length cid)))
     (should (equal cid (pos-cid-decode (pos-cid--text cid)))))
@@ -210,8 +216,8 @@ inventory of its files give every CID recorded, as pyposlib must also."
     (should-error (pos-cid-decode bad))))
 
 (ert-deftest pos-cid/a-file-s-dag-size-follows-from-its-size-alone ()
-  "With 256-byte chunks and 4 links a node, sizes across every shape of
-DAG give the size the file's real DAG has."
+  "The size computed for a file is the size its real DAG has.
+With 256-byte chunks and 4 links a node, every shape of DAG is tried."
   (let ((pos-cid-chunk-size 256)
         (pos-cid-file-max-links 4))
     (pos-test-with-temp-dir dir

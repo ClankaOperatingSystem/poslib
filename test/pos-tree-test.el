@@ -143,6 +143,7 @@ Return that last plan.  Fail if ten rounds do not settle it."
 ;;;; Mounts
 
 (ert-deftest pos-tree/a-repository-that-declares-nothing-needs-nothing ()
+  "A repository that declares nothing plans no action and finds nothing."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
                                           "README" "root\n")))
@@ -150,12 +151,14 @@ Return that last plan.  Fail if ten rounds do not settle it."
                      '((pos . 2) (actions . []) (findings . [])))))))
 
 (ert-deftest pos-tree/only-a-repository-is-planned ()
+  "A directory that is not a repository is refused a plan."
   (pos-tree-test-with dir
     (should (eq 'not-a-repository
                 (condition-case err (pos-tree-plan dir)
                   (pos-tree-refused (nth 1 err)))))))
 
 (ert-deftest pos-tree/a-missing-child-is-excluded-and-then-cloned ()
+  "A declared child not yet there is excluded and then cloned."
   (pos-tree-test-with dir
     (let ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
                                            "README" "child\n"))
@@ -205,6 +208,7 @@ to do, and no repository sees a change to commit."
         (should (equal (pos-tree-test-status repository) ""))))))
 
 (ert-deftest pos-tree/a-child-off-its-branch-is-found-and-left ()
+  "A child on another branch than declared is found and left as it is."
   (pos-tree-test-with dir
     (let* ((child (apply #'pos-tree-test-repository
                          (expand-file-name "origins/child" dir)
@@ -274,6 +278,7 @@ to do, and no repository sees a change to commit."
       (should (equal (pos-tree-test-summary (pos-tree-plan root)) nil)))))
 
 (ert-deftest pos-tree/a-refused-config-is-found-and-nothing-beneath-planned ()
+  "A refused configuration is found, and nothing beneath it is planned."
   (pos-tree-test-with dir
     (let* ((child (apply #'pos-tree-test-repository
                          (expand-file-name "origins/child" dir)
@@ -372,9 +377,9 @@ to do, and no repository sees a change to commit."
                      '("archive-excludes ." "path-taken README" "missing wealth"))))))
 
 (ert-deftest pos-tree/a-directory-declares-what-is-beneath-it ()
-  "A directory's own configuration mounts a repository beneath it, which
-is excluded in the repository the directory is part of, and is given
-that repository's skills."
+  "A directory's own configuration mounts a repository beneath it.
+Which is excluded in the repository the directory is part of, and is
+given that repository's skills."
   (pos-tree-test-with dir
     (let* ((product (pos-tree-test-repository (expand-file-name "origins/product" dir)
                                               "README" "product\n"))
@@ -393,6 +398,7 @@ that repository's skills."
                               "employment/widget/.agents/skills/r/SKILL.md" root))))))
 
 (ert-deftest pos-tree/a-repository-declared-with-no-remote-is-found ()
+  "A repository declared with no remote is found as a path taken."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
                                           "README" "root\n")))
@@ -403,8 +409,9 @@ that repository's skills."
                      '("archive-excludes ." "path-taken health"))))))
 
 (ert-deftest pos-tree/what-no-entry-declares-is-found-wherever-it-is ()
-  "A repository, and a directory with a configuration, at any depth; but
-not in an archive, an attic, or a hidden or underscore directory."
+  "What no entry declares is found at any depth, outside excluded places.
+A repository, and a directory with a configuration; but not in an
+archive, an attic, or a hidden or underscore directory."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository
                  (expand-file-name "root" dir)
@@ -430,6 +437,7 @@ not in an archive, an attic, or a hidden or underscore directory."
                        "undeclared vendor/lib"))))))
 
 (ert-deftest pos-tree/a-worktree-of-a-child-is-excluded-and-cloned ()
+  "A declared worktree of a child is excluded and cloned on its branch."
   (pos-tree-test-with dir
     (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
                                             "README" "child\n"))
@@ -503,6 +511,7 @@ not in an archive, an attic, or a hidden or underscore directory."
       (should (file-exists-p (expand-file-name "projects/child/README" root))))))
 
 (ert-deftest pos-tree/a-clone-that-fails-is-refused-and-what-was-done-stays ()
+  "A clone that fails refuses the plan, and what was done before stays."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository
                  (expand-file-name "root" dir)
@@ -590,6 +599,7 @@ not in an archive, an attic, or a hidden or underscore directory."
                      "child's\n")))))
 
 (ert-deftest pos-tree/a-local-skill-is-not-linked ()
+  "A skill marked .pos-local is not linked down into a child."
   (pos-tree-test-with dir
     (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
                                             "README" "child\n"))
@@ -646,6 +656,7 @@ not in an archive, an attic, or a hidden or underscore directory."
                      '("off-branch projects/child"))))))
 
 (ert-deftest pos-tree/two-childrens-skills-of-one-name-are-found-and-left ()
+  "Two children's skills of one name clash, are found and are left."
   (pos-tree-test-with dir
     (let* ((a (apply #'pos-tree-test-repository (expand-file-name "origins/a" dir)
                      (pos-tree-test-skill "same")))
@@ -662,6 +673,7 @@ not in an archive, an attic, or a hidden or underscore directory."
       (should (equal (pos-tree-test-skill-names root) nil)))))
 
 (ert-deftest pos-tree/a-link-whose-skill-is-gone-is-removed ()
+  "A link whose skill is gone is unlinked from the child."
   (pos-tree-test-with dir
     (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
                                             "README" "child\n"))
@@ -679,6 +691,7 @@ not in an archive, an attic, or a hidden or underscore directory."
                      nil)))))
 
 (ert-deftest pos-tree/a-link-to-outside-the-tree-is-left-and-keeps-its-name ()
+  "A skill link pointing outside the tree is left, and keeps its name."
   (pos-tree-test-with dir
     (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
                                             "README" "child\n"))
@@ -697,6 +710,7 @@ not in an archive, an attic, or a hidden or underscore directory."
       (should (equal (file-symlink-p link) elsewhere)))))
 
 (ert-deftest pos-tree/skills-beneath-claude-are-preserved ()
+  "Skills already beneath .claude/ are preserved, not replaced by a link."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository
                  (expand-file-name "root" dir)
@@ -707,6 +721,9 @@ not in an archive, an attic, or a hidden or underscore directory."
       (should (equal (pos-tree-test-status root) "")))))
 
 (ert-deftest pos-tree/existing-claude-layouts-survive-skill-linking ()
+  "Whatever is at .claude or .claude/skills survives skill linking.
+A file, a directory, a link or a dangling link: each is left as it was,
+the tree is clean after, and a second plan has nothing to do."
   (dolist (path '(".claude" ".claude/skills"))
     (dolist (kind '(file directory link dangling))
       (pos-tree-test-with dir
@@ -728,6 +745,10 @@ not in an archive, an attic, or a hidden or underscore directory."
           (should (equal (pos-tree-test-summary (pos-tree-plan root)) nil)))))))
 
 (ert-deftest pos-tree/archives-follow-each-scope-and-policy-changes ()
+  "Archive excludes follow each scope and change with its policy.
+A scope whose configuration says nothing has its archives/ ignored at
+any depth; one that keeps them committed has its own tracked; a line
+the exclude file held before stays."
   (pos-tree-test-with dir
     (let* ((root (pos-tree-test-repository
                   (expand-file-name "root" dir)
@@ -754,6 +775,8 @@ not in an archive, an attic, or a hidden or underscore directory."
                                (with-temp-buffer (insert-file-contents file) (buffer-string)))))))
 
 (ert-deftest pos-tree/archive-rules-preserve-damaged-blocks ()
+  "A damaged archive block in the exclude file is left as it is.
+The scope is found config-refused and the file is not rewritten."
   (pos-tree-test-with dir
     (let* ((root (pos-tree-test-repository
                   (expand-file-name "root" dir)

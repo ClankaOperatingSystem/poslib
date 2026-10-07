@@ -22,8 +22,9 @@
 
 ;; The helpers every test file may use, so that no test file carries
 ;; its own copy: a temporary directory that is cleaned up whatever
-;; happens, files written into it, a repository made in it, a clock
-;; that does not move, and the shape a refusal is checked in.
+;; happens, files written into it, a repository made in it, and the
+;; shape a refusal is checked in.  Time is not faked: a function that
+;; depends on it takes the time as an argument, and a test passes one.
 ;;
 ;; A test file requires this and nothing of another test file.  What
 ;; a test needs of the configuration it binds itself, with `let'.
@@ -151,17 +152,6 @@ Signal an error if git did not succeed."
 
 (defconst pos-test-sunday (encode-time (list 0 0 23 6 9 2026 nil -1 nil))
   "Sunday 2026-09-06 23:00 local: the sweep boundary the tests use.")
-
-(defmacro pos-test-with-clock (time &rest body)
-  "Evaluate BODY with `current-time' and `float-time' answering TIME.
-TIME is a time value; a test that depends on today binds it here."
-  (declare (indent 1) (debug (form body)))
-  (let ((now (make-symbol "now")))
-    `(let ((,now ,time))
-       (cl-letf (((symbol-function 'current-time) (lambda () ,now))
-                 ((symbol-function 'float-time)
-                  (lambda (&optional time) (time-to-seconds (or time ,now)))))
-         ,@body))))
 
 ;;;; Bytes and JSON
 

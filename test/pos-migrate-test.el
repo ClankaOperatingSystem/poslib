@@ -92,7 +92,8 @@ canon's link to the renamed file follows it."
                             (pos-ledger-read (expand-file-name "canon.org" scope))))))
 
 (ert-deftest pos-migrate/links-become-cids-rumours-or-annotations ()
-  "Within the receipt, a collection, links stay; the later record cites
+  "Links within a receipt stay; links out of it cite or are annotated.
+Within the receipt, a collection, links stay; the later record cites
 the earlier by CID, and the earlier's link forward is annotated; canon
 gets a rumour; a broken link is annotated."
   (pos-migrate-test-with-legacy
@@ -117,8 +118,9 @@ gets a rumour; a broken link is annotated."
       (should-error (pos-migrate-plan (expand-file-name "archives" scope)) :type 'pos-ledger-refused))))
 
 (ert-deftest pos-migrate/a-link-into-a-containers-archive-cites-a-rumour ()
-  "A child's archive citing its container's archive cites a rumour, so
-children migrate before their containers and nothing waits on a cycle."
+  "A child's archive citing its container's archive cites a rumour.
+So children migrate before their containers and nothing waits on a
+cycle."
   (pos-migrate-test-with-legacy
     (let ((child (expand-file-name "projects/child" scope)))
       (pos-test-write-bytes (expand-file-name "archives/up.md" child)
@@ -130,8 +132,9 @@ children migrate before their containers and nothing waits on a cycle."
                                             (append (alist-get 'links plan) nil)))))))))
 
 (ert-deftest pos-migrate/a-capsule-is-kept-byte-for-byte ()
-  "A capsule is a collection by its manifest: no README is added and its
-links, broken or not, are left as written, so its own verification holds."
+  "A capsule is a collection by its manifest, and is left as written.
+No README is added and its links, broken or not, are left as written,
+so its own verification holds."
   (pos-migrate-test-with-legacy
     (let ((cap (expand-file-name "archives/capsules/snap" scope))
           (text "# A\n\nSee [what was](../../gone.md).\n"))
@@ -154,8 +157,8 @@ links, broken or not, are left as written, so its own verification holds."
                                                   'utf-8)))))))
 
 (ert-deftest pos-migrate/a-link-to-a-withdrawn-record-cites-a-rumour ()
-  "A record withdrawn to canon, at the same relative path, is not a broken
-link: the link cites a rumour of the canon file."
+  "A link to a record withdrawn to canon is not broken.
+At the same relative path, the link cites a rumour of the canon file."
   (pos-migrate-test-with-legacy
     (pos-migrate--writable archive)
     (pos-test-write-bytes (expand-file-name "archives/notes.md" scope)

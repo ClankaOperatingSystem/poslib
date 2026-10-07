@@ -127,9 +127,10 @@
      ,@body))
 
 (ert-deftest pos-signin/signing-in-keeps-a-token-only-its-owner-can-read ()
-  "The browser is sent to the issuer with the keeper's client, the scopes
-it names and one for a refresh token, and a challenge; the code that
-comes back is exchanged with the verifier; what is kept is mode 0600."
+  "Signing in sends the browser to the issuer and keeps the token.
+With the keeper's client, the scopes it names and one for a refresh
+token, and a challenge; the code that comes back is exchanged with the
+verifier; what is kept is mode 0600."
   (pos-signin-test-with-issuer
     (let ((told (pos-signin "https://one.keeper.example/ledgers/a" 10))
           (asked (lambda (name) (cadr (assoc name (car pos-signin-test-asked))))))
@@ -145,9 +146,9 @@ comes back is exchanged with the verifier; what is kept is mode 0600."
       (should (equal #o600 (logand #o777 (file-modes (pos-signin-file))))))))
 
 (ert-deftest pos-signin/one-sign-in-serves-every-ledger-of-a-keeper ()
-  "Asked to sign in to a second origin that names the same issuer and
-client, nothing is opened; and a request to an origin never seen adopts
-the token after its first refusal."
+  "A second origin of the same issuer and client opens nothing.
+Asked to sign in to it, the token kept serves; and a request to an
+origin never seen adopts the token after its first refusal."
   (pos-signin-test-with-issuer
     (pos-signin "https://one.keeper.example" 10)
     (let ((again (pos-signin "https://two.keeper.example" 10)))
@@ -168,6 +169,7 @@ the token after its first refusal."
       (should (equal "access-1" (pos-signin-token "https://three.keeper.example"))))))
 
 (ert-deftest pos-signin/a-token-about-to-expire-is-refreshed-and-kept ()
+  "A token about to expire is refreshed, and the new pair is kept."
   (pos-signin-test-with-issuer
     (setq pos-signin-test-lifetime 30)
     (pos-signin "https://one.keeper.example" 10)
@@ -178,6 +180,7 @@ the token after its first refusal."
                                           (car (pos-signin--load)))))))))
 
 (ert-deftest pos-signin/a-token-that-cannot-be-refreshed-is-no-token ()
+  "A token that cannot be refreshed is no token at all."
   (pos-signin-test-with-issuer
     (setq pos-signin-test-lifetime 30)
     (pos-signin "https://one.keeper.example" 10)
@@ -192,13 +195,14 @@ the token after its first refusal."
     (should-not (file-exists-p (pos-signin-file)))))
 
 (ert-deftest pos-signin/nobody-signing-in-is-refused-when-the-wait-runs-out ()
+  "Nobody signing in before the wait runs out is refused as access."
   (pos-signin-test-with-issuer
     (let ((pos-signin-browse-function #'ignore))
       (pos-test-refused pos-ledger-refused "access" (pos-signin "https://one.keeper.example" 0.3)))))
 
 (ert-deftest pos-signin/a-request-without-a-token-says-to-sign-in ()
-  "Refused for want of a token, with none kept, a request says how to get
-one and opens nothing."
+  "A request refused for want of a token says how to get one.
+With none kept, it opens nothing."
   (pos-signin-test-with-issuer
     (let ((pos-remote-send-function (lambda (&rest _) (cons 401 "{\"refused\":\"access\"}"))))
       (should (equal "Not signed in to this keeper; sign in with: sign-in https://one.keeper.example/ledgers/a"
@@ -210,8 +214,8 @@ one and opens nothing."
       (should-not pos-signin-test-asked))))
 
 (ert-deftest pos-signin/what-either-library-keeps-the-other-reads ()
-  "The shared fixture: a kept file, and the token each keeper's requests
-then carry."
+  "The shared fixture gives a kept file and the token each request carries.
+Each keeper's requests then carry the token recorded."
   (dolist (named (pos-fixtures "signin"))
     (pos-signin-test-with-issuer
       (let-alist (cdr named)

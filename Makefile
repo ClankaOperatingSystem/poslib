@@ -69,7 +69,7 @@ lint: deps
 	         -f batch-byte-compile $(SUPPORT) $(TESTS); \
 	 status=$$?; rm -f test/*.elc; exit $$status
 	@out=$$($(BATCH) -l checkdoc \
-	         --eval '(mapc (function checkdoc-file) (list $(patsubst %,"%",$(SRC) $(SUPPORT))))' 2>&1); \
+	         --eval '(mapc (function checkdoc-file) (list $(patsubst %,"%",$(SRC) $(SUPPORT) $(TESTS))))' 2>&1); \
 	 echo "$$out"; ! echo "$$out" | grep -q '^Warning'
 
 clean:
