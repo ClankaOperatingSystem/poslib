@@ -5,7 +5,8 @@ EMACS ?= emacs
 # Dependencies, from Package-Requires, each fetched from its Git repository
 # at one commit into _deps/: markdown-mode 2.8, yaml 1.2.4, and org-roam
 # 2.3.1 with what it requires: compat 31.1.0.0, cond-let 1.1.5, llama
-# 1.0.6, dash 2.20.0, emacsql 4.4.2 and magit-section 4.7.1, from magit.
+# 1.0.6, dash 2.20.0, emacsql 4.4.2, magit-section 4.7.1, from magit, and
+# transient 0.13.8, which magit-section wants newer than Emacs ships.
 MARKDOWN_MODE = f5d520b3ee7722dd2231ab586ba51d8eb166e49b
 YAML          = 5546f36bde24a9a8c1934e0f6ce205cd41d72537
 COMPAT        = 90880f81419577e1d3f68424d2a3adf31e6d663e
@@ -14,9 +15,11 @@ LLAMA         = 6850d0c91b629da14fdff2300c222289d1a0029a
 DASH          = b96413794b2fa9e37a17ca0d6fe0d0396006d3ec
 EMACSQL       = 7a4c607912c8fdd1fca4def4915d68f43b12d4da
 MAGIT         = 659f89955cf60fe3d4326d881c412df06c69680d
+TRANSIENT     = 0cacc84ff0c7df126e194666ff8b8a1e6082e796
 ORG_ROAM      = 7ce95a286ba7d0383f2ab16ca4cdbf79901921ff
 DEPS   = -L _deps/markdown-mode -L _deps/yaml -L _deps/compat -L _deps/cond-let \
-         -L _deps/llama -L _deps/dash -L _deps/emacsql -L _deps/magit/lisp -L _deps/org-roam
+         -L _deps/llama -L _deps/dash -L _deps/emacsql -L _deps/transient/lisp \
+         -L _deps/magit/lisp -L _deps/org-roam
 BATCH  = $(EMACS) -Q --batch $(DEPS) -L lisp
 SRC    = lisp/pos.el lisp/pos-capture.el lisp/pos-cid.el lisp/pos-ledger.el lisp/pos-links.el lisp/pos-seal.el lisp/pos-index.el lisp/pos-migrate.el lisp/pos-signin.el lisp/pos-remote.el lisp/pos-tree.el lisp/pos-startup.el lisp/pos-roam.el
 IPFS  ?= ipfs
@@ -45,6 +48,7 @@ deps:
 	$(call fetch,llama,https://github.com/tarsius/llama.git,$(LLAMA),llama.el)
 	$(call fetch,dash,https://github.com/magnars/dash.el.git,$(DASH),dash.el)
 	$(call fetch,emacsql,https://github.com/magit/emacsql.git,$(EMACSQL),emacsql.el)
+	$(call fetch,transient,https://github.com/magit/transient.git,$(TRANSIENT),lisp/transient.el)
 	$(call fetch,magit,https://github.com/magit/magit.git,$(MAGIT),lisp/magit-section.el)
 	$(call fetch,org-roam,https://github.com/org-roam/org-roam.git,$(ORG_ROAM),org-roam.el)
 

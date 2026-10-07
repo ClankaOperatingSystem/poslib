@@ -36,8 +36,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 * Install
 
 - Clone; load with =-L poslib/lisp=, with org-roam and what it requires
-  on the load path: =make deps= fetches them into =_deps/= at the commits
-  the Makefile names.
+  on the load path, transient among them, newer than Emacs ships:
+  =make deps= fetches them into =_deps/= at the commits the Makefile
+  names.
 - Or =package-vc=:
 
 #+begin_src emacs-lisp
