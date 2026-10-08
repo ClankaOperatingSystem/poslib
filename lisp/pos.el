@@ -231,13 +231,17 @@ The files are those of the corpus a command may write."
   "Return Org files under ROOT that are not in its corpus.
 A walk of its own, kept as it was: every Org file beneath ROOT but
 those in the archive, prose and hidden directories, less the files
-the corpus reads.  A lock file, which Emacs leaves as a dangling link
-beside a file being edited, is not one; visiting it would wait on a
-question."
-  (let ((covered (pos-files root))
-        (excluded (mapcar (lambda (dir)
-                            (file-name-as-directory (expand-file-name dir root)))
-                          (cons pos-sweep-default-path pos-prose-directories))))
+the corpus reads, and less the files of a methodology a project of the
+tree uses, which are the method's own and no task of this root.  A
+lock file, which Emacs leaves as a dangling link beside a file being
+edited, is not one; visiting it would wait on a question."
+  (let* ((corpus (pos-corpus root))
+         (covered (pos-corpus-files corpus))
+         (excluded (append
+                    (mapcar (lambda (dir)
+                              (file-name-as-directory (expand-file-name dir root)))
+                            (cons pos-sweep-default-path pos-prose-directories))
+                    (mapcar #'cddr (pos-corpus-methodologies corpus)))))
     (seq-remove (lambda (file)
                   (or (file-symlink-p file)
                       (seq-some (lambda (dir) (string-prefix-p dir file)) excluded)))
