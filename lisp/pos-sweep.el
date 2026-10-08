@@ -132,6 +132,25 @@ of done entries with an open entry beneath them, which stay."
        nil 'file))
     (cons count (nreverse skipped))))
 
+(defun pos-sweep-done-digest (file)
+  "Return a short digest of the done entries of FILE that would be archived.
+Twelve hexadecimal digits of the SHA-1 of their subtrees' text, in
+the file's order, so that it changes when an entry is added, removed
+or edited, and not when the rest of the file is.  The empty string
+when none would be archived."
+  (let ((texts nil))
+    (with-current-buffer (pos-visit file)
+      (org-map-entries
+       (lambda ()
+         (when (and (org-entry-is-done-p) (not (pos--open-descendant-p)))
+           (let ((end (save-excursion (org-end-of-subtree t) (point))))
+             (push (buffer-substring-no-properties (point) end) texts)
+             (setq org-map-continue-from end))))
+       nil 'file))
+    (if texts
+        (substring (sha1 (mapconcat #'identity (nreverse texts) "\n")) 0 12)
+      "")))
+
 (defun pos-archive-done-in-file (file archive relative time)
   "Archive the done entries of FILE into ARCHIVE, stamped TIME.
 RELATIVE is FILE's path as the archive records it, relative to the
@@ -234,8 +253,9 @@ Each is sealed into DIR's archive at sweep/ under the week's name."
 (defun pos-sweep-rows (corpus week)
   "Return the rows of a sweep of CORPUS for WEEK, changing nothing.
 One for each writable file with a done entry: (FILE DONE DESTINATION
-SKIPPED), FILE and DESTINATION relative to the root, DONE how many
-entries would be archived, SKIPPED the headings that would stay."
+SKIPPED DIGEST), FILE and DESTINATION relative to the root, DONE how
+many entries would be archived, SKIPPED the headings that would stay,
+DIGEST what `pos-sweep-done-digest' gives for the file."
   (let ((root (pos-corpus-root corpus)) rows)
     (pcase-dolist (`(,file . ,scope) (pos-corpus-entries corpus))
       (when (pos-corpus-writable-p corpus file)
@@ -245,15 +265,16 @@ entries would be archived, SKIPPED the headings that would stay."
             (push (list (file-relative-name file root) count
                         (file-relative-name
                          (pos-sweep-destination kind entry dir file week) root)
-                        skipped)
+                        skipped (pos-sweep-done-digest file))
                   rows)))))
     (nreverse rows)))
 
 (defun pos-sweep-plan (root &optional week)
   "Return the plan to sweep the tree at ROOT for WEEK, as Org text.
 WEEK defaults to the one the latest boundary closed.  One table row
-per file with done entries; a done entry with an open entry beneath
-it is named below the table and stays."
+per file with done entries, the last column a digest of them that an
+apply holds the file to; a done entry with an open entry beneath it
+is named below the table and stays."
   (let* ((week (or week (pos-week-name (pos-sweep-boundary (current-time)))))
          (rows (pos-sweep-rows (pos-corpus root) week)))
     (with-temp-buffer
@@ -261,14 +282,15 @@ it is named below the table and stays."
               "- sweep: archive the file's done entries to the destination.\n"
               "- skip or ?: left in place.\n"
               "- Then: pos sweep apply.\n\n"
-              "| act | file | done | destination |\n|-\n")
-      (pcase-dolist (`(,file ,count ,destination ,_) rows)
-        (insert (format "| %s | %s | %d | %s |\n"
-                        (if (> count 0) "sweep" "skip") file count destination)))
+              "| act | file | done | destination | entries |\n|-\n")
+      (pcase-dolist (`(,file ,count ,destination ,_ ,digest) rows)
+        (insert (format "| %s | %s | %d | %s | %s |\n"
+                        (if (> count 0) "sweep" "skip") file count destination
+                        digest)))
       (let ((skipped (seq-filter (lambda (row) (nth 3 row)) rows)))
         (when skipped
           (insert "\nDone, but with open children; these stay:\n")
-          (pcase-dolist (`(,file ,_ ,_ ,headings) skipped)
+          (pcase-dolist (`(,file ,_ ,_ ,headings ,_) skipped)
             (dolist (heading headings)
               (insert (format "- %s: %s\n" file heading))))))
       (org-mode)
@@ -278,7 +300,8 @@ it is named below the table and stays."
 
 (defun pos-sweep-read-plan (file)
   "Return (WEEK . ROWS) from the plan in FILE.
-Each row is (ACT FILE DONE DESTINATION)."
+Each row is (ACT FILE DONE DESTINATION DIGEST); DIGEST is nil for a
+row with no entries column, as a plan written before there was one."
   (with-temp-buffer
     (insert-file-contents file)
     (let ((week (and (re-search-forward "^#\\+TITLE: Sweep \\(\\S-+\\)" nil t)
@@ -287,11 +310,13 @@ Each row is (ACT FILE DONE DESTINATION)."
       (unless week (user-error "Not a sweep plan: %s" file))
       (goto-char (point-min))
       (while (re-search-forward
-              "^| *\\([^|]*?\\) *| *\\([^|]*?\\) *| *\\([0-9]+\\) *| *\\([^|]*?\\) *|"
+              (concat "^| *\\([^|]*?\\) *| *\\([^|]*?\\) *| *\\([0-9]+\\) *"
+                      "| *\\([^|]*?\\) *|\\(?: *\\([^|\n]*?\\) *|\\)?")
               nil t)
         (unless (equal (match-string 1) "act")
           (push (list (match-string 1) (match-string 2)
-                      (string-to-number (match-string 3)) (match-string 4))
+                      (string-to-number (match-string 3)) (match-string 4)
+                      (match-string 5))
                 rows)))
       (cons week (nreverse rows)))))
 
@@ -300,22 +325,24 @@ Each row is (ACT FILE DONE DESTINATION)."
 (defun pos-sweep-apply (root plan &optional dry-run)
   "Apply the sweep PLAN, a file, to the tree at ROOT; with DRY-RUN change nothing.
 Each row marked sweep whose file still has the done entries the plan
-counted is archived to its destination, stamped with the week's
+showed is archived to its destination, stamped with the week's
 boundary.  Return (:archived :skipped :left :stale): entries archived,
 headings that stayed for an open child, rows left as not sweep, and
-rows whose count has changed since the plan."
+rows whose done entries have changed since the plan: by their digest,
+or by their count alone where the row carries no digest."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (corpus (pos-corpus root))
          (read (pos-sweep-read-plan plan))
          (week (car read))
          (time (pos-sweep-week-time week))
          (archived 0) (skipped nil) (left 0) (stale 0))
-    (pcase-dolist (`(,act ,relative ,count ,destination) (cdr read))
+    (pcase-dolist (`(,act ,relative ,count ,destination ,digest) (cdr read))
       (let ((file (expand-file-name relative root)))
         (cond
          ((not (equal act "sweep")) (setq left (1+ left)))
          ((or (not (pos-corpus-writable-p corpus file))
-              (/= count (car (pos-sweep-done-entries file))))
+              (/= count (car (pos-sweep-done-entries file)))
+              (and digest (not (equal digest (pos-sweep-done-digest file)))))
           (setq stale (1+ stale)))
          (dry-run
           (setq archived (+ archived count)

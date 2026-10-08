@@ -441,11 +441,12 @@ the week and the rows back."
       (should-not (string-search "old.org" text))
       (pos-sweep-test-with-plan plan root pos-sweep-test-week
         (should (equal text (pos-test-file-string plan)))
-        (should (equal '("2026-W36"
+        (should (equal `("2026-W36"
                          ("sweep" "intray.org" 3
-                          "archive/orgmode/2026-W36/intray.org_archive")
+                          "archive/orgmode/2026-W36/intray.org_archive"
+                          ,(pos-sweep-done-digest (expand-file-name "intray.org" root)))
                          ("skip" "life/notes.org" 0
-                          "archive/orgmode/2026-W36/life/notes.org_archive"))
+                          "archive/orgmode/2026-W36/life/notes.org_archive" ""))
                        (pos-sweep-read-plan plan)))))))
 
 (ert-deftest pos-sweep/a-plan-s-destinations-follow-each-file-s-adapter ()
@@ -465,7 +466,8 @@ _sweep/."
       (should (equal '(("sweep" "health/projects/rest.org" 1
                         "health/_sweep/2026-W36/projects/rest.org_archive")
                        ("sweep" "intray.org" 1 "history/2026-W36/intray.org_archive"))
-                     (cdr (pos-sweep-read-plan plan)))))))
+                     (mapcar (lambda (row) (seq-take row 4))
+                             (cdr (pos-sweep-read-plan plan))))))))
 
 (ert-deftest pos-sweep/a-file-that-is-not-a-plan-is-refused ()
   "A file without a sweep title is not a plan, and is a `user-error'."
@@ -538,6 +540,35 @@ so a reviewer never approves what was not shown."
                      (pos-sweep-test-text root "gained.org")))
       (should (equal "* DONE first\n" (pos-sweep-test-text root "lost.org")))
       (should-not (file-exists-p (expand-file-name "archive" root))))))
+
+(ert-deftest pos-sweep/a-file-with-other-done-entries-than-the-plan-s-is-stale ()
+  "A row is stale when its file's done entries are not the ones planned.
+The count alone does not tell: with one entry finished and another
+deleted since the plan, or one entry's text edited, the file has as
+many done entries as the plan counted and is still left untouched.
+An edit elsewhere in the file leaves the row fresh.  A row with no
+entries column, as an older plan has, is held to its count alone."
+  (pos-test-with-files root
+      `(("swapped.org" . "* DONE first\n* TODO second\n")
+        ("edited.org" . "* DONE first\n")
+        ("elsewhere.org" . "* DONE first\n* TODO second\n"))
+    (pos-sweep-test-with-plan plan root pos-sweep-test-week
+      (dolist (change '(("swapped.org" . "* TODO first\n* DONE second\n")
+                        ("edited.org" . "* DONE first\nand a note\n")
+                        ("elsewhere.org" . "* DONE first\n* TODO third\n")))
+        (with-current-buffer (pos-visit (expand-file-name (car change) root))
+          (erase-buffer)
+          (insert (cdr change))
+          (save-buffer)))
+      (should (equal '(:archived 1 :skipped nil :left 0 :stale 2)
+                     (pos-sweep-apply root plan t)))
+      ;; The same plan without its last column.
+      (with-temp-file plan
+        (insert "#+TITLE: Sweep 2026-W36\n\n"
+                "| act | file | done | destination |\n|-\n"
+                "| sweep | swapped.org | 1 | archive/orgmode/2026-W36/swapped.org_archive |\n"))
+      (should (equal '(:archived 1 :skipped nil :left 0 :stale 0)
+                     (pos-sweep-apply root plan t))))))
 
 (ert-deftest pos-sweep/a-dry-run-counts-and-writes-nothing ()
   "A dry run gives the counts an apply would, and changes no file.
