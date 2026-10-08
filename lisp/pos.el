@@ -307,7 +307,7 @@ error, trimmed."
       (delete-file errors))))
 
 (defun pos-lint-methodology-checks (root)
-  "Run the checks the methodologies of ROOT's projects declare; return findings.
+  "Run each check a methodology of ROOT's projects declares; return findings.
 As doc/pos-methodology.txt section 3 has it: a check is run in the
 project; each FILE:LINE: MESSAGE line it prints is a finding at that
 file, relative to the project, and any other line a finding at the
