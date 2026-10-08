@@ -362,12 +362,14 @@ WEEK defaults to the one the latest boundary closed.  Return what
 (defun pos-sweep-close (root &optional week)
   "Return the seal plans that close the swept weeks before WEEK in ROOT.
 WEEK defaults to the one the latest boundary closed.  One plan for
-each week beneath the _sweep/ of each scope whose sweep is sealed."
+each week beneath the _sweep/ of each scope whose sweep is sealed.
+A scope in another repository of the tree is left to that repository."
   (let* ((corpus (pos-corpus root))
          (week (or week (pos-week-name (pos-sweep-boundary (current-time)))))
          (seen nil) plans)
     (dolist (scope (pos-corpus-scopes corpus))
-      (when (pos-scope-config scope)
+      (when (and (pos-scope-config scope)
+                 (pos-corpus-scope-writable-p corpus scope))
         (seq-doseq (entry (alist-get 'archives (pos-scope-config scope)))
           (when-let* ((kind (alist-get 'sweep entry))
                       (dir (file-name-as-directory

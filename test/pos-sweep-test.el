@@ -667,5 +667,21 @@ Its archive files stay as they are, and no seal plan is made."
              (expand-file-name "archive/orgmode/2026-W35/intray.org_archive" root)))
     (should-not (pos-sweep-close root "2026-W36"))))
 
+(ert-deftest pos-sweep/a-week-swept-in-a-child-repository-is-not-closed ()
+  "Closing leaves the swept weeks of a child repository to that repository.
+A child repository whose own configuration seals its sweep has a
+staged week beneath its _sweep/.  Closing from the root gives no
+plan for it, so nothing is renamed and no ledger event is written
+inside the child; closing from the child gives the one plan."
+  (pos-test-with-files root
+      `((".clanka/config.yml" . ,(pos-sweep-test-config))
+        ("child/.git/HEAD" . ,pos-sweep-test-git-head)
+        ("child/.clanka/config.yml"
+         . ,(pos-sweep-test-config (pos-sweep-test-entry "." "sweep: sealed")))
+        ("child/_sweep/2026-W35/intray.org_archive" . "* DONE finished\n"))
+    (should-not (pos-sweep-close root "2026-W36"))
+    (should (equal 1 (length (pos-sweep-close (expand-file-name "child" root)
+                                              "2026-W36"))))))
+
 (provide 'pos-sweep-test)
 ;;; pos-sweep-test.el ends here
