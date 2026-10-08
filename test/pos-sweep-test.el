@@ -549,6 +549,23 @@ The files keep their entries and no archive directory is made."
       (should (equal pos-sweep-test-intray (pos-sweep-test-text root "intray.org")))
       (should-not (file-exists-p (expand-file-name "archive" root))))))
 
+;;;; The command line
+
+(ert-deftest pos-sweep/dry-run-is-read-before-or-after-the-plan-s-name ()
+  "What follows apply is read as a dry run wherever --dry-run stands.
+Before the plan's name, after it, or alone; with neither, an apply of
+the default plan.  Another option, or a second name, is no reading at
+all, so that the command refuses it instead of applying for real."
+  (should (equal '(nil) (pos-sweep--apply-arguments nil)))
+  (should (equal '(nil . "sweep.org") (pos-sweep--apply-arguments '("sweep.org"))))
+  (should (equal '(t) (pos-sweep--apply-arguments '("--dry-run"))))
+  (should (equal '(t . "sweep.org")
+                 (pos-sweep--apply-arguments '("--dry-run" "sweep.org"))))
+  (should (equal '(t . "sweep.org")
+                 (pos-sweep--apply-arguments '("sweep.org" "--dry-run"))))
+  (should-not (pos-sweep--apply-arguments '("sweep.org" "--dryrun")))
+  (should-not (pos-sweep--apply-arguments '("sweep.org" "other.org"))))
+
 ;;;; The report
 
 (ert-deftest pos-sweep/the-report-names-each-skipped-entry ()

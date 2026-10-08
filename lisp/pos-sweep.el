@@ -395,12 +395,23 @@ Return the event file of each."
       write the plan to FILE, default sweep.org: the done entries of
       each file and where they would go; change nothing
   apply [--dry-run] [FILE]
-      archive the done entries of each file marked sweep in FILE
+      archive the done entries of each file marked sweep in FILE;
+      --dry-run, before or after FILE, counts and changes nothing
   close [--apply]
       print the seal plans of the swept weeks that have closed, as
       JSON; with --apply, seal them
 "
   "What `pos-sweep-batch' prints for help.")
+
+(defun pos-sweep--apply-arguments (arguments)
+  "Read ARGUMENTS, what follows apply, as (DRY-RUN . FILE), or nil.
+DRY-RUN is non-nil where --dry-run is among them, before or after
+FILE; FILE is the plan's name, or nil where none is given.  Nil for
+any other option or a second name, so that no word is passed over."
+  (let ((names (remove "--dry-run" arguments)))
+    (unless (or (cdr names)
+                (seq-some (lambda (name) (string-prefix-p "-" name)) names))
+      (cons (and (member "--dry-run" arguments) t) (car names)))))
 
 (defun pos-sweep-batch ()
   "Run a command from `command-line-args-left', as in `pos-sweep-usage'."
@@ -415,10 +426,8 @@ Return the event file of each."
                             (cl-count-if (lambda (line) (string-prefix-p "| sweep" line))
                                          (split-string text "\n"))
                             (file-relative-name file root)))))
-          (`("apply" . ,rest)
-           (let* ((dry-run (equal (car rest) "--dry-run"))
-                  (file (expand-file-name (or (if dry-run (cadr rest) (car rest)) "sweep.org")
-                                          root))
+          (`("apply" . ,(app pos-sweep--apply-arguments `(,dry-run . ,name)))
+           (let* ((file (expand-file-name (or name "sweep.org") root))
                   (week (car (pos-sweep-read-plan file))))
              (princ (concat (pos-sweep-report week (pos-sweep-apply root file dry-run) dry-run)
                             "\n"))))
