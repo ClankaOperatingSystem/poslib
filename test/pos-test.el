@@ -213,7 +213,7 @@ changed."
   (pos-test-with-files root '(("intray.org" . "* WIP busy\n"))
     (let ((before org-todo-keywords))
       (with-current-buffer (pos-visit (expand-file-name "intray.org" root))
-        (should (equal '("BACKLOG" "TODO" "NEXT" "WIP" "BLOCKED"
+        (should (equal '("BACKLOG" "TODO" "NEXT" "WIP" "BLOCKED" "WAITING"
                          "DONE" "CANCELLED")
                        org-todo-keywords-1))
         (should (equal '("DONE" "CANCELLED") org-done-keywords)))

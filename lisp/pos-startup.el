@@ -77,12 +77,13 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
   "The questions a session opens with.")
 
 (defconst pos-startup-views
-  '("next" "scheduled" "deadlines" "reviews" "reviews-to-schedule" "intray"
-    "all")
+  '("next" "waiting" "scheduled" "deadlines" "reviews" "reviews-to-schedule"
+    "intray" "all")
   "The names of the views, in the order they are printed.")
 
 (defconst pos-startup-default-views
-  '("next" "scheduled" "deadlines" "reviews" "reviews-to-schedule" "intray")
+  '("next" "waiting" "scheduled" "deadlines" "reviews" "reviews-to-schedule"
+    "intray")
   "The views `pos-startup-report' prints when none is named.")
 
 (defvar pos-startup--root nil
@@ -277,6 +278,10 @@ Text: a title, then one line for each item, labelled by its scope."
        (let ((org-agenda-overriding-header "NEXT items"))
          (pos-startup--or-none
           (pos-startup--agenda (lambda () (org-todo-list "NEXT"))))))
+      ("waiting"
+       (let ((org-agenda-overriding-header "WAITING items"))
+         (pos-startup--or-none
+          (pos-startup--agenda (lambda () (org-todo-list "WAITING"))))))
       ("scheduled"
        ;; Deadlines and reviews have views of their own.
        (let ((org-agenda-overriding-header
