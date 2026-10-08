@@ -53,7 +53,9 @@ canon is a sequence. Each entry is a mapping:
     at          where the kind's instances are in a project that uses
                 the methodology: a path beneath the project. With a
                 final slash, a directory holding one file per
-                instance; without, the one file that is the instance
+                instance; without, the one file that is the instance.
+                Or a URL, for a kind kept outside the repository: a
+                database behind an API, say
     format      a word naming what the instances are written in, for a
                 reader: markdown, json, org, or any other word. It
                 binds nothing: no tool reads an instance because of
@@ -61,15 +63,20 @@ canon is a sequence. Each entry is a mapping:
     derived     true for a kind the methodology's commands rebuild
                 from other kinds and a person does not edit; false
                 when absent
-    entrance    the file a reader opens first to find the instances, a
-                path beneath the project; when absent, at
+    entrance    where a reader starts to find the instances, a path
+                beneath the project or a URL; when absent, at
 
-at and entrance are paths as a child's path is (pos-directory, section
-2): relative, no empty part, no part that is . or .., no backslash
-(bad-path otherwise). They are paths in the project, not in the
-methodology: the methodology supplies the kind and the means, and the
-project owns the instances. A kind whose at is a directory may be
-empty in a project that has recorded nothing yet.
+A path in at or entrance is as a child's path is (pos-directory,
+section 2): relative, no empty part, no part that is . or .., no
+backslash (bad-path otherwise). It is a path in the project, not in
+the methodology: the methodology supplies the kind and the means, and
+the project owns the instances. A kind whose at is a directory may be
+empty in a project that has recorded nothing yet. A URL begins with a
+scheme and ://, and is taken as written: nothing of it is checked, and
+no tool reads it. A method whose canon is a database behind an API
+declares the kind at the API's URL, so that a reader is told where it
+is; what the method keeps in the repository beside it, a journal of
+its work, say, is a kind of its own with a path.
 
 A methodology's own files are not canon of any project. A tool that
 walks a project for its files does not enter a methodology, whether it
