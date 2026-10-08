@@ -938,6 +938,44 @@ half applied."
       (should (equal "* TODO fix the gate\n"
                      (pos-test-text root "intray.org"))))))
 
+(ert-deftest pos/a-group-linked-from-a-child-repository-is-unwritable ()
+  "A group whose dropped ID is linked from a child repository is left.
+Both copies are the root's own, but a file of a configured child
+repository links to the dropped copy's ID and the kept copy has its
+own.  The root may not rewrite that link, and cutting the copy would
+leave it pointing at nothing, so neither copy is cut, no file is
+changed and the group is counted unwritable."
+  (let ((intray (pos-test-lines "* TODO fix the gate"
+                                ":PROPERTIES:"
+                                ":ID: dropped"
+                                ":END:"))
+        (areas (pos-test-lines "* Household"
+                               "** TODO Fix the gate"
+                               ":PROPERTIES:"
+                               ":ID: kept"
+                               ":END:"))
+        (notes (pos-test-lines ":PROPERTIES:"
+                               ":ID: file-c"
+                               ":END:"
+                               "[[id:dropped]]")))
+    (pos-test-with-files root
+        `(("intray.org" . ,intray)
+          ("life/life-areas.org" . ,areas)
+          ("child/.git/HEAD" . ,pos-test-git-head)
+          ("child/.clanka/config.yml" . ,pos-test-child-config)
+          ("child/notes.org" . ,notes)
+          ("dedupe.org"
+           . ,(pos-test-lines "* fix the gate"
+                              "| drop | intray.org | 1 | | 0 |"
+                              "| keep | life/life-areas.org | 2 | Household | 0 |")))
+      (let ((plan (expand-file-name "dedupe.org" root)))
+        (should (equal (list :resolved 0 :merged 0 :relinked 0
+                             :skipped 0 :unwritable 1 :vanished 0 :stale 0)
+                       (pos-dedupe-apply root plan)))
+        (should (equal intray (pos-test-text root "intray.org")))
+        (should (equal areas (pos-test-text root "life/life-areas.org")))
+        (should (equal notes (pos-test-text root "child/notes.org")))))))
+
 (ert-deftest pos/a-group-with-a-copy-in-a-child-repository-is-unwritable ()
   "A group with a copy in a configured child repository is left as it is.
 The child's files are read, so the copy is a duplicate the plan lists;

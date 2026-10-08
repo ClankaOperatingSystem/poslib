@@ -710,6 +710,32 @@ N :unwritable N :stale N), JOBS in the plan's order."
                     jobs)))))))
     (list (nreverse jobs) :skipped skipped :unwritable unwritable :stale stale)))
 
+(defun pos-dedupe--relinks-unwritable-p (job root corpus)
+  "Return non-nil if resolving JOB would relink a file ROOT may not write.
+A dropped copy's ID that does not pass to the kept copy has its links
+pointed at the kept copy's; a link the index records in a file CORPUS
+says ROOT may not write cannot be.  Call within `pos-roam-with-index'."
+  (pcase-let* ((`(,key ,keep . ,drops) job)
+               (keep-id (and (pos--marker-still-at-p keep key)
+                             (org-entry-get keep "ID")))
+               (true-root (file-truename root)))
+    (seq-some
+     (lambda (drop)
+       (when-let* ((drop-id (and (pos--marker-still-at-p (car drop) key)
+                                 (org-entry-get (car drop) "ID"))))
+         (if (not keep-id)
+             (progn (setq keep-id drop-id) nil)
+           (seq-some
+            (lambda (referrer)
+              ;; The index names a file by its true path, the corpus as
+              ;; ROOT was given.
+              (not (pos-corpus-writable-p
+                    corpus
+                    (expand-file-name (file-relative-name (car referrer) true-root)
+                                      root))))
+            (pos-roam-referrers drop-id)))))
+     drops)))
+
 (defun pos-dedupe--resolve (job dry-run)
   "Resolve JOB, a group with its markers, as `pos-dedupe--jobs' gives it.
 Each dropped copy whose body differs from the kept one's is merged
@@ -759,21 +785,26 @@ Return (:resolved :merged :relinked :skipped :unwritable :vanished
 not write, one of another repository's, is left as it is and counted
 unwritable.  A dropped copy's ID passes to the kept copy where it has
 none; else each \"id:\" link to it that the index records is pointed
-at the kept copy's, and :relinked counts them."
+at the kept copy's, and :relinked counts them.  A group with such a
+link in a file ROOT may not write is left and counted unwritable too,
+since cutting the copy would leave that link pointing at nothing."
   (pos-roam-with-index root
-    (let ((resolved 0) (merged 0) (relinked 0) (vanished 0)
+    (let ((resolved 0) (merged 0) (relinked 0) (vanished 0) (unlinkable 0)
+          (corpus (pos-corpus root))
           (make-backup-files nil)
           (touched nil))
       ;; Every marker is resolved before any edit, so that a plan whose
       ;; lines have moved is found stale as a whole.
-      (pcase-let ((`(,jobs . ,counts) (pos-dedupe--jobs root plan (pos-corpus root))))
+      (pcase-let ((`(,jobs . ,counts) (pos-dedupe--jobs root plan corpus)))
         (dolist (job jobs)
-          (let ((result (pos-dedupe--resolve job dry-run)))
-            (setq resolved (+ resolved (plist-get result :resolved))
-                  merged (+ merged (plist-get result :merged))
-                  relinked (+ relinked (plist-get result :relinked))
-                  vanished (+ vanished (plist-get result :vanished)))
-            (dolist (buffer (plist-get result :touched)) (cl-pushnew buffer touched))))
+          (if (pos-dedupe--relinks-unwritable-p job root corpus)
+              (setq unlinkable (1+ unlinkable))
+            (let ((result (pos-dedupe--resolve job dry-run)))
+              (setq resolved (+ resolved (plist-get result :resolved))
+                    merged (+ merged (plist-get result :merged))
+                    relinked (+ relinked (plist-get result :relinked))
+                    vanished (+ vanished (plist-get result :vanished)))
+              (dolist (buffer (plist-get result :touched)) (cl-pushnew buffer touched)))))
         (unless dry-run
           (dolist (job jobs)
             (dolist (marker (cons (cadr job) (mapcar #'car (cddr job))))
@@ -783,7 +814,7 @@ at the kept copy's, and :relinked counts them."
               (when (buffer-modified-p) (save-buffer)))))
         (list :resolved resolved :merged merged :relinked relinked
               :skipped (plist-get counts :skipped)
-              :unwritable (plist-get counts :unwritable)
+              :unwritable (+ unlinkable (plist-get counts :unwritable))
               :vanished vanished :stale (plist-get counts :stale))))))
 
 (defun pos-dedupe-report (result dry-run)
