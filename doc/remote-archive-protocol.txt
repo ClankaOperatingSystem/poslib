@@ -1,5 +1,5 @@
 The remote archive protocol
-Version 1
+Version 2; version 1 is served beside it until retired (section 11)
 
 A scope's archive is sealed evidence, and its ledger records every seal
 (doc/formats.org). The ledger stays with the scope. The archive need
@@ -29,13 +29,17 @@ the keeper's copy lets it verify what it is sent and lets the two be
 compared.
 
 
-2. The four operations
+2. The operations
 
 describe    GET {base}/
 
     What the keeper holds of the ledger, as a JSON object:
 
-        protocol    1
+        protocol    the lowest version the keeper serves, 1 or 2
+        protocols   every version it serves, ascending: [1, 2] or [2]
+        retiring    by version, the date, YYYY-MM-DD, after which the
+                    keeper may stop serving it (section 11); absent
+                    where no version is retiring
         ledger_id   the ledger's id, or null if it has no event yet
         head        what names its last event, or null
         events      how many events it holds
@@ -47,16 +51,47 @@ describe    GET {base}/
     null. A keeper that keeps no ledger at {base} refuses describe, as
     it does every operation there, as absent.
 
+    protocol is the lowest version so that a client of version 1, which
+    knows only that member, reads what it always did. A client reads
+    protocols where it is present and protocol where it is not.
+
 event       GET {base}/events/{number}
 
     The bytes of event {number}, counting from 1, exactly as the
     ledger's file holds them.
 
+held        POST {base}/blocks
+
+    Which of some blocks the keeper does not hold. The body is a JSON
+    array of CIDs; the answer is a JSON object:
+
+        missing     the CIDs of the array the keeper holds no block
+                    for, in the array's order
+
+    A block is held whether an event enrols it or not (section 3,
+    "Blocks held and not yet enrolled"). A body that is not an array of
+    CIDs is refused as request; one longer than the keeper takes, as
+    size. A keeper takes an array of at least 1024 CIDs.
+
+put         PUT {base}/blocks/{cid}
+
+    One block: the bytes {cid} names, as the body, with content type
+    application/octet-stream. The keeper hashes what arrives and keeps
+    it only if it is the block {cid} names; else it refuses as entry.
+    The answer is 201 if the block was not held before and 200 if it
+    was, and either way the block is held. A body larger than the
+    keeper takes is refused as size; a keeper takes at least 1048576
+    bytes, the largest block of an archive under the import profile
+    doc/formats.org names, so any block of an archive can be put.
+
+    Putting is safe to repeat: a client that lost the answer puts
+    again. A client puts the blocks of a file in any order, and puts
+    none the keeper says it holds.
+
 append      POST {base}/events
 
-    One event, with the bytes of files it or earlier events enrol, and
-    what the client says of itself. The body is multipart/form-data,
-    its parts in this order:
+    One event, and what the client says of itself. The body is
+    multipart/form-data, its parts in this order:
 
         name        the ledger file's name, NNNNNNNN-NAME.json
         event       the file's bytes
@@ -64,11 +99,12 @@ append      POST {base}/events
         {name}      zero or more later events, in order, each part
                     named by its ledger file's name and holding that
                     file's bytes (section 3, "Whose an event is")
-        {cid}       zero or more files, each part named by the CID of
-                    the bytes it holds
 
-    No two parts have one name. A ledger file's name is no CID, so a
-    later event is told from a file by its part's name.
+    No two parts have one name. An append of version 2 carries no
+    file: the bytes an event enrols are put as blocks before it is
+    appended, and a part named by a CID is refused as request. An
+    append of version 1 carries files as parts named by their CIDs
+    (section 11).
 
     The answer is the description after the event, as describe gives
     it: 201 if the event was appended, 200 if that event was already
@@ -81,7 +117,9 @@ read        GET {base}/ipfs/{cid}
     or with {path} the file at that path beneath a directory. The path
     is percent-encoded, segment by segment. This is the IPFS gateway's
     path, so a gateway holding the same blocks answers the same.
-    Reading a directory itself is not in version 1.
+    Reading a directory itself is not in this protocol. A block held
+    but enrolled by no event is not read: it is absent here until an
+    event enrols it.
 
 
 3. What a keeper verifies
@@ -96,11 +134,21 @@ A keeper takes nothing on trust. Before it keeps anything of an append:
     previous, its ledger_id, its entries. A schema 3 event is read
     strictly, as a block.
   - The event is this ledger's ("Whose an event is", below).
-  - Each file's bytes have the CID its part is named by.
+  - Each block put, and each file an append of version 1 carries, has
+    the CID it is named by.
   - For a schema 3 event, every entry the ledger then enrols has its
-    bytes held, from this request or an earlier one, hidden entries
-    apart, which IPFS would leave out; and the ledger folds to the
-    event's root (doc/formats.org, "From an inventory").
+    bytes held, hidden entries apart, which IPFS would leave out; and
+    the ledger folds to the event's root (doc/formats.org, "From an
+    inventory").
+
+An entry's bytes are held when the block its CID names is held and so
+is every block that one links, through every level of the file's DAG
+(doc/formats.org, "Content identifiers"): a file of one chunk is its one raw leaf, and
+a larger file is its file nodes and their leaves. Each is held from a
+put, from a file an append of version 1 carried, which the keeper
+splits into its blocks, or from an earlier event. Directory nodes are
+not sent: the keeper derives them when it folds the root, sharded as
+IPFS shards them.
 
 Events of schema 1 and 2 are kept without their files being required,
 since they belong to a ledger being replayed whose root only its
@@ -109,6 +157,19 @@ schema 3 event onward: the conversion event, or a ledger's first.
 
 A keeper may refuse more than this, a body too large or a caller not
 allowed. It may not accept less.
+
+Blocks held and not yet enrolled. A block put before any event enrols
+it is held for at least seven days from when it was last put. After
+that the keeper may forget a block that no event it holds enrols;
+putting it again, within the seven days or after, holds it afresh.
+A client resuming a seal interrupted longer ago asks held and puts what
+is missing. Forgetting such a block is not erasure (section 7): no
+event names it, nothing lists it, and a later put restores it. Once an
+event enrols a block, the keeper holds it as it holds everything the
+ledger enrols.
+
+Putting a block and asking what is held are allowed to whoever may
+append (section 8): a put is the first half of an append.
 
 Whose an event is. A keeper that has agreed to keep one ledger at
 {base} takes no event of another. The ledger an event belongs to is the
@@ -160,7 +221,11 @@ kind, and possibly message, for a person. A client goes by the kind.
                      enrols are not held
     422  root        the ledger does not fold to the event's root
     422  request     the request is not as section 2 has it
-    413  size        the body is larger than the keeper takes
+    422  version     the request is in a version the keeper does not
+                     serve (section 11); the object's protocols member
+                     lists those it does
+    413  size        the body is larger than the keeper takes, or the
+                     array longer
     401, 403  access the caller may not do this
     404  absent      no ledger kept at {base}, no such event, or
                      nothing the ledger enrols there
@@ -184,6 +249,13 @@ answer and writing its own ledger file, asks describe, fetches the
 events it lacks by number, verifies them as it verifies its own ledger,
 and writes them. A keeper behind the client is sent the events it
 lacks, in order.
+
+A seal interrupted while its blocks were being put is resumed, not
+restarted: the client lists the blocks of the files the event enrols,
+asks held, puts those missing, and appends. A disruption loses at most
+the block in flight. The blocks of each file are listed from the file's
+bytes alone (doc/formats.org, "Content identifiers"), so nothing of the interrupted
+attempt need have been kept by the client.
 
 
 6. Claims
@@ -274,16 +346,18 @@ each of several keepers then carries, or null.
 
 9. The ports
 
-A client's code calls the four operations through a port, so that a
-keeper can be HTTP, a test's tape, or another transport.
+A client's code calls the operations through a port, so that a keeper
+can be HTTP, a test's tape, or another transport.
 
   - pyposlib: remote.RemoteArchive, a typing.Protocol, with
     HttpRemoteArchive its wire and Keeper the keeping side in memory;
     remote.following gives the later events an append is sent with.
+    held and put are its methods of those names.
   - poslib: the generic functions pos-remote-describe,
-    pos-remote-event, pos-remote-append and pos-remote-read, with
-    pos-remote-http the wire; pos-remote-following gives the later
-    events an append is sent with.
+    pos-remote-event, pos-remote-held, pos-remote-put,
+    pos-remote-append and pos-remote-read, with pos-remote-http the
+    wire; pos-remote-following gives the later events an append is
+    sent with.
 
 
 10. Fixtures
@@ -293,8 +367,9 @@ exchanges in order, each:
 
     call        the operation and its arguments
     request     the method, the path beneath the base URL, the
-                Authorization header, and for an append the content
-                type and the SHA-256 of the body
+                Authorization header, and for an append or a put the
+                content type and the SHA-256 of the body; for held, the
+                body, the JSON array
     response    the status and the body
     result      what the call returns: an object, or for event and
                 read an object whose bytes is the body
@@ -305,8 +380,10 @@ the result or refusal recorded. A keeper, sent a tape's requests in
 order from empty, must answer with the status recorded and the body
 recorded, or for a refusal the kind. A tape may have ledger_id, the
 ledger its keeper has agreed to keep; without it the keeper keeps
-whichever ledger it is first sent. An append's call may have following,
-the later events sent with it, each a name and an event.
+whichever ledger it is first sent. A tape may have protocols, the
+versions its keeper serves; without it they are 1 and 2. An append's
+call may have following, the later events sent with it, each a name
+and an event; one of version 1 may have files, by CID.
 
 For the request bodies to compare, the clients here write multipart one
 way: each part is
@@ -319,3 +396,35 @@ then --{boundary}-- CRLF, the later events in the ledger's order, then
 the files in order of their CIDs, claims as canonical JSON, and the boundary "pos-" followed by the SHA-256, in
 hex, of the parts' bytes one after another. A keeper accepts any
 multipart/form-data body with those parts.
+
+
+11. Versions
+
+A keeper serves one or more versions of this protocol and lists them
+in describe as protocols. A client speaks the highest version it knows
+that the keeper lists. A request in a version the keeper does not
+serve is refused as version, and the refusal lists those it does, so a
+client that cannot speak any of them fails with a plain reason to be
+upgraded.
+
+Version 1. What differs in it is this. Its describe has protocol
+alone, without protocols or retiring. Its append carries the bytes of files the event
+or earlier events enrol, as parts after the later events, each named
+by the CID of the bytes it holds, the files in order of their CIDs,
+and the keeper splits each into its blocks and verifies them as
+section 3 says. It has no held and no put. A keeper that lists 1
+serves appends of either kind at {base}/events, telling them apart by
+whether a part is named by a CID, and verifies both the same.
+
+Retiring a version. A keeper that means to stop serving a version
+names the date in describe, under retiring, and keeps serving it until
+that date. A client whose only version is one that is retiring warns
+on every run that it must be upgraded by then. After the date the
+keeper may drop the version from protocols and refuse it as version.
+The claims each event carries (section 6) name the tool and its commit
+that made it, so a keeper sees which tools still speak a version and
+sets the date from use rather than guesswork.
+
+Version 1 is retired when no keeper lists it. Its text then leaves this
+document, which keeps a line saying that the version existed; the text
+itself stays in the document's history.
