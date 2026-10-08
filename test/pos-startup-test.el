@@ -309,6 +309,19 @@ its description."
                        ("alpha" . "NEXT Draft the outline")
                        ("responsibilities/home/roof" . "NEXT Call the roofer")))))))
 
+(ert-deftest pos-startup/the-waiting-view-lists-each-waiting-item ()
+  "The waiting view lists each WAITING item, labelled by its scope.
+WAITING is an open keyword of the one sequence, so the item is no
+plain heading; a NEXT item beside it belongs to the next view alone."
+  (pos-test-with-files root
+      '(("intray.org" . "* Unsorted\n** WAITING Hear from the roofer\n** NEXT Answer the letter\n"))
+    (let ((text (pos-startup-view root "waiting")))
+      (should (string-prefix-p "WAITING items\n" text))
+      (should (equal (pos-startup-test-lines text)
+                     '(("intray" . "WAITING Hear from the roofer")))))
+    (should-not (string-match-p "Hear from the roofer"
+                                (pos-startup-view root "next")))))
+
 (ert-deftest pos-startup/the-scheduled-view-leaves-out-reviews-and-deadlines ()
   "The scheduled view lists scheduled items, not reviews or deadlines.
 Reviews and deadlines have views of their own.  In the tree, beta's
@@ -452,7 +465,7 @@ open items and health's has one open and one done."
   "A view with no item says so, as does each empty list within a view.
 The tree here holds one empty intray and nothing else."
   (pos-test-with-files root '(("intray.org" . "* Unsorted\n"))
-    (dolist (view '("next" "scheduled" "deadlines" "intray" "all"))
+    (dolist (view '("next" "waiting" "scheduled" "deadlines" "intray" "all"))
       (ert-info ((format "the %s view" view))
         (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view)))))
     (should (= 3 (length (split-string (pos-startup-view root "reviews")
@@ -477,7 +490,8 @@ path, tools/widget/notes."
     (let ((text (pos-startup-report root)))
       (should (string-prefix-p pos-startup-prompts text))
       (should (string-match-p "^Files read: 16$" text))
-      (dolist (title '("NEXT items" "Scheduled items, next 14 days" "Deadlines, all open"
+      (dolist (title '("NEXT items" "WAITING items" "Scheduled items, next 14 days"
+                       "Deadlines, all open"
                        "Project reviews, late" "Projects with a review to be scheduled"
                        "Intray, to be placed"))
         (ert-info ((format "the %s view" title))
