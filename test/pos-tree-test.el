@@ -299,8 +299,9 @@ the key."
 ;;;; Names, kinds and directories
 
 (ert-deftest pos-tree/a-configuration-has-either-name ()
-  "Either directory and either file name is read, alike."
+  "Any of the directory names and either file name is read, alike."
   (dolist (file '(".clanka/config.yaml" ".clanka/config.yml"
+                  ".clankos/config.yaml" ".clankos/config.yml"
                   ".pos/config.yaml" ".pos/config.yml"))
     (pos-tree-test-with dir
       (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
@@ -316,8 +317,8 @@ the key."
                          '("exclude . work" "clone work"))))))))
 
 (ert-deftest pos-tree/two-configurations-are-refused ()
-  "Both directories, or both file names in one, and nothing is planned."
-  (dolist (other '(".pos/config.yaml" ".clanka/config.yml"))
+  "Two directories, or both file names in one, and nothing is planned."
+  (dolist (other '(".pos/config.yaml" ".clankos/config.yaml" ".clanka/config.yml"))
     (pos-tree-test-with dir
       (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
                                             "README" "root\n")))
