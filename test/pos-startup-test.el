@@ -348,7 +348,7 @@ In the tree, beta's Pay the bill is DONE with a deadline on day 10."
     (should-not (string-match-p "Pay the bill" (pos-startup-view root "deadlines")))))
 
 (ert-deftest pos-startup/reviews-are-listed-late-or-due-and-apart-by-kind ()
-  "The reviews view lists open reviews: projects', responsibilities' and the root's apart.
+  "The reviews view lists open reviews, apart by the kind of their scope.
 A review is a heading tagged `pos-startup-review-tag'; it is listed
 when late or scheduled in the window, under the kind of the scope its
 file belongs to.  In the tree, alpha's review is three days late, and
