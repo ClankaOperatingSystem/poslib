@@ -534,7 +534,10 @@ as the plan says: by that keeper, or on disk for a plan without the key.
    must then be valid and end at the keeper's head. Anything else is
    refused (=chain=), with the ledger as it was. A seal interrupted
    after its keeper took an event is finished this way, and so is a
-   ledger behind because another clone sealed.
+   ledger behind because another clone sealed. The answer also says
+   which versions of the protocol the keeper serves, and the client
+   speaks the highest it knows of them: 2, or 1 where the keeper lists
+   none.
 3. As step 2 above, the inventory being what the ledger enrols.
 4. Each rumour not yet sealed is sent: an event whose =item= is the
    rumour and whose =add= is its entry, of mode =0444=, with the one
@@ -542,9 +545,13 @@ as the plan says: by that keeper, or on disk for a plan without the key.
 5. Unless its event is in the ledger, the item's files in =originals=
    are rewritten where it lies, its staging directories left empty are
    removed as in step 4 above, its entries must be as planned, else
-   =plan=, and its event is sent with every file it enrols. The event
-   is as in step 6 above, of schema 3, =empty= as found in the item
-   where it lies.
+   =plan=, and its event is sent with every file it enrols: under
+   version 1, inside the append; under version 2, each file's blocks
+   are put first, the keeper having been asked which of them, in sorted
+   order and at most 1024 at a time, it lacks, and the event is then
+   appended alone. A seal interrupted while putting resumes there,
+   since a block held is not put again. The event is as in step 6
+   above, of schema 3, =empty= as found in the item where it lies.
 6. An event is written to the ledger once the keeper has answered that
    it holds it, and not before. What a keeper refuses is refused by its
    kind, and nothing is written.
@@ -572,10 +579,10 @@ The keeper is reached with the bearer token in the environment's
 Fixtures: =fixtures/ledger/seal-*=: a tree, a source and destination, a
 date for rumours, and the plan, the last event and the report after it,
 paths relative to the tree; or the refusal. A fixture sealed to a keeper
-has =keeper=, the keeper's =url=, a =token= and the =exchanges= in order,
-each a =request= and a =response= as a tape of
-=doc/remote-archive-protocol.txt= has them, and =claims=, sent in place
-of the client's own. A client makes each request as recorded and no
+has =keeper=, the keeper's =url=, a =token=, the =protocols= it serves
+and the =exchanges= in order, each a =request= and a =response= as a
+tape of =doc/remote-archive-protocol.txt= has them, and =claims=, sent
+in place of the client's own. A client makes each request as recorded and no
 other, and the item is gone afterwards unless the seal was refused. The
 report after a seal is made asking no keeper.
 
@@ -598,9 +605,12 @@ Then, for each archive:
 
 1. The keeper is asked what it holds. It must hold the ledger's first
    events and no other: no more events than the ledger has, its head
-   naming the ledger's event of that number; else =chain=.
+   naming the ledger's event of that number; else =chain=. The client
+   speaks the highest version of the protocol the keeper lists that it
+   knows, as a seal to a keeper does.
 2. Each event it lacks is sent in order, as its ledger file's bytes, with
-   the files that event enrolled and the ledger still enrols. They are
+   the files that event enrolled and the ledger still enrols: inside the
+   append under version 1, put as blocks first under version 2. They are
    read from the paths they have now, since a schema 2 conversion may
    have renamed or removed what an earlier event enrolled, and each is
    named by the CID the ledger enrols it under. No file is sent twice in
@@ -615,7 +625,8 @@ Then, for each archive:
    files, sent with them by the run that sent the events. If it refuses
    the first schema 3 event as =entry=, the event at which a keeper
    requires every file enrolled before it, that event is sent once more
-   with all of them.
+   with all of them: inside the append, or, under version 2, their
+   blocks put first.
 5. The keeper is asked again, and must describe the ledger's head, its
    number of events and its recorded root; else =chain=.
 6. The archive is removed from disk, its empty directories with it. The
@@ -625,9 +636,11 @@ The claims sent with each event are a seal's, without =plan=. What the
 keeper refuses is refused by its kind, with the archive still on disk.
 
 Run again after an interruption, it sends what the keeper still lacks. A
-keeper limits what one append may hold (=size=). Files travel with the
-events that enrolled them so that an archive larger than that limit can
-be moved; one event's files larger than it cannot.
+keeper limits what one append may hold (=size=). Under version 1 files
+travel with the events that enrolled them, so that an archive larger
+than that limit can be moved; one event's files larger than it cannot.
+Under version 2 nothing larger than one block crosses in a request, so
+the limit does not bind.
 
 It prints =kept=, each an =archive= with its =keeper= and the =events=
 and =files= sent, and =skipped=, each an =archive= with its =reason=.

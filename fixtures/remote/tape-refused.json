@@ -1,7 +1,10 @@
 {
- "description": "What a keeper refuses, each by its kind, before anything is kept: an event out of turn, bytes under a CID not theirs, a file not sent, a root the ledger does not fold to, an event that is not a block, and one not under its own name; then the event as it should be, and another put forward as the same number.",
+ "description": "What a keeper refuses, each by its kind, before anything is kept: an event out of turn, bytes under a CID not theirs, a file not sent, a root the ledger does not fold to, an event that is not a block, and one not under its own name; then the event as it should be, and another put forward as the same number; and, of a keeper of version 1 alone, a block put or asked after, as version.",
  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
  "token": "tape-token",
+ "protocols": [
+  1
+ ],
  "exchanges": [
   {
    "call": {
@@ -191,6 +194,45 @@
     "body": "{\"refused\":\"chain\"}\n"
    },
    "refused": "chain"
+  },
+  {
+   "call": {
+    "operation": "put",
+    "cid": "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
+    "block": "hello"
+   },
+   "request": {
+    "method": "PUT",
+    "path": "/blocks/bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
+    "authorization": "Bearer tape-token",
+    "content_type": "application/octet-stream",
+    "body_sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+   },
+   "response": {
+    "status": 422,
+    "body": "{\"message\":\"Blocks are put in version 2; this keeper serves [1]\",\"refused\":\"version\"}\n"
+   },
+   "refused": "version"
+  },
+  {
+   "call": {
+    "operation": "held",
+    "cids": [
+     "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq"
+    ]
+   },
+   "request": {
+    "method": "POST",
+    "path": "/blocks",
+    "authorization": "Bearer tape-token",
+    "content_type": "application/json",
+    "body_sha256": "a4e8978f1908700c2fca892d3b40bcdd0db6df8f7a64f1ac213d6ae8dddcf591"
+   },
+   "response": {
+    "status": 422,
+    "body": "{\"message\":\"Blocks are put in version 2; this keeper serves [1]\",\"refused\":\"version\"}\n"
+   },
+   "refused": "version"
   }
  ]
 }

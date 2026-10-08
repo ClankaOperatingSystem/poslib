@@ -22,17 +22,23 @@
 
 ;; The client's side of doc/remote-archive-protocol.txt, in lockstep
 ;; with pyposlib.  A ledger stays with its scope; the archive it enrols
-;; may be kept by a keeper, reached at a URL.  Four operations pass
+;; may be kept by a keeper, reached at a URL.  Six operations pass
 ;; between them, and they are generic functions, so that what keeps an
 ;; archive can be HTTP, a test's tape or another transport:
 ;;
-;; - `pos-remote-describe': what the keeper holds of the ledger.
+;; - `pos-remote-describe': what the keeper holds of the ledger, and the
+;;   versions of the protocol it serves.
 ;; - `pos-remote-event': an event's bytes, by number.
-;; - `pos-remote-append': an event, with files and the client's claims.
+;; - `pos-remote-held': which of some blocks the keeper lacks (version 2).
+;; - `pos-remote-put': one block, by its CID (version 2).
+;; - `pos-remote-append': an event and the client's claims; under version
+;;   1, the files it enrols travel with it.
 ;; - `pos-remote-read': the bytes under a CID, or at a path beneath it.
 ;;
-;; `pos-remote-following' is what a client sends after an event that
-;; names no ledger, so that a keeper can tell whose it is.
+;; `pos-remote-version' is the version a client speaks to a keeper: the
+;; highest it lists that the client knows.  `pos-remote-following' is
+;; what a client sends after an event that names no ledger, so that a
+;; keeper can tell whose it is.
 ;;
 ;; `pos-remote-http' is the protocol's wire.  A refusal signals
 ;; `pos-ledger-refused' with the kind the keeper names.  Nothing here
@@ -54,7 +60,16 @@
 
 (cl-defgeneric pos-remote-describe (archive)
   "Return what the keeper of ARCHIVE has of its ledger.
-An alist: protocol, ledger_id, head, events, root and erased.")
+An alist: protocol, protocols and any retiring, ledger_id, head, events,
+root and erased.")
+
+(cl-defgeneric pos-remote-held (archive cids)
+  "Return the CIDS, a list, that the keeper of ARCHIVE has no block for.
+In their order.  Version 2.")
+
+(cl-defgeneric pos-remote-put (archive cid bytes)
+  "Have the keeper of ARCHIVE hold the block CID names, BYTES.
+Return non-nil if it was not held before.  Version 2.")
 
 (cl-defgeneric pos-remote-event (archive number)
   "Return the bytes of event NUMBER of ARCHIVE's ledger, as its file has them.")
@@ -62,17 +77,39 @@ An alist: protocol, ledger_id, head, events, root and erased.")
 (cl-defgeneric pos-remote-append (archive name event files claims &optional following)
   "Append to ARCHIVE the event of bytes EVENT, which the ledger file NAME is.
 FILES is an alist of CID and bytes: the files it or earlier events
-enrol.  CLAIMS is an alist of what the client says of itself, strings
-by name.  FOLLOWING is the events after it, an alist of name and bytes
-in order, by which an event that names no ledger is known for this
-ledger's (`pos-remote-following').  Return the description after it,
-as `pos-remote-describe'.  The same event again at the same number
-changes nothing.")
+enrol, which travel with the event under version 1 and are nil under
+version 2, their blocks put first.  CLAIMS is an alist of what the
+client says of itself, strings by name.  FOLLOWING is the events after
+it, an alist of name and bytes in order, by which an event that names
+no ledger is known for this ledger's (`pos-remote-following').  Return
+the description after it, as `pos-remote-describe'.  The same event
+again at the same number changes nothing.")
 
 (cl-defgeneric pos-remote-read (archive cid &optional path)
   "Return the bytes ARCHIVE's ledger enrols under CID.
 A file or an event; or with PATH, the file at that path beneath a
 directory.")
+
+;;;; Which version
+
+(defconst pos-remote-versions '(1 2)
+  "The versions of the protocol this client speaks, ascending.")
+
+(defun pos-remote-version (described)
+  "Return the version to speak to the keeper DESCRIBED.
+DESCRIBED is as `pos-remote-describe' gives it.  The highest of
+`pos-remote-versions' it lists under protocols, or 1 where it lists
+none, as a keeper of version 1 alone does.  Refused as
+`version' where none is shared."
+  (let* ((offered (let ((listed (alist-get 'protocols described)))
+                    (if (and listed (not (eq listed :null)))
+                        (append listed nil)
+                      (list (or (alist-get 'protocol described) 1)))))
+         (shared (seq-filter (lambda (v) (memq v offered)) pos-remote-versions)))
+    (unless shared
+      (pos-ledger--refuse 'version "The keeper serves protocol versions %S; this client speaks %S"
+                          offered pos-remote-versions))
+    (apply #'max shared)))
 
 ;;;; Whose an event is
 
@@ -197,8 +234,8 @@ The boundary is taken from the bytes, so equal parts are equal bodies."
                    "--" boundary "--\r\n"))
           (concat "multipart/form-data; boundary=" boundary))))
 
-(defun pos-remote--call (archive method path &optional body content-type)
-  "Return the body ARCHIVE's keeper answers METHOD on PATH with.
+(defun pos-remote--call-status (archive method path &optional body content-type)
+  "Return (STATUS . BODY) that ARCHIVE's keeper answers METHOD on PATH with.
 BODY, with its CONTENT-TYPE, is sent if given.  Any answer but 200 or
 201 is refused, by the kind its body names or its status means.
 Given no token, the request carries the one kept for the keeper by
@@ -222,7 +259,7 @@ is asked once more with a token already kept that it takes."
           (setq answer (funcall exchange adopted)))))
     (let ((status (car answer)))
       (if (memq status '(200 201))
-          (cdr answer)
+          answer
         (let ((named (ignore-errors
                        (alist-get 'refused (pos-ledger-parse (cdr answer))))))
           (if (and (eql status 401) (null given))
@@ -233,9 +270,30 @@ is asked once more with a token already kept that it takes."
                                       (t 'remote))
                                 "%s %s answered %d" method path status)))))))
 
+(defun pos-remote--call (archive method path &optional body content-type)
+  "Return the body ARCHIVE's keeper answers METHOD on PATH with.
+BODY and CONTENT-TYPE are as `pos-remote--call-status' takes them; this
+is that, without the status."
+  (cdr (pos-remote--call-status archive method path body content-type)))
+
 (cl-defmethod pos-remote-describe ((archive pos-remote-http))
   "Return what the keeper of ARCHIVE has of its ledger, over HTTP."
   (pos-ledger-parse (pos-remote--call archive "GET" "/")))
+
+(cl-defmethod pos-remote-held ((archive pos-remote-http) cids)
+  "Return which of CIDS the keeper of ARCHIVE lacks, over HTTP."
+  (append (alist-get 'missing
+                     (pos-ledger-parse
+                      (pos-remote--call archive "POST" "/blocks"
+                                        (pos-ledger-json (vconcat cids))
+                                        "application/json")))
+          nil))
+
+(cl-defmethod pos-remote-put ((archive pos-remote-http) cid bytes)
+  "Have the keeper of ARCHIVE hold the block CID names, BYTES, over HTTP.
+Non-nil if the keeper answered 201: it was not held before."
+  (eql 201 (car (pos-remote--call-status archive "PUT" (concat "/blocks/" cid)
+                                         (string-to-unibyte bytes) "application/octet-stream"))))
 
 (cl-defmethod pos-remote-event ((archive pos-remote-http) number)
   "Return the bytes of event NUMBER of ARCHIVE's ledger, over HTTP."
@@ -244,7 +302,8 @@ is asked once more with a token already kept that it takes."
 (cl-defmethod pos-remote-append ((archive pos-remote-http) name event files claims
                                  &optional following)
   "Append to ARCHIVE the event EVENT named NAME, with FILES and CLAIMS, over HTTP.
-FOLLOWING, the events after it, goes after the claims and before the files."
+FOLLOWING, the events after it, goes after the claims and before the
+files; under version 2 FILES is nil and nothing follows the later events."
   (let ((sent (pos-remote--multipart
                (append (list (cons "name" (encode-coding-string name 'utf-8))
                              (cons "event" event)
