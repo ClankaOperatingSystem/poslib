@@ -474,6 +474,28 @@ its own replaces them beneath itself."
                      '("undeclared attic/lib" "undeclared lab/vendor/lib"
                        "undeclared work/attic/lib"))))))
 
+(ert-deftest pos-tree/exclusions-do-not-reach-into-a-mounted-repository ()
+  "A mounted repository's exclusions are its own, not those of its parent.
+The root excludes vendor and so replaces the default, which excludes
+attic.  A child repository that declares no exclude has the default:
+beneath it vendor is walked and attic is not, the reverse of the root."
+  (pos-tree-test-with dir
+    (let* ((child (pos-tree-test-repository
+                   (expand-file-name "origins/child" dir)
+                   ".clanka/config.yml" "pos: 2\nprojects: projects/\n"))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".clanka/config.yaml"
+                  (concat "pos: 2\nprojects: projects/\nchildren:\n"
+                          (pos-tree-test-child "child" child)
+                          "exclude:\n  - vendor\n"))))
+      (pos-tree-test-settle root)
+      (dolist (path '("vendor/lib" "attic/lib" "child/vendor/lib" "child/attic/lib"))
+        (pos-tree-test-repository (expand-file-name path root) "README" "l\n"))
+      (should (equal (seq-filter (lambda (line) (string-prefix-p "undeclared" line))
+                                 (pos-tree-test-summary (pos-tree-plan root)))
+                     '("undeclared child/vendor/lib" "undeclared attic/lib"))))))
+
 (ert-deftest pos-tree/archive-scopes-are-not-looked-for-in-excluded-directories ()
   "An archives directory beneath an excluded one is no scope of the node.
 One that is not excluded is, as before."
