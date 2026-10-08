@@ -45,6 +45,9 @@ describe    GET {base}/
         events      how many events it holds
         root        the root its last event recorded, or null
         erased      the CIDs whose bytes it has erased, sorted
+        search      how the keeper searches (section 12): an object
+                    whose modes lists the modes it serves; null, or
+                    absent, for a keeper that does not search
 
     A keeper that has agreed to keep the ledger and holds no event of
     it yet answers with events 0 and with ledger_id, head and root
@@ -120,6 +123,14 @@ read        GET {base}/ipfs/{cid}
     Reading a directory itself is not in this protocol. A block held
     but enrolled by no event is not read: it is absent here until an
     event enrols it.
+
+search      GET {base}/search?q={query}&mode={mode}&limit={n}&within={cid}
+
+    Where {query} is found in what the ledger enrols: a JSON object
+    whose hits each name a file by an ipfs:// reference, a range in it
+    and the passage there, as section 12 has it. A keeper that
+    searches says so in describe, under search; one that does not
+    refuses the operation as absent.
 
 
 3. What a keeper verifies
@@ -224,6 +235,8 @@ kind, and possibly message, for a person. A client goes by the kind.
     422  version     the request is in a version the keeper does not
                      serve (section 11); the object's protocols member
                      lists those it does
+    422  mode        the search is in a mode the keeper does not serve
+                     (section 12); describe lists those it does
     413  size        the body is larger than the keeper takes, or the
                      array longer
     401, 403  access the caller may not do this
@@ -352,12 +365,16 @@ can be HTTP, a test's tape, or another transport.
   - pyposlib: remote.RemoteArchive, a typing.Protocol, with
     HttpRemoteArchive its wire and Keeper the keeping side in memory;
     remote.following gives the later events an append is sent with.
-    held and put are its methods of those names.
+    held and put are its methods of those names. search is a second
+    Protocol, remote.ArchiveSearch, with search its one method, which
+    HttpRemoteArchive also satisfies and Keeper answers in literal
+    mode; so does an adapter over an archive on disk (section 12,
+    "Conformance").
   - poslib: the generic functions pos-remote-describe,
     pos-remote-event, pos-remote-held, pos-remote-put,
-    pos-remote-append and pos-remote-read, with pos-remote-http the
-    wire; pos-remote-following gives the later events an append is
-    sent with.
+    pos-remote-append, pos-remote-read and pos-remote-search, with
+    pos-remote-http the wire; pos-remote-following gives the later
+    events an append is sent with.
 
 
 10. Fixtures
@@ -383,7 +400,9 @@ ledger its keeper has agreed to keep; without it the keeper keeps
 whichever ledger it is first sent. A tape may have protocols, the
 versions its keeper serves; without it they are 1 and 2. An append's
 call may have following, the later events sent with it, each a name
-and an event; one of version 1 may have files, by CID.
+and an event; one of version 1 may have files, by CID. A search's call
+has q, and any of mode, limit and within that the search gives; its
+result is the object answered.
 
 For the request bodies to compare, the clients here write multipart one
 way: each part is
@@ -428,3 +447,107 @@ sets the date from use rather than guesswork.
 Version 1 is retired when no keeper lists it. Its text then leaves this
 document, which keeps a line saying that the version existed; the text
 itself stays in the document's history.
+
+Search (section 12) is no version: a keeper of either version serves it
+or does not, and says which in describe. A client that never searches
+and never reads the search member sees nothing of it.
+
+
+12. Search
+
+An agent reading an archive on disk greps it and opens the file at the
+line grep names. search is that, said so that a keeper can answer it
+from whatever it keeps, an index or the blocks themselves, and so that
+a client need not know which.
+
+    search      GET {base}/search?q={query}&mode={mode}&limit={n}&within={cid}
+
+    q is the query, and is required. mode is one of the modes the
+    keeper lists in describe; literal where none is given. limit is
+    the most hits to answer with, a positive integer; without it the
+    keeper's own cap applies, which is at least 100. within is a CID
+    the ledger enrols, a file, a directory or a collection, and only
+    what is beneath it is searched; without it, everything the
+    ledger's last event folds to. Each value is percent-encoded, every
+    byte of its UTF-8 but RFC 3986's unreserved characters, so a space
+    is %20; the parameters are sent in this order, those not given
+    left out.
+
+    The answer is a JSON object:
+
+        hits        an array of hits, in the order below
+
+    and each hit is a JSON object:
+
+        ref         ipfs://{cid}/{path}: the file, named as a sealed
+                    item's links name it (doc/formats.org, "Links"):
+                    the CID of the item that holds it, else of the
+                    collection, else of the file itself, then the path
+                    beneath that where the file is not the whole. read
+                    of {cid} and {path} in this ledger gives the file.
+        range       where in the file. For text, {"lines": [first,
+                    last]}, counting from 1, both lines included. What
+                    a range is in other media is not yet said; a client
+                    passes over a range it does not understand.
+        passage     the file's text at the range: its bytes decoded as
+                    UTF-8 and split into lines at LF, lines first to
+                    last joined by LF, with no terminator after the
+                    last.
+        score       in a ranked mode, a number, higher being better;
+                    absent in literal and regex. It orders one answer's
+                    hits and nothing else: scores from two keepers, or
+                    from two answers, do not compare.
+
+What is searched. The files the ledger enrols, as their bytes. A file
+that does not decode as UTF-8 gives no hit in any mode below; a file
+whose bytes are erased (section 7) gives none; events are not
+searched. A file enrolled under more than one path gives a hit at
+each. The bytes a CID names do not change, so a hit's passage is what
+the file holds whenever the keeper last looked at it; what an index
+behind the ledger misses is new files, never the content of old.
+
+Modes. A keeper that searches serves literal, and lists in describe
+each other mode it serves:
+
+    literal     the query's characters occur in a line as given, case
+                and all; a hit for each such line, its range that line
+    regex       the query is a POSIX extended regular expression, as
+                grep -E takes one, matched within a line; a hit for
+                each line that matches, its range that line. One that
+                does not parse is refused as request
+    words       the query is words to look for; the keeper decides
+                what a hit is and how far it runs, and ranks them
+    semantic    the query is a question or a description; the keeper
+                finds passages that answer it by meaning, and ranks
+                them
+
+Order. In literal and regex the hits are in the archive's order: by
+path as the ledger's fold has it, bytewise, then by first line; limit
+keeps the first of them. In a ranked mode they are in order of score,
+best first, and limit keeps the best.
+
+Trust. A hit is the keeper's claim and the archive is the authority: a
+client that reads ref at range finds passage, byte for byte, or the
+keeper is wrong. A keeper that answers with text of its own composing,
+a summary or a paraphrase, does not search in the sense of this
+document, whatever its mode. How a keeper finds its hits is its own: an
+index kept beside the blocks, a service that reads the archive through
+this protocol, or a scan of the blocks themselves.
+
+One ledger. A search is one ledger's, beneath its base URL, as every
+operation is. Which ledgers a scope and its children have is the
+client's to know from its configuration (doc/pos-directory.txt), and a
+client searching several asks each and keeps each answer's order; it
+merges nothing by score.
+
+Refusals. A keeper that does not search refuses the operation as
+absent, as it refuses any path it does not serve. A mode it does not
+list is refused as mode; a request with no q, or with a limit that is
+not a positive integer, as request; a within the ledger does not
+enrol, as absent.
+
+Conformance. Two keepers of one archive, asked the same literal or
+regex search, answer the same hits in the same order, limit apart; and
+an archive on disk, searched by the rules above, gives what its keeper
+gives. A ranked mode is held to trust alone: every hit's passage is
+what read gives at its range. fixtures/remote/ holds a search tape.
