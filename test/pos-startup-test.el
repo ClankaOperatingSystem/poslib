@@ -500,6 +500,46 @@ In the tree, twice/ holds two configurations."
                      "The node has two configurations)\n")
              (pos-startup-report root)))))
 
+(defconst pos-startup-test-declaration
+  (concat "methodology: 1\ncanon:\n"
+          "  - kind: decision\n    at: decisions/\n    format: markdown\n"
+          "    entrance: decisions/index.json\n"
+          "  - kind: decision-index\n    at: decisions/index.json\n    format: json\n"
+          "    derived: true\n")
+  "A declaration of two kinds, as doc/pos-methodology.txt has it.")
+
+(defconst pos-startup-test-project
+  "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/adr\n"
+  "The configuration of a project with one methodology, adr.")
+
+(ert-deftest pos-startup/the-report-names-the-kinds-methodologies-declare ()
+  "After what was not read, the report lists each kind a methodology declares.
+One line per kind: the project, the methodology, the kind, where it
+is and where to start.  The methodology's own Org file is not read,
+and nothing of the kind is in a view."
+  (pos-test-with-files root
+      `((".clanka/config.yml" . ,pos-startup-test-project)
+        ("project.org" . "* NEXT Decide the format\n")
+        ("methodologies/adr/methodology.yaml" . ,pos-startup-test-declaration)
+        ("methodologies/adr/README.org" . "* TODO Inside the methodology\n")
+        ("decisions/0001-keep.md" . "# 0001. Keep\n\nStatus: Proposed\n"))
+    (let ((text (pos-startup-report root)))
+      (should (string-match-p
+               (concat "^Files read: 1\n\nCanon of other kinds, not read:\n"
+                       "  \\.  adr  decision        decisions/            start at decisions/index.json\n"
+                       "  \\.  adr  decision-index  decisions/index.json  start at decisions/index.json\n\n")
+               text))
+      (should-not (string-match-p "Inside the methodology" text)))))
+
+(ert-deftest pos-startup/a-refused-declaration-is-one-line ()
+  "A methodology whose declaration is refused is one line, naming the refusal."
+  (pos-test-with-files root
+      `((".clanka/config.yml" . ,pos-startup-test-project)
+        ("methodologies/adr/methodology.yaml" . "methodology: 2\n"))
+    (should (string-match-p
+             "^Canon of other kinds, not read:\n  \\.  adr  (refused: unknown-version: .*)\n"
+             (pos-startup-report root)))))
+
 (ert-deftest pos-startup/the-report-walks-the-tree-once ()
   "The report walks the tree once for all its views; a view alone walks itself.
 `pos-startup-report' binds the corpus, and each `pos-startup-view' it

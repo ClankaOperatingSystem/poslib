@@ -86,6 +86,34 @@ need not be listed; it is a plain directory."
 (defconst pos-corpus-test-responsibility "pos: 2\nprojects: projects/\n"
   "The configuration of a responsibility whose projects lie in projects/.")
 
+(defconst pos-corpus-test-project
+  (concat "pos: 2\nmethodologies: methodologies\nchildren:\n"
+          "  - path: methodologies/adr\n"
+          "  - path: methodologies/mounted\n    remote: git@example.org:m.git\n")
+  "The configuration of a project with a local methodology and a mounted one.")
+
+(ert-deftest pos-corpus/a-methodology-is-not-entered ()
+  "A project's methodology is not read, a directory of it or a repository in it.
+Its own Org files are not the project's canon.  A mounted one is a
+repository the root's commands do not write, as before; the corpus
+names both, with their directories."
+  (let ((corpus (pos-corpus-test-walk
+                 `(("p" dir :config ,pos-corpus-test-project)
+                   ("p/project.org" file)
+                   ("p/methodologies/adr/README.org" file)
+                   ("p/methodologies/adr/skills/adr-record/SKILL.md" file)
+                   ("p/methodologies/mounted" dir :repository t)
+                   ("p/methodologies/mounted/README.org" file)
+                   ("p/decisions/0001-keep.md" file)))))
+    (should (equal '(("p/project.org" . "p")) (pos-corpus-test-files corpus)))
+    (should (equal '("p/methodologies/mounted") (pos-corpus-unwritable corpus)))
+    (should (equal '(("adr" . "p/methodologies/adr") ("mounted" . "p/methodologies/mounted"))
+                   (mapcar (lambda (methodology)
+                             (cons (cadr methodology)
+                                   (file-relative-name
+                                    (directory-file-name (cddr methodology)) "/r/")))
+                           (pos-corpus-methodologies corpus))))))
+
 ;;;; Files and the root
 
 (ert-deftest pos-corpus/the-root-owns-every-file-no-scope-claims ()

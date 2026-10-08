@@ -44,6 +44,7 @@
 ;; - `pos-corpus': walk a root once and return its corpus.
 ;; - `pos-corpus-files', `pos-corpus-owner', `pos-corpus-scopes':
 ;;   the files, the scope each belongs to, and the scopes.
+;; - `pos-corpus-methodologies': the methodologies the projects declare.
 ;; - `pos-corpus-writable-p': whether a command may write a file.
 
 ;;; Code:
@@ -104,6 +105,18 @@ Nil for a scope whose configuration names none."
 
 ;;;; The walk
 
+(defun pos-corpus--methodology-paths (scope)
+  "Return the paths of the methodologies SCOPE's node declares.
+Each is relative to the root.  The node is the nearest scope at or
+above SCOPE with a configuration."
+  (when-let* ((node (if (pos-scope-config scope) scope (pos-scope-node scope)))
+              (config (pos-scope-config node)))
+    (mapcar (lambda (methodology)
+              (if (equal (pos-scope-path node) ".")
+                  (cdr methodology)
+                (concat (pos-scope-path node) "/" (cdr methodology))))
+            (pos-tree-methodologies config))))
+
 (defun pos-corpus--walk (root lister)
   "Walk the tree at ROOT and return its corpus, asking LISTER what is where.
 LISTER is called with a path relative to ROOT, \"\" for ROOT, and
@@ -158,6 +171,9 @@ two-configurations, and :names, the names in it, sorted."
                     (cond
                      ((pos-tree-unwalked-p (string-remove-prefix exclusions-node path)
                                            exclusions))
+                     ;; A methodology's files are not the project's canon.
+                     ((member path (pos-corpus--methodology-paths scope))
+                      (when (plist-get info :repository) (push path unwritable)))
                      ;; A repository with no configuration is a product.
                      ((and (plist-get info :repository) (not text))
                       (push path unwritable))
@@ -237,6 +253,21 @@ enters what they allow and lists every Org file, with its scope."
   "Return the scopes of CORPUS of KIND: root, responsibility or project."
   (seq-filter (lambda (scope) (eq (pos-scope-kind scope) kind))
               (pos-corpus-scopes corpus)))
+
+(defun pos-corpus-methodologies (corpus)
+  "Return the methodologies CORPUS's projects declare, each (SCOPE NAME . DIR).
+DIR is the methodology's directory, absolute, as a directory name,
+whether or not it is there."
+  (mapcan (lambda (scope)
+            (when-let* ((config (pos-scope-config scope)))
+              (mapcar (lambda (methodology)
+                        (cons scope
+                              (cons (car methodology)
+                                    (file-name-as-directory
+                                     (expand-file-name (cdr methodology)
+                                                       (pos-scope-dir scope))))))
+                      (pos-tree-methodologies config))))
+          (pos-corpus-scopes corpus)))
 
 (defun pos-corpus-writable-p (corpus file)
   "Return non-nil if a command may write FILE, a file of CORPUS.

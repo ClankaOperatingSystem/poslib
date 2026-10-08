@@ -157,6 +157,22 @@ plan.  Fail if ten rounds do not settle it."
                            (pos-tree-test-sorted
                             (pos-tree-read-config .yaml))))))))))
 
+(ert-deftest pos-tree/a-declaration-is-read-as-the-fixtures-say ()
+  "Each fixture's methodology.yaml gives its declaration, or its kind of refusal."
+  (let ((fixtures (pos-fixtures "pos-methodology")))
+    (should (> (length fixtures) 5))
+    (dolist (named fixtures)
+      (ert-info ((car named) :prefix "fixture: ")
+        (let-alist (cdr named)
+          (if .refused
+              (should (equal .refused
+                             (condition-case err
+                                 (progn (pos-tree-read-methodology .yaml) "accepted")
+                               (pos-tree-refused (symbol-name (nth 1 err))))))
+            (should (equal (pos-tree-test-sorted .declaration)
+                           (pos-tree-test-sorted
+                            (pos-tree-read-methodology .yaml))))))))))
+
 ;;;; Mounts
 
 (ert-deftest pos-tree/a-repository-that-declares-nothing-needs-nothing ()

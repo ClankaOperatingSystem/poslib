@@ -1,0 +1,5 @@
+{
+ "about": "A check is the name of a command in bin/, not a path.",
+ "yaml": "methodology: 1\nchecks:\n  - bin/adr-check\n",
+ "refused": "bad-value"
+}

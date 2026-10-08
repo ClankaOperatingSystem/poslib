@@ -424,6 +424,95 @@ message, for a file doc/pos-directory.txt does not allow."
                      :null))
         (warnings . ,(vconcat (nreverse pos-tree--warnings)))))))
 
+;;;; The declaration
+
+(defconst pos-tree-methodology-file "methodology.yaml"
+  "The declaration at a methodology's root, doc/pos-methodology.txt.")
+
+(defun pos-tree--declared-path (value what)
+  "Return VALUE, the path of a WHAT in a project, as written.
+Refuse one that does not stay beneath the project.  A final slash,
+which marks a directory of instances, is allowed."
+  (unless (pos-tree--path-p (if (and (> (length value) 1) (string-suffix-p "/" value))
+                                (substring value 0 -1)
+                              value))
+    (pos-tree--refuse 'bad-path "Not a path for %s: %s" what value))
+  value)
+
+(defun pos-tree--kinds (entries)
+  "Return the kinds of canon in ENTRIES, a sequence, checked, defaults filled in."
+  (let ((names nil))
+    (seq-map-indexed
+     (lambda (entry index)
+       (let-alist (pos-tree--mapping
+                   entry "A kind"
+                   '(("kind" string t) ("at" string t) ("format" string nil)
+                     ("derived" string nil) ("entrance" string nil))
+                   (format "canon[%d]" index))
+         (when (member .kind names)
+           (pos-tree--refuse 'bad-value "A kind is declared twice: %s" .kind))
+         (push .kind names)
+         (unless (member .derived '(nil "true" "false"))
+           (pos-tree--refuse 'bad-value "derived is true or false: %s" .kind))
+         `((kind . ,.kind)
+           (at . ,(pos-tree--declared-path .at "at"))
+           (format . ,(or .format :null))
+           (derived . ,(if (equal .derived "true") t :false))
+           (entrance . ,(if .entrance
+                            (pos-tree--declared-path .entrance "entrance")
+                          .at)))))
+     entries)))
+
+(defun pos-tree--checks (names)
+  "Return NAMES, a sequence of check names, checked."
+  (seq-map (lambda (name)
+             (let ((typed (pos-tree--typed name 'string)))
+               (unless typed
+                 (pos-tree--refuse 'wrong-type "A check is not a string"))
+               (when (string-match-p "/" (car typed))
+                 (pos-tree--refuse 'bad-value
+                                   "A check is a name in bin/, not a path: %s"
+                                   (car typed)))
+               (car typed)))
+           names))
+
+(defun pos-tree-read-methodology (text)
+  "Return the declaration in TEXT, a methodology.yaml's, checked.
+An alist of methodology, the version; canon, a vector of kinds, each
+an alist of kind, at, format, derived and entrance with defaults
+filled in; checks, a vector of names; and warnings, a vector of
+strings, one for each key this reader does not know.  Signal
+`pos-tree-refused' for a file doc/pos-methodology.txt does not allow."
+  (let ((pos-tree--warnings nil)
+        (parsed (condition-case nil
+                    (yaml-parse-string text :object-type 'alist
+                                       :object-key-type 'string
+                                       :sequence-type 'array
+                                       :string-values t)
+                  (error (pos-tree--refuse 'not-yaml "Not readable as YAML")))))
+    (unless (pos-tree--mapping-p parsed)
+      (pos-tree--refuse 'not-a-mapping "The declaration is not a mapping"))
+    (let ((version (car (pos-tree--typed (cdr (assoc "methodology" parsed)) 'integer))))
+      (when (and version (/= version 1))
+        (pos-tree--refuse 'unknown-version "Not a version this reader knows: %s"
+                          version)))
+    (let ((top (pos-tree--mapping
+                parsed "The declaration"
+                '(("methodology" integer t) ("canon" sequence nil)
+                  ("checks" sequence nil)))))
+      `((methodology . 1)
+        (canon . ,(vconcat (pos-tree--kinds (alist-get 'canon top))))
+        (checks . ,(vconcat (pos-tree--checks (alist-get 'checks top))))
+        (warnings . ,(vconcat (nreverse pos-tree--warnings)))))))
+
+(defun pos-tree-read-methodology-file (dir)
+  "Return the declaration of the methodology at DIR, or nil if it has none.
+Signal `pos-tree-refused' for one this reader does not allow."
+  (let ((file (expand-file-name pos-tree-methodology-file dir)))
+    (when (file-regular-p file)
+      (pos-tree-read-methodology
+       (with-temp-buffer (insert-file-contents file) (buffer-string))))))
+
 ;;;; Git
 
 (defun pos-tree--git (dir &rest args)

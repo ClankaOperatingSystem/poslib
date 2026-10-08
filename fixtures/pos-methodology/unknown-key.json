@@ -1,0 +1,10 @@
+{
+ "about": "A key this version does not define is a warning, named by its place, and the rest is read.",
+ "yaml": "methodology: 1\ncanon:\n  - kind: decision\n    at: decisions/\n    format: markdown\n    colour: blue\n",
+ "declaration": {
+  "methodology": 1,
+  "canon": [{"kind": "decision", "at": "decisions/", "format": "markdown", "derived": false, "entrance": "decisions/"}],
+  "checks": [],
+  "warnings": ["unknown-key: canon[0].colour"]
+ }
+}

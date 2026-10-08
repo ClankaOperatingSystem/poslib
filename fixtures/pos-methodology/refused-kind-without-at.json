@@ -1,0 +1,5 @@
+{
+ "about": "A kind must say where its instances are.",
+ "yaml": "methodology: 1\ncanon:\n  - kind: decision\n    format: markdown\n",
+ "refused": "missing-key"
+}

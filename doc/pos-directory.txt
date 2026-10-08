@@ -164,6 +164,12 @@ path: an entry at that path itself, or deeper beneath it, is refused
 (bad-path). The name clankos is reserved: an entry whose methodology
 is named clankos is refused (bad-value).
 
+A tool that walks a project for its files does not enter a
+methodology, whether it is a directory of the project's repository or
+a repository mounted there: a methodology's own files are not the
+project's canon. What a methodology holds, and the kinds of canon it
+declares, are in doc/pos-methodology.txt.
+
 path is any path that stays beneath the node: relative, with no empty
 part and no part that is . or .., and no backslash. No folder name
 carries meaning. It does not pass through another child: what is
@@ -557,6 +563,9 @@ array with every default filled in, a child with no remote having null
 for its remote and branch, and an archive carrying sweep and path only
 when written; server, an object or null; and warnings, an array of
 strings, empty when the file holds no key the reader does not know.
+
+fixtures/pos-methodology/ holds declarations, as doc/pos-methodology.txt
+section 5 describes them.
 
 The tests of the tool in real repositories include a project that
 declares a mounted methodology and a local one, each holding a skill

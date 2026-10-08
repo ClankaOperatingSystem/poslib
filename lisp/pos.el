@@ -290,9 +290,62 @@ Each copy names the others."
                     findings))))))
     (nreverse findings)))
 
+(defun pos-lint--check-output (command project)
+  "Run COMMAND, a check, in PROJECT; return (STATUS OUTPUT . ERRORS).
+OUTPUT is what it printed on standard output, ERRORS on standard
+error, trimmed."
+  (let ((errors (make-temp-file "pos-lint-")))
+    (unwind-protect
+        (with-temp-buffer
+          (let* ((default-directory project)
+                 (status (call-process command nil (list t errors) nil)))
+            (cons status
+                  (cons (buffer-string)
+                        (string-trim (with-temp-buffer
+                                       (insert-file-contents errors)
+                                       (buffer-string)))))))
+      (delete-file errors))))
+
+(defun pos-lint-methodology-checks (root)
+  "Run the checks the methodologies of ROOT's projects declare; return findings.
+As doc/pos-methodology.txt section 3 has it: a check is run in the
+project; each FILE:LINE: MESSAGE line it prints is a finding at that
+file, relative to the project, and any other line a finding at the
+project; a check that exits 2 is a finding at the methodology with what
+it printed on standard error.  A declaration that is refused, and a
+check bin/ does not hold, are each a finding at the methodology."
+  (let (findings)
+    (pcase-dolist (`(,scope ,name . ,dir) (pos-corpus-methodologies (pos-corpus root)))
+      (let ((at (directory-file-name dir))
+            (project (pos-scope-dir scope)))
+        (condition-case err
+            (seq-doseq (check (alist-get 'checks (or (pos-tree-read-methodology-file dir)
+                                                     '((checks . [])))))
+              (let ((command (expand-file-name (concat "bin/" check) dir)))
+                (if (not (file-executable-p command))
+                    (push (list at 1 (format "check %s is not in bin/ of %s" check name))
+                          findings)
+                  (pcase-let ((`(,status ,output . ,errors)
+                               (pos-lint--check-output command project)))
+                    (if (memq status '(0 1))
+                        (dolist (line (split-string output "\n" t))
+                          (push (if (string-match "\\`\\(.+?\\):\\([0-9]+\\): \\(.*\\)\\'" line)
+                                    (list (expand-file-name (match-string 1 line) project)
+                                          (string-to-number (match-string 2 line))
+                                          (match-string 3 line))
+                                  (list (directory-file-name project) 1 line))
+                                findings))
+                      (push (list at 1 (format "check %s could not check: %s" check errors))
+                            findings))))))
+          (pos-tree-refused
+           (push (list at 1 (format "declaration refused: %s: %s" (nth 1 err) (nth 2 err)))
+                 findings)))))
+    (nreverse findings)))
+
 (defvar pos-lint-repo-checks
   '(pos-lint-stranded-tasks
-    pos-lint-duplicate-tasks)
+    pos-lint-duplicate-tasks
+    pos-lint-methodology-checks)
   "Whole-tree checks: root to findings.")
 
 (defun pos-lint-format (findings root)
