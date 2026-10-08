@@ -225,7 +225,8 @@ One directory per week, one archive file per source."
 
 (cl-defmethod pos-sweep-destination ((_kind (eql sealed)) _entry dir file week)
   "Return FILE's archive beneath DIR's _sweep/, in WEEK's directory.
-The week's directory stays there until the week closes and is sealed."
+The week's directory stays there until sweeps no longer write into
+it, a week after the week ended, and is then sealed."
   (expand-file-name (concat (file-relative-name file dir) "_archive")
                     (expand-file-name week (expand-file-name "_sweep" dir))))
 
