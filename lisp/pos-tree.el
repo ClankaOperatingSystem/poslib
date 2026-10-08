@@ -317,15 +317,17 @@ underscore or a dot, as doc/pos-directory.txt has it.")
 (defun pos-tree--exclusions (value)
   "Return VALUE, a configuration's exclude sequence, checked, as a vector.
 Each entry is a directory's name or a glob over one, with * for any
-text, or a path beneath the node when it holds a slash; a final slash
-is dropped.  Nil for nil."
+text, or a path beneath the node when it holds a slash.  A path's
+final slash is dropped unless the path is one name, which keeps it:
+without it the entry would read as a name.  Nil for nil."
   (when value
     (vconcat
      (seq-map (lambda (entry)
                 (unless (pos-tree--typed entry 'string)
                   (pos-tree--refuse 'wrong-type "exclude: an entry is not a string"))
                 (if (string-match-p "/" entry)
-                    (pos-tree--location entry "exclude")
+                    (let ((path (pos-tree--location entry "exclude")))
+                      (if (string-match-p "/" path) path (concat path "/")))
                   entry))
               value))))
 
@@ -343,12 +345,19 @@ declares none, or when CONFIG is nil."
 PATH is relative to the node whose EXCLUSIONS these are, a list as
 `pos-tree-exclusions' gives.  An entry with a slash names a path and
 excludes it and what lies beneath it; any other names a directory,
-with * for any text, wherever it lies beneath the node."
-  (let ((name (file-name-nondirectory path)))
+with * for any text, wherever it lies beneath the node.  A name is
+matched letter for letter: case counts, and no character but * stands
+for another."
+  (let ((name (file-name-nondirectory path))
+        (case-fold-search nil))
     (seq-some (lambda (entry)
                 (if (string-match-p "/" entry)
-                    (pos-tree--within-p path entry)
-                  (string-match-p (wildcard-to-regexp entry) name)))
+                    (pos-tree--within-p path (string-remove-suffix "/" entry))
+                  (string-match-p
+                   (concat "\\`"
+                           (mapconcat #'regexp-quote (split-string entry "\\*") ".*")
+                           "\\'")
+                   name)))
               exclusions)))
 
 (defun pos-tree-read-config (text)

@@ -1,0 +1,21 @@
+{
+ "about": "A path of one name keeps its final slash, so that it stays a path beneath the node and is not read as a name at any depth.",
+ "yaml": "pos: 2\nprojects: projects/\nexclude:\n  - journal/\n  - meta/journal/\n  - journal\n",
+ "config": {
+  "kind": "responsibility",
+  "projects": "projects",
+  "methodologies": null,
+  "image": null,
+  "bin": null,
+  "exclude": [
+   "journal/",
+   "meta/journal",
+   "journal"
+  ],
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null,
+  "warnings": []
+ }
+}
