@@ -2,6 +2,9 @@
  "description": "A schema 2 ledger replayed to a keeper: its old events bare, the conversion event refused until every file the ledger enrols comes with it, then the root the ledger recorded and a file read beneath it.",
  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
  "token": "tape-token",
+ "protocols": [
+  1
+ ],
  "exchanges": [
   {
    "call": {
