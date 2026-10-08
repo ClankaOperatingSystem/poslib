@@ -1,0 +1,5 @@
+{
+ "about": "One entry per kind.",
+ "yaml": "methodology: 1\ncanon:\n  - kind: decision\n    at: decisions/\n    format: markdown\n  - kind: decision\n    at: records/\n    format: markdown\n",
+ "refused": "bad-value"
+}

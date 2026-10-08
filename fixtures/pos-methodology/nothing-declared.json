@@ -1,0 +1,5 @@
+{
+ "about": "A declaration with the version alone declares no kinds and no checks, as an absent file does.",
+ "yaml": "methodology: 1\n",
+ "declaration": {"methodology": 1, "canon": [], "checks": [], "warnings": []}
+}

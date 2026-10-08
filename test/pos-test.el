@@ -333,6 +333,32 @@ Open and done tasks in the right places are the normal state."
       (should-not (pos-lint))
       (should (equal "" (pos-lint-format nil root))))))
 
+(ert-deftest pos/a-methodologys-checks-are-run-by-the-lint ()
+  "A check a methodology declares is run in the project, its lines findings.
+A FILE:LINE: MESSAGE line is a finding at that file, relative to the
+project; another line is a finding at the project; a check that exits
+2 is a finding at the methodology with its standard error; a check
+bin/ does not hold is a finding at the methodology."
+  (pos-test-with-files root
+      '((".clanka/config.yml"
+         . "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/adr\n")
+        ("intray.org" . "* TODO open\n")
+        ("methodologies/adr/methodology.yaml"
+         . "methodology: 1\nchecks:\n  - adr-check\n  - adr-broken\n  - adr-missing\n")
+        ("methodologies/adr/bin/adr-check"
+         . "#!/bin/sh\necho 'decisions/0002.md:3: status not known'\necho 'index out of date'\nexit 1\n")
+        ("methodologies/adr/bin/adr-broken"
+         . "#!/bin/sh\necho 'no decisions directory' >&2\nexit 2\n"))
+    (dolist (name '("adr-check" "adr-broken"))
+      (set-file-modes (expand-file-name (concat "methodologies/adr/bin/" name) root) #o755))
+    (let ((pos-directory root))
+      (should (equal (pos-test-lines
+                      ".:1: index out of date"
+                      "decisions/0002.md:3: status not known"
+                      "methodologies/adr:1: check adr-broken could not check: no decisions directory"
+                      "methodologies/adr:1: check adr-missing is not in bin/ of adr")
+                     (pos-lint-format (pos-lint) root))))))
+
 (ert-deftest pos/findings-print-file-line-message-relative-to-the-root ()
   "Findings print as file:line: message, relative to the root, in order.
 The order is by file then line, so a compilation buffer walks the

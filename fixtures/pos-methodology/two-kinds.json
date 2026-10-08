@@ -1,0 +1,13 @@
+{
+ "about": "A methodology declares two kinds, authored records and a derived index, and a check. The index's entrance defaults to its at.",
+ "yaml": "methodology: 1\ncanon:\n  - kind: decision\n    at: decisions/\n    format: markdown\n    entrance: decisions/index.json\n  - kind: decision-index\n    at: decisions/index.json\n    format: json\n    derived: true\nchecks:\n  - adr-check\n",
+ "declaration": {
+  "methodology": 1,
+  "canon": [
+   {"kind": "decision", "at": "decisions/", "format": "markdown", "derived": false, "entrance": "decisions/index.json"},
+   {"kind": "decision-index", "at": "decisions/index.json", "format": "json", "derived": true, "entrance": "decisions/index.json"}
+  ],
+  "checks": ["adr-check"],
+  "warnings": []
+ }
+}

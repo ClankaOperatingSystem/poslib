@@ -1,0 +1,147 @@
+The methodology directory
+Version 1
+
+A project uses methodologies: each a repository or a directory declared
+directly beneath the project's methodologies path (doc/pos-directory.txt,
+section 2). A methodology supplies skills and commands, which section 6
+of that document says how the tree tool links into the project. This
+document says what else a methodology holds: a declaration of the kinds
+of canon its commands create and maintain in the project, and of the
+checks it supplies for them; and what a tool does with the declaration.
+
+A methodology has no configuration. It declares no children and names
+no locations; it is what its declaring entry says it is. What it holds:
+
+    version              one line, which names what the directory holds
+    skills/NAME/         a skill, named with the methodology's name and
+                         a hyphen (pos-directory, section 6)
+    bin/NAME             a command
+    methodology.yaml     the declaration (section 1); optional
+
+Everything here works with no server and no network.
+
+
+1. The declaration
+
+methodology.yaml at the methodology's root is YAML, read under the
+rules of the configuration (pos-directory, section 1): no anchors,
+aliases, tags or second document; every scalar is the text written; a
+key the reader does not know is a warning, named by its place, and the
+rest is read; a value the reader cannot read refuses the whole file,
+with a kind of refusal from that document's list; the version number
+changes only when a key's meaning changes.
+
+The top level is a mapping:
+
+    methodology    1, the version of this document; required
+    canon          the kinds of canon this methodology maintains in a
+                   project (section 2); absent means none
+    checks         the checks it supplies (section 3); absent means none
+
+A methodology whose directory has no methodology.yaml declares no
+kinds and no checks: it supplies skills and commands only. A file that
+is empty lacks its version (missing-key); one that is not a mapping is
+refused (not-a-mapping).
+
+
+2. Kinds of canon
+
+canon is a sequence. Each entry is a mapping:
+
+    kind        the kind's name, a string; one entry per name, a name
+                written twice refused (bad-value)
+    at          where the kind's instances are in a project that uses
+                the methodology: a path beneath the project. With a
+                final slash, a directory holding one file per
+                instance; without, the one file that is the instance
+    format      a word naming what the instances are written in, for a
+                reader: markdown, json, org, or any other word. It
+                binds nothing: no tool reads an instance because of
+                it, and no format is required; absent, none is named
+    derived     true for a kind the methodology's commands rebuild
+                from other kinds and a person does not edit; false
+                when absent
+    entrance    the file a reader opens first to find the instances, a
+                path beneath the project; when absent, at
+
+at and entrance are paths as a child's path is (pos-directory, section
+2): relative, no empty part, no part that is . or .., no backslash
+(bad-path otherwise). They are paths in the project, not in the
+methodology: the methodology supplies the kind and the means, and the
+project owns the instances. A kind whose at is a directory may be
+empty in a project that has recorded nothing yet.
+
+A methodology's own files are not canon of any project. A tool that
+walks a project for its files does not enter a methodology, whether it
+is a directory of the project's repository or a repository mounted
+there (pos-directory, section 2), so a methodology's documentation is
+never a project's tasks.
+
+What a tool does with a kind: nothing to the instances. The corpus
+reads Org files and no instance of a kind because of its format; an
+instance that happens to be an Org file in the project is read as any
+Org file of the project is. What the declaration gives a tool is the
+knowledge that the kind is there and where a reader starts, which the
+start-up report prints (section 4).
+
+
+3. Checks
+
+checks is a sequence of strings, each the name of a command in the
+methodology's bin/ (bad-value for a name with a slash, or one bin/
+does not hold when the methodology is there). A check is run by the
+lint in the project that declares the methodology, after the lint's
+own checks of the project's Org files:
+
+  - It is run with the project's directory as its working directory
+    and no arguments.
+  - It prints findings, one per line, as FILE:LINE: MESSAGE, FILE
+    relative to the project; a line not of that form is a finding at
+    the project itself, with the line as its message.
+  - It exits 0 for no finding, 1 for findings, and 2 when it could not
+    check; the lint reports the last as a finding at the methodology's
+    path, with what the check printed on standard error.
+
+The lint prints a check's findings among its own, FILE relative to the
+root, sorted with them. A declaration the lint cannot read, and a check
+named that bin/ does not hold, are each a finding at the methodology's
+path. A check reads what it likes within the project and writes
+nothing; a check that writes is a defect of the methodology.
+
+
+4. What a reader is told
+
+The start-up report (pos-startup; clankos' docs/startup-prompt.txt)
+reads the corpus, every Org file the tree's configurations allow, and
+nothing else. After "Files read" it prints, for each project of the
+tree that uses a methodology declaring kinds, one line per kind:
+
+    Canon of other kinds, not read:
+      PROJECT  METHODOLOGY  KIND  AT  start at ENTRANCE
+
+PROJECT is the project's path as the report labels its scopes, "." for
+the root; the others are the declaration's, with at and entrance
+relative to the project. A methodology whose declaration is refused is
+one line, naming the methodology and the refusal, so that a reader
+knows a kind may be missing from the list. The section is absent when
+no methodology of the tree declares a kind.
+
+The report's views stay what they are: items of the corpus's Org
+files. An instance of another kind is in no view.
+
+
+5. Tests
+
+fixtures/pos-methodology/ holds declarations for both libraries, as
+fixtures/pos-directory/ holds configurations (pos-directory, section
+8). Each fixture is a JSON object: about; yaml, the file's text; and
+either declaration, what a reader makes of it, or refused, the kind of
+refusal. declaration has methodology, the version; canon, an array of
+kinds with every default filled in, format a string or null, derived
+true or false and entrance as written or as at; checks, an array of
+strings; and warnings, an array of strings.
+
+The tests of the tools in real repositories include a project with a
+methodology whose Org file is not read as the project's, local and
+mounted; a report that lists a declared kind with its entrance; and a
+lint that runs a check and reports its findings among its own.

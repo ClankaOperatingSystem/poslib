@@ -309,6 +309,49 @@ Text: a title, then one line for each item, labelled by its scope."
       (_ (user-error "Unknown view: %s (one of %s)"
                      view (string-join pos-startup-views ", "))))))
 
+(defun pos-startup--table (rows)
+  "Return ROWS, lists of strings, as lines with their columns aligned."
+  (let ((widths nil))
+    (dolist (row rows)
+      (seq-map-indexed (lambda (cell i)
+                         (setf (alist-get i widths)
+                               (max (or (alist-get i widths) 0) (length cell))))
+                       row))
+    (mapconcat (lambda (row)
+                 (concat "  "
+                         (string-trim-right
+                          (mapconcat #'identity
+                                     (seq-map-indexed
+                                      (lambda (cell i) (string-pad cell (alist-get i widths)))
+                                      row)
+                                     "  "))
+                         "\n"))
+               rows "")))
+
+(defun pos-startup--other-kinds ()
+  "Return the section naming the kinds of canon methodologies declare, or \"\".
+One line for each kind a project's methodology declares, as
+doc/pos-methodology.txt has it: the project, the methodology, the kind,
+where it is and where to start reading.  A methodology whose declaration
+is refused is one line naming the refusal."
+  (let (rows)
+    (pcase-dolist (`(,scope ,name . ,dir)
+                   (pos-corpus-methodologies pos-startup--corpus))
+      (condition-case err
+          (seq-doseq (kind (alist-get 'canon (or (pos-tree-read-methodology-file dir)
+                                                 '((canon . [])))))
+            (push (list (pos-scope-path scope) name (alist-get 'kind kind)
+                        (alist-get 'at kind)
+                        (concat "start at " (alist-get 'entrance kind)))
+                  rows))
+        (pos-tree-refused
+         (push (list (pos-scope-path scope) name
+                     (format "(refused: %s: %s)" (nth 1 err) (nth 2 err)))
+               rows))))
+    (if rows
+        (concat "\nCanon of other kinds, not read:\n" (pos-startup--table (nreverse rows)))
+      "")))
+
 (defun pos-startup-report (root &optional views)
   "Return the opening questions, then VIEWS of ROOT's Org files, as text.
 VIEWS defaults to `pos-startup-default-views'."
@@ -324,6 +367,7 @@ VIEWS defaults to `pos-startup-default-views'."
               (mapconcat (lambda (finding)
                            (format "Not read: %s (%s)\n" (car finding) (cdr finding)))
                          (pos-corpus-findings pos-startup--corpus) "")
+              (pos-startup--other-kinds)
               (mapconcat (lambda (view) (concat "\n" (pos-startup-view root view)))
                          views "")))))
 

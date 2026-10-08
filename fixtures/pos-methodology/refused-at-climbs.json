@@ -1,0 +1,5 @@
+{
+ "about": "A kind's at is a path beneath the project.",
+ "yaml": "methodology: 1\ncanon:\n  - kind: decision\n    at: ../decisions/\n    format: markdown\n",
+ "refused": "bad-path"
+}
