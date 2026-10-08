@@ -398,7 +398,9 @@ order from empty, must answer with the status recorded and the body
 recorded, or for a refusal the kind. A tape may have ledger_id, the
 ledger its keeper has agreed to keep; without it the keeper keeps
 whichever ledger it is first sent. A tape may have protocols, the
-versions its keeper serves; without it they are 1 and 2. An append's
+versions its keeper serves; without it they are 1 and 2. A tape may
+have search, the modes its keeper searches in; without it the keeper
+does not search. An append's
 call may have following, the later events sent with it, each a name
 and an event; one of version 1 may have files, by CID. A search's call
 has q, and any of mode, limit and within that the search gives; its
