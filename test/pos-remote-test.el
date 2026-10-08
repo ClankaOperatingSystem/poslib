@@ -41,6 +41,7 @@ As the tape writes it: an object, or for bytes an object holding them."
       ("read"
        `((bytes . ,(decode-coding-string (pos-remote-read archive .cid .path) 'utf-8))))
       ("held" `((missing . ,(vconcat (pos-remote-held archive (append .cids nil))))))
+      ("search" (pos-remote-search archive .q .mode .limit .within))
       ("put" `((held . ,(if (pos-remote-put archive .cid (encode-coding-string .block 'utf-8 t))
                             "new" "already"))))
       ("append"

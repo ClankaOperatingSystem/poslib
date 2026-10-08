@@ -22,7 +22,7 @@
 
 ;; The client's side of doc/remote-archive-protocol.txt, in lockstep
 ;; with pyposlib.  A ledger stays with its scope; the archive it enrols
-;; may be kept by a keeper, reached at a URL.  Six operations pass
+;; may be kept by a keeper, reached at a URL.  Seven operations pass
 ;; between them, and they are generic functions, so that what keeps an
 ;; archive can be HTTP, a test's tape or another transport:
 ;;
@@ -34,6 +34,8 @@
 ;; - `pos-remote-append': an event and the client's claims; under version
 ;;   1, the files it enrols travel with it.
 ;; - `pos-remote-read': the bytes under a CID, or at a path beneath it.
+;; - `pos-remote-search': where a query is found, as references with a
+;;   range and the passage there, from a keeper that searches.
 ;;
 ;; `pos-remote-version' is the version a client speaks to a keeper: the
 ;; highest it lists that the client knows.  `pos-remote-following' is
@@ -61,7 +63,7 @@
 (cl-defgeneric pos-remote-describe (archive)
   "Return what the keeper of ARCHIVE has of its ledger.
 An alist: protocol, protocols and any retiring, ledger_id, head, events,
-root and erased.")
+root, erased, and search for a keeper that searches.")
 
 (cl-defgeneric pos-remote-held (archive cids)
   "Return the CIDS, a list, that the keeper of ARCHIVE has no block for.
@@ -89,6 +91,16 @@ again at the same number changes nothing.")
   "Return the bytes ARCHIVE's ledger enrols under CID.
 A file or an event; or with PATH, the file at that path beneath a
 directory.")
+
+(cl-defgeneric pos-remote-search (archive query &optional mode limit within)
+  "Return where QUERY is found in what ARCHIVE's ledger enrols.
+MODE is one the keeper lists under search in `pos-remote-describe',
+literal where nil.  LIMIT is the most hits wanted, or nil for the
+keeper's cap.  WITHIN is a CID the ledger enrols, to search beneath it
+alone, or nil for everything.  Return an alist whose hits is a vector
+of hits, each an alist: ref, an ipfs:// link; range; passage, the text
+there; and in a ranked mode score.  A keeper that does not search
+refuses as `absent'; a mode it does not serve, as `mode'.")
 
 ;;;; Which version
 
@@ -321,6 +333,22 @@ files; under version 2 FILES is nil and nothing follows the later events."
    (concat "/ipfs/" cid
            (unless (member path '(nil ""))
              (concat "/" (mapconcat #'url-hexify-string (split-string path "/") "/"))))))
+
+(cl-defmethod pos-remote-search ((archive pos-remote-http) query &optional mode limit within)
+  "Return where QUERY is found in ARCHIVE, over HTTP.
+MODE, LIMIT and WITHIN go as query parameters after q, in that order,
+each left out where nil."
+  (pos-ledger-parse
+   (pos-remote--call
+    archive "GET"
+    (concat "/search?"
+            (mapconcat (lambda (parameter)
+                         (concat (car parameter) "=" (url-hexify-string (cdr parameter))))
+                       (seq-filter #'cdr
+                                   `(("q" . ,query) ("mode" . ,mode)
+                                     ("limit" . ,(and limit (number-to-string limit)))
+                                     ("within" . ,within)))
+                       "&")))))
 
 (provide 'pos-remote)
 ;;; pos-remote.el ends here
