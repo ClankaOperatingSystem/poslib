@@ -261,6 +261,22 @@ longer read.  The message names the setting and says as much."
           (should (string-match-p "no longer read" messages)))
       (makunbound 'pos-pillars))))
 
+(ert-deftest pos/the-roam-index-exclusions-in-pos-config-el-are-reported ()
+  "A pos-config.el that still sets the roam index's exclusions is told so.
+`pos-roam-excluded-directories' once named the directories the index
+left out; the index covers the corpus, so the setting is no longer
+read.  The message names the setting and says where exclusions go."
+  (pos-test-with-files root
+      `(("pos-config.el"
+         . ,(pos-test-lines ";;; -*- lexical-binding: t -*-"
+                            "(setq pos-roam-excluded-directories '(\"attic\"))")))
+    (unwind-protect
+        (ert-with-message-capture messages
+          (should (pos-load-config root))
+          (should (string-match-p "pos-roam-excluded-directories" messages))
+          (should (string-match-p "under exclude" messages)))
+      (makunbound 'pos-roam-excluded-directories))))
+
 ;;;; Normalising keywords
 
 (ert-deftest pos/normalising-strips-todo-lines-and-respells-canceled ()
