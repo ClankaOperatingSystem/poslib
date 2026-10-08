@@ -103,7 +103,9 @@ as it is.  A buffer already visiting FILE is returned as it is."
     (pos-startup-excluded-directories
      . "the directories not read are declared under exclude in the configuration")
     (pos-archive-directory
-     . "where a scope's done items go is declared by its archive entry's sweep and path"))
+     . "where a scope's done items go is declared by its archive entry's sweep and path")
+    (pos-roam-excluded-directories
+     . "the index covers the corpus, whose exclusions are declared under exclude in the configuration"))
   "Settings pos-config.el once set, each with what replaced it.")
 
 (defun pos-load-config (&optional root)
