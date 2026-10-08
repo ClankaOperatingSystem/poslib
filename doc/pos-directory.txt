@@ -476,9 +476,16 @@ The tool keeps these rules:
 The archives ROOT command applies only archive-excludes actions from
 a fresh plan and prints the remaining plan. It clones nothing, installs
 nothing and changes no link. Initiation and tree-building commands use
-this operation after writing configuration. Like plan and apply, it
-exits 0 for an empty remaining plan, 1 for remaining work or findings,
-and 2 for a refusal.
+this operation after writing configuration.
+
+The install ROOT SOURCE command applies only the exclude, install,
+link, unlink and note actions from a fresh plan made with SOURCE, and
+prints the remaining plan. It clones nothing and changes no archive
+rule, so it uses no network. A command run in a tree uses this
+operation first, so that what is installed there is the source's.
+
+Like plan and apply, each exits 0 for an empty remaining plan, 1 for
+remaining work or findings, and 2 for a refusal.
 
 
 8. Tests

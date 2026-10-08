@@ -51,6 +51,7 @@
 ;;   node does not enter.
 ;; - `pos-tree-plan': the plan for the tree at a root.
 ;; - `pos-tree-apply': do a plan, and return the plan that remains.
+;; - `pos-tree-install': do only what a plan installs and links.
 ;; - `pos-tree-batch': the command line.
 
 ;;; Code:
@@ -1171,6 +1172,19 @@ no link."
       (pos-tree--do (expand-file-name root) action)))
   (pos-tree-plan root))
 
+(defun pos-tree-install (root source)
+  "Apply only what is installed at ROOT from SOURCE; return the remaining plan.
+Read a fresh plan made with SOURCE.  Do its exclude, install, link,
+unlink and note actions.  Clone no repository and change no archive
+rule."
+  (let ((dir (file-name-as-directory (expand-file-name root)))
+        (from (expand-file-name source)))
+    (seq-doseq (action (alist-get 'actions (pos-tree-plan root source)))
+      (when (member (alist-get 'do action)
+                    '("exclude" "install" "link" "unlink" "note"))
+        (pos-tree--do dir action from)))
+    (pos-tree-plan root source)))
+
 ;;;; Command line
 
 (defconst pos-tree-usage
@@ -1189,6 +1203,10 @@ no link."
       update only the managed archive rules in Git's info/exclude;
       print the remaining plan; do not clone repositories, install or
       link
+  install ROOT SOURCE
+      install from SOURCE and bring the links to it up to date; print
+      the remaining plan; do not clone repositories or change archive
+      rules
 
 Exit 0 nothing to do, 1 something to do or to report, 2 refused.
 "
@@ -1209,6 +1227,8 @@ Exit 0 nothing to do, 1 something to do or to report, 2 refused.
         ((or `("plan" ,root) `("plan" ,root ,source))
          (pos-tree--print (pos-tree-plan root source)))
         (`("archives" ,root) (pos-tree--print (pos-tree-ignore-archives root)))
+        (`("install" ,root ,source)
+         (pos-tree--print (pos-tree-install root source)))
         ((or `("apply" ,root ,file) `("apply" ,root ,file ,source))
          (pos-tree--print
           (pos-tree-apply
