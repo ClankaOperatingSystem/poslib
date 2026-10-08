@@ -48,6 +48,7 @@
 (require 'pos-remote)
 
 (declare-function pos-index-bytes "pos-index" (uri &optional directory))
+(declare-function pos-search-command "pos-search" (args))
 
 ;;;; Items
 
@@ -1263,6 +1264,9 @@ and skipped, each an archive with the reason."
   fetch LINK
       print the bytes of the archived file LINK names, an ipfs:// link,
       from a scope above the current directory: on disk or its keeper's
+  search ROOT QUERY [--mode MODE] [--limit N] [--within CID]
+      print each line QUERY is found on in the archives under ROOT, on
+      disk or at their keepers, as LINK:LINE:TEXT; exit 1 with none
   sign-in URL
       sign in to the keeper at URL, in a browser, and keep the token
 
@@ -1340,6 +1344,13 @@ Exit 0 done or clean, 1 findings, 2 refused.
          (require 'pos-index)
          ;; The file's bytes as they are: `princ' would encode them.
          (send-string-to-terminal (pos-index-bytes link)))
+        (`("search" ,root ,query . ,options)
+         (require 'pos-search)
+         (let ((status (pos-search-command (cons root (cons query options)))))
+           (unless status
+             (message "Usage: search ROOT QUERY [--mode MODE] [--limit N] [--within CID]")
+             (kill-emacs 2))
+           (kill-emacs status)))
         (`("sign-in" ,url)
          (princ (json-serialize (pos-signin url) :false-object :false))
          (terpri))

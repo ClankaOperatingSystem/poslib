@@ -374,7 +374,9 @@ can be HTTP, a test's tape, or another transport.
     pos-remote-event, pos-remote-held, pos-remote-put,
     pos-remote-append, pos-remote-read and pos-remote-search, with
     pos-remote-http the wire; pos-remote-following gives the later
-    events an append is sent with.
+    events an append is sent with. pos-search-disk answers search over
+    an archive on disk, and pos-search-scope asks each archive under a
+    root through whichever reaches it (section 12, "Conformance").
 
 
 10. Fixtures
