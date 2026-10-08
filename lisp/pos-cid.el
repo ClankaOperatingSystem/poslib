@@ -31,6 +31,8 @@
 ;; - `pos-cid-tree': CID of every file and directory in a tree.
 ;; - `pos-cid-inventory': the same from the files' paths, CIDs and
 ;;   sizes alone, nothing read: how a ledger gives its archive's root.
+;; - `pos-cid-blocks': every block of a file's DAG, by CID: what a keeper
+;;   is put, block by block.
 ;; - `pos-cid-decode': the bytes of a CID written in base32.
 ;; - `pos-cid-block': the CID of one block under a codec.
 ;;
@@ -254,17 +256,52 @@ A plain directory node, or a HAMT shard where that node would exceed
   "Return the raw leaf node of BYTES."
   (list (pos-cid--cid pos-cid--raw bytes) (length bytes) (length bytes)))
 
+(defun pos-cid--file-links (children)
+  "Return (LINKS . DATA) of the file node linking CHILDREN, each a node."
+  (let ((sizes (mapcar (lambda (c) (nth 2 c)) children)))
+    (cons (mapcar (lambda (c) (list (nth 0 c) "" (nth 1 c))) children)
+          (concat (pos-cid--varint-field 1 2)
+                  (pos-cid--varint-field 3 (apply #'+ sizes))
+                  (mapconcat (lambda (s) (pos-cid--varint-field 4 s)) sizes)))))
+
 (defun pos-cid--file-node (children)
   "Return the file node linking CHILDREN, each a node."
-  (let* ((sizes (mapcar (lambda (c) (nth 2 c)) children))
-         (data (concat (pos-cid--varint-field 1 2)
-                       (pos-cid--varint-field 3 (apply #'+ sizes))
-                       (mapconcat (lambda (s) (pos-cid--varint-field 4 s))
-                                  sizes)))
-         (node (pos-cid--pb (mapcar (lambda (c) (list (nth 0 c) "" (nth 1 c)))
-                                    children)
-                            data)))
-    (append node (list (apply #'+ sizes)))))
+  (let ((parts (pos-cid--file-links children)))
+    (append (pos-cid--pb (car parts) (cdr parts))
+            (list (apply #'+ (mapcar (lambda (c) (nth 2 c)) children))))))
+
+(defun pos-cid-blocks (bytes)
+  "Return the blocks of the unibyte string BYTES as a file, (CID . BLOCK) each.
+Its leaves, and the nodes over them when it is more than one chunk, the
+file's own CID among them; CID is text.  Equal blocks appear once."
+  (when (multibyte-string-p bytes)
+    (error "Encode the string first: blocks are of bytes"))
+  (let ((size (length bytes)) (start 0) nodes held)
+    (while (progn
+             (let* ((chunk (substring bytes start (min size (+ start pos-cid-chunk-size))))
+                    (node (pos-cid--leaf chunk)))
+               (unless (assoc (pos-cid--text (car node)) held)
+                 (push (cons (pos-cid--text (car node)) chunk) held))
+               (push node nodes))
+             (setq start (+ start pos-cid-chunk-size))
+             (< start size)))
+    (setq nodes (nreverse nodes))
+    (while (cdr nodes)
+      (let (level)
+        (while nodes
+          (let (group)
+            (dotimes (_ pos-cid-file-max-links)
+              (when nodes (push (pop nodes) group)))
+            (let* ((children (nreverse group))
+                   (parts (pos-cid--file-links children))
+                   (node (pos-cid--file-node children)))
+              (unless (assoc (pos-cid--text (car node)) held)
+                (push (cons (pos-cid--text (car node))
+                            (pos-cid--pb-node (car parts) (cdr parts)))
+                      held))
+              (push node level))))
+        (setq nodes (nreverse level))))
+    (nreverse held)))
 
 (defun pos-cid--balance (nodes)
   "Return the root of a balanced file DAG over leaf NODES.
