@@ -455,6 +455,23 @@ directory is read by the corpus, so it is not stranded either."
                              (list notes 2 (format outside "TODO")))
                        (pos-lint-stranded-tasks root)))))))
 
+(ert-deftest pos/a-task-in-a-methodologys-own-file-is-not-stranded ()
+  "A task in a methodology's own file is the method's, not a stranded one.
+A methodology a project uses may document itself in Org; the corpus
+does not read it, and nor does this check.  A task in an attic
+beside it still is stranded."
+  (pos-test-configured
+    (pos-test-with-files root
+        '((".clanka/config.yml"
+           . "pos: 2\nprojects: projects/\nchildren:\n  - path: projects/p\n")
+          ("projects/p/.clanka/config.yml"
+           . "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/adr\n")
+          ("projects/p/methodologies/adr/README.org" . "* NEXT Inside the methodology\n")
+          ("attic/notes.org" . "* TODO write it\n"))
+      (should (equal (list (list (expand-file-name "attic/notes.org" root) 1
+                                 "task keyword outside the agenda files (TODO)"))
+                     (pos-lint-stranded-tasks root))))))
+
 (ert-deftest pos/copies-of-one-task-in-two-files-name-each-other ()
   "Copies of one task heading in two corpus files each report the other.
 Headings compare lower-cased and trimmed, so Fix the gate and fix the
