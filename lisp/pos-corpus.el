@@ -280,5 +280,17 @@ configuration to govern; a symbolic link is never reached."
                           (string-prefix-p (concat repository "/") relative))
                         (pos-corpus-unwritable corpus))))))
 
+;; `pos-corpus-writable-p' asks of a file the corpus reads; a command
+;; that writes beside a scope's files, as a seal does, asks of the scope.
+(defun pos-corpus-scope-writable-p (corpus scope)
+  "Return non-nil if a command may write within SCOPE, a scope of CORPUS.
+A scope at or beneath another repository of the tree is that
+repository's to write."
+  (let ((path (pos-scope-path scope)))
+    (not (seq-some (lambda (repository)
+                     (or (equal repository path)
+                         (string-prefix-p (concat repository "/") path)))
+                   (pos-corpus-unwritable corpus)))))
+
 (provide 'pos-corpus)
 ;;; pos-corpus.el ends here
