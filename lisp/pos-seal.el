@@ -247,7 +247,8 @@ item, from WRITTEN-AT if given."
 LEDGER-ID names a new ledger; by default it takes the id its scope's
 entry names, else one made at random.  DATE, by default today's, dates
 any rumours the item's links need.  With AS-DESTINATION, a file's links
-are read as written from DESTINATION, not from where it lies."
+are read as written from DESTINATION, not from where it lies; when it
+is a directory, they are read as written from there."
   (let* ((source (directory-file-name (file-truename (pos-ledger--checked source))))
          (destination (directory-file-name (expand-file-name destination)))
          (archive (pos-seal--outermost-archive destination)))
@@ -302,8 +303,10 @@ are read as written from DESTINATION, not from where it lies."
                        (pos-seal--resolve source rel archive (pos-seal--files source rel)
                                           collections
                                           (or date (format-time-string "%Y-%m-%d"))
-                                          (and as-destination
-                                               (file-name-directory destination)))))
+                                          (cond ((stringp as-destination)
+                                                 (file-name-as-directory as-destination))
+                                                (as-destination
+                                                 (file-name-directory destination))))))
             ;; A rumour sealed already, word for word, is cited, not sealed again.
             (setq rumours
                   (vconcat
@@ -336,17 +339,24 @@ are read as written from DESTINATION, not from where it lies."
               (inventory_sha256 . ,(pos-ledger-sha (pos-ledger-json actual)))
               ,@(when kept `((kept . ,kept))))))))))
 
-(defun pos-seal-stage (bytes destination &optional ledger-id)
+(defun pos-seal-stage (bytes destination &optional ledger-id links-from)
   "Stage BYTES, a new record, and return the plan to seal them at DESTINATION.
 They are staged beside the archive, in _seal/, so the move is one rename,
 with DESTINATION's extension, by which their links are found; the links
-are read as written from DESTINATION.  If planning fails, nothing is
-left staged.
+are read as written from DESTINATION, or from LINKS-FROM, a directory,
+where a program composed the record somewhere else.  If planning fails,
+nothing is left staged.
 LEDGER-ID names a new ledger, as for `pos-seal-plan'."
   (let* ((archive (or (pos-seal--outermost-archive (expand-file-name destination))
                       (pos-ledger--refuse 'destination "Destination is not in an archive: %s"
                                           destination)))
-         (stage (expand-file-name "_seal" (file-name-directory archive))))
+         (stage (expand-file-name "_seal" (file-name-directory archive)))
+         (links-from (and links-from
+                          (let ((dir (file-truename (expand-file-name links-from))))
+                            (unless (file-directory-p dir)
+                              (pos-ledger--refuse 'source "No such directory to read links from: %s"
+                                                  links-from))
+                            dir))))
     (make-directory stage t)
     (let ((file (make-temp-file (expand-file-name "new-" stage) nil
                                (file-name-extension destination t))))
@@ -356,7 +366,7 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
           (insert bytes)))
       (set-file-modes file #o644)
       (condition-case err
-          (pos-seal-plan file destination ledger-id nil t)
+          (pos-seal-plan file destination ledger-id nil (or links-from t))
         (error
          (delete-file file)
          (when (directory-empty-p stage) (delete-directory stage))
@@ -1231,8 +1241,9 @@ and skipped, each an archive with the reason."
 
   seal SOURCE DESTINATION [--apply]
       print the plan to seal SOURCE at DESTINATION, in an archive
-  write-new DESTINATION [--apply]
-      print the plan to seal a new record, read from standard input
+  write-new DESTINATION [--links-from DIR] [--apply]
+      print the plan to seal a new record, read from standard input;
+      its links read as written from DESTINATION, or from DIR
   apply PLAN HASH
       apply a reviewed plan, named by its hash
   check ROOT
@@ -1279,23 +1290,26 @@ Exit 0 done or clean, 1 findings, 2 refused.
                       plan))
                    'utf-8))))
         (`("write-new" ,destination . ,rest)
-         (unless (member rest '(nil ("--apply")))
-           (message "Usage: write-new DESTINATION [--apply]")
-           (kill-emacs 2))
-         (let* ((bytes (with-temp-buffer
-                         (set-buffer-multibyte nil)
-                         (insert-file-contents-literally "/dev/stdin")
-                         (buffer-string)))
-                (plan (pos-seal-stage bytes destination)))
-           (princ (decode-coding-string
-                   (pos-ledger-json
-                    (if rest
+         (let ((links-from (and (equal (car rest) "--links-from") (cadr rest))))
+           (when links-from (setq rest (cddr rest)))
+           (unless (and (member rest '(nil ("--apply")))
+                        (or links-from (not (member "--links-from" rest))))
+             (message "Usage: write-new DESTINATION [--links-from DIR] [--apply]")
+             (kill-emacs 2))
+           (let* ((bytes (with-temp-buffer
+                           (set-buffer-multibyte nil)
+                           (insert-file-contents-literally "/dev/stdin")
+                           (buffer-string)))
+                  (plan (pos-seal-stage bytes destination nil links-from)))
+             (princ (decode-coding-string
+                     (pos-ledger-json
+                      (if rest
                         (let* ((hash (pos-ledger-sha (pos-ledger-json plan)))
                                (result (pos-seal-apply plan hash)))
                           `((plan . ,plan) (hash . ,hash)
                             (event . ,(car result)) (root . ,(cdr result))))
                       plan))
-                   'utf-8))))
+                   'utf-8)))))
         (`("apply" ,plan-file ,hash)
          (let* ((plan (pos-ledger-parse (pos-ledger-read plan-file)))
                 (result (pos-seal-apply plan hash)))
