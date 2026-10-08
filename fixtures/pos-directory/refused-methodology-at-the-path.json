@@ -1,0 +1,5 @@
+{
+ "about": "A methodology's path has one part after the methodologies path; the methodologies path itself cannot be a child.",
+ "yaml": "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies\n    remote: git@example.org:all.git\n",
+ "refused": "bad-path"
+}

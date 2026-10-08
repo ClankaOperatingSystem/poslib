@@ -1,0 +1,33 @@
+{
+ "about": "A project declares its methodologies as children directly beneath its methodologies path, mounted or local, and may declare a product elsewhere beneath it. The config says no more than for any child; which are methodologies follows from methodologies and each path.",
+ "yaml": "pos: 2\nmethodologies: methodologies\nbin: bin\nchildren:\n  - path: methodologies/hello\n    remote: git@example.org:hello.git\n  - path: methodologies/notes\n  - path: products/hello\n    remote: git@example.org:hello.git\n    branch: next-release\n",
+ "config": {
+  "kind": "project",
+  "projects": null,
+  "methodologies": "methodologies",
+  "image": null,
+  "bin": "bin",
+  "exclude": null,
+  "children": [
+   {
+    "path": "methodologies/hello",
+    "remote": "git@example.org:hello.git",
+    "branch": "master"
+   },
+   {
+    "path": "methodologies/notes",
+    "remote": null,
+    "branch": null
+   },
+   {
+    "path": "products/hello",
+    "remote": "git@example.org:hello.git",
+    "branch": "next-release"
+   }
+  ],
+  "worktrees": [],
+  "archives": [],
+  "server": null,
+  "warnings": []
+ }
+}
