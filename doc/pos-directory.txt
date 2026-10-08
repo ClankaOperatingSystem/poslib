@@ -251,10 +251,14 @@ entry's sweep says how: weekly writes them into Org archive files
 beneath the scope, at path, one directory for each ISO week and
 within it one file for each source, named by the source's path within
 the scope with _archive appended; sealed writes the week's files the
-same way beneath _sweep/ in the scope and, once the week has closed,
-seals that week's directory into the scope's archive at sweep/WEEK,
-on disk or with the scope's keeper as kept says, so that finished
-work has the same standing as any sealed item. A file is retired by
+same way beneath _sweep/ in the scope and seals a week's directory
+into the scope's archive at sweep/WEEK, on disk or with the scope's
+keeper as kept says, so that finished work has the same standing as
+any sealed item. A week's directory is sealed once sweeps no longer
+write into it. A sweep writes into the directory of the latest week
+to have ended, at Sunday 23:00 local time, and goes on doing so until
+the next week ends; so that directory is sealed after the following
+Sunday 23:00, and an earlier week's at any time. A file is retired by
 the nearest entry with sweep at or above the scope it belongs to,
 within the same repository; when none has one, it is retired weekly
 beneath the root of its repository, at the default path, as before
