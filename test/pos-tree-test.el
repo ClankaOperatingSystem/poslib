@@ -496,6 +496,31 @@ beneath it vendor is walked and attic is not, the reverse of the root."
                                  (pos-tree-test-summary (pos-tree-plan root)))
                      '("undeclared child/vendor/lib" "undeclared attic/lib"))))))
 
+(ert-deftest pos-tree/an-exclude-entry-is-a-name-or-a-path-read-exactly ()
+  "An entry is a name at any depth or a path beneath the node, read exactly.
+journal/ is a path of one name: the node's own journal and what lies
+beneath it, not a journal deeper down, where the name journal is one
+at any depth.  A name is matched letter for letter, so attic leaves
+Attic to be walked, and only * stands for other text: ? and [ are
+themselves."
+  (let ((path (pos-tree-exclusions
+               `((exclude . ,(pos-tree--exclusions ["journal/" "meta/notes/"])))))
+        (name '("journal" "attic" "tmp*" "what?" "[draft]")))
+    (should (equal '("journal/" "meta/notes") path))
+    (should (pos-tree-unwalked-p "journal" path))
+    (should (pos-tree-unwalked-p "journal/2026" path))
+    (should-not (pos-tree-unwalked-p "a/b/journal" path))
+    (should (pos-tree-unwalked-p "meta/notes/old" path))
+    (should (pos-tree-unwalked-p "a/b/journal" name))
+    (should (pos-tree-unwalked-p "a/attic" name))
+    (should-not (pos-tree-unwalked-p "a/Attic" name))
+    (should (pos-tree-unwalked-p "tmpfiles" name))
+    (should-not (pos-tree-unwalked-p "a/Tmpfiles" name))
+    (should (pos-tree-unwalked-p "what?" name))
+    (should-not (pos-tree-unwalked-p "whats" name))
+    (should (pos-tree-unwalked-p "[draft]" name))
+    (should-not (pos-tree-unwalked-p "d" name))))
+
 (ert-deftest pos-tree/archive-scopes-are-not-looked-for-in-excluded-directories ()
   "An archives directory beneath an excluded one is no scope of the node.
 One that is not excluded is, as before."

@@ -87,7 +87,11 @@ exclude is a sequence of strings. Each is the name of a directory, or
 a glob over one with * for any text, which keeps a walk out of every
 directory of that name beneath this node, however deep; or, when it
 holds a slash, a path beneath this node, which keeps a walk out of
-that directory and what lies beneath it. A final slash is dropped. The
+that directory and what lies beneath it. A name is matched letter for
+letter: attic does not exclude Attic, and no character but * stands
+for another. A path's final slash is dropped, unless the path is one
+name: journal/ is the directory journal of this node and no other,
+and keeps its slash to say so. The
 exclusions in force at a directory are those of the nearest node at or
 above it in the same repository that has the key, replacing what it
 would inherit; when no node of the repository has it, they are
