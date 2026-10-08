@@ -31,6 +31,9 @@
  "keeper": {
   "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
   "token": "tape-token",
+  "protocols": [
+   1
+  ],
   "exchanges": []
  },
  "error": "kept"

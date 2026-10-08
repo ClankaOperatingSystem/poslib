@@ -2,6 +2,9 @@
  "description": "A keeper told which ledger it keeps is sent the first events of a ledger begun before events carried a ledger_id. The first, which names no ledger, is refused alone, refused followed only by an event that names none, and refused followed to an event that names another ledger; it is appended when the events after it reach the one that names this ledger. The second is sent with the third, and the third alone.",
  "url": "https://keeper.example/ledger",
  "token": "tape-token",
+ "protocols": [
+  1
+ ],
  "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
  "exchanges": [
   {

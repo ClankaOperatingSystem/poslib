@@ -2,6 +2,9 @@
  "description": "Two seals kept and read back: the keeper empty, an event appended with its file, the same event again, which changes nothing, a second with its files and the client's claims, then events and files read by number, by CID and by path, and what is not there.",
  "url": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
  "token": "tape-token",
+ "protocols": [
+  1
+ ],
  "exchanges": [
   {
    "call": {
