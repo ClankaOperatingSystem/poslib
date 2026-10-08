@@ -129,11 +129,11 @@ projects.  A file not named project.org adds its own base name."
 
 (defun pos-startup--reviewed-scopes ()
   "Return the paths of the scopes of `pos-startup--corpus' with a review scheduled.
-That is, a project or responsibility holding an open, scheduled
-heading tagged `pos-startup-review-tag'."
+That is, a project, a responsibility or the root holding an open,
+scheduled heading tagged `pos-startup-review-tag'."
   (let (scopes)
     (pcase-dolist (`(,file . ,scope) (pos-corpus-entries pos-startup--corpus))
-      (when (memq (pos-scope-kind scope) '(project responsibility))
+      (when (memq (pos-scope-kind scope) '(project responsibility root))
         (with-current-buffer (pos-visit file)
           (org-map-entries
            (lambda ()
@@ -181,8 +181,8 @@ A link is given as its description."
 (defun pos-startup--reviews ()
   "Return the reviews view of `pos-startup--corpus'.
 Headings tagged `pos-startup-review-tag' that are late or scheduled
-within `pos-startup-review-days', projects' and responsibilities'
-apart."
+within `pos-startup-review-days': projects', responsibilities' and
+the root's apart.  The root's reviews are of the whole tree."
   (mapconcat
    (lambda (pair)
      (let* ((org-agenda-files (pos-startup--files-of-kind (car pair)))
@@ -200,12 +200,13 @@ apart."
             (pos-startup--agenda
              (lambda () (org-agenda-list nil nil pos-startup-review-days)))
           (concat title "\n")))))
-   '((project . "Project") (responsibility . "Responsibility"))
+   '((project . "Project") (responsibility . "Responsibility") (root . "Root"))
    "\n"))
 
 (defun pos-startup--reviews-to-schedule ()
   "Return the view of the scopes of `pos-startup--corpus' with no review scheduled.
-Active projects, by `pos-startup-active-statuses', and responsibilities."
+Active projects, by `pos-startup-active-statuses', responsibilities,
+and the root, named \".\" as its configuration names it."
   (let ((reviewed (pos-startup--reviewed-scopes))
         projects)
     (dolist (file (pos-startup--files-of-kind 'project))
@@ -220,7 +221,10 @@ Active projects, by `pos-startup-active-statuses', and responsibilities."
      "\n"
      (pos-startup--list "Responsibilities with a review to be scheduled"
                         (seq-remove (lambda (scope) (member scope reviewed))
-                                    (pos-startup--responsibilities))))))
+                                    (pos-startup--responsibilities)))
+     "\n"
+     (pos-startup--list "Root with a review to be scheduled"
+                        (unless (member "." reviewed) '("."))))))
 
 (defun pos-startup--intray ()
   "Return the intray view of `pos-startup--corpus'.

@@ -348,17 +348,17 @@ In the tree, beta's Pay the bill is DONE with a deadline on day 10."
     (should-not (string-match-p "Pay the bill" (pos-startup-view root "deadlines")))))
 
 (ert-deftest pos-startup/reviews-are-listed-late-or-due-and-apart-by-kind ()
-  "The reviews view lists open reviews, projects' and responsibilities' apart.
+  "The reviews view lists open reviews: projects', responsibilities' and the root's apart.
 A review is a heading tagged `pos-startup-review-tag'; it is listed
-when late or scheduled in the window, and when its file belongs to a
-project or a responsibility.  In the tree, alpha's review is three
-days late, and home's and health's are in the window; beta's Old
-review is DONE, so not listed; shed's review is due today, but its
-file is the root's, so it is not listed."
+when late or scheduled in the window, under the kind of the scope its
+file belongs to.  In the tree, alpha's review is three days late, and
+home's and health's are in the window; beta's Old review is DONE, so
+not listed; shed's review is due today, and shed is a plain directory,
+so its file is the root's and the review is the root's."
   (pos-startup-test-with-tree
     (let* ((text (pos-startup-view root "reviews"))
            (parts (split-string text "\n\n" t)))
-      (should (= 2 (length parts)))
+      (should (= 3 (length parts)))
       (should (string-prefix-p "Project reviews, late or due in the next 7 days\n"
                                (nth 0 parts)))
       (should (string-match-p "alpha +3 days late: +TODO Review Alpha" (nth 0 parts)))
@@ -369,7 +369,10 @@ file is the root's, so it is not listed."
                               (nth 1 parts)))
       (should (string-match-p "health/intray +Scheduled: +TODO Review health"
                               (nth 1 parts)))
-      (should-not (string-match-p "Review the shed" text)))))
+      (should (string-prefix-p "Root reviews, late or due in the next 7 days\n"
+                               (nth 2 parts)))
+      (should (string-match-p "responsibilities/shed/index +Scheduled: +TODO Review the shed"
+                              (nth 2 parts))))))
 
 (ert-deftest pos-startup/the-reviews-window-is-today-and-the-days-after-it ()
   "The reviews view covers `pos-startup-review-days' days from today.
@@ -382,23 +385,55 @@ scheduled on day 6 and cellar's on day 7."
       (should-not (string-match-p "Review the cellar" text)))))
 
 (ert-deftest pos-startup/scopes-with-no-review-scheduled-are-named ()
-  "Active projects and responsibilities with no open review are named.
+  "Active projects, responsibilities and the root with no open review are named.
 A project is active when its file's STATUS is one of
-`pos-startup-active-statuses'; every responsibility counts.  A review
-scheduled on any date, in the window or beyond it, is a review.  In
-the tree, beta, checkup and roof are active without one; gamma is
-complete, delta has no status and tools/widget's file has none.  Of
-the responsibilities, health/teeth and garden have none; home, health
-and kitchen have one in the window, and cellar one beyond it.  shed
-is no responsibility, so it is not named."
+`pos-startup-active-statuses'; every responsibility counts, and so
+does the root, named \".\".  A review scheduled on any date, in the
+window or beyond it, is a review.  In the tree, beta, checkup and
+roof are active without one; gamma is complete, delta has no status
+and tools/widget's file has none.  Of the responsibilities,
+health/teeth and garden have none; home, health and kitchen have one
+in the window, and cellar one beyond it.  shed is no responsibility,
+so it is not named, and its review is the root's, so the root is not
+named either."
   (pos-startup-test-with-tree
     (let ((parts (split-string (pos-startup-view root "reviews-to-schedule") "\n\n" t)))
+      (should (= 3 (length parts)))
       (should (equal (mapcar #'car (pos-startup-test-lines (nth 0 parts)))
                      '("health/projects/checkup" "projects/beta"
                        "responsibilities/home/projects/roof")))
       (should (equal (split-string (nth 1 parts) "\n" t " +")
                      '("Responsibilities with a review to be scheduled"
-                       "health/teeth" "responsibilities/garden"))))))
+                       "health/teeth" "responsibilities/garden")))
+      (should (equal (nth 2 parts)
+                     "Root with a review to be scheduled\n  (none)\n")))))
+
+(ert-deftest pos-startup/the-root-pair-reviews-the-whole-tree ()
+  "The root's reviews are listed as the root's, and a root without one is named.
+A root holds its reviews in life.org: a weekly one and a four-weekly
+one on the same weekday, each a repeating scheduled item.  Here the
+weekly review is due today and the four-weekly one in three weeks, so
+the weekly is listed and the four-weekly is beyond the window; the
+root has a review, so it is not named.  A root with an intray alone
+is named, as \".\"."
+  (pos-test-with-files root
+      `((".clanka/config.yml" . ,pos-startup-test-responsibility)
+        ("intray.org" . "* Unsorted\n")
+        ("life.org"
+         . ,(concat "#+TITLE: Life\n\n* Purpose and principles\n\n* Vision\n\n"
+                    "* Goals\n\n* Reviews\n\n"
+                    "** TODO Weekly review :review:\nSCHEDULED: "
+                    (substring (pos-startup-test-day 0) 0 -1) " ++1w>\n\n"
+                    "** TODO Monthly review :review:\nSCHEDULED: "
+                    (substring (pos-startup-test-day 21) 0 -1) " ++4w>\n")))
+    (let ((parts (split-string (pos-startup-view root "reviews") "\n\n" t)))
+      (should (string-match-p "^  life +Scheduled: +TODO Weekly review$" (nth 2 parts)))
+      (should-not (string-match-p "Monthly review" (nth 2 parts))))
+    (should (string-suffix-p "Root with a review to be scheduled\n  (none)\n"
+                             (pos-startup-view root "reviews-to-schedule"))))
+  (pos-test-with-files root '(("intray.org" . "* Unsorted\n"))
+    (should (string-suffix-p "Root with a review to be scheduled\n  .\n"
+                             (pos-startup-view root "reviews-to-schedule")))))
 
 (ert-deftest pos-startup/the-intray-view-lists-what-is-captured-and-not-placed ()
   "The intray view lists each open item under Unsorted in an intray.org.
@@ -419,10 +454,15 @@ The tree here holds one empty intray and nothing else."
     (dolist (view '("next" "scheduled" "deadlines" "intray" "all"))
       (ert-info ((format "the %s view" view))
         (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view)))))
-    (should (= 2 (length (split-string (pos-startup-view root "reviews")
+    (should (= 3 (length (split-string (pos-startup-view root "reviews")
                                        "  (none)\n" t))))
-    (should (= 2 (length (split-string (pos-startup-view root "reviews-to-schedule")
-                                       "  (none)\n" t))))))
+    ;; The root has no review, so the third list names it.
+    (let ((parts (mapcar #'string-trim-right
+                         (split-string (pos-startup-view root "reviews-to-schedule")
+                                       "\n\n" t))))
+      (should (string-suffix-p "\n  (none)" (nth 0 parts)))
+      (should (string-suffix-p "\n  (none)" (nth 1 parts)))
+      (should (equal "Root with a review to be scheduled\n  ." (nth 2 parts))))))
 
 ;;;; The report
 
