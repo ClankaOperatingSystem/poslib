@@ -185,6 +185,36 @@ default."
                             (alist-get 'path b)))))
     children))
 
+(defun pos-tree--check-methodologies (at children)
+  "Refuse one of CHILDREN beneath AT, the methodologies path, not a methodology.
+A methodology's path is AT and one more part, its name, which is not
+clankos."
+  (dolist (child children)
+    (let ((path (alist-get 'path child)))
+      (when (pos-tree--within-p path at)
+        (let ((name (and (> (length path) (length at))
+                         (substring path (1+ (length at))))))
+          (when (or (not name) (string-match-p "/" name))
+            (pos-tree--refuse 'bad-path "A methodology is one part beneath %s: %s"
+                              at path))
+          (when (equal name "clankos")
+            (pos-tree--refuse 'bad-value "The name clankos is reserved: %s" path)))))))
+
+(defun pos-tree-methodologies (config)
+  "Return the methodologies CONFIG declares, each (NAME . PATH), by name.
+A methodology is a child directly beneath the path CONFIG says its
+methodologies belong at; its NAME is the last part of its PATH, which
+is relative to the node.  None for a node that is no project."
+  (let ((at (alist-get 'methodologies config)))
+    (when (stringp at)
+      (sort (delq nil
+                  (mapcar (lambda (child)
+                            (let ((path (alist-get 'path child)))
+                              (when (pos-tree--within-p path at)
+                                (cons (substring path (1+ (length at))) path))))
+                          (append (alist-get 'children config) nil)))
+            (lambda (a b) (string< (car a) (car b)))))))
+
 (defun pos-tree--own-scope (path children what)
   "Refuse if PATH, a WHAT's scope, is one of CHILDREN or beneath one."
   (dolist (child children)
@@ -364,6 +394,8 @@ message, for a file doc/pos-directory.txt does not allow."
       (when (and projects methodologies)
         (pos-tree--refuse 'bad-value
                           "A node says where its projects belong or its methodologies, not both"))
+      (when methodologies
+        (pos-tree--check-methodologies methodologies children))
       ;; A tool with no YAML reader finds the image by its line.
       (when (and image
                  (not (let ((case-fold-search nil))
@@ -488,8 +520,9 @@ for a file that is refused, and for two configurations."
   "A repository of the tree that is mounted as declared.
 CHILDREN are its children mounted as declared, each (ENTRY . NODE).
 HELD are the directories of its children that are there and are not
-planned, because of a finding."
-  dir config children held)
+planned, because of a finding.  LOCALS are the directories of the
+repository that have a configuration of their own, each (DIR . CONFIG)."
+  dir config children held locals)
 
 (defun pos-tree--rel (path)
   "Return PATH relative to the root of the tree being planned."
@@ -676,6 +709,9 @@ with its final slash, or nil for REPO."
 (defvar pos-tree--mounted nil
   "The declared paths of repositories in the repository being planned.")
 
+(defvar pos-tree--local-configs nil
+  "The configured directories of the repository being planned, (DIR . CONFIG).")
+
 (defvar pos-tree--local nil
   "The declared paths of directories in the repository being planned.")
 
@@ -741,6 +777,7 @@ What its own configuration declares is planned as REPO's.  Return
         (push within pos-tree--local)
         (condition-case err
             (when-let* ((own (pos-tree--config path nil)))
+              (push (cons path own) pos-tree--local-configs)
               (unless (eq (alist-get 'exclude own) :null)
                 (push (cons within (pos-tree-exclusions own)) pos-tree--local-exclusions))
               (pos-tree--declared repo path own))
@@ -799,6 +836,7 @@ Return its node, with a node for each repository beneath it that is
 mounted as declared, by this repository or by a directory of it."
   (let* ((pos-tree--mounted nil)
          (pos-tree--local nil)
+         (pos-tree--local-configs nil)
          (pos-tree--local-exclusions nil)
          (pos-tree--archive-paths nil)
          (pos-tree--archive-refused nil)
@@ -807,7 +845,7 @@ mounted as declared, by this repository or by a directory of it."
                           (pos-tree-exclusions config))
     (when config (pos-tree--archive-excludes dir))
     (pos-tree--node :dir dir :config config :children (car declared)
-                    :held (cdr declared))))
+                    :held (cdr declared) :locals (nreverse pos-tree--local-configs))))
 
 ;;;; What is installed
 
@@ -862,11 +900,14 @@ working tree has no configuration lacks."
   (when-let* ((file (pos-tree-config-file dir)))
     (expand-file-name "auto" (expand-file-name (file-name-directory file) dir))))
 
-(defun pos-tree--own-link-p (link auto)
-  "Return non-nil if LINK is a symbolic link whose target is in AUTO."
+(defun pos-tree--own-link-p (link owned)
+  "Return non-nil if LINK is a symbolic link whose target is in one of OWNED.
+OWNED are directories the tool's links point into: auto/, and the
+methodologies of a project."
   (when-let* ((to (file-symlink-p link)))
-    (string-prefix-p (file-name-as-directory auto)
-                     (expand-file-name to (file-name-directory link)))))
+    (let ((target (expand-file-name to (file-name-directory link))))
+      (seq-some (lambda (dir) (string-prefix-p (file-name-as-directory dir) target))
+                owned))))
 
 (defun pos-tree--closed (dir path)
   "Return the first part of PATH under DIR that links cannot be made beneath.
@@ -896,35 +937,43 @@ commit that added it."
            (concat "tracked, added in " (car (last (split-string added "\n"))))))
      "untracked")))
 
-(defun pos-tree--link-in (dir within names targets auto)
+(defun pos-tree--link-in (dir within links owned)
   "Plan the tool's links in WITHIN, a directory of the repository at DIR.
-Each of NAMES is to be a link to the entry of that name in TARGETS, a
-directory of AUTO.  A name held by something else is found and left,
-and another of the tool's links there is removed."
+LINKS is an alist (NAME . TARGETS): NAME is to be a link to the entry
+of that name in TARGETS, a directory in one of OWNED, the directories
+the tool's links point into.  A name held by something else is found
+and left; a name LINKS gives twice is found for its second; and another
+of the tool's links there is removed."
   (let* ((in (expand-file-name within dir))
-         (closed (pos-tree--closed dir within)))
+         (closed (pos-tree--closed dir within))
+         (names nil))
     (if closed
-        (when names (pos-tree--taken dir closed))
-      (dolist (name names)
+        (when links (pos-tree--taken dir closed))
+      (pcase-dolist (`(,name . ,targets) links)
         (let* ((path (concat within "/" name))
                (link (expand-file-name name in))
                (shown (pos-tree--rel link))
                (target (file-relative-name (expand-file-name name targets) in)))
           (cond
-           ((pos-tree--own-link-p link auto)
+           ((member name names)
+            (pos-tree--find "name-taken" shown "named by more than one"))
+           ((pos-tree--own-link-p link owned)
+            (push name names)
             (pos-tree--exclude dir path)
             (unless (equal (file-symlink-p link) target)
               (pos-tree--act "unlink" `(path . ,shown))
               (pos-tree--act "link" `(path . ,shown) `(target . ,target))))
            ((or (file-symlink-p link) (file-exists-p link))
+            (push name names)
             (pos-tree--taken dir path))
            (t
+            (push name names)
             (pos-tree--exclude dir path)
             (pos-tree--act "link" `(path . ,shown) `(target . ,target))))))
       (when (file-directory-p in)
         (dolist (name (directory-files in nil directory-files-no-dot-files-regexp))
           (let ((link (expand-file-name name in)))
-            (when (and (not (member name names)) (pos-tree--own-link-p link auto))
+            (when (and (not (member name names)) (pos-tree--own-link-p link owned))
               (pos-tree--act "unlink" `(path . ,(pos-tree--rel link))))))))))
 
 (defun pos-tree--not-skills (in)
@@ -940,8 +989,7 @@ A skill is a directory holding a SKILL.md.  The tool's note is left out."
   "Return the text of the note for IN, an ordinary .claude/skills."
   (let ((others (pos-tree--not-skills in)))
     (concat
-     "ClankOS made the links named clankos-* in this directory, and this\n"
-     "note.\n\n"
+     "ClankOS made the symbolic links in this directory, and this note.\n\n"
      "Coding agents share skills from .agents/skills/. This directory's\n"
      "skills can be moved there, and .claude/skills replaced by a symbolic\n"
      "link to ../.agents/skills. ClankOS then makes its links in the one\n"
@@ -965,32 +1013,37 @@ in another repository of the tree."
          (not (equal (file-name-directory target) skills))
          (not (pos-tree--tracked-p dir (concat ".agents/skills/" name))))))
 
-(defun pos-tree--agents-entries (dir)
-  "Return the names in .agents/skills of the repository at DIR.
+(defun pos-tree--agents-entries (dir &optional path)
+  "Return the names in PATH, .agents/skills by default, of the repository at DIR.
 None where a part of that path is not an ordinary directory."
-  (let ((skills (expand-file-name ".agents/skills" dir)))
-    (and (not (pos-tree--closed dir ".agents/skills"))
+  (let* ((path (or path ".agents/skills"))
+         (skills (expand-file-name path dir)))
+    (and (not (pos-tree--closed dir path))
          (file-directory-p skills)
          (directory-files skills nil directory-files-no-dot-files-regexp))))
 
-(defun pos-tree--claude (dir skills auto)
-  "Plan .claude/skills in the repository at DIR for SKILLS, installed in AUTO.
-Absent, it is to be a link to ../.agents/skills when there are skills
-there.  An ordinary directory has the tool's links made in it too, and
-its note.  A file or a symbolic link, there or at .claude, is left."
-  (let* ((in (expand-file-name ".claude/skills" dir))
-         (stray (expand-file-name (concat ".agents/skills/" pos-tree--note) dir))
-         (ordinary (and (not (pos-tree--closed dir ".claude/skills"))
+(defun pos-tree--claude (dir prefix links owned)
+  "Plan .claude/skills beneath PREFIX in the repository at DIR for LINKS.
+PREFIX is a directory of the repository, relative and ending in a
+slash, or empty for the repository itself.  LINKS and OWNED are as
+`pos-tree--link-in' takes them.  Absent, .claude/skills is to be a
+link to ../.agents/skills when there are skills there.  An ordinary
+directory has the tool's links made in it too, and its note.  A file
+or a symbolic link, there or at .claude, is left."
+  (let* ((skills-path (concat prefix ".claude/skills"))
+         (agents-path (concat prefix ".agents/skills"))
+         (in (expand-file-name skills-path dir))
+         (stray (expand-file-name (concat agents-path "/" pos-tree--note) dir))
+         (ordinary (and (not (pos-tree--closed dir skills-path))
                         (file-directory-p in))))
     (cond
-     ((pos-tree--closed dir ".claude/skills"))
+     ((pos-tree--closed dir skills-path))
      (ordinary
-      (pos-tree--link-in dir ".claude/skills" skills
-                         (expand-file-name "skills" auto) auto)
-      (let ((path (concat ".claude/skills/" pos-tree--note))
+      (pos-tree--link-in dir skills-path links owned)
+      (let ((path (concat skills-path "/" pos-tree--note))
             (note (expand-file-name pos-tree--note in)))
         (cond
-         ((not skills))
+         ((not links))
          ((pos-tree--tracked-p dir path) (pos-tree--taken dir path))
          (t (pos-tree--exclude dir path)
             (unless (and (file-regular-p note)
@@ -998,22 +1051,60 @@ its note.  A file or a symbolic link, there or at .claude, is left."
                                 (with-temp-buffer (insert-file-contents note)
                                                   (buffer-string))))
               (pos-tree--act "note" `(path . ,(pos-tree--rel note))))))))
-     ((or skills (pos-tree--agents-entries dir))
-      (pos-tree--exclude dir ".claude/skills")
+     ((or links (pos-tree--agents-entries dir agents-path))
+      (pos-tree--exclude dir skills-path)
       (pos-tree--act "link" `(path . ,(pos-tree--rel in))
                      '(target . "../.agents/skills"))))
     ;; The note went with the directory's entries when they were moved.
     (when (and (not ordinary) (file-regular-p stray)
                (not (pos-tree--tracked-p
-                     dir (concat ".agents/skills/" pos-tree--note))))
+                     dir (concat agents-path "/" pos-tree--note))))
       (pos-tree--act "unlink" `(path . ,(pos-tree--rel stray))))))
+
+(defun pos-tree--methodology-links (base config)
+  "Return what the methodologies CONFIG declares at BASE supply.
+A cons (SKILLS . COMMANDS), each an alist (NAME . DIRECTORY) as
+`pos-tree--link-in' takes, by methodology and then by name.  A
+methodology not there is left for its clone; one with a skill not named
+after it is found (methodology-refused) and supplies nothing."
+  (let (skills commands)
+    (pcase-dolist (`(,name . ,path) (pos-tree-methodologies config))
+      (let* ((dir (expand-file-name path base))
+             (held (and (file-directory-p dir) (pos-tree--held dir "skills")))
+             (bad (seq-find (lambda (skill)
+                              (not (string-prefix-p (concat name "-") skill)))
+                            held)))
+        (cond
+         ((not (file-directory-p dir)))
+         (bad (pos-tree--find "methodology-refused" (pos-tree--rel dir)
+                              (format "a skill not named %s-NAME: %s" name bad)))
+         (t (dolist (skill held)
+              (push (cons skill (expand-file-name "skills" dir)) skills))
+            (dolist (command (pos-tree--held dir "bin"))
+              (push (cons command (expand-file-name "bin" dir)) commands))))))
+    (cons (nreverse skills) (nreverse commands))))
+
+(defun pos-tree--in-directory (dir base config)
+  "Plan the links to the methodologies of the project at BASE, in DIR.
+BASE is a directory of the repository at DIR, with CONFIG its own."
+  (when (stringp (alist-get 'methodologies config))
+    (let ((prefix (file-name-as-directory (file-relative-name base dir)))
+          (owned (list (expand-file-name (alist-get 'methodologies config) base)))
+          (bin (alist-get 'bin config)))
+      (pcase-let ((`(,skills . ,commands) (pos-tree--methodology-links base config)))
+        (pos-tree--link-in dir (concat prefix ".agents/skills") skills owned)
+        (when (stringp bin)
+          (pos-tree--link-in dir (concat prefix bin) commands owned))
+        (pos-tree--claude dir prefix skills owned)))))
 
 (defun pos-tree--installs (node)
   "Plan what is installed in NODE and in the repositories beneath it.
 A repository with a configuration has auto/ in its configuration
 directory, replaced from the source when its version is another, and
-links to what auto/ holds.  One with none, a product, has nothing
-planned in it but the removal of links an earlier tool made."
+links to what auto/ holds and to what its methodologies supply.  A
+project that is a directory of it has links to its own methodologies.
+One with no configuration, a product, has nothing planned in it but
+the removal of links an earlier tool made."
   (let* ((dir (pos-tree--node-dir node))
          (config (pos-tree--node-config node))
          (auto (and config (pos-tree--auto dir))))
@@ -1027,19 +1118,29 @@ planned in it but the removal of links an earlier tool made."
       (let* ((version (and pos-tree--source (pos-tree--version pos-tree--source)))
              (stale (and version (not (equal version (pos-tree--version auto)))))
              (from (if stale pos-tree--source auto))
-             (skills (pos-tree--held from "skills"))
+             (at (alist-get 'methodologies config))
+             (owned (if (stringp at) (list auto (expand-file-name at dir)) (list auto)))
+             (supplied (pos-tree--methodology-links dir config))
+             (skills (append (mapcar (lambda (name)
+                                       (cons name (expand-file-name "skills" auto)))
+                                     (pos-tree--held from "skills"))
+                             (car supplied)))
+             (commands (append (mapcar (lambda (name)
+                                         (cons name (expand-file-name "bin" auto)))
+                                       (pos-tree--held from "bin"))
+                               (cdr supplied)))
              (bin (alist-get 'bin config)))
         (when (or stale (file-symlink-p auto) (file-exists-p auto))
           (pos-tree--exclude dir (file-relative-name auto dir)))
         (when stale
           (pos-tree--act "install" `(path . ,(pos-tree--rel auto))
                          `(version . ,version)))
-        (pos-tree--link-in dir ".agents/skills" skills
-                           (expand-file-name "skills" auto) auto)
+        (pos-tree--link-in dir ".agents/skills" skills owned)
         (when (stringp bin)
-          (pos-tree--link-in dir bin (pos-tree--held from "bin")
-                             (expand-file-name "bin" auto) auto))
-        (pos-tree--claude dir skills auto)))
+          (pos-tree--link-in dir bin commands owned))
+        (pos-tree--claude dir "" skills owned)))
+    (pcase-dolist (`(,base . ,own) (pos-tree--node-locals node))
+      (pos-tree--in-directory dir base own))
     (dolist (child (pos-tree--node-children node))
       (pos-tree--installs (cdr child)))))
 

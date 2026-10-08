@@ -1,0 +1,5 @@
+{
+ "about": "A methodology's path has one part after the methodologies path; an entry deeper beneath it is refused.",
+ "yaml": "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/mine/hello\n    remote: git@example.org:hello.git\n",
+ "refused": "bad-path"
+}

@@ -53,7 +53,8 @@ The top level is a mapping:
                     responsibility
     methodologies   where this node's methodologies belong: a path
                     beneath it, usually methodologies/. It makes the
-                    node a project
+                    node a project. Each methodology is a child
+                    declared directly beneath this path (section 2)
     image           the container image this node's commands run in
     bin             where links to this node's commands are made
                     (section 6): a path beneath it, usually bin
@@ -137,16 +138,31 @@ children is a sequence. Each entry is a mapping:
 
 An entry is a boundary. Its path and everything beneath it is the
 child's and not this node's. The entry does not say what the child is;
-what is at the path does:
+where it is, and what is at the path, do:
 
+    directly beneath a project's methodologies path    a methodology
     a configuration that says where its methodologies belong   a project
     any other configuration                             a responsibility
     no configuration                                           a product
 
 A responsibility is a branch of the tree: it declares children of its
-own, each node naming only what is directly beneath it. A project and a
-product are leaves. A product is a subject, under its own rules, and
-this document says nothing of what is in it.
+own, each node naming only what is directly beneath it. A project is a
+leaf: it declares no responsibility or project. Its children are its
+methodologies, each directly beneath its methodologies path, and
+products it works on, anywhere else beneath it. A product is a subject,
+under its own rules, and this document says nothing of what is in it.
+
+A methodology is a repository or a directory that supplies skills and
+commands to the project that declares it (section 6). Its name is the
+last part of its path: methodologies/hello is the methodology hello.
+Nothing at the path says it is one; the entry's place does, so the
+same repository is a methodology where a project declares it beneath
+its methodologies path and a product wherever else it is declared,
+mounted as often as there are entries for it, each on its own branch.
+A methodology's path has exactly one part after the methodologies
+path: an entry at that path itself, or deeper beneath it, is refused
+(bad-path). The name clankos is reserved: an entry whose methodology
+is named clankos is refused (bad-value).
 
 path is any path that stays beneath the node: relative, with no empty
 part and no part that is . or .., and no backslash. No folder name
@@ -329,9 +345,11 @@ Links make what is installed found:
   - A link is a relative symbolic link. It is untracked, with its path
     in .git/info/exclude.
   - A link is the tool's if it is a symbolic link whose target is in
-    auto/ of the repository it is made in. The tool's link to something
-    no longer there is removed. So a skill or a command a newer source
-    leaves out goes, and its link with it.
+    auto/ of the repository it is made in, or beneath the methodologies
+    path of the project it is made in. The tool's link to something no
+    longer there, or into a methodology no longer declared, is removed.
+    So a skill or a command a newer source leaves out goes, and its
+    link with it.
 
 Where the path of a link the tool would make holds anything else, a
 file, a directory or another link, the tool leaves it as it is and
@@ -367,8 +385,36 @@ untracked symbolic link in .agents/skills/ whose target is a skill's
 directory in another repository of the tree, is removed: in a product
 too, since the tool made it.
 
-This document does not say how a project's methodologies supply
-skills.
+A project's methodologies supply skills and commands in the same way,
+from where they lie. A methodology is a directory holding
+
+    skills/NAME/   a skill: a directory holding a SKILL.md, whose NAME
+                   begins with the methodology's name and a hyphen
+    bin/NAME       a command
+
+either of which may be absent. Nothing is copied: for each skill,
+.agents/skills/NAME is a link to it in the methodology's directory,
+and for each command, where the project says bin, NAME there is a link
+to it. The links are made as the links above are, relative, untracked
+and excluded, and .claude/skills is served the same way. They are made
+in the project: at the root of its repository, beside the source's
+links, when the project is a repository; in its directory, when it is
+a directory of a repository. The methodology is whatever is at its
+path: a change to it is seen on the next plan, and nothing is
+versioned.
+
+A methodology that holds a skill whose NAME does not begin with the
+methodology's name and a hyphen is reported (methodology-refused) and
+nothing of it is linked; the project's other methodologies and the
+source's skills are. Where a methodology's skill or command has the
+name of one of the source's, or of another methodology's, the path is
+held by the tool's own link to the first, and the second is reported
+(name-taken) as any other is. A methodology not yet cloned is cloned
+as any child is, and its links are planned on the plan that follows.
+
+Nothing is installed in a methodology and nothing in it is changed:
+the tool reads its skills and commands and writes only links in the
+project that declares it.
 
 
 7. The two steps
@@ -422,7 +468,11 @@ and findings, which the tool reports and does not act on:
                     projects belong nor its methodologies. What it
                     declares is planned all the same
     name-taken      a path where the tool would make a link, held by
-                    something that is not the tool's
+                    something that is not the tool's, or named by
+                    more than one skill or command
+    methodology-refused  a methodology with a skill whose name does
+                    not begin with the methodology's name and a
+                    hyphen: nothing of it is linked
 
 A plan is a JSON object:
 
@@ -481,8 +531,9 @@ nothing and changes no link. Initiation and tree-building commands use
 this operation after writing configuration.
 
 The install ROOT SOURCE command applies only the exclude, install,
-link, unlink and note actions from a fresh plan made with SOURCE, and
-prints the remaining plan. It clones nothing and changes no archive
+link, unlink and note actions from a fresh plan made with SOURCE, the
+links to each project's methodologies among them, and prints the
+remaining plan. It clones nothing and changes no archive
 rule, so it uses no network. A command run in a tree uses this
 operation first, so that what is installed there is the source's.
 
@@ -506,3 +557,9 @@ array with every default filled in, a child with no remote having null
 for its remote and branch, and an archive carrying sweep and path only
 when written; server, an object or null; and warnings, an array of
 strings, empty when the file holds no key the reader does not know.
+
+The tests of the tool in real repositories include a project that
+declares a mounted methodology and a local one, each holding a skill
+and a command; a methodology with a skill named without its prefix; a
+methodology whose entry is removed; and one repository mounted as a
+product in one place and a methodology in another.

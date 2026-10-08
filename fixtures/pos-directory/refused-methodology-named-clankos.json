@@ -1,0 +1,5 @@
+{
+ "about": "The name clankos is reserved for the source's own skills; a methodology cannot have it.",
+ "yaml": "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/clankos\n    remote: git@example.org:clankos.git\n",
+ "refused": "bad-value"
+}

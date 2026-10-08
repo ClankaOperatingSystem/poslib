@@ -939,5 +939,215 @@ The scope is found config-refused and the file is not rewritten."
       (should (equal (with-temp-buffer (insert-file-contents file) (buffer-string))
                      pos-tree--archive-begin)))))
 
+;;;; Methodologies
+
+(defun pos-tree-test-method (name &rest commands)
+  "Return the files of a methodology NAME as a plist.
+It has the skill NAME-greet and each of COMMANDS, a command."
+  (append
+   (list (format "skills/%s-greet/SKILL.md" name)
+         (format "---\nname: %s-greet\ndescription: A skill.\n---\n" name))
+   (cl-loop for command in commands
+            append (list (concat "bin/" command) "#!/bin/sh\n"))))
+
+(defun pos-tree-test-project (&rest children)
+  "Return a project's config.yaml, with bin, declaring CHILDREN."
+  (concat "pos: 2\nmethodologies: methodologies\nbin: bin\n"
+          (if children (concat "children:\n" (apply #'concat children)) "children: []\n")))
+
+(ert-deftest pos-tree/a-mounted-methodology-is-linked-in-place ()
+  "A project's methodology supplies its skill and command by links to it.
+The links are made beside the source's, nothing of it is copied into
+auto/, nothing in it changes, and a second plan is empty."
+  (pos-tree-test-with dir
+    (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
+                                         "clankos-capture" "pos-capture"))
+           (hello (apply #'pos-tree-test-repository
+                         (expand-file-name "origins/hello" dir)
+                         (pos-tree-test-method "hello" "hello-greet")))
+           (project (pos-tree-test-repository
+                     (expand-file-name "origins/project" dir)
+                     ".clanka/config.yml"
+                     (pos-tree-test-project
+                      (pos-tree-test-child "methodologies/hello" hello))))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".clanka/config.yml"
+                  (pos-tree-test-config
+                   (pos-tree-test-child "projects/p" project))))
+           (in-project (expand-file-name "projects/p" root)))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
+      (should (equal (file-symlink-p
+                      (expand-file-name ".agents/skills/hello-greet" in-project))
+                     "../../methodologies/hello/skills/hello-greet"))
+      (should (equal (file-symlink-p
+                      (expand-file-name ".agents/skills/clankos-capture" in-project))
+                     "../../.clanka/auto/skills/clankos-capture"))
+      (should (equal (file-symlink-p (expand-file-name "bin/hello-greet" in-project))
+                     "../methodologies/hello/bin/hello-greet"))
+      (should (equal (file-symlink-p (expand-file-name "bin/pos-capture" in-project))
+                     "../.clanka/auto/bin/pos-capture"))
+      (should (file-exists-p
+               (expand-file-name ".agents/skills/hello-greet/SKILL.md" in-project)))
+      (should (equal (pos-tree-test-names in-project ".clanka/auto/skills")
+                     '("clankos-capture")))
+      (should (equal (file-symlink-p (expand-file-name ".claude/skills" in-project))
+                     "../.agents/skills"))
+      (dolist (repository (list root in-project
+                                (expand-file-name "methodologies/hello" in-project)))
+        (should (equal (pos-tree-test-status repository) "")))
+      (should (equal (pos-tree-test-summary (pos-tree-plan root source)) nil)))))
+
+(ert-deftest pos-tree/a-directory-project-links-its-local-methodology ()
+  "A project that is a directory of a repository has its links made there.
+Its methodology is a directory of the same repository, with no
+remote; the links are relative to the project and excluded."
+  (pos-tree-test-with dir
+    (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
+                                         "clankos-capture"))
+           (root (apply #'pos-tree-test-repository
+                        (expand-file-name "root" dir)
+                        ".clanka/config.yml"
+                        (pos-tree-test-config "  - path: projects/p\n")
+                        "projects/p/.clanka/config.yml"
+                        (pos-tree-test-project "  - path: methodologies/notes\n")
+                        (cl-loop for (path text)
+                                 on (pos-tree-test-method "notes" "notes-take")
+                                 by #'cddr
+                                 append (list (concat "projects/p/methodologies/notes/"
+                                                      path)
+                                              text))))
+           (in-project (expand-file-name "projects/p" root)))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
+      (should (equal (file-symlink-p
+                      (expand-file-name ".agents/skills/notes-greet" in-project))
+                     "../../methodologies/notes/skills/notes-greet"))
+      (should (equal (file-symlink-p (expand-file-name "bin/notes-take" in-project))
+                     "../methodologies/notes/bin/notes-take"))
+      (should (equal (file-symlink-p (expand-file-name ".claude/skills" in-project))
+                     "../.agents/skills"))
+      (should (equal (pos-tree-test-names in-project ".agents/skills") '("notes-greet")))
+      (should (equal (pos-tree-test-names root ".agents/skills") '("clankos-capture")))
+      (should (equal (pos-tree-test-status root) ""))
+      (should (equal (pos-tree-test-summary (pos-tree-plan root source)) nil)))))
+
+(ert-deftest pos-tree/a-skill-without-its-methodologys-prefix-is-refused ()
+  "A methodology with a skill not named after it is found and supplies nothing.
+The source's links are made all the same."
+  (pos-tree-test-with dir
+    (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
+                                         "clankos-capture"))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".clanka/config.yml"
+                  (pos-tree-test-project "  - path: methodologies/hello\n")
+                  "methodologies/hello/skills/greet/SKILL.md"
+                  "---\nname: greet\ndescription: A skill.\n---\n"
+                  "methodologies/hello/bin/hello-greet" "#!/bin/sh\n"))
+           (plan (pos-tree-test-settle root source)))
+      (should (equal (pos-tree-test-summary plan)
+                     '("methodology-refused methodologies/hello")))
+      (should (equal (alist-get 'detail (aref (alist-get 'findings plan) 0))
+                     "a skill not named hello-NAME: greet"))
+      (should (equal (pos-tree-test-names root ".agents/skills") '("clankos-capture")))
+      (should-not (file-exists-p (expand-file-name "bin" root))))))
+
+(ert-deftest pos-tree/a-methodology-no-longer-declared-loses-its-links ()
+  "When a methodology's entry goes, its links are removed and it is left.
+Its repository, still there, is found as undeclared."
+  (pos-tree-test-with dir
+    (let* ((hello (apply #'pos-tree-test-repository
+                         (expand-file-name "origins/hello" dir)
+                         (pos-tree-test-method "hello" "hello-greet")))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".clanka/config.yml"
+                  (pos-tree-test-project
+                   (pos-tree-test-child "methodologies/hello" hello)))))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
+      (pos-tree-test-commit root ".clanka/config.yml" (pos-tree-test-project))
+      (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                     '("unlink .agents/skills/hello-greet"
+                       "unlink bin/hello-greet"
+                       "undeclared methodologies/hello")))
+      (pos-tree-test-settle root)
+      (should-not (file-symlink-p (expand-file-name ".agents/skills/hello-greet" root)))
+      (should (file-exists-p
+               (expand-file-name "methodologies/hello/skills/hello-greet/SKILL.md"
+                                 root))))))
+
+(ert-deftest pos-tree/the-same-repository-is-a-product-elsewhere ()
+  "One repository is a methodology in one place and a product in others.
+A project mounts it beneath its methodologies path and, on another
+branch, as a product; a responsibility mounts it as a product.  Only
+the methodology mount is read; nothing is written in a product."
+  (pos-tree-test-with dir
+    (let* ((hello (apply #'pos-tree-test-repository
+                         (expand-file-name "origins/hello" dir)
+                         (pos-tree-test-method "hello" "hello-greet")))
+           (project (pos-tree-test-repository
+                     (expand-file-name "origins/project" dir)
+                     ".clanka/config.yml"
+                     (pos-tree-test-project
+                      (pos-tree-test-child "methodologies/hello" hello)
+                      (pos-tree-test-child "products/hello" hello "branch: next"))))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".clanka/config.yml"
+                  (pos-tree-test-config
+                   (pos-tree-test-child "projects/p" project)
+                   (pos-tree-test-child "products/hello" hello))))
+           (in-project (expand-file-name "projects/p" root)))
+      (pos-test-git hello "branch" "next")
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
+      (should (equal (file-symlink-p
+                      (expand-file-name ".agents/skills/hello-greet" in-project))
+                     "../../methodologies/hello/skills/hello-greet"))
+      (dolist (product (list (expand-file-name "products/hello" in-project)
+                             (expand-file-name "products/hello" root)))
+        (should-not (file-exists-p (expand-file-name ".agents" product)))
+        (should-not (file-exists-p (expand-file-name ".clanka" product)))
+        (should (equal (pos-tree-test-status product) "")))
+      (should (equal (pos-test-git (expand-file-name "products/hello" in-project)
+                                   "symbolic-ref" "--short" "HEAD")
+                     "next")))))
+
+(ert-deftest pos-tree/a-methodology-named-clankos-is-refused ()
+  "The reader refuses a methodology named clankos, so nothing is planned."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".clanka/config.yml"
+                 (pos-tree-test-project
+                  (pos-tree-test-child "methodologies/clankos"
+                                       "git@example.org:clankos.git")))))
+      (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                     '("config-refused ."))))))
+
+(ert-deftest pos-tree/two-methodologies-supplying-one-name-are-found ()
+  "Where two methodologies supply one command, the first is linked.
+The second is found as a name taken, named by more than one."
+  (pos-tree-test-with dir
+    (let* ((root (apply #'pos-tree-test-repository
+                        (expand-file-name "root" dir)
+                        ".clanka/config.yml"
+                        (pos-tree-test-project "  - path: methodologies/alpha\n"
+                                               "  - path: methodologies/beta\n")
+                        (append
+                         (cl-loop for (path text) on (pos-tree-test-method "alpha" "greet")
+                                  by #'cddr
+                                  append (list (concat "methodologies/alpha/" path) text))
+                         (cl-loop for (path text) on (pos-tree-test-method "beta" "greet")
+                                  by #'cddr
+                                  append (list (concat "methodologies/beta/" path) text)))))
+           (plan (pos-tree-test-settle root)))
+      (should (equal (pos-tree-test-summary plan) '("name-taken bin/greet")))
+      (should (equal (alist-get 'detail (aref (alist-get 'findings plan) 0))
+                     "named by more than one"))
+      (should (equal (file-symlink-p (expand-file-name "bin/greet" root))
+                     "../methodologies/alpha/bin/greet"))
+      (should (equal (pos-tree-test-names root ".agents/skills")
+                     '("alpha-greet" "beta-greet"))))))
+
 (provide 'pos-tree-test)
 ;;; pos-tree-test.el ends here
