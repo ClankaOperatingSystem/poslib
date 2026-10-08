@@ -305,6 +305,28 @@ applied twice, it adds nothing."
       (should (string-match-p "Rumour of notes.org"
                               (alist-get 'text (aref (alist-get 'rumours plan) 0)))))))
 
+(ert-deftest pos-seal/a-new-records-links-may-be-read-from-elsewhere ()
+  "A new record's links are read from the directory it was composed in.
+A program that writes a record in the project's root, linking to
+notes.org beside it, seals it with links-from the root; the link is a
+rumour of notes.org, as it would be if written from the destination.
+A directory that is not there is refused, and nothing is left staged."
+  (pos-test-with-scope
+    (pos-test-write-bytes (expand-file-name "notes.org" scope) "#+TITLE: Notes\n")
+    (let* ((plan (pos-seal-stage "See [notes](notes.org).\n"
+                                 (expand-file-name "archives/journal/h.md" scope)
+                                 nil scope))
+           (links (alist-get 'links plan)))
+      (should (equal "rumour" (alist-get 'kind (aref links 0))))
+      (should (string-match-p "Rumour of notes.org"
+                              (alist-get 'text (aref (alist-get 'rumours plan) 0)))))
+    (let ((staged (directory-files (expand-file-name "_seal" scope) nil "\\`new-")))
+      (should-error (pos-seal-stage "new\n" (expand-file-name "archives/journal/i.md" scope)
+                                    nil (expand-file-name "nowhere" scope))
+                    :type 'pos-ledger-refused)
+      (should (equal staged
+                     (directory-files (expand-file-name "_seal" scope) nil "\\`new-"))))))
+
 (ert-deftest pos-seal/two-items-may-rumour-one-target-on-one-day ()
   "Each item's rumour of a target names that item, so is its own record;
 a rumour already sealed word for word is cited, not sealed again."
