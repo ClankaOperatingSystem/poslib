@@ -5,6 +5,9 @@
  "protocols": [
   1
  ],
+ "search": [
+  "literal"
+ ],
  "exchanges": [
   {
    "call": {
