@@ -688,7 +688,7 @@ A seal interrupted between the keeper's answer and the ledger's file
 leaves the keeper an event ahead: the events the ledger lacks are
 fetched and written.  Refuse `chain', with the ledger as it was, unless
 the keeper's events continue this ledger's and end at the keeper's
-head."
+head.  Return the keeper's description."
   (let* ((described (pos-remote-describe keeper))
          (theirs (alist-get 'events described))
          (head (let ((h (alist-get 'head described))) (unless (eq h :null) h)))
@@ -715,18 +715,50 @@ head."
        (when (and (zerop events) (file-directory-p ledger)
                   (null (pos-ledger--entries ledger)))
          (delete-directory ledger))
-       (signal (car err) (cdr err))))))
+       (signal (car err) (cdr err))))
+    described))
+
+(defconst pos-seal-held-at-once 1024
+  "CIDs a keeper is asked about in one request: the least it takes.")
+
+(defun pos-seal--ensure-held (keeper files)
+  "Have KEEPER hold every block of FILES, an alist of CID and bytes.
+Under version 2: it is asked which blocks it lacks, in sorted order and at most
+`pos-seal-held-at-once' at a time, and is put each of those.  A seal
+interrupted while putting resumes here, since what is held is not put
+again."
+  (let (blocks)
+    (dolist (file files)
+      (dolist (block (pos-cid-blocks (cdr file)))
+        (unless (assoc (car block) blocks)
+          (push block blocks))))
+    (let ((cids (sort (mapcar #'car blocks) #'string<)))
+      (while cids
+        (let ((batch (seq-take cids pos-seal-held-at-once)))
+          (setq cids (seq-drop cids pos-seal-held-at-once))
+          (dolist (missing (pos-remote-held keeper batch))
+            (pos-remote-put keeper missing (cdr (assoc missing blocks)))))))))
+
+(defun pos-seal--send-event (keeper version name event files claims &optional following)
+  "Append to KEEPER the event EVENT named NAME, with FILES as VERSION takes them.
+Inside the append under version 1; put as blocks first under version 2.
+CLAIMS and FOLLOWING are as `pos-remote-append' takes them."
+  (if (eql version 2)
+      (progn (pos-seal--ensure-held keeper files)
+             (pos-remote-append keeper name event nil claims following))
+    (pos-remote-append keeper name event files claims following)))
 
 (defun pos-seal--apply-kept (plan expected)
   "Apply PLAN, whose hash is EXPECTED, to an archive kept by a keeper.
-Each event is sent with its files, written to the ledger once the
-keeper has it, and the item is then removed from where it lay.
-Interrupted, it resumes.  Return (EVENT-FILE . ROOT)."
+Each event is sent with its files, inside the append or as blocks put
+first by the keeper's version, written to the ledger once the keeper
+has it, and the item is then removed from where it lay.  Interrupted,
+it resumes.  Return (EVENT-FILE . ROOT)."
   (let-alist plan
     (let* ((keeper (funcall pos-remote-keeper-function .kept))
            (claims (funcall pos-seal-claims-function plan expected))
            (rel (file-relative-name .destination .archive))
-           (_ (pos-seal--catch-up .archive .ledger keeper))
+           (version (pos-remote-version (pos-seal--catch-up .archive .ledger keeper)))
            (sealed (pos-seal--sealed plan))
            (entries-of
             (lambda ()
@@ -737,7 +769,7 @@ Interrupted, it resumes.  Return (EVENT-FILE . ROOT)."
             (lambda (item add collections empty files)
               (pcase-let ((`(,file ,_ ,bytes)
                            (pos-seal--event-of plan item add collections empty)))
-                (pos-remote-append keeper file bytes files claims)
+                (pos-seal--send-event keeper version file bytes files claims)
                 (pos-seal--write-new (expand-file-name file .ledger) bytes)))))
       (when (and (null sealed)
                  (not (equal (pos-ledger-sha
@@ -1013,7 +1045,9 @@ schema 3 event, or nil."
   "Move to its keeper each archive under ROOT that is to be kept by one.
 That is, each whose scope's entry gives it to a keeper and whose files
 are still on disk.  The keeper is sent the events it lacks, in order,
-each with the files it enrolled.  A keeper that holds earlier events is
+each with the files it enrolled: inside the append under version 1 of
+the protocol, put as blocks first under version 2.  A keeper that holds
+earlier events is
 taken to hold their files; if it refuses the first schema 3 event for
 want of them, that event is sent again with every file enrolled before
 it, since it is where a keeper requires them.  A first event that names
@@ -1070,6 +1104,7 @@ reason."
       (let* ((keeper (funcall pos-remote-keeper-function url))
              (claims (funcall pos-seal-claims-function `((archive . ,archive)) nil))
              (described (pos-remote-describe keeper))
+             (version (pos-remote-version described))
              (held (alist-get 'events described))
              (names (mapcar #'file-name-nondirectory files))
              (events (cl-mapcar (lambda (name file) (cons name (pos-ledger-read file)))
@@ -1098,14 +1133,14 @@ reason."
                     (event (cdr (nth i events)))
                     (vouching (pos-remote-following events (1+ i))))
                 (condition-case err
-                    (pos-remote-append keeper (nth i names) event batch claims vouching)
+                    (pos-seal--send-event keeper version (nth i names) event batch claims vouching)
                   (pos-ledger-refused
                    ;; The keeper took an earlier event without its files:
                    ;; they go with the event at which it requires them.
                    (unless (and (eq (cadr err) 'entry) (eql i first) (> held 0))
                      (signal (car err) (cdr err)))
                    (setq batch (funcall batch-of (apply #'append (seq-take added (1+ i)))))
-                   (pos-remote-append keeper (nth i names) event batch claims vouching)))
+                   (pos-seal--send-event keeper version (nth i names) event batch claims vouching)))
                 (setq sent (append (mapcar #'car batch) sent))))))
         (let ((now (pos-remote-describe keeper)))
           (unless (and (equal head (alist-get 'head now))

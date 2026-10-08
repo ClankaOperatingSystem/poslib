@@ -367,9 +367,9 @@ exchanges in order, each:
 
     call        the operation and its arguments
     request     the method, the path beneath the base URL, the
-                Authorization header, and for an append or a put the
-                content type and the SHA-256 of the body; for held, the
-                body, the JSON array
+                Authorization header, and for a request with a body,
+                an append, a put or held, the content type and the
+                SHA-256 of the body
     response    the status and the body
     result      what the call returns: an object, or for event and
                 read an object whose bytes is the body
