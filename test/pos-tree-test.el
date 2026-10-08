@@ -857,6 +857,26 @@ It is removed from a product too, since the tool made it."
       (pos-tree-test-settle root source)
       (should (equal (file-symlink-p link) elsewhere)))))
 
+(ert-deftest pos-tree/installing-alone-clones-nothing ()
+  "Only what is installed is done, and the rest stays planned.
+A declared child that is not there is excluded and stays to be cloned."
+  (pos-tree-test-with dir
+    (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
+                                         "clankos-capture"))
+           (child (pos-tree-test-repository (expand-file-name "origins/child" dir)
+                                            "README" "child\n"))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".clanka/config.yml"
+                  (pos-tree-test-config
+                   (pos-tree-test-child "projects/child" child)))))
+      (should (equal (pos-tree-test-summary (pos-tree-install root source))
+                     '("clone projects/child")))
+      (should (file-exists-p
+               (expand-file-name ".agents/skills/clankos-capture/SKILL.md" root)))
+      (should-not (file-exists-p (expand-file-name "projects/child" root)))
+      (should (equal (pos-tree-test-status root) "")))))
+
 (ert-deftest pos-tree/a-source-that-is-not-one-is-refused ()
   "A source with no version, or a skill not named clankos-NAME, is refused."
   (pos-tree-test-with dir
