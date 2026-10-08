@@ -410,8 +410,9 @@ named either."
 
 (ert-deftest pos-startup/the-root-pair-reviews-the-whole-tree ()
   "The root's reviews are listed as the root's, and a root without one is named.
-A root holds its reviews in life.org: a weekly one and a four-weekly
-one on the same weekday, each a repeating scheduled item.  Here the
+A root holds its reviews in any Org file of its own, here life.org:
+a weekly one and a four-weekly one on the same weekday, each a
+repeating scheduled item.  No file name is read for them.  Here the
 weekly review is due today and the four-weekly one in three weeks, so
 the weekly is listed and the four-weekly is beyond the window; the
 root has a review, so it is not named.  A root with an intray alone
