@@ -1,0 +1,5 @@
+{
+ "about": "A colon alone does not make a URL: a value with no scheme and :// is a path, and this one climbs.",
+ "yaml": "methodology: 1\ncanon:\n  - kind: decision\n    at: ../crm:decisions\n    format: markdown\n",
+ "refused": "bad-path"
+}

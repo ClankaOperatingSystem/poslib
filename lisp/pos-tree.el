@@ -429,14 +429,21 @@ message, for a file doc/pos-directory.txt does not allow."
 (defconst pos-tree-methodology-file "methodology.yaml"
   "The declaration at a methodology's root, doc/pos-methodology.txt.")
 
+(defun pos-tree-url-p (value)
+  "Return non-nil if VALUE is a URL: a scheme, then ://."
+  (string-match-p "\\`[A-Za-z][A-Za-z0-9+.-]*://" value))
+
 (defun pos-tree--declared-path (value what)
-  "Return VALUE, the path of a WHAT in a project, as written.
-Refuse one that does not stay beneath the project.  A final slash,
-which marks a directory of instances, is allowed."
-  (unless (pos-tree--path-p (if (and (> (length value) 1) (string-suffix-p "/" value))
-                                (substring value 0 -1)
-                              value))
-    (pos-tree--refuse 'bad-path "Not a path for %s: %s" what value))
+  "Return VALUE, where a WHAT of a kind is, as written.
+A path beneath the project, refused if it does not stay beneath it,
+with a final slash allowed, which marks a directory of instances; or
+a URL, for a kind kept outside the repository, which is taken as
+written."
+  (unless (or (pos-tree-url-p value)
+              (pos-tree--path-p (if (and (> (length value) 1) (string-suffix-p "/" value))
+                                    (substring value 0 -1)
+                                  value)))
+    (pos-tree--refuse 'bad-path "Not a path or a URL for %s: %s" what value))
   value)
 
 (defun pos-tree--kinds (entries)

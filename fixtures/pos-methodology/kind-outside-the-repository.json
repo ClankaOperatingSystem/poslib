@@ -1,0 +1,25 @@
+{
+ "about": "A kind kept outside the repository, a CRM behind an API, is declared at its URL, which is taken as written; the journal the method keeps in the repository is a kind with a path. The URL is its own entrance.",
+ "yaml": "methodology: 1\ncanon:\n  - kind: opportunity\n    at: https://crm.example.org/api/opportunities\n    format: json\n  - kind: journal\n    at: journal/\n    format: markdown\n",
+ "declaration": {
+  "methodology": 1,
+  "canon": [
+   {
+    "kind": "opportunity",
+    "at": "https://crm.example.org/api/opportunities",
+    "format": "json",
+    "derived": false,
+    "entrance": "https://crm.example.org/api/opportunities"
+   },
+   {
+    "kind": "journal",
+    "at": "journal/",
+    "format": "markdown",
+    "derived": false,
+    "entrance": "journal/"
+   }
+  ],
+  "checks": [],
+  "warnings": []
+ }
+}
