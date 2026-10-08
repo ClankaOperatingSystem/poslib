@@ -1,0 +1,5 @@
+{
+ "about": "The directory of command links stays beneath its node.",
+ "yaml": "pos: 2\nbin: ../bin\n",
+ "refused": "bad-path"
+}

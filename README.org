@@ -42,8 +42,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   a keeper.
 - =doc/pos-directory.txt= :: what a node declares in =.clanka/= or =.pos/=: the
   repositories mounted beneath it, working trees, where archives are
-  kept and the server it is bound to; how skills are linked through the
-  tree; and the two steps of the tool that makes a tree as declared.
+  kept and the server it is bound to; the skills and commands installed
+  in each repository of the tree; and the two steps of the tool that
+  makes a tree as declared.
 - =fixtures/= :: their examples, run by both.
 - =test/= :: ERT tests, one file per module, on =test/pos-test-support.el=.
 

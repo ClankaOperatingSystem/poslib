@@ -6,19 +6,18 @@
   "projects": "projects",
   "methodologies": null,
   "image": null,
+  "bin": null,
   "exclude": null,
   "children": [
    {
     "path": "health",
     "remote": null,
-    "branch": null,
-    "skills-up": false
+    "branch": null
    },
    {
     "path": "projects/kitchen",
     "remote": null,
-    "branch": null,
-    "skills-up": false
+    "branch": null
    }
   ],
   "worktrees": [],

@@ -1,18 +1,18 @@
 {
- "about": "Quoting changes nothing: a quoted version and a quoted boolean are read as the same text unquoted.",
- "yaml": "pos: \"2\"\nchildren:\n  - path: \"projects/a\"\n    remote: 'git@example.org:a.git'\n    skills-up: \"true\"\n",
+ "about": "Quoting changes nothing: a quoted version and a quoted path are read as the same text unquoted.",
+ "yaml": "pos: \"2\"\nchildren:\n  - path: \"projects/a\"\n    remote: 'git@example.org:a.git'\n",
  "config": {
   "kind": null,
   "projects": null,
   "methodologies": null,
   "image": null,
+  "bin": null,
   "exclude": null,
   "children": [
    {
     "path": "projects/a",
     "remote": "git@example.org:a.git",
-    "branch": "master",
-    "skills-up": true
+    "branch": "master"
    }
   ],
   "worktrees": [],

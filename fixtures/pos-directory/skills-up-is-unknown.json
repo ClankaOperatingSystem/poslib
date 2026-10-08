@@ -1,6 +1,6 @@
 {
- "about": "A key in a child this version does not define is a warning named by its place; the child is read.",
- "yaml": "pos: 2\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    pin: abc\n",
+ "about": "skills-up was a child's key in an earlier version of the document. It is a key this version does not define: a warning, and the child is read.",
+ "yaml": "pos: 2\nchildren:\n  - path: projects/a\n    remote: git@example.org:a.git\n    skills-up: true\n",
  "config": {
   "kind": null,
   "projects": null,
@@ -19,7 +19,7 @@
   "archives": [],
   "server": null,
   "warnings": [
-   "unknown-key: children[0].pin"
+   "unknown-key: children[0].skills-up"
   ]
  }
 }
