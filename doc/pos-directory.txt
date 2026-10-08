@@ -89,8 +89,8 @@ directory of that name beneath this node, however deep; or, when it
 holds a slash, a path beneath this node, which keeps a walk out of
 that directory and what lies beneath it. A final slash is dropped. The
 exclusions in force at a directory are those of the nearest node at or
-above it that has the key, replacing what it would inherit; when no
-node has it, they are
+above it in the same repository that has the key, replacing what it
+would inherit; when no node of the repository has it, they are
 
     archives, attic, node_modules, "_*", ".*"
 
@@ -100,7 +100,10 @@ glob beginning with * is quoted, as YAML asks. What exclude governs is
 reading: a tool that walks a node for its files, its undeclared
 repositories or its archive scopes does not enter an excluded
 directory. A directory named archives is an archive scope wherever it
-lies, whether or not the walk enters it.
+lies, whether or not the walk enters it. A repository mounted in the
+tree is read by its own configuration: the exclusions of the
+repository it is mounted in do not reach into it, and one that
+declares none has the default.
 
 A reader reads the keys written here. A key it does not know, at any
 level, is a warning, which names the key by its place in the file, as
