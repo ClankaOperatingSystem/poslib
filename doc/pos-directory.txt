@@ -38,7 +38,6 @@ is, and one that resolves types may resolve a quoted word too. The
 keys below say what each value is:
 
     a string    any text but the empty one, null and ~
-    a boolean   true or false, in those letters
     an integer  a whole number in digits, with no leading zero
 
 So a branch named 1.10 or no is that text, and a value left empty is
@@ -54,6 +53,8 @@ The top level is a mapping:
                     beneath it, usually methodologies/. It makes the
                     node a project
     image           the container image this node's commands run in
+    bin             where links to this node's commands are made
+                    (section 6): a path beneath it, usually bin
     exclude         the directories a walk of this node does not enter
                     (below)
     children    what is declared beneath this one (section 2)
@@ -68,12 +69,16 @@ projects. A file with both is refused (bad-value). A file with neither
 is not refused: its node is unconfigured, which a tool reports, and a
 person is asked which it is before the node is used.
 
-A final slash on either path is dropped.
+A final slash on any of these paths is dropped.
 
 image is written on a line of its own, as "image: NAME" from the start
 of the line, with NAME unquoted and holding no space, quotation mark
 or #, so that a tool with no YAML reader finds it by its line. Any
-other way of writing it is refused (bad-value).
+other way of writing it is refused (bad-value). A node that names no
+image takes that of the nearest node above it in the same repository
+that names one. A mounted child does not take its container's: where
+nothing in its own repository names one, its commands run in the
+tool's default image, wherever the child is mounted.
 
 exclude is a sequence of strings. Each is the name of a directory, or
 a glob over one with * for any text, which keeps a walk out of every
@@ -127,8 +132,6 @@ children is a sequence. Each entry is a mapping:
                 that is a directory of this node's repository
     branch      with remote, the branch its working tree rests on;
                 master when absent
-    skills-up   with remote, true if the child's skills are also linked
-                into this repository (section 6); false when absent
 
 An entry is a boundary. Its path and everything beneath it is the
 child's and not this node's. The entry does not say what the child is;
@@ -161,10 +164,10 @@ for a path is the path from the repository's root with a slash before
 it, which anchors it there.
 
 A child with no remote is a directory of the same repository, tracked
-and committed with it. It has no branch and no skills-up, and an entry
-that gives it either is refused (bad-value). Nothing is excluded or
-cloned for it. What its own configuration declares is declared for the
-repository it is part of.
+and committed with it. It has no branch, and an entry that gives it
+one is refused (bad-value). Nothing is excluded or cloned for it. What
+its own configuration declares is declared for the repository it is
+part of.
 
 A responsibility's one-file projects are Org files where its projects
 belong, and no entry declares them: making the file is the commitment.
@@ -285,48 +288,85 @@ beneath it. The files are untracked, with their paths in
 Nothing is written outside the tree.
 
 
-6. Skills
+6. What is installed
 
-ClankOS shares skills from .agents/skills/, one directory each, holding
-a SKILL.md. Repositories may keep other skill layouts. Existing files,
-directories and links at .claude/skills are left alone, without a
-finding or a migration. Discovering and evaluating skills in other
-locations is separate from bringing the tree to its declarations.
+The tool installs skills and commands in each repository of the tree
+that has a configuration at its root: the root's, and each mounted
+responsibility's and project's. A coding agent looks for skills from
+where a session starts up to the root of that repository and no
+further, so a session started anywhere in such a repository finds
+what is installed at its root, and finds the same in each.
 
-If .agents or .agents/skills is a file or symbolic link, that
-repository's skill layout is left alone: no skills are read from it or
-linked into it. An ordinary .agents/skills directory can contain other
-files; they keep their names and are not shared as skills. Processing
-continues in the repositories beneath it.
+Nothing is installed in a product, and nothing in a product is read,
+linked or changed. A product's skills are its own. So are the skills a
+repository keeps besides those installed: the tool links none of them
+into another repository.
 
-A coding agent looks for skills from where a session starts up to the
-root of that repository and no further. A repository mounted in place
-therefore sees none of its containers' skills. Links supply them:
+The tool is given a directory to install from, the source:
 
-  - Down, always. Each of a repository's own skills is linked into
-    .agents/skills/ of every repository beneath it, at any depth.
-  - Up, only when asked. Where a child's entry has skills-up true, the
-    child's own skills are linked into this repository, and no farther.
-  - Only a repository's own skills are linked. A link is never linked
-    on, so nothing returns to where it came from and nothing passes
-    from one child to another.
-  - Where two skills have one name, the nearer has it: a repository's
-    own skill before any link, a nearer container's before a farther
-    one's, and a container's before a child's. Two children's skills
-    of one name are a finding, and neither is linked.
-  - A link is a relative symbolic link to the skill's directory. It is
-    untracked, with its path in .git/info/exclude of the repository it
-    is made in.
-  - Where a repository has skills and no .claude/skills, a link to
-    ../.agents/skills is made the same way, untracked and excluded,
-    provided .claude is absent or an ordinary directory. An existing
-    .claude file or symbolic link is left alone too.
+    version        one line, which names what the source holds
+    skills/NAME/   a skill: a directory holding a SKILL.md, whose NAME
+                   begins "clankos-"
+    bin/NAME       a command
 
-A linked skill calls only what travels with it or is installed: scripts
-within its own directory, which the link carries, and installed
-commands. Nothing in a repository's bin/ is linked. A skill that calls
-into its own repository outside its directory holds a file named
-.pos-local in its directory, and is not linked.
+Given no source, the tool installs nothing, and keeps the links below
+to what is already installed. A source that names no version, or holds
+a skill named otherwise, is refused (bad-source).
+
+In the configuration directory at a repository's root, auto/ is the
+tool's alone. Where it is absent, or its version is not the source's,
+it is replaced whole by a copy of the source. It is untracked, with its
+path in .git/info/exclude. What anyone else writes in it is lost.
+
+Links make what is installed found:
+
+  - For each skill in auto/skills/, .agents/skills/NAME is a link to
+    it.
+  - For each command in auto/bin/, where the node at the repository's
+    root says bin, NAME in that directory is a link to it.
+  - A link is a relative symbolic link. It is untracked, with its path
+    in .git/info/exclude.
+  - A link is the tool's if it is a symbolic link whose target is in
+    auto/ of the repository it is made in. The tool's link to something
+    no longer there is removed. So a skill or a command a newer source
+    leaves out goes, and its link with it.
+
+Where the path of a link the tool would make holds anything else, a
+file, a directory or another link, the tool leaves it as it is and
+reports it (name-taken), saying whether the repository tracks it and,
+if so, the commit that added it. The other links are made. A coding
+agent may take what holds the name for the skill it was to find, so
+the finding is reported until the name is free. Where .agents or
+.agents/skills is a file or a symbolic link, no skill link is made in
+that repository, and that path is reported the same way; so is a part
+of the path a node names as bin.
+
+A coding agent that reads .claude/skills is served too:
+
+  - Where the repository has skills in .agents/skills/, .claude/skills
+    is absent, and .claude is absent or an ordinary directory, a link
+    to ../.agents/skills is made, untracked and excluded.
+  - Where .claude/skills is an ordinary directory, the tool makes its
+    skill links there as well, each to the skill in auto/, and writes
+    beside them a note, README.clankos, untracked and excluded. The
+    note says that the directory's skills can be moved to
+    .agents/skills/ and the directory replaced by a link to it, lists
+    each entry that is not a directory holding a SKILL.md, and so is
+    no skill, and names where that convention is described. A note
+    the repository tracks is not the tool's, and is reported as a
+    name taken. Once .claude/skills is no longer an ordinary directory
+    the note is removed from .agents/skills/, where it went if the
+    directory's entries were moved there.
+  - A .claude or .claude/skills that is a file or a symbolic link is
+    left as it is.
+
+A link an earlier version of this document had the tool make, an
+untracked symbolic link in .agents/skills/ whose target is a skill's
+directory in another repository of the tree, is removed: in a product
+too, since the tool made it.
+
+This document does not say how a project's methodologies supply
+skills.
 
 
 7. The two steps
@@ -349,8 +389,11 @@ A plan holds actions:
     clone       a declared child or worktree that is not there
     exclude     a path to add to a .git/info/exclude
     archive-excludes  replace the managed archive block in info/exclude
-    link        a skill link to make, or the .claude/skills link
-    unlink      a link the tool made whose skill or declaration is gone
+    install     a repository's auto/ to replace from the source
+    link        a link to a skill or a command, or the .claude/skills
+                link, to make
+    unlink      a link or a note of the tool's that is no longer wanted
+    note        the note to write in an ordinary .claude/skills
     configure   an agent's file to write or remove for a server
 
 and findings, which the tool reports and does not act on:
@@ -359,7 +402,7 @@ and findings, which the tool reports and does not act on:
                     in that repository or beneath it
     off-branch      a child whose working tree is on a branch other
                     than the declared one: nothing is planned in it or
-                    beneath it, and links to its skills are left
+                    beneath it
     path-taken      a path taken by something that is not a
                     repository, or that is or passes through a
                     symbolic link; and a child with no remote whose
@@ -376,7 +419,8 @@ and findings, which the tool reports and does not act on:
     unconfigured    a node whose configuration says neither where its
                     projects belong nor its methodologies. What it
                     declares is planned all the same
-    name-clash      two children's skills of one name
+    name-taken      a path where the tool would make a link, held by
+                    something that is not the tool's
 
 A plan is a JSON object:
 
@@ -395,8 +439,10 @@ An action is an object whose do is the action's name. With it:
                 repository
     archive-excludes  repository and paths, a sorted array of archive
                 directory paths relative to that repository
+    install     path, that of the auto/ directory, and version
     link        path and target, the text of the link
     unlink      path
+    note        path
 
 A finding is an object with finding, its name, path, and where there
 is more to say, detail. Every path is relative to the root of the
@@ -416,22 +462,23 @@ The tool keeps these rules:
     not yet merged mounts nothing. The configuration of the repository
     the tool is run in, and of each directory of a repository, is read
     from the working tree.
-  - It replaces only its marked archive block, otherwise never writes
-    over what is there, never removes a working tree, and never writes
-    outside the tree it is run in.
+  - It replaces only its marked archive block and its auto/
+    directories, otherwise never writes over what is there, never
+    removes a working tree, and never writes outside the tree it is run
+    in. In a product it writes nothing, and removes only a link it
+    made.
   - Run in a repository, it takes that repository as the root. It does
     not look for a container, and a link whose target is outside the
     tree is left as it is.
-  - A link is the tool's if it is an untracked symbolic link in
-    .agents/skills/ whose target is a skill's directory in another
-    repository of the tree. It keeps no record besides.
+  - It keeps no record of the links it made: what section 6 says of a
+    link's target is how it knows its own.
 
 The archives ROOT command applies only archive-excludes actions from
-a fresh plan and prints the remaining plan. It clones nothing and
-changes no skill link. Initiation and tree-building commands use this
-operation after writing configuration. Like plan and apply, it exits
-0 for an empty remaining plan, 1 for remaining work or findings, and
-2 for a refusal.
+a fresh plan and prints the remaining plan. It clones nothing, installs
+nothing and changes no link. Initiation and tree-building commands use
+this operation after writing configuration. Like plan and apply, it
+exits 0 for an empty remaining plan, 1 for remaining work or findings,
+and 2 for a refusal.
 
 
 8. Tests
@@ -444,8 +491,8 @@ fixtures/pos-directory/ holds configuration files for both libraries.
 Each fixture is a JSON object: about, what it shows; yaml, the file's
 text; and either config, what a reader makes of it, or refused, the
 kind of refusal. config has kind, which is responsibility, project or null;
-projects, methodologies and image, each a string or null; exclude, an
-array of strings or null; children, worktrees and archives, each an
+projects, methodologies, image and bin, each a string or null; exclude,
+an array of strings or null; children, worktrees and archives, each an
 array with every default filled in, a child with no remote having null
 for its remote and branch, and an archive carrying sweep and path only
 when written; server, an object or null; and warnings, an array of

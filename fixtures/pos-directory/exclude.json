@@ -6,6 +6,7 @@
   "projects": "projects",
   "methodologies": null,
   "image": null,
+  "bin": null,
   "exclude": [
    "archives",
    "attic",

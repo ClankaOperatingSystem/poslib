@@ -6,25 +6,23 @@
   "projects": null,
   "methodologies": null,
   "image": null,
+  "bin": null,
   "exclude": null,
   "children": [
    {
     "path": "projects/a",
     "remote": "git@example.org:a.git",
-    "branch": "1.10",
-    "skills-up": false
+    "branch": "1.10"
    },
    {
     "path": "projects/b",
     "remote": "git@example.org:b.git",
-    "branch": "no",
-    "skills-up": false
+    "branch": "no"
    },
    {
     "path": "projects/c",
     "remote": "git@example.org:c.git",
-    "branch": "2026-10-01",
-    "skills-up": false
+    "branch": "2026-10-01"
    }
   ],
   "worktrees": [],
