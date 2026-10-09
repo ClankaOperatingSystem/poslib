@@ -3,12 +3,22 @@
 :END:
 #+TITLE: archive
 
-An archive is the part of a [[id:530709f8-639a-4701-851e-11b93907abd3][scope]] that accumulates.
+An archive is the part of a
+[[id:530709f8-639a-4701-851e-11b93907abd3][scope]] that accumulates.
 
-An archive is the complement of [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]]. Canon evolves, and the
-archive accumulates. An archive is made of [[id:efba3260-b37e-461a-aabe-b285799a4968][sealed items]]. A sealed
-item never changes, so an archive only grows. Things enter it by
-[[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]] and in no other way. Its [[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] records every seal.
-Canon cites the archive by [[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]], which is how canon's
-provenance is traced. An archive is kept on disk beside its scope, or by a
-[[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]].
+An archive is the complement of
+[[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]]. Canon evolves, and the
+archive accumulates. An archive is made of
+[[id:efba3260-b37e-461a-aabe-b285799a4968][sealed items]]. A sealed item
+never changes, so an archive only grows. Things enter it by
+[[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]] and in no other way.
+Its [[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] records every
+seal. Canon cites the archive by
+[[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]], which is how
+canon's provenance is traced. An archive is kept on disk beside its scope,
+or by a [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]]. The scope's
+[[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]] says which. The
+[[id:90cd82cd-8947-4015-91b5-53335880dd64][recorded root]] is the id of
+everything in the archive. A
+[[id:f3bfe249-83ff-45c3-ba76-d1f6460f97b8][checkpoint]] shows if the
+archive or its ledger has gone missing.

@@ -7,9 +7,11 @@ A collection is a directory that is sealed as one unit, with the links
 between its files left as written.
 
 A directory is a collection when its =README.org= declares it one. At
-[[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]], a link from one file in a collection to another stays a
-plain path. Outside a collection, such a link is rewritten as an
-[[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]]. The [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]] that seals a collection lists it. An
-ipfs link to a file in a collection cites the collection, then the file's
-path within it. A collection is a [[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]], or a directory
+[[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]], a link from one file
+in a collection to another stays a plain path. Outside a collection, such
+a link is rewritten as an [[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs
+link]]. The [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]] that seals
+a collection lists it. An ipfs link to a file in a collection cites the
+collection, then the file's path within it. A collection is a
+[[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]], or a directory
 inside one.

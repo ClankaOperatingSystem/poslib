@@ -3,21 +3,33 @@
 :END:
 #+TITLE: recorded root
 
-A recorded root is the id of a sealed [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]].
+A recorded root is the id of a
+[[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealed]]
+[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]].
 
 The id is an IPFS content identifier, a CID.[fn:1] poslib computes it from
 the archive's contents, exactly as =ipfs add= does for a directory. The
 files and directories form a Merkle tree, hashed with SHA-256.[fn:2] A
 very large directory is stored as a HAMT.[fn:3] The same contents always
-give the same id, and any change gives a different one. Each [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]]
-writes down the id the archive has after its seal. The recorded root of a
-[[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] is the id in its last event. A [[id:468d8a4f-eff3-427d-be75-a7922c939cfc][fold]] should reach the
-same id. If the archive on disk gives a different id, it has changed since
-the seal. A [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]] checks the id before it accepts an event.
+give the same id, and any change gives a different one. Each
+[[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]] writes down the id the
+archive has after its seal. The recorded root of a
+[[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] is the id in its last
+event. A [[id:468d8a4f-eff3-427d-be75-a7922c939cfc][fold]] should reach
+the same id. If the archive on disk gives a different id, it has changed
+since the seal. A [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]]
+checks the id before it accepts an event. An
+[[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]] uses a CID of the
+same sort to name one [[id:efba3260-b37e-461a-aabe-b285799a4968][sealed
+item]].
 
-[fn:1] [[https://docs.ipfs.tech/concepts/content-addressing/][Content Identifiers (CIDs)]], in the IPFS documentation. poslib
-follows the unixfs-v1-2025 import profile of [[https://specs.ipfs.tech/ipips/ipip-0499/][IPIP-499]].
+[fn:1] [[https://docs.ipfs.tech/concepts/content-addressing/][Content
+Identifiers (CIDs)]], in the IPFS documentation. poslib follows the
+unixfs-v1-2025 import profile of
+[[https://specs.ipfs.tech/ipips/ipip-0499/][IPIP-499]].
 
-[fn:2] [[https://en.wikipedia.org/wiki/Merkle_tree][Merkle tree]], on Wikipedia.
+[fn:2] [[https://en.wikipedia.org/wiki/Merkle_tree][Merkle tree]], on
+Wikipedia.
 
-[fn:3] [[https://en.wikipedia.org/wiki/Hash_array_mapped_trie][Hash array mapped trie]], on Wikipedia.
+[fn:3] [[https://en.wikipedia.org/wiki/Hash_array_mapped_trie][Hash array
+mapped trie]], on Wikipedia.

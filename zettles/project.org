@@ -5,14 +5,21 @@
 
 A project is a piece of work that ends when its outcome is reached.
 
-It belongs to one [[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]]. Every project inherits the same
-basic [[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]], which manages tasks in Org mode in the style of
-GTD. Under it, a project has a NEXT action, and a project with none is
-stuck. A project is expected to have a scheduled review item, and is
-flagged if it has none. A small project is one Org file, kept where its
-responsibility's [[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]] says its projects go. A larger
-project is a directory with a configuration of its own, which says where
-its further methodologies are kept. A project can work on a
-[[id:1afc8602-cf2b-469a-9813-ef7154f8b459][product]]. It is a [[id:530709f8-639a-4701-851e-11b93907abd3][scope]], with its own [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]] and
-[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]]. It holds no responsibilities, so it is a leaf of the
+It belongs to one
+[[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]]. Every project
+inherits the same basic
+[[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]], which manages
+[[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][tasks in Org mode]] in the
+style of GTD. Under it, a project has a NEXT action, and a project with
+none is stuck. A project is expected to have a scheduled review item, and
+is flagged if it has none. A small project is one Org file, kept where its
+responsibility's
+[[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]] says its
+projects go. A larger project is a directory with a configuration of its
+own, which says where its further methodologies are kept. A project can
+work on a [[id:1afc8602-cf2b-469a-9813-ef7154f8b459][product]]. It is a
+[[id:530709f8-639a-4701-851e-11b93907abd3][scope]], with its own
+[[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]]. A project that is a
+directory has its own [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]]
+too. It holds no responsibilities, so it is a leaf of the
 [[id:eda47489-3b75-4229-8c40-f74795fbca20][tree of responsibilities]].

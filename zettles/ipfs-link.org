@@ -3,16 +3,25 @@
 :END:
 #+TITLE: ipfs link
 
-An ipfs link is a link that names a [[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]] by the id of its
+An ipfs link is a link that names a
+[[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]] by the id of its
 contents.
 
 It has the form =ipfs://CID/PATH=.[fn:1] The CID is the id of the sealed
-item, or of a [[id:00af5358-4add-409f-802c-c2d099bcc356][collection]] inside it. The path picks out one file
-within it. The link does not say where the file is stored, so it works the
-same whether the [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] is on disk or held by a [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]].
-[[id:d5a281ef-457a-44ad-97f7-92f46e207e31][Sealing]] writes these links in place of path links. [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][Canon]] uses them to
-cite the archive. An ipfs link can never come to point at different
-contents, because different contents have a different CID. poslib computes
-each CID itself. It publishes nothing to the IPFS network.
+item, or of a [[id:00af5358-4add-409f-802c-c2d099bcc356][collection]]
+inside it. The path picks out one file within it. The link does not say
+where the file is stored, so it works the same whether the
+[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] is on disk or held by
+a [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]].
+[[id:d5a281ef-457a-44ad-97f7-92f46e207e31][Sealing]] writes these links in
+place of path links. [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][Canon]]
+uses them to cite the archive. An ipfs link can never come to point at
+different contents, because different contents have a different CID.
+poslib computes each CID itself. It publishes nothing to the IPFS network.
+Where the thing linked to is outside the archive, the ipfs link names a
+[[id:0bca5ce7-5bdd-4a66-84d1-66c30c79caf7][rumour]]. The
+[[id:90cd82cd-8947-4015-91b5-53335880dd64][recorded root]] is a CID too,
+for the whole archive.
 
-[fn:1] [[https://docs.ipfs.tech/concepts/content-addressing/][Content Identifiers (CIDs)]], in the IPFS documentation.
+[fn:1] [[https://docs.ipfs.tech/concepts/content-addressing/][Content
+Identifiers (CIDs)]], in the IPFS documentation.

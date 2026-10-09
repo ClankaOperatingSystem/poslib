@@ -7,12 +7,21 @@ A configuration is a file in which a directory tells poslib what it is and
 what is under it.
 
 It is =config.yaml=, in a directory named =.pos= at the top of a
-[[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]] or a [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]]. poslib also accepts =.clanka=
-or =.clankos= as the directory's name, as a courtesy to the ClankOS
-project. It says which of the two the directory is. It lists the paths of
-the directory's children, and each path is a [[id:c587099a-d0f8-4c7a-a0b5-0b42ecc6daa8][boundary]]. It says how
-each [[id:530709f8-639a-4701-851e-11b93907abd3][scope]]'s [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] is kept: on disk, or by a
-[[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]]. It names the directories that are left out of the
-[[id:93d0542c-ef28-4af2-bff4-5f16e3f87021][corpus]]. A [[id:1afc8602-cf2b-469a-9813-ef7154f8b459][product]] has none. poslib reads every configuration
-in a [[id:eda47489-3b75-4229-8c40-f74795fbca20][tree of responsibilities]] and brings the tree to match what
-they declare.
+[[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]] or a
+[[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]]. poslib also accepts
+=.clanka= or =.clankos= as the directory's name, as a courtesy to the
+ClankOS project. It says which of the two the directory is. It lists the
+paths of the directory's children, and each path is a
+[[id:c587099a-d0f8-4c7a-a0b5-0b42ecc6daa8][boundary]]. It says how each
+[[id:530709f8-639a-4701-851e-11b93907abd3][scope]]'s
+[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] is kept: on disk, or
+by a [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]]. It names the
+directories that are left out of the
+[[id:93d0542c-ef28-4af2-bff4-5f16e3f87021][corpus]]. A
+[[id:1afc8602-cf2b-469a-9813-ef7154f8b459][product]] has none. poslib
+reads every configuration in a
+[[id:eda47489-3b75-4229-8c40-f74795fbca20][tree of responsibilities]] and
+brings the tree to match what they declare. A project's configuration also
+says where each [[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]]
+is kept. A [[id:f6fe4fc1-3277-4d24-bcaa-0b0b2da2f0b8][protocol]] says what
+a configuration may hold.

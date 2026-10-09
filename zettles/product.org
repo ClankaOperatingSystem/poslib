@@ -3,16 +3,22 @@
 :END:
 #+TITLE: product
 
-A product is a directory in a [[id:eda47489-3b75-4229-8c40-f74795fbca20][tree of responsibilities]] that is kept
-under its own rules.
+A product is a directory in a
+[[id:eda47489-3b75-4229-8c40-f74795fbca20][tree of responsibilities]] that
+is kept under its own rules.
 
-A product can be the subject of a [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]], i.e. a project generally
-produces change to a product. The two are not the same thing, and many
-people confuse them. The project is the work, and it ends. The product is
-the thing worked on, and it stays. A product belongs to a
-[[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]]. It is usually a repository of its own. It has no
-poslib [[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]], which is how poslib tells it from a
-responsibility or a project. Its parent's configuration declares it, and
-its path there is a [[id:c587099a-d0f8-4c7a-a0b5-0b42ecc6daa8][boundary]]. poslib installs nothing in a product,
-and it reads and changes nothing in it. Its files are not part of the
-[[id:93d0542c-ef28-4af2-bff4-5f16e3f87021][corpus]].
+A product can be the subject of a
+[[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]], i.e. a project
+generally produces change to a product. The two are not the same thing,
+and many people confuse them. The project is the work, and it ends. The
+product is the thing worked on, and it stays. A product belongs to a
+[[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]], or to a
+project that works on it. It is usually a repository of its own. It has no
+poslib [[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]], which
+is how poslib tells it from a responsibility or a project. Its parent's
+configuration declares it, and its path there is a
+[[id:c587099a-d0f8-4c7a-a0b5-0b42ecc6daa8][boundary]]. poslib installs
+nothing in a product, and it reads and changes nothing in it. Its files
+are not part of the [[id:93d0542c-ef28-4af2-bff4-5f16e3f87021][corpus]].
+The [[id:a5472c74-3ec5-482d-9e12-de172e55cb31][dependency rule]] does not
+apply inside a product.
