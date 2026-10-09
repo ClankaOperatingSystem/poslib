@@ -213,12 +213,12 @@ are its own, and a project may hold a configuration of its own kind."
                               (pos-corpus-owner corpus "/r/health/projects/checkup.org")))))))
 
 (ert-deftest pos-corpus/a-directorys-name-carries-no-meaning-by-itself ()
-  "A directory named projects or responsibilities is plain without a configuration.
+  "A directory is plain without a configuration, whatever its name.
 Its files belong to the scope above, and nothing in it is a scope."
   (let ((corpus (pos-corpus-test-walk '(("projects/alpha/project.org" file)
-                                        ("responsibilities/home/index.org" file)))))
-    (should (equal '(("projects/alpha/project.org" . ".")
-                     ("responsibilities/home/index.org" . "."))
+                                        ("home/index.org" file)))))
+    (should (equal '(("home/index.org" . ".")
+                     ("projects/alpha/project.org" . "."))
                    (pos-corpus-test-files corpus)))
     (should-not (pos-corpus-test-scopes corpus))))
 

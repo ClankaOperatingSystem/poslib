@@ -253,10 +253,10 @@ plan.  Fail if ten rounds do not settle it."
                                           "README" "root\n")))
       (pos-tree-test-repository (expand-file-name "projects/a" root))
       (pos-tree-test-repository
-       (expand-file-name "responsibilities/plain/projects/b" root))
+       (expand-file-name "plain/projects/b" root))
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("undeclared projects/a"
-                       "undeclared responsibilities/plain/projects/b"))))))
+                     '("undeclared plain/projects/b"
+                       "undeclared projects/a"))))))
 
 (ert-deftest pos-tree/a-childs-config-is-read-as-committed ()
   "An edit to a child's config.yaml that is not committed mounts nothing."
@@ -543,13 +543,13 @@ One that is not excluded is, as before."
                   (expand-file-name "root" dir)
                   ".pos/config.yaml"
                   (concat (pos-tree-test-config
-                           (pos-tree-test-child "responsibilities/it" child))
+                           (pos-tree-test-child "it" child))
                           "worktrees:\n"
                           "  - path: projects/fix/_worktrees/do-the-thing\n"
-                          "    of: responsibilities/it\n"
+                          "    of: it\n"
                           "    branch: do-the-thing\n"))))
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("exclude . responsibilities/it" "clone responsibilities/it"
+                     '("exclude . it" "clone it"
                        "exclude . projects/fix/_worktrees/do-the-thing"
                        "clone projects/fix/_worktrees/do-the-thing")))
       (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
@@ -692,9 +692,9 @@ is left to do, and no repository sees a change to commit."
                   (expand-file-name "root" dir)
                   ".clanka/config.yml"
                   (concat (pos-tree-test-config
-                           (pos-tree-test-child "responsibilities/child" child))
+                           (pos-tree-test-child "child" child))
                           "bin: bin\n")))
-           (in-child (expand-file-name "responsibilities/child" root))
+           (in-child (expand-file-name "child" root))
            (in-product (expand-file-name "products/product" in-child)))
       (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
       (dolist (repository (list root in-child))
