@@ -1,0 +1,15 @@
+:PROPERTIES:
+:ID:       eda47489-3b75-4229-8c40-f74795fbca20
+:END:
+#+TITLE: tree of responsibilities
+
+A tree of responsibilities is a hierarchically organised collection of
+personal responsibilities, represented as directories in a filesystem.
+
+Each branch is a [[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]]. A leaf is a [[id:1afc8602-cf2b-469a-9813-ef7154f8b459][product]], a
+[[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]], or a responsibility with no projects or products. Each
+responsibility has a [[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]]: a file that lists the paths of
+its children. Tools learn what kind of thing a directory is from that
+file, not from the directory's name. One tree can span several
+repositories, and each joins at a [[id:c587099a-d0f8-4c7a-a0b5-0b42ecc6daa8][boundary]]. A whole tree, or a part
+of one, is called a [[id:4942c91a-4024-44d5-b549-41a105415fdd][garden]].

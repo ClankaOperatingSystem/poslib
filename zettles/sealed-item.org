@@ -1,0 +1,14 @@
+:PROPERTIES:
+:ID:       efba3260-b37e-461a-aabe-b285799a4968
+:END:
+#+TITLE: sealed item
+
+A sealed item is a file or directory that has been put into an
+[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] and can no longer change.
+
+Each act of [[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]] puts one item into an archive. One [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]]
+in the [[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] records it. The item gets an identifier computed from
+its contents, so any change to it would show. An [[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]] cites
+the item by that identifier. Nothing is added to a sealed item later. A
+[[id:00af5358-4add-409f-802c-c2d099bcc356][collection]] is a sealed directory whose files keep their links to
+each other.

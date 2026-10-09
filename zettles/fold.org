@@ -1,0 +1,15 @@
+:PROPERTIES:
+:ID:       468d8a4f-eff3-427d-be75-a7922c939cfc
+:END:
+#+TITLE: fold
+
+A fold is a reading of a [[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] from start to end, to find out what
+its [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] should contain.
+
+A ledger lists everything ever put into an archive, one [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]] at a
+time. A fold adds those up. The result is the full list of what the
+archive should contain. A fold is needed when a [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]] stores the
+archive on a server, because the ledger is then all that is on disk. It is
+needed to check an archive on disk, by comparing the disk with the list. A
+keeper folds the ledger too, before it accepts anything new. The
+[[id:90cd82cd-8947-4015-91b5-53335880dd64][recorded root]] of the last event is the answer a fold should reach.

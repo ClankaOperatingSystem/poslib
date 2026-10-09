@@ -1,0 +1,14 @@
+:PROPERTIES:
+:ID:       97a43a8f-e4e2-4b6f-9c08-b11a0455eac5
+:END:
+#+TITLE: responsibility
+
+A responsibility is an area of life or work that a person looks after and
+that does not finish.
+
+It is a directory in a [[id:eda47489-3b75-4229-8c40-f74795fbca20][tree of responsibilities]]. It can hold other
+responsibilities, as well as a set of [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][projects]] that drive it forwards,
+and a set of [[id:1afc8602-cf2b-469a-9813-ef7154f8b459][products]] that belong to it. Its [[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]] says
+where its projects are kept, and that marks it as a responsibility. Its
+tasks and notes are [[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]]. It is a [[id:530709f8-639a-4701-851e-11b93907abd3][scope]], so it has its
+own [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]] and its own [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]].

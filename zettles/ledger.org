@@ -1,0 +1,14 @@
+:PROPERTIES:
+:ID:       1e668ccf-548f-4c26-ae57-ddb057d4c7a2
+:END:
+#+TITLE: ledger
+
+A ledger is the ordered record of every seal made into one
+[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]].
+
+Each archive has one ledger. It is a numbered series of files, and each
+file is one [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]]. Each event names the one before it, so an event
+cannot be removed or changed unnoticed. The ledger stays with its
+[[id:530709f8-639a-4701-851e-11b93907abd3][scope]], even when a [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]] holds the archive. The [[id:468d8a4f-eff3-427d-be75-a7922c939cfc][fold]]
+of a ledger gives everything the archive should hold, without reading the
+archive. A [[id:f3bfe249-83ff-45c3-ba76-d1f6460f97b8][checkpoint]] records where a ledger ended.

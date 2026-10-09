@@ -1,0 +1,26 @@
+:PROPERTIES:
+:ID:       a5472c74-3ec5-482d-9e12-de172e55cb31
+:END:
+#+TITLE: dependency rule
+
+The dependency rule states that a [[id:530709f8-639a-4701-851e-11b93907abd3][scope]] refers only to what lies
+inside it, and never to what contains it or sits beside it.[fn:1]
+
+The dependency rule applies throughout a [[id:4942c91a-4024-44d5-b549-41a105415fdd][garden]]: every
+[[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]] and [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]] in the
+[[id:eda47489-3b75-4229-8c40-f74795fbca20][tree of responsibilities]] is a scope under it, and a
+[[id:1afc8602-cf2b-469a-9813-ef7154f8b459][product]] keeps its own rules. A [[id:c587099a-d0f8-4c7a-a0b5-0b42ecc6daa8][boundary]], drawn by a
+[[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]], marks where one scope ends and a contained scope
+begins, so the rule runs one way: a container refers down into what it
+contains, and what is contained behaves as though its container does not
+exist. The rule limits [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]], which links to its own scope's canon,
+to the scopes inside that one, and to its own [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] by
+[[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]]. [[id:d5a281ef-457a-44ad-97f7-92f46e207e31][Sealing]] applies it to each
+[[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]]: a link from the item to anything outside its scope's
+archive is replaced by a link to a [[id:0bca5ce7-5bdd-4a66-84d1-66c30c79caf7][rumour]], which records that the
+thing was said to exist.
+
+[fn:1] The name is Robert C. Martin's. His Dependency Rule says that
+"source code dependencies can only point inwards": [[https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html][The Clean Architecture]], 2012, and the book
+/Clean Architecture/, 2017. See [[https://en.wikipedia.org/wiki/Robert_C._Martin][Robert C. Martin]] on Wikipedia, which
+also lists his /Clean Code/, 2009.

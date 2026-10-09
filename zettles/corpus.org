@@ -1,0 +1,13 @@
+:PROPERTIES:
+:ID:       93d0542c-ef28-4af2-bff4-5f16e3f87021
+:END:
+#+TITLE: corpus
+
+A corpus is the set of Org files that poslib reads under a directory.
+
+It is every Org file under that directory, except those in excluded
+directories. A [[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]] lists the exclusions. By default they
+are every [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]], every attic, and every directory whose name
+starts with an underscore or a dot. Files inside a [[id:1afc8602-cf2b-469a-9813-ef7154f8b459][product]] are not
+in the corpus. poslib's commands for tasks and reviews read the corpus and
+nothing else. What the corpus holds is [[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]].

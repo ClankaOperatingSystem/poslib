@@ -1,0 +1,11 @@
+:PROPERTIES:
+:ID:       530709f8-639a-4701-851e-11b93907abd3
+:END:
+#+TITLE: scope
+
+A scope is the directory of one [[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]] or [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]].
+
+A file is in the scope of the nearest responsibility or project that
+contains it. A scope stops at each [[id:c587099a-d0f8-4c7a-a0b5-0b42ecc6daa8][boundary]] inside it. Each scope
+keeps its own [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]], [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] and [[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]]. Under the
+[[id:a5472c74-3ec5-482d-9e12-de172e55cb31][dependency rule]], a scope links only to things inside itself.
