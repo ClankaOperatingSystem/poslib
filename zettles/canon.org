@@ -3,13 +3,20 @@
 :END:
 #+TITLE: canon
 
-Canon is the part of a [[id:530709f8-639a-4701-851e-11b93907abd3][scope]] that evolves.
+Canon is the part of a [[id:530709f8-639a-4701-851e-11b93907abd3][scope]]
+that evolves.
 
-Canon is the complement of the [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]]. Canon evolves, and the
-archive accumulates. Taken together, they are everything a [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]]
-knows. The provenance of canon is the archive: canon cites, by
-[[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]], each [[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]] it was drawn from. In a
-[[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]], canon is [[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]]. In a project, canon is
-also whatever each [[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]] keeps there, and each sort is a
-[[id:cea827dc-7a1e-4da8-8c15-c32be34b5b54][kind of canon]]. The [[id:a5472c74-3ec5-482d-9e12-de172e55cb31][dependency rule]] limits what canon may
-link to.
+Canon is the complement of the
+[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]]. Canon evolves, and
+the archive accumulates. Taken together, they are everything a
+[[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]] knows. The provenance
+of canon is the archive: canon cites, by
+[[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]], each
+[[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]] it was drawn
+from. In a [[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]],
+canon is [[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]]. In a
+project, canon is also whatever each
+[[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]] keeps there, and
+each sort is a [[id:cea827dc-7a1e-4da8-8c15-c32be34b5b54][kind of canon]].
+The [[id:a5472c74-3ec5-482d-9e12-de172e55cb31][dependency rule]] limits
+what canon may link to.

@@ -4,17 +4,26 @@
 #+TITLE: rumour
 
 A rumour is a short sealed note which says that a thing outside the
-[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] existed when an item was sealed.
+[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] existed when an item
+was sealed.
 
 A rumour is a reification: it turns a statement into a record with its own
 id.[fn:1] An item being sealed may link to a file that is not in its
-archive, such as a file of [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]] or a file in another
-[[id:530709f8-639a-4701-851e-11b93907abd3][scope]]. That file can change or move later, and a
-[[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]] cannot. So [[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]] does not keep the link. It
-writes a rumour, seals the rumour first, and points the link at it by
-[[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]]. The rumour gives the path, the date, and what was found
-there: the file's size, its SHA-256 hash and its title. It does not copy
-the file. This is how the [[id:a5472c74-3ec5-482d-9e12-de172e55cb31][dependency rule]] holds inside an archive.
+archive, such as a file of
+[[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]] or a file in another
+[[id:530709f8-639a-4701-851e-11b93907abd3][scope]]. That file can change
+or move later, and a [[id:efba3260-b37e-461a-aabe-b285799a4968][sealed
+item]] cannot. So [[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]]
+does not keep the link. It writes a rumour, seals the rumour first, and
+points the link at it by [[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs
+link]]. The rumour gives the path, the date, and what was found there: the
+file's size, its SHA-256 hash and its title. It does not copy the file.
+This is how the [[id:a5472c74-3ec5-482d-9e12-de172e55cb31][dependency
+rule]] holds inside an archive. The
+[[id:cae4c927-70f5-4c6c-83de-6b871b0ee099][seal plan]] lists each rumour
+before it is written.
 
-[fn:1] [[https://en.wikipedia.org/wiki/Reification_(knowledge_representation)][Reification (knowledge representation)]], on Wikipedia: "the process
-of turning a predicate or statement into an addressable object".
+[fn:1]
+[[https://en.wikipedia.org/wiki/Reification_(knowledge_representation)][Reification
+(knowledge representation)]], on Wikipedia: "the process of turning a
+predicate or statement into an addressable object".

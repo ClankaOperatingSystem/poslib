@@ -3,12 +3,20 @@
 :END:
 #+TITLE: event
 
-An event is one file in a [[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]], and it records one seal.
+An event is one file in a
+[[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]], and it records one
+seal.
 
-It names the [[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]]. It lists each file the seal added, with
-the identifier of that file's contents. It lists each [[id:00af5358-4add-409f-802c-c2d099bcc356][collection]] in
-the item. It names the event before it. It gives the
-[[id:90cd82cd-8947-4015-91b5-53335880dd64][recorded root]]: the identifier the whole [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] should have
-after this seal. An event's file name is the identifier of its own
-contents, so an altered event no longer matches its name. When a
-[[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]] holds the archive, [[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]] sends it each event.
+It names the [[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]]. It
+lists each file the seal added, with the id of that file's contents. It
+lists each [[id:00af5358-4add-409f-802c-c2d099bcc356][collection]] in the
+item. It names the event before it. It gives the
+[[id:90cd82cd-8947-4015-91b5-53335880dd64][recorded root]]: the id the
+whole [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] should have
+after this seal. An event's file name is its number, then the id of its
+own contents, so an altered event no longer matches its name. When a
+[[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]] holds the archive,
+[[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]] sends it each event.
+A [[id:468d8a4f-eff3-427d-be75-a7922c939cfc][fold]] reads the events in
+order. A [[id:f3bfe249-83ff-45c3-ba76-d1f6460f97b8][checkpoint]] holds the
+name of the last one.

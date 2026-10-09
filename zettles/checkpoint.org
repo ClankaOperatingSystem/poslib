@@ -3,16 +3,20 @@
 :END:
 #+TITLE: checkpoint
 
-A checkpoint is a small file that records where a [[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] ended at
-one moment.
+A checkpoint is a small file that records where a
+[[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] ended at one moment.
 
-It holds the name of the ledger's last [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]] at that moment. An
+It holds the name of the ledger's last
+[[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]] at that moment. An
 event's name is the hash of its contents, so the name fixes the whole
-ledger up to that point.[fn:1] poslib writes a checkpoint after each seal.
-A later check looks for that name among the ledger's events. If the name
-is not there, events have been cut from the end of the ledger, or the
-[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] and its ledger have gone. A checkpoint is kept beside the
-archive, in its [[id:530709f8-639a-4701-851e-11b93907abd3][scope]].
+ledger up to that point.[fn:1] poslib writes a checkpoint after each
+[[id:d5a281ef-457a-44ad-97f7-92f46e207e31][seal]]. A later check looks for
+that name among the ledger's events. If the name is not there, events have
+been cut from the end of the ledger, or the
+[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] and its ledger have
+gone. A checkpoint is kept beside the archive, in its
+[[id:530709f8-639a-4701-851e-11b93907abd3][scope]].
 
 [fn:1] Each event holds the hash of the one before it, as in a linear hash
-chain: [[https://en.wikipedia.org/wiki/Linked_timestamping][Linked timestamping]], on Wikipedia.
+chain: [[https://en.wikipedia.org/wiki/Linked_timestamping][Linked
+timestamping]], on Wikipedia.

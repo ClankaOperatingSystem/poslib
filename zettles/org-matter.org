@@ -7,7 +7,12 @@ Org matter is the collection of Org files that poslib manages.
 
 It holds tasks, project files and review items. It follows strict
 conventions, because poslib reads and rewrites it. One sequence of TODO
-keywords applies to all of it. It is the [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]] of a
-[[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]], and part of the canon of every [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]]. The
-[[id:93d0542c-ef28-4af2-bff4-5f16e3f87021][corpus]] is the Org matter that poslib reads under one directory. A
+keywords applies to all of it. It is the
+[[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]] of a
+[[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]], and part of
+the canon of every [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]].
+The [[id:93d0542c-ef28-4af2-bff4-5f16e3f87021][corpus]] is the Org matter
+that poslib reads under one directory. A
 [[id:4942c91a-4024-44d5-b549-41a105415fdd][garden]] is a hierarchy of it.
+A [[id:cea827dc-7a1e-4da8-8c15-c32be34b5b54][kind of canon]] is canon that
+is not Org matter.
