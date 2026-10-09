@@ -1,0 +1,21 @@
+:PROPERTIES:
+:ID:       219a360a-81c8-4c47-8f9c-574e862ec12b
+:END:
+#+TITLE: keeper
+
+A keeper is a server that stores an [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] away from its
+[[id:530709f8-639a-4701-851e-11b93907abd3][scope]].
+
+A scope's [[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]] says whether a keeper holds its archive,
+and gives the keeper's URL. The [[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] stays on disk with the
+scope. The keeper holds a copy of each [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]], and the contents of
+every file those events list. [[id:d5a281ef-457a-44ad-97f7-92f46e207e31][Sealing]] sends each new item and event
+to the keeper. The keeper checks what it is sent: it hashes the contents,
+does its own [[id:468d8a4f-eff3-427d-be75-a7922c939cfc][fold]], and compares the [[id:90cd82cd-8947-4015-91b5-53335880dd64][recorded root]]. It
+refuses anything that does not match. Contents travel as IPFS blocks of at
+most 1 MiB. A file is read back by its CID, at the same path an IPFS
+gateway uses.[fn:1] Any server that follows the remote archive
+[[id:f6fe4fc1-3277-4d24-bcaa-0b0b2da2f0b8][protocol]] is a keeper, and poslib and pyposlib are its clients. A
+keeper may also search the archive.
+
+[fn:1] [[https://docs.ipfs.tech/concepts/ipfs-gateway/][IPFS Gateway]], in the IPFS documentation.

@@ -1,0 +1,19 @@
+:PROPERTIES:
+:ID:       cae4c927-70f5-4c6c-83de-6b871b0ee099
+:END:
+#+TITLE: seal plan
+
+A seal plan is a file that says exactly what one seal will do, written
+before anything is changed.
+
+It names the item, and where in the [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] it will go. It lists
+each file to be added, with its id. It lists each link that will be
+rewritten, with the text before and after. It lists each [[id:0bca5ce7-5bdd-4a66-84d1-66c30c79caf7][rumour]]
+that will be made. It names the [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]] that will be written to the
+[[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]]. A person reviews the plan. [[id:d5a281ef-457a-44ad-97f7-92f46e207e31][Sealing]] is then given the
+plan's SHA-256 hash, and refuses a plan with any other hash.[fn:1] It also
+refuses if the archive or the item has changed since the plan was made. So
+what is sealed is what was reviewed.
+
+[fn:1] The plan is canonical JSON, so the same plan always has the same
+bytes and the same hash: [[https://ipld.io/specs/codecs/dag-json/spec/][DAG-JSON]], in the IPLD specifications.

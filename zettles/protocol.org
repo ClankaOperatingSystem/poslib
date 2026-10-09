@@ -1,0 +1,14 @@
+:PROPERTIES:
+:ID:       f6fe4fc1-3277-4d24-bcaa-0b0b2da2f0b8
+:END:
+#+TITLE: protocol
+
+A protocol is a written description of how a job is done, which any tool
+can follow.
+
+poslib writes each protocol down as a specification. poslib and pyposlib
+both implement them, and shared test cases hold the two to the same
+result. One protocol covers the [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]]: [[id:d5a281ef-457a-44ad-97f7-92f46e207e31][sealing]], the
+[[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]] and the [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]]. Another covers the
+[[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]] of a [[id:eda47489-3b75-4229-8c40-f74795fbca20][tree of responsibilities]]. Others cover
+tasks in [[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]]. A [[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]] builds on them.

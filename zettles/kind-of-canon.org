@@ -1,0 +1,15 @@
+:PROPERTIES:
+:ID:       cea827dc-7a1e-4da8-8c15-c32be34b5b54
+:END:
+#+TITLE: kind of canon
+
+A kind of canon is one sort of [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]] that a [[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]]
+declares it keeps in a [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]].
+
+The methodology gives each kind a name. Its declaration says where the
+instances are in the project, and where a reader should start. An instance
+can be a file, a directory of files, or something outside the repository
+at a URL. The project owns the instances. poslib reads [[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]]
+only. A kind of canon is how a methodology tells poslib about canon in any
+other form. poslib does not read or change those instances. It tells a
+reader that the kind exists and where to start.

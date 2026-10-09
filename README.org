@@ -46,6 +46,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   in each repository of the tree; and the two steps of the tool that
   makes a tree as declared.
 - =fixtures/= :: their examples, run by both.
+- =zettles/= :: a zettelkasten of the ideas needed to understand the code:
+  one Org file for each, linked to each other and read with org-roam.
 - =test/= :: ERT tests, one file per module, on =test/pos-test-support.el=.
 
 * Install

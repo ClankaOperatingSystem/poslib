@@ -1,0 +1,97 @@
+poslib's zettelkasten
+
+One zettle for each idea needed to understand poslib and its protocols. The
+zettles are Org files, indexed by org-roam and linked to each other. Every
+zettle follows the template and the rules below. A zettle that breaks a rule
+is corrected or removed.
+
+Reading it in Emacs
+
+The zettelkasten stands alone. Point org-roam at this directory:
+
+    (setq org-roam-directory "/path/to/poslib/zettles/")
+    (org-roam-db-sync)
+
+M-x org-roam-node-find then finds a zettle by its title, a link opens the
+zettle it names, and M-x org-roam-buffer-toggle shows the zettles that
+link to the one in view. Emacs then reads this zettelkasten and no other,
+until org-roam-directory is set back.
+
+The template
+
+    :PROPERTIES:
+    :ID:       <new UUID>
+    :END:
+    #+TITLE: <the idea, as a noun or short noun phrase>
+
+    <The idea> is <what it is in poslib, in one plain sentence>. Or, for
+    a rule: <The rule> states that <what it requires>.
+
+    <One paragraph that says how the idea relates to other ideas in the
+    zettelkasten. Each other idea's name is a
+    link: [[id:<UUID>][name of the other zettle]]. Where the idea or its
+    name comes from outside poslib, a footnote says so.[fn:1]>
+
+    [fn:1] <Who and what it comes from>: [[https://example.org/][title of the web page]].
+
+The rules
+
+A zettle
+
+- A zettle holds one idea. When a zettle comes to hold two, it is split into
+  two zettles that link to each other.
+- A zettle is the definition, then the paragraph, then any footnotes. It has
+  no headings, lists, tables or further paragraphs.
+- A zettle is written in the present tense and holds no status, dates or
+  history.
+
+The words
+
+- Plain English throughout: short sentences and everyday words.
+- Where a thing has a technical name an expert knows, such as IPFS, CID,
+  Merkle tree or HAMT, the zettle uses that name, in a plain sentence, with
+  a footnote that links to it.
+- An id is called an id.
+
+The first sentence
+
+- The first sentence defines the idea. It begins with the idea's name.
+- It is written in plain language. A reader who has not read poslib's
+  specifications understands it at first reading.
+- It says what the idea is in poslib. It is not a dictionary definition:
+  "A ledger is the ordered record of every seal made into one archive",
+  not "A ledger is a book of accounts".
+- It is one sentence. A definition that needs a second sentence is
+  rewritten.
+- It makes one claim. It has no list of parts or qualities joined by
+  commas and "and"; what else is true of the idea goes in the paragraph.
+
+The paragraph
+
+- One paragraph follows the definition. It explains how the idea relates
+  to other ideas in the zettelkasten.
+- The paragraph is full of links. Every idea it names that has a zettle is
+  an id: link to that zettle, on the idea's name. A paragraph with few
+  links is rewritten to name the ideas it relies on.
+- Each relation is stated with an exact verb: contains, is made by,
+  identifies, replaces, is checked against. "Is related to" and "see
+  also" say nothing.
+- Where two zettles are related, each says so from its own side.
+- The paragraph does not repeat the specification. It says enough that
+  the specification can then be read.
+
+Footnotes
+
+- Footnotes are optional. A footnote says where an idea or its name
+  comes from outside poslib: the person, the work, and links to pages on
+  the web, such as Wikipedia or the original text.
+- Links to the web appear in footnotes only. The definition and the
+  paragraph link to zettles of the zettelkasten only.
+
+The file
+
+- A zettle is one file directly in this directory, named for its title in
+  lower case with hyphens: recorded-root.org.
+- Its first line opens a property drawer that holds its Org ID. The ID
+  never changes; the title and the file name may.
+- The title is the idea's name as the first sentence uses it.

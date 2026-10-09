@@ -1,0 +1,17 @@
+:PROPERTIES:
+:ID:       d5a281ef-457a-44ad-97f7-92f46e207e31
+:END:
+#+TITLE: sealing
+
+Sealing is the act of putting a file or directory into an [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]]
+for good.
+
+It is the only way into an archive. It has two steps. First poslib writes
+a [[id:cae4c927-70f5-4c6c-83de-6b871b0ee099][seal plan]], which a person reviews. Then poslib carries out that
+plan and no other. Sealing moves the item into the archive. It rewrites
+each link in the item as an [[id:cc5b47b1-e21a-4ea5-927c-13f5a558e6b5][ipfs link]], so the link still works
+wherever the archive is kept. A link to something outside the archive
+becomes a link to a [[id:0bca5ce7-5bdd-4a66-84d1-66c30c79caf7][rumour]]. Sealing writes one [[id:8322059f-d15d-4dc2-86b2-27625b2c8b82][event]] in the
+[[id:1e668ccf-548f-4c26-ae57-ddb057d4c7a2][ledger]], and a [[id:f3bfe249-83ff-45c3-ba76-d1f6460f97b8][checkpoint]]. It makes the item's files
+read-only. The item is then a [[id:efba3260-b37e-461a-aabe-b285799a4968][sealed item]]. If a [[id:219a360a-81c8-4c47-8f9c-574e862ec12b][keeper]] holds
+the archive, sealing sends the item and the event to it.

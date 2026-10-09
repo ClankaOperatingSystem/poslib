@@ -1,0 +1,12 @@
+:PROPERTIES:
+:ID:       4942c91a-4024-44d5-b549-41a105415fdd
+:END:
+#+TITLE: garden
+
+A garden is a whole or a part of a [[id:eda47489-3b75-4229-8c40-f74795fbca20][tree of responsibilities]].
+
+"Garden" is the everyday word for one. It is a hierarchy of
+[[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]] to which the [[id:a5472c74-3ec5-482d-9e12-de172e55cb31][dependency rule]] applies. Working in
+a garden, you see the [[id:530709f8-639a-4701-851e-11b93907abd3][scope]] in front of you and the scopes under
+it. You do not see any larger tree it belongs to. It is called a garden
+because it has to be tended. Pruning and reviewing keep it in order.

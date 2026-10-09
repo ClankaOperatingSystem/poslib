@@ -1,0 +1,22 @@
+:PROPERTIES:
+:ID:       7442c287-5543-48e2-a20a-855af70fc35e
+:END:
+#+TITLE: methodology
+
+A methodology is a set of skills and commands that a [[id:e6a6108d-d2c0-4999-a9fa-c759e0ef9b23][project]] uses
+to do one kind of work.
+
+Methodologies are the extension mechanism that builds on poslib, using a
+"ports and adapters" model.[fn:1] poslib provides a basic [[id:f6fe4fc1-3277-4d24-bcaa-0b0b2da2f0b8][protocol]]
+for managing an [[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] and one for managing tasks. These suit a
+[[id:4942c91a-4024-44d5-b549-41a105415fdd][garden]], but might not suit the methodology a project requires. A
+project lists its methodologies in its [[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]]. Each one is a
+directory or a mounted repository inside the project. A methodology can
+declare each [[id:cea827dc-7a1e-4da8-8c15-c32be34b5b54][kind of canon]] it keeps in the project, and the checks
+it runs on them. It applies to the project that lists it and to no other.
+Every project also has the basic methodology, which manages tasks as
+[[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]]. A methodology's own files are not part of the project's
+[[id:93d0542c-ef28-4af2-bff4-5f16e3f87021][corpus]].
+
+[fn:1] "Ports and adapters" is Alistair Cockburn's name for hexagonal
+architecture: see [[https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)][Hexagonal architecture (software)]] on Wikipedia.
