@@ -345,8 +345,9 @@ is a directory, they are read as written from there."
 They are staged beside the archive, in _seal/, so the move is one rename,
 with DESTINATION's extension, by which their links are found; the links
 are read as written from DESTINATION, or from LINKS-FROM, a directory,
-where a program composed the record somewhere else.  If planning fails,
-nothing is left staged.
+where a program composed the record somewhere else.  The staged file is
+named for DESTINATION, so staging for it again replaces what was staged
+before.  If planning fails, nothing is left staged.
 LEDGER-ID names a new ledger, as for `pos-seal-plan'."
   (let* ((archive (or (pos-seal--outermost-archive (expand-file-name destination))
                       (pos-ledger--refuse 'destination "Destination is not in an archive: %s"
@@ -359,8 +360,15 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
                                                   links-from))
                             dir))))
     (make-directory stage t)
-    (let ((file (make-temp-file (expand-file-name "new-" stage) nil
-                               (file-name-extension destination t))))
+    (let ((file (expand-file-name
+                 (concat "new-"
+                         (substring (pos-ledger-sha
+                                     (encode-coding-string
+                                      (file-relative-name (expand-file-name destination) archive)
+                                      'utf-8))
+                                    0 16)
+                         (file-name-extension destination t))
+                 stage)))
       (let ((coding-system-for-write 'binary))
         (with-temp-file file
           (set-buffer-multibyte nil)

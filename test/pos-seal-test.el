@@ -273,6 +273,24 @@ applied twice, it adds nothing."
       (should (equal "handover\n" (pos-ledger-read (expand-file-name "archives/journal/h.md"
                                                                      scope)))))))
 
+(ert-deftest pos-seal/a-new-record-staged-again-replaces-the-first ()
+  "Staging for one destination twice leaves one staged file, the second's.
+The first plan is refused, the second seals, and _seal is gone."
+  (pos-test-with-scope
+    (let* ((target (expand-file-name "archives/journal/h.md" scope))
+           (first (pos-seal-stage "draft\n" target))
+           (second (pos-seal-stage "handover\n" target)))
+      (should (equal (alist-get 'source first) (alist-get 'source second)))
+      (should (equal 1 (length (directory-files (expand-file-name "_seal" scope) nil
+                                                "\\`new-"))))
+      (should (equal 'plan
+                     (cadr (should-error
+                            (pos-seal-apply first (pos-ledger-sha (pos-ledger-json first)))
+                            :type 'pos-ledger-refused))))
+      (pos-test-approve second)
+      (should (equal "handover\n" (pos-ledger-read target)))
+      (should-not (file-exists-p (expand-file-name "_seal" scope))))))
+
 (ert-deftest pos-seal/a-new-record-may-start-an-archive ()
   "A scope with no archives/ yet has an empty one; sealing makes it."
   (pos-test-with-scope
@@ -364,7 +382,8 @@ a rumour already sealed word for word is cited, not sealed again."
       (should-not (file-exists-p target))
       (let ((applied (funcall run "--apply")))
         (ert-info ((cadr applied)) (should (equal 0 (car applied)))))
-      (should (equal "handover\n" (pos-ledger-read target))))))
+      (should (equal "handover\n" (pos-ledger-read target)))
+      (should-not (file-exists-p (expand-file-name "_seal" scope))))))
 
 (ert-deftest pos-seal/a-program-seals-an-item-explicitly ()
   "The seal command with --apply moves and seals at once; without it, a plan."

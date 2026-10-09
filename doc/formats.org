@@ -358,7 +358,10 @@ SHA-256 of its canonical JSON; application refuses any other.
 outside any archive, to DESTINATION, a path that does not yet exist inside
 an outermost =archives/=, which itself need not exist yet. =write-new
 DESTINATION= first stages new bytes in =_seal/= beside the archive, in a
-file with DESTINATION's extension, then plans the same way, reading their
+file with DESTINATION's extension, named =new-= and the first sixteen
+hexadecimal digits of the SHA-256 of DESTINATION's path from the archive,
+so that staging for DESTINATION again replaces what was staged before,
+then plans the same way, reading their
 links as written from DESTINATION, or with =--links-from DIR= as written
 from DIR, where a program composed the record somewhere else, in the
 project's root say; if planning fails, the staged file is removed, and
