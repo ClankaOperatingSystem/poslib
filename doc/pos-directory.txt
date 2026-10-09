@@ -20,11 +20,10 @@ refused, and is rewritten to this version.
 
 1. The file
 
-A node's configuration directory is named .clanka, .clankos or .pos.
-The three names mean the same; .clanka is the one a tool writes, and
-the others are held so that no other tool's file can be mistaken for
-it. In it the configuration is config.yaml or config.yml, which mean
-the same too. It is committed with the node. A node has one
+A node's configuration directory is named .pos. One named .clanka or
+.clankos is read as well, and means the same: those are the names
+ClankOS gives it. In it the configuration is config.yaml or config.yml,
+which mean the same too. It is committed with the node. A node has one
 configuration: two directories, or two files in one, are refused
 (two-configurations). A
 directory without one declares nothing, and what kind of thing it is

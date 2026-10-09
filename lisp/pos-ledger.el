@@ -502,7 +502,7 @@ ADD is an alist of path and entry; PREVIOUS a hash or nil."
 ;;;; Configuration
 
 (defconst pos-ledger-config-directories '(".clanka" ".clankos" ".pos")
-  "The names a configuration directory may have, the one written first.")
+  "The names a configuration directory may have.")
 
 (defconst pos-ledger-config-names '("config.yaml" "config.yml")
   "The names a configuration file may have within its directory.")
