@@ -573,5 +573,26 @@ makes reads that; called by itself, a view walks."
 The root here does not exist, and is never looked at."
   (should-error (pos-startup-report "/nonexistent/" '("bogus")) :type 'user-error))
 
+;;;; The command
+
+(ert-deftest pos-startup/the-command-prints-each-view-it-is-given ()
+  "The output is the report of the views named, however many.
+Two, three and four --view arguments each print the report
+`pos-startup-report' gives for those views in that order, a view
+named twice being printed twice.  The index goes to a cache of the
+test's own."
+  (pos-startup-test-with-tree
+    (let ((pos-directory root)
+          (pos-roam-cache-directory (make-temp-file "pos-startup-test-" t)))
+      (dolist (views '(("next" "reviews")
+                       ("next" "scheduled" "reviews")
+                       ("reviews" "reviews" "next" "scheduled")))
+        (ert-info ((format "%d views" (length views)))
+          (let ((command-line-args-left
+                 (mapcan (lambda (view) (list "--view" view)) views)))
+            (should (equal (pos-startup-report root views)
+                           (with-output-to-string (pos-startup-batch))))
+            (should-not command-line-args-left)))))))
+
 (provide 'pos-startup-test)
 ;;; pos-startup-test.el ends here
