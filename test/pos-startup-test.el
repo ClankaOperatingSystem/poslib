@@ -322,6 +322,22 @@ plain heading; a NEXT item beside it belongs to the next view alone."
     (should-not (string-match-p "Hear from the roofer"
                                 (pos-startup-view root "next")))))
 
+(ert-deftest pos-startup/the-someday-view-lists-each-someday-item ()
+  "The someday view lists each SOMEDAY item, labelled by its scope.
+SOMEDAY is an open keyword of the one sequence.  The item is in no
+other view by keyword, and a report that names no view leaves the
+someday view out."
+  (pos-test-with-files root
+      '(("intray.org" . "* Unsorted\n** SOMEDAY Learn to weld\n** NEXT Answer the letter\n"))
+    (let ((text (pos-startup-view root "someday")))
+      (should (string-prefix-p "SOMEDAY items\n" text))
+      (should (equal (pos-startup-test-lines text)
+                     '(("intray" . "SOMEDAY Learn to weld")))))
+    (dolist (view '("next" "waiting"))
+      (should-not (string-match-p "Learn to weld"
+                                  (pos-startup-view root view))))
+    (should-not (string-match-p "^SOMEDAY items" (pos-startup-report root)))))
+
 (ert-deftest pos-startup/the-scheduled-view-leaves-out-reviews-and-deadlines ()
   "The scheduled view lists scheduled items, not reviews or deadlines.
 Reviews and deadlines have views of their own.  In the tree, beta's

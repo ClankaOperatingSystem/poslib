@@ -66,7 +66,7 @@ it, which that repository's own configuration governs."
 
 ;; One sequence for every file; per-file #+TODO lines drift.
 (defconst pos-todo-keywords
-  '((sequence "BACKLOG" "TODO" "NEXT" "WIP" "BLOCKED" "WAITING"
+  '((sequence "TODO" "NEXT" "WAITING" "SOMEDAY"
               "|" "DONE" "CANCELLED"))
   "The TODO sequence, shaped as `org-todo-keywords'.")
 
@@ -183,7 +183,8 @@ The files are those of the corpus a command may write."
        (pos--finding file "done entry has open children")))))
 
 (defconst pos-lint-stale-keywords
-  '("CANCELED" "CLARIFY" "DELEGATE" "DELEGATED" "SOMEDAY" "MAYBE")
+  '("BACKLOG" "WIP" "BLOCKED" "CANCELED" "CLARIFY" "DELEGATE" "DELEGATED"
+    "MAYBE")
   "Retired keywords; headings starting with one are plain text.")
 
 (defun pos-lint-stale-keyword (file)

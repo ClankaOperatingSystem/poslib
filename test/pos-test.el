@@ -210,11 +210,10 @@ two states and no other."
 Org reads `org-todo-keywords' as a buffer enters Org mode, so the
 sequence is bound for that moment only; the user's own setting is not
 changed."
-  (pos-test-with-files root '(("intray.org" . "* WIP busy\n"))
+  (pos-test-with-files root '(("intray.org" . "* WAITING held\n"))
     (let ((before org-todo-keywords))
       (with-current-buffer (pos-visit (expand-file-name "intray.org" root))
-        (should (equal '("BACKLOG" "TODO" "NEXT" "WIP" "BLOCKED" "WAITING"
-                         "DONE" "CANCELLED")
+        (should (equal '("TODO" "NEXT" "WAITING" "SOMEDAY" "DONE" "CANCELLED")
                        org-todo-keywords-1))
         (should (equal '("DONE" "CANCELLED") org-done-keywords)))
       (should (eq before org-todo-keywords)))))
@@ -222,10 +221,10 @@ changed."
 (ert-deftest pos/the-one-sequence-is-in-force-without-a-file-line ()
   "A file with no #+TODO line is read by the one sequence.
 CANCELLED is done, so an entry in that state is done and the sweep
-would take it; WIP is open under the sequence, though no line in the
-file says so, so an entry in that state is not."
+would take it; WAITING is open under the sequence, though no line in
+the file says so, so an entry in that state is not."
   (pos-test-with-files root
-      '(("intray.org" . "* CANCELLED dropped\n* WIP busy\n* TODO open\n"))
+      '(("intray.org" . "* CANCELLED dropped\n* WAITING held\n* TODO open\n"))
     (with-current-buffer (pos-visit (expand-file-name "intray.org" root))
       (should (equal '(t nil nil)
                      (org-map-entries (lambda () (and (org-entry-is-done-p) t))
@@ -391,19 +390,22 @@ tree in one order and a diff of two runs is meaningful."
 
 (ert-deftest pos/a-heading-beginning-with-a-retired-keyword-is-a-finding ()
   "A heading beginning with a retired keyword is plain text, and reported.
-CANCELED and CLARIFY were once in the sequence; Org now reads them as
-the first word of a title, so the task is open and invisible.  A word
-never in any sequence, like LATER, is just a word."
+CANCELED, CLARIFY and BACKLOG were once in the sequence; Org now reads
+them as the first word of a title, so the task is open and invisible.
+A word never in any sequence, like LATER, is just a word."
   (pos-test-with-files root
       `(("intray.org" . ,(pos-test-lines "* CANCELED old"
                                          "* CLARIFY me"
                                          "* LATER timesheets"
-                                         "* TODO fine")))
+                                         "* TODO fine"
+                                         "* BACKLOG mend the fence")))
     (let ((file (expand-file-name "intray.org" root)))
       (should (equal (list (list file 1
                                  "stale keyword CANCELED (not in the sequence)")
                            (list file 2
-                                 "stale keyword CLARIFY (not in the sequence)"))
+                                 "stale keyword CLARIFY (not in the sequence)")
+                           (list file 5
+                                 "stale keyword BACKLOG (not in the sequence)"))
                      (pos-lint-stale-keyword file))))))
 
 (ert-deftest pos/a-todo-line-in-a-file-is-a-finding ()
@@ -479,7 +481,7 @@ gate are one task.  A copy nested below the top level is seen like
 any other.  A plain heading, Finances, is no task and is not compared."
   (pos-test-with-files root
       '(("intray.org" . "* TODO fix the gate\n* Finances\n")
-        ("life/home/areas.org" . "* Finances\n** BACKLOG Fix the gate\n"))
+        ("life/home/areas.org" . "* Finances\n** NEXT Fix the gate\n"))
     (should (equal (list (list (expand-file-name "intray.org" root) 1
                                "duplicate task (also life/home/areas.org:2)")
                          (list (expand-file-name "life/home/areas.org" root) 2
