@@ -40,7 +40,7 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   the keeper of a ledger's archive; =lisp/pos-remote.el= and pyposlib's
   =remote.py= are its clients, and any server that does what it says is
   a keeper.
-- =doc/pos-directory.txt= :: what a node declares in =.clanka/=, =.clankos/= or =.pos/=: the
+- =doc/pos-directory.txt= :: what a node declares in =.pos/=, =.clanka/= or =.clankos/=: the
   repositories mounted beneath it, working trees, where archives are
   kept and the server it is bound to; the skills and commands installed
   in each repository of the tree; and the two steps of the tool that
@@ -65,8 +65,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 
 * Configure
 
-- Which files a command reads is declared in the tree's =.clanka/=,
-  =.clankos/= or =.pos/= configurations, as =doc/pos-directory.txt= says: every Org
+- Which files a command reads is declared in the tree's =.pos/=,
+  =.clanka/= or =.clankos/= configurations, as =doc/pos-directory.txt= says: every Org
   file beneath the root but those under =exclude=, and those of a
   repository with no configuration.
 - =pos-config.el= at the repository root; =pos-load-config= loads it.
