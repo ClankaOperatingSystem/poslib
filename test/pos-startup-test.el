@@ -82,28 +82,28 @@ one of its own."
           . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n#+TITLE: Gamma\n")
          ("projects/delta/project.org"
           . "#+TITLE: Delta\n* TODO Plan the delta\n:PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n")
-         ;; Responsibilities under responsibilities/, each by its own
+         ;; Responsibilities at the root, each by its own
          ;; configuration: home has a review in the window and a project
          ;; of its own; garden has none; kitchen's and cellar's reviews
          ;; fall at the edges of the reviews window.  shed has no
          ;; configuration, so it is a plain directory of the root.
-         ("responsibilities/home/.clanka/config.yml" . ,pos-startup-test-responsibility)
-         ("responsibilities/home/index.org"
+         ("home/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("home/index.org"
           . ,(concat "* TODO Review the home :review:\nSCHEDULED: "
                      (pos-startup-test-day 3) "\n"))
-         ("responsibilities/home/projects/roof/project.org"
+         ("home/projects/roof/project.org"
           . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Call the roofer\n")
-         ("responsibilities/garden/.clanka/config.yml" . ,pos-startup-test-responsibility)
-         ("responsibilities/garden/index.org" . "* TODO Prune the hedge\n")
-         ("responsibilities/kitchen/.clanka/config.yml" . ,pos-startup-test-responsibility)
-         ("responsibilities/kitchen/index.org"
+         ("garden/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("garden/index.org" . "* TODO Prune the hedge\n")
+         ("kitchen/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("kitchen/index.org"
           . ,(concat "* TODO Review the kitchen :review:\nSCHEDULED: "
                      (pos-startup-test-day 6) "\n"))
-         ("responsibilities/cellar/.clanka/config.yml" . ,pos-startup-test-responsibility)
-         ("responsibilities/cellar/index.org"
+         ("cellar/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("cellar/index.org"
           . ,(concat "* TODO Review the cellar :review:\nSCHEDULED: "
                      (pos-startup-test-day 7) "\n"))
-         ("responsibilities/shed/index.org"
+         ("shed/index.org"
           . ,(concat "* TODO Review the shed :review:\nSCHEDULED: "
                      (pos-startup-test-day 0) "\n"))
          ;; Responsibilities elsewhere: health, and teeth within it.
@@ -162,21 +162,21 @@ every other Org file is read, but twice/notes.org, which lies beneath
 a refused configuration."
   (pos-startup-test-with-tree
     (should (equal (pos-test-relative (pos-corpus-files (pos-corpus root)) root)
-                   '("health/intray.org"
+                   '("cellar/index.org"
+                     "garden/index.org"
+                     "health/intray.org"
                      "health/projects/checkup.org"
                      "health/teeth/intray.org"
+                     "home/index.org"
+                     "home/projects/roof/project.org"
                      "intray.org"
+                     "kitchen/index.org"
                      "projects/alpha/notes.org"
                      "projects/alpha/project.org"
                      "projects/beta/project.org"
                      "projects/delta/project.org"
                      "projects/gamma/project.org"
-                     "responsibilities/cellar/index.org"
-                     "responsibilities/garden/index.org"
-                     "responsibilities/home/index.org"
-                     "responsibilities/home/projects/roof/project.org"
-                     "responsibilities/kitchen/index.org"
-                     "responsibilities/shed/index.org"
+                     "shed/index.org"
                      "tools/widget/notes.org")))))
 
 (ert-deftest pos-startup/a-file-not-named-as-an-org-file-is-not-read ()
@@ -196,28 +196,28 @@ notes.txt is not an Org file, .#lock.org is a lock file and
 (ert-deftest pos-startup/a-scope-is-known-by-its-configuration-alone ()
   "A responsibility is a configured directory; a project lies in its projects.
 A directory's name means nothing by itself.  In the tree, health,
-health/teeth and the four under responsibilities/ each hold a
+health/teeth, home, garden, kitchen and cellar each hold a
 configuration that says where their projects belong, so each is a
-responsibility; responsibilities/shed holds none, so it is a plain
-directory of the root.  What lies directly in a projects directory is
+responsibility; shed holds none, so it is a plain directory of the
+root.  What lies directly in a projects directory is
 a project, as is tools/widget, whose configuration says where its
 methodologies belong."
   (pos-startup-test-with-tree
     (let ((corpus (pos-corpus root)))
       (should (eq 'root (pos-scope-kind (car (pos-corpus-scopes corpus)))))
       (should (equal (pos-startup-test-scopes corpus)
-                     '((responsibility . "health")
+                     '((responsibility . "cellar")
+                       (responsibility . "garden")
+                       (responsibility . "health")
                        (project . "health/projects/checkup")
                        (responsibility . "health/teeth")
+                       (responsibility . "home")
+                       (project . "home/projects/roof")
+                       (responsibility . "kitchen")
                        (project . "projects/alpha")
                        (project . "projects/beta")
                        (project . "projects/delta")
                        (project . "projects/gamma")
-                       (responsibility . "responsibilities/cellar")
-                       (responsibility . "responsibilities/garden")
-                       (responsibility . "responsibilities/home")
-                       (project . "responsibilities/home/projects/roof")
-                       (responsibility . "responsibilities/kitchen")
                        (project . "tools/widget")))))))
 
 (ert-deftest pos-startup/a-refused-configuration-is-a-finding-and-a-leaf ()
@@ -261,20 +261,20 @@ The owner is `pos-corpus-owner', whose rules pos-corpus-test.el pins
 on listings; here they are shown on the tree.  A one-file project's
 path is the file's without its .org.  In the tree, roof lies in home's
 projects directory, so its file is roof's, not home's; shed's file is
-the root's, since responsibilities/shed has no configuration; and a
-file that is not read has no owner."
+the root's, since shed has no configuration; and a file that is not
+read has no owner."
   (pos-startup-test-with-tree
     (let ((corpus (pos-corpus root)))
       (pcase-dolist (`(,path ,kind ,scope)
                      '(("intray.org" root ".")
-                       ("responsibilities/shed/index.org" root ".")
+                       ("shed/index.org" root ".")
                        ("projects/alpha/notes.org" project "projects/alpha")
                        ("health/projects/checkup.org" project "health/projects/checkup")
                        ("tools/widget/notes.org" project "tools/widget")
-                       ("responsibilities/home/index.org"
-                        responsibility "responsibilities/home")
-                       ("responsibilities/home/projects/roof/project.org"
-                        project "responsibilities/home/projects/roof")
+                       ("home/index.org"
+                        responsibility "home")
+                       ("home/projects/roof/project.org"
+                        project "home/projects/roof")
                        ("health/teeth/intray.org" responsibility "health/teeth")))
         (ert-info ((format "the owner of %s" path))
           (let ((owner (pos-corpus-owner corpus (expand-file-name path root))))
@@ -304,10 +304,10 @@ its description."
     (let ((text (pos-startup-view root "next")))
       (should (string-prefix-p "NEXT items\n" text))
       (should (equal (pos-startup-test-lines text)
-                     '(("intray" . "NEXT Answer the letter")
+                     '(("home/roof" . "NEXT Call the roofer")
+                       ("intray" . "NEXT Answer the letter")
                        ("alpha/notes" . "NEXT Read the paper")
-                       ("alpha" . "NEXT Draft the outline")
-                       ("responsibilities/home/roof" . "NEXT Call the roofer")))))))
+                       ("alpha" . "NEXT Draft the outline")))))))
 
 (ert-deftest pos-startup/the-waiting-view-lists-each-waiting-item ()
   "The waiting view lists each WAITING item, labelled by its scope.
@@ -378,13 +378,13 @@ so its file is the root's and the review is the root's."
       (should-not (string-match-p "Old review" text))
       (should (string-prefix-p "Responsibility reviews, late or due in the next 7 days\n"
                                (nth 1 parts)))
-      (should (string-match-p "responsibilities/home/index +Scheduled: +TODO Review the home"
+      (should (string-match-p "home/index +Scheduled: +TODO Review the home"
                               (nth 1 parts)))
       (should (string-match-p "health/intray +Scheduled: +TODO Review health"
                               (nth 1 parts)))
       (should (string-prefix-p "Root reviews, late or due in the next 7 days\n"
                                (nth 2 parts)))
-      (should (string-match-p "responsibilities/shed/index +Scheduled: +TODO Review the shed"
+      (should (string-match-p "shed/index +Scheduled: +TODO Review the shed"
                               (nth 2 parts))))))
 
 (ert-deftest pos-startup/the-reviews-window-is-today-and-the-days-after-it ()
@@ -413,11 +413,11 @@ named either."
     (let ((parts (split-string (pos-startup-view root "reviews-to-schedule") "\n\n" t)))
       (should (= 3 (length parts)))
       (should (equal (mapcar #'car (pos-startup-test-lines (nth 0 parts)))
-                     '("health/projects/checkup" "projects/beta"
-                       "responsibilities/home/projects/roof")))
+                     '("health/projects/checkup" "home/projects/roof"
+                       "projects/beta")))
       (should (equal (split-string (nth 1 parts) "\n" t " +")
                      '("Responsibilities with a review to be scheduled"
-                       "health/teeth" "responsibilities/garden")))
+                       "garden" "health/teeth")))
       (should (equal (nth 2 parts)
                      "Root with a review to be scheduled\n  (none)\n")))))
 
