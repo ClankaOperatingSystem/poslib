@@ -120,8 +120,8 @@ none, as a keeper of version 1 alone does.  Refused as
                       (list (or (alist-get 'protocol described) 1)))))
          (shared (seq-filter (lambda (v) (memq v offered)) pos-remote-versions)))
     (unless shared
-      (pos-ledger--refuse 'version "The keeper serves protocol versions %S; this client speaks %S"
-                          offered pos-remote-versions))
+      (pos-ledger-refuse 'version "The keeper serves protocol versions %S; this client speaks %S"
+                         offered pos-remote-versions))
     (apply #'max shared)))
 
 ;;;; Whose an event is
@@ -199,16 +199,16 @@ that has not answered in `pos-remote-timeout' seconds is refused."
                      (cl-letf (((symbol-function 'url-http-handle-authentication)
                                 (lambda (_proxy) t)))
                        (url-retrieve-synchronously url t t pos-remote-timeout))
-                   (error (pos-ledger--refuse 'remote "%s: %s" url
-                                              (error-message-string err))))))
+                   (error (pos-ledger-refuse 'remote "%s: %s" url
+                                             (error-message-string err))))))
     (unless buffer
-      (pos-ledger--refuse 'remote "%s: no answer" url))
+      (pos-ledger-refuse 'remote "%s: no answer" url))
     (unwind-protect
         (with-current-buffer buffer
           (goto-char (point-min))
           (unless (and (looking-at "HTTP/[0-9.]+ \\([0-9]+\\)")
                        (bound-and-true-p url-http-end-of-headers))
-            (pos-ledger--refuse 'remote "%s: no answer" url))
+            (pos-ledger-refuse 'remote "%s: no answer" url))
           (let ((status (string-to-number (match-string 1))))
             (goto-char url-http-end-of-headers)
             (forward-line 1)
@@ -276,12 +276,12 @@ is asked once more with a token already kept that it takes."
         (let ((named (ignore-errors
                        (alist-get 'refused (pos-bytes-parse (cdr answer))))))
           (if (and (eql status 401) (null given))
-              (pos-ledger--refuse
+              (pos-ledger-refuse
                'access "Not signed in to this keeper; sign in with: sign-in %s" url)
-            (pos-ledger--refuse (cond ((stringp named) (intern named))
-                                      ((alist-get status pos-remote--kinds))
-                                      (t 'remote))
-                                "%s %s answered %d" method path status)))))))
+            (pos-ledger-refuse (cond ((stringp named) (intern named))
+                                     ((alist-get status pos-remote--kinds))
+                                     (t 'remote))
+                               "%s %s answered %d" method path status)))))))
 
 (defun pos-remote--call (archive method path &optional body content-type)
   "Return the body ARCHIVE's keeper answers METHOD on PATH with.

@@ -59,9 +59,9 @@ plan that is not a seal plan, a source that is not there, and an id
 link whose ID two files hold."
   (let-alist seal-plan
     (unless (and (equal .operation "seal") (stringp .source) (stringp .destination))
-      (pos-ledger--refuse 'plan "Not a seal plan"))
+      (pos-ledger-refuse 'plan "Not a seal plan"))
     (unless (or (file-exists-p .source) (file-symlink-p .source))
-      (pos-ledger--refuse 'source "No such item: %s" .source))
+      (pos-ledger-refuse 'source "No such item: %s" .source))
     (let* ((root (file-name-as-directory (file-truename root)))
            (corpus (pos-corpus root))
            (source (directory-file-name .source))
@@ -73,7 +73,7 @@ link whose ID two files hold."
                                         (not (string-prefix-p
                                               ".." (pos-relink--within (car place) source))))
                                       places))
-                   (pos-ledger--refuse
+                   (pos-ledger-refuse
                     'unresolved "Two files hold the ID %s: %s" id
                     (mapconcat (lambda (place) (file-relative-name (car place) root))
                                (reverse places) ", "))))
@@ -124,17 +124,17 @@ is written.  Return the files rewritten, relative to the plan's root.
 Refuse a plan that is not a relink plan, a destination not sealed,
 and a file changed since the plan was made."
   (unless (equal (pos-bytes-sha (pos-bytes-json plan)) expected)
-    (pos-ledger--refuse 'plan "Reviewed plan hash mismatch"))
+    (pos-ledger-refuse 'plan "Reviewed plan hash mismatch"))
   (let-alist plan
     (unless (and (eql .schema 1) (equal .operation "relink"))
-      (pos-ledger--refuse 'plan "Not a relink plan"))
+      (pos-ledger-refuse 'plan "Not a relink plan"))
     (let ((item (pos-links-link .destination))
           writes)
       (seq-doseq (entry .files)
         (let* ((file (expand-file-name (alist-get 'file entry) .root))
                (bytes (pos-bytes-read file)))
           (unless (equal (pos-bytes-sha bytes) (alist-get 'sha256 entry))
-            (pos-ledger--refuse 'plan "File changed since review: %s" file))
+            (pos-ledger-refuse 'plan "File changed since review: %s" file))
           (push (list file
                       (pos-links-rewrite
                        bytes

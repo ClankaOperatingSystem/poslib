@@ -30,6 +30,7 @@
 ;; - `pos-ledger-kept': the keeper an archive is kept by, if it has one.
 ;; - `pos-ledger-named': the id an archive's ledger is to have, if named.
 ;; - `pos-ledger-check': the report on every archive under a root.
+;; - `pos-ledger-refuse': signal a refusal, for this module and its callers.
 ;;
 ;; JSON values are Lisp values: objects alists, arrays vectors, strings,
 ;; integers and :null.  Refusals signal `pos-ledger-refused' with a kind
@@ -64,7 +65,7 @@ The environment's POS_ARCHIVE_OFFLINE, set to anything, says the same.")
 
 (define-error 'pos-ledger-refused "Archive integrity refused")
 
-(defun pos-ledger--refuse (kind format &rest args)
+(defun pos-ledger-refuse (kind format &rest args)
   "Signal a refusal of KIND, with a message from FORMAT and ARGS."
   (signal 'pos-ledger-refused (list kind (apply #'format format args))))
 
@@ -94,7 +95,7 @@ FILE names what was read, for the refusal."
                           (list parsed)))
                  (error nil))))
     (unless value
-      (pos-ledger--refuse 'encoding "Not a DAG-JSON block: %s" file))
+      (pos-ledger-refuse 'encoding "Not a DAG-JSON block: %s" file))
     (car value)))
 
 (defun pos-ledger--event-cid (bytes)
@@ -122,7 +123,7 @@ FILE names what was read, for the refusal."
   (let ((attributes (file-attributes file)))
     (unless (and attributes (null (file-attribute-type attributes))
                  (= 1 (file-attribute-link-number attributes)))
-      (pos-ledger--refuse 'link "Expected a regular file with one link: %s" file))
+      (pos-ledger-refuse 'link "Expected a regular file with one link: %s" file))
     attributes))
 
 (defun pos-ledger--mode (file)
@@ -144,7 +145,7 @@ FILE names what was read, for the refusal."
                  (equal (file-attribute-size before) (file-attribute-size after))
                  (equal (file-attribute-modification-time before)
                         (file-attribute-modification-time after)))
-      (pos-ledger--refuse 'changed "File changed while reading: %s" file))
+      (pos-ledger-refuse 'changed "File changed while reading: %s" file))
     (list (cons 'mode (logand (pos-ledger--mode file) (lognot #o222)))
           (cons 'sha256 (pos-bytes-sha bytes))
           (cons 'size (length bytes)))))
@@ -166,9 +167,9 @@ An archive not yet made holds nothing."
           (cond
            ((and (null rel) (equal name pos-ledger-directory))
             (unless (and (file-directory-p path) (not (file-symlink-p path)))
-              (pos-ledger--refuse 'ledger "Integrity metadata must be a directory")))
+              (pos-ledger-refuse 'ledger "Integrity metadata must be a directory")))
            ((file-symlink-p path)
-            (pos-ledger--refuse 'link "Symlink in archive: %s" path))
+            (pos-ledger-refuse 'link "Symlink in archive: %s" path))
            ((file-directory-p path) (walk path child))
            (t (push (cons child (pos-ledger-record path)) result))))))
     (sort result (lambda (a b) (string< (car a) (car b))))))
@@ -213,7 +214,7 @@ An archive not yet made holds nothing."
         (inside (expand-file-name pos-ledger-directory archive)))
     (cond ((and (or (file-exists-p beside) (file-symlink-p beside))
                 (or (file-exists-p inside) (file-symlink-p inside)))
-           (pos-ledger--refuse 'ledger "Two ledgers for one archive: %s" archive))
+           (pos-ledger-refuse 'ledger "Two ledgers for one archive: %s" archive))
           ((or (file-exists-p beside) (file-symlink-p beside)) beside)
           (t inside))))
 
@@ -230,7 +231,7 @@ from its fingerprint, and adds only new paths."
          (kept (seq-remove (lambda (e) (member (car e) remove)) entries))
          (moved (mapcar (lambda (e) (cons (or (cdr (assoc (car e) rename)) (car e)) (cdr e)))
                         kept))
-         (bad (lambda () (pos-ledger--refuse 'entry "Invalid conversion: %s" file))))
+         (bad (lambda () (pos-ledger-refuse 'entry "Invalid conversion: %s" file))))
     (unless (and (vectorp (alist-get 'remove event)) (listp (alist-get 'add event))
                  (listp (alist-get 'rename event)) (listp (alist-get 'convert event))
                  (seq-every-p (lambda (p) (assoc p legacy)) remove)
@@ -291,7 +292,7 @@ nil nil)."
      ((not (or (file-exists-p folder) (file-symlink-p folder)))
       (list nil nil 0 nil nil nil nil nil))
      ((or (file-symlink-p folder) (not (file-directory-p folder)))
-      (pos-ledger--refuse 'ledger "Invalid ledger: %s" folder))
+      (pos-ledger-refuse 'ledger "Invalid ledger: %s" folder))
      (t
       (dolist (name (pos-ledger--entries folder))
         (let* ((path (expand-file-name name folder))
@@ -304,7 +305,7 @@ nil nil)."
           (setq number (1+ number))
           (unless (and id (equal id (if blocked (pos-ledger--event-cid bytes)
                                       (pos-bytes-sha bytes))))
-            (pos-ledger--refuse 'sequence "Ledger sequence/hash failure: %s" path))
+            (pos-ledger-refuse 'sequence "Ledger sequence/hash failure: %s" path))
           (let* ((event (if blocked (pos-ledger--strict bytes path)
                           (pos-bytes-parse bytes)))
                  (keys (and (listp event) (pos-ledger--keys event)))
@@ -341,17 +342,17 @@ nil nil)."
                              to-blocks)
                          (eq (eql version 3) blocked)
                          (equal (alist-get 'previous event) follows))
-              (pos-ledger--refuse 'chain "Ledger chain failure: %s" path))
+              (pos-ledger-refuse 'chain "Ledger chain failure: %s" path))
             (setq schema version)
             (let ((event-id (alist-get 'ledger_id event)))
               (cond
                (event-id
                 (unless (and (pos-ledger--uuid-p event-id)
                              (or (null ledger-id) (equal event-id ledger-id)))
-                  (pos-ledger--refuse 'identity "Ledger identity changed"))
+                  (pos-ledger-refuse 'identity "Ledger identity changed"))
                 (setq ledger-id event-id))
                (ledger-id
-                (pos-ledger--refuse 'identity "Ledger identity removed"))))
+                (pos-ledger-refuse 'identity "Ledger identity removed"))))
             (setq root (when (memq schema '(2 3)) (alist-get 'root event)))
             (when conversion
               (setq converted t
@@ -367,45 +368,45 @@ nil nil)."
                                             (pos-path-within-p
                                              (pos-bytes-key (car pair)) item))
                                           (alist-get 'add event)))
-                  (pos-ledger--refuse 'entry "Invalid root, item or collections: %s" path))
+                  (pos-ledger-refuse 'entry "Invalid root, item or collections: %s" path))
                 (when (eql schema 3)
                   (unless (and (pos-ledger--collections-p (alist-get 'empty event))
                                (seq-every-p (lambda (p) (pos-path-within-p p item))
                                             (alist-get 'empty event)))
-                    (pos-ledger--refuse 'entry "Invalid empty directories: %s" path)))
+                    (pos-ledger-refuse 'entry "Invalid empty directories: %s" path)))
                 (push item items))
               (setq collections (append (alist-get 'collections event) collections)))
             (when conversion
               (unless (and (pos-ledger--cid-p root)
                            (pos-ledger--collections-p (alist-get 'collections event)))
-                (pos-ledger--refuse 'entry "Invalid root or collections: %s" path))
+                (pos-ledger-refuse 'entry "Invalid root or collections: %s" path))
               (setq collections (append (alist-get 'collections event) collections)))
             (when to-blocks
               (unless (and (pos-ledger--cid-p root)
                            (pos-ledger--collections-p (alist-get 'empty event)))
-                (pos-ledger--refuse 'entry "Invalid root or empty directories: %s" path)))
+                (pos-ledger-refuse 'entry "Invalid root or empty directories: %s" path)))
             (when (eql schema 3)
               (setq empty (append (alist-get 'empty event) empty)))
             (let ((add (unless (or conversion to-blocks) (alist-get 'add event))))
               (unless (listp add)
-                (pos-ledger--refuse 'entry "Invalid ledger additions"))
+                (pos-ledger-refuse 'entry "Invalid ledger additions"))
               (dolist (pair add)
                 (let ((name (pos-bytes-key (car pair))))
                   (unless (pos-path-safe-p name)
-                    (pos-ledger--refuse 'entry "Unsafe relative path: %s" name))
+                    (pos-ledger-refuse 'entry "Unsafe relative path: %s" name))
                   (when (or (equal (car (split-string name "/")) pos-ledger-directory)
                             (assoc name entries))
-                    (pos-ledger--refuse
+                    (pos-ledger-refuse
                      'entry "Ledger cannot replace an earlier entry or index itself"))
                   (unless (pos-ledger--entry-p (cdr pair) (if (eql schema 1) 1 2))
-                    (pos-ledger--refuse 'entry "Invalid ledger entry"))
+                    (pos-ledger-refuse 'entry "Invalid ledger entry"))
                   (push (cons name (cdr pair)) entries)))))
           (setq previous id
                 previous-cid (if blocked id
                                (pos-ledger--event-cid (pos-ledger--as-block bytes))))
           (push path files)))
       (unless files
-        (pos-ledger--refuse 'empty "Empty ledger needs investigation: %s" folder))
+        (pos-ledger-refuse 'empty "Empty ledger needs investigation: %s" folder))
       (list (sort entries (lambda (a b) (string< (car a) (car b))))
             previous number (nreverse files) root
             (seq-uniq (sort collections #'string<))
@@ -456,8 +457,8 @@ configuration that is refused, and for two in one node."
          (node (locate-dominating-file scope #'pos-ledger-config-files))
          (files (and node (pos-ledger-config-files node))))
     (when (cdr files)
-      (pos-ledger--refuse 'config "Configuration refused (two-configurations): %s"
-                          node))
+      (pos-ledger-refuse 'config "Configuration refused (two-configurations): %s"
+                         node))
     (when files
       (require 'pos-tree)
       (let* ((file (expand-file-name (car files) node))
@@ -466,8 +467,8 @@ configuration that is refused, and for two in one node."
                   (pos-tree-read-config
                    (decode-coding-string (pos-bytes-read file) 'utf-8))
                 (pos-tree-refused
-                 (pos-ledger--refuse 'config "Configuration refused (%s): %s"
-                                     (cadr err) file))))
+                 (pos-ledger-refuse 'config "Configuration refused (%s): %s"
+                                    (cadr err) file))))
              (path (directory-file-name
                     (file-relative-name scope (expand-file-name node)))))
         (seq-find (lambda (a) (equal (alist-get 'scope a) path))
@@ -500,8 +501,8 @@ A ledger with no event yet, or an archive no entry names a ledger for,
 is not refused."
   (let ((named (pos-ledger-named archive)))
     (when (and named files (not (equal named (pos-ledger-identity files))))
-      (pos-ledger--refuse 'identity "Not the ledger its entry names, %s: %s"
-                          named archive))))
+      (pos-ledger-refuse 'identity "Not the ledger its entry names, %s: %s"
+                         named archive))))
 
 (defun pos-ledger--kept-here (dir)
   "Return the archive of the scope DIR, if kept by a keeper and not here.
@@ -517,7 +518,7 @@ DIR has a ledger beside where its archive would be, and no archives."
   "Return KNOWN, the ledger's entries, as the inventory of the kept ARCHIVE.
 Refuse `kept' if ARCHIVE has files on disk: it is not with its keeper yet."
   (when (pos-ledger-inventory archive)
-    (pos-ledger--refuse 'kept "Kept by a keeper, and has files on disk: %s" archive))
+    (pos-ledger-refuse 'kept "Kept by a keeper, and has files on disk: %s" archive))
   known)
 
 (defun pos-ledger--ask (url cids)
@@ -549,7 +550,7 @@ The system aliases /tmp and /var are allowed."
   (let ((path (directory-file-name (expand-file-name root))))
     (named-let up ((part path))
       (when (and (file-symlink-p part) (not (member part '("/tmp" "/var"))))
-        (pos-ledger--refuse 'link "Symlink: %s" part))
+        (pos-ledger-refuse 'link "Symlink: %s" part))
       (let ((parent (directory-file-name (file-name-directory part))))
         (unless (equal parent part) (up parent))))
     path))
@@ -571,7 +572,7 @@ its own."
     (unless (or (file-directory-p root)
                 (and (equal (file-name-nondirectory root) "archives")
                      (pos-ledger--kept-here (file-name-directory root))))
-      (pos-ledger--refuse 'root "Root must be an existing directory"))
+      (pos-ledger-refuse 'root "Root must be an existing directory"))
     (if (equal (file-name-nondirectory root) "archives")
         (list root)
       (named-let walk ((dir root))
@@ -582,7 +583,7 @@ its own."
             (when (and (file-directory-p path)
                        (not (string-match-p "\\`[._]" name)))
               (when (file-symlink-p path)
-                (pos-ledger--refuse 'link "Symlink in discovery: %s" path))
+                (pos-ledger-refuse 'link "Symlink in discovery: %s" path))
               (if (equal name "archives")
                   (push path found)
                 (walk path))))))
@@ -606,7 +607,7 @@ its own."
       (cond
        ((not (or (file-exists-p folder) (file-symlink-p folder))))
        ((or (file-symlink-p folder) (not (file-directory-p folder)))
-        (pos-ledger--refuse 'checkpoint "Invalid checkpoint directory"))
+        (pos-ledger-refuse 'checkpoint "Invalid checkpoint directory"))
        (t (setq files (append files (mapcar (lambda (n) (expand-file-name n folder))
                                             (pos-ledger--entries folder)))))))
     files))
@@ -662,7 +663,7 @@ within are known by the names their events are enrolled under."
                                 (concat (pos-bytes-sha bytes) ".json"))
                          (pos-bytes-parse bytes))))
         (unless value
-          (pos-ledger--refuse 'checkpoint "Checkpoint hash failure: %s" file))
+          (pos-ledger-refuse 'checkpoint "Checkpoint hash failure: %s" file))
         (unless (and (listp value)
                      (equal (pos-ledger--keys value) '("coverage" "heads" "schema"))
                      (eql 1 (alist-get 'schema value))
@@ -671,14 +672,14 @@ within are known by the names their events are enrolled under."
                      (seq-every-p (lambda (head) (or (pos-ledger--hex-p head)
                                                      (pos-ledger--event-cid-p head)))
                                   (alist-get 'heads value)))
-          (pos-ledger--refuse 'checkpoint "Invalid checkpoint"))
+          (pos-ledger-refuse 'checkpoint "Invalid checkpoint"))
         (when (or (not archive-root) (equal (alist-get 'coverage value) "archive"))
           (setq required (append (alist-get 'heads value) required)))))
     (dolist (archive archives)
       (setq present (append (pos-ledger--ledger-hashes archive) present)))
     (let ((absent (sort (seq-uniq (seq-difference required present)) #'string<)))
       (when absent
-        (pos-ledger--refuse
+        (pos-ledger-refuse
          'anchor "Missing anchored ledger (archive removed or history truncated): %s"
          (string-join absent ", "))))))
 
@@ -700,7 +701,7 @@ entry records no CID, as a legacy ledger's do."
                    (let ((path (pos-bytes-key (car pair)))
                          (entry (cdr pair)))
                      (unless (assq 'cid entry)
-                       (pos-ledger--refuse 'entry "No CID enrolled for %s" path))
+                       (pos-ledger-refuse 'entry "No CID enrolled for %s" path))
                      (unless (seq-some (lambda (part) (string-prefix-p "." part))
                                        (split-string path "/"))
                        (list path (alist-get 'cid entry) (alist-get 'size entry)))))
