@@ -138,7 +138,7 @@ Refuse a root that has no configuration."
 
 (defun pos-person--file-id (file)
   "Return the ID that FILE has before its first heading, or nil."
-  (pos-person--file-keyword file "^[ \t]*:ID:[ \t]+\\(\\S-+\\)[ \t]*$"))
+  (pos-person--file-keyword file "^[ \t]*:ID:[ \t]+\\([^ \t\n]+\\)[ \t]*$"))
 
 (defun pos-person--file-title (file)
   "Return the title of FILE, or nil."

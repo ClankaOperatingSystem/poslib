@@ -316,6 +316,18 @@ An item that is not WAITING is refused, and so is the state WAITING."
                                                 "DONE" "Slates came"))
                      "DONE")))))
 
+(ert-deftest pos-person/a-files-id-is-read-whatever-buffer-is-current ()
+  "The ID is the one word after the keyword, in any buffer's syntax.
+In a buffer whose syntax has a newline as no space, the ID is still
+read without the line that follows it."
+  (pos-test-with-files root
+      '(("a.org" . ":PROPERTIES:\n:ID:       an-id\n:END:\n#+TITLE: A\n"))
+    (with-temp-buffer
+      (set-syntax-table (make-syntax-table))
+      (modify-syntax-entry ?\n "w")
+      (should (equal "an-id"
+                     (pos-person--file-id (expand-file-name "a.org" root)))))))
+
 (ert-deftest pos-person/the-shell-entry-runs-each-command ()
   "The entry prints what each command made, relative to the root."
   (pos-person-test-with-tree
