@@ -883,7 +883,7 @@ One row per entry; each subtree quoted below."
               "- move: set file, optionally under (heading path).\n"
               "- skip or ?: left in place.\n"
               "- Full entries quoted below.\n"
-              "- Then: pos refile apply.\n\n"
+              "- Then: pos-refile apply.\n\n"
               "| act | line | heading | file | under | excerpt |\n|-\n")
       (dolist (entry candidates)
         (pcase-let* ((`(,line ,heading ,_section ,subtree) entry)
