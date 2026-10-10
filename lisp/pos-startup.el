@@ -37,7 +37,7 @@
 ;; - `pos-startup-view-items': one view, as data: what each line is of.
 ;; - `pos-startup-data': the report as data, for `json-serialize'.
 ;; - `pos-startup-batch': shell entry; --view NAME, repeated, picks views;
-;;   --json prints the data.
+;;   --weekly picks `pos-startup-weekly-views'; --json prints the data.
 ;;
 ;; The data of a view is gathered while its text is made, an item for
 ;; each line, so the two forms cannot differ in what they list.
@@ -59,6 +59,11 @@
 
 (defcustom pos-startup-review-days 7
   "Days, from today, that the reviews view covers."
+  :type 'integer
+  :group 'pos)
+
+(defcustom pos-startup-finished-days 7
+  "Days, to today, that the finished view covers."
   :type 'integer
   :group 'pos)
 
@@ -96,13 +101,20 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
 
 (defconst pos-startup-views
   '("next" "waiting" "someday" "scheduled" "deadlines" "reviews"
-    "reviews-to-schedule" "stuck" "intray" "all")
+    "reviews-to-schedule" "stuck" "intray" "finished" "all")
   "The names of the views, in the order they are printed.")
 
 (defconst pos-startup-default-views
   '("next" "waiting" "scheduled" "deadlines" "reviews" "reviews-to-schedule"
     "stuck" "intray")
   "The views `pos-startup-report' prints when none is named.")
+
+(defconst pos-startup-weekly-views
+  '("intray" "next" "waiting" "scheduled" "deadlines" "reviews" "stuck"
+    "reviews-to-schedule" "someday" "finished")
+  "The views of a weekly review, in the order the review reads them.
+What is to be placed; what is next, waited for, dated and to be
+reviewed; what is set aside; and what was finished in the week.")
 
 (defvar pos-startup--root nil
   "The root being read, while a view is made.")
@@ -386,6 +398,33 @@ been captured and not yet placed."
            nil 'file))))
     (pos-startup--list "Intray, to be placed" (nreverse lines))))
 
+(defun pos-startup--finished ()
+  "Return the finished view of `pos-startup--corpus'.
+Each item in a done state whose CLOSED date is today or within the
+`pos-startup-finished-days' days before it, with that date.  An item
+with no CLOSED date is not listed."
+  (let ((since (- (org-today) pos-startup-finished-days))
+        lines)
+    (dolist (file (pos-corpus-files pos-startup--corpus))
+      (with-current-buffer (pos-visit file)
+        (org-map-entries
+         (lambda ()
+           (let ((closed (org-entry-get nil "CLOSED")))
+             (when (and closed (org-entry-is-done-p)
+                        (>= (org-time-string-to-absolute closed) since))
+               (when pos-startup--gathering
+                 (push (pos-startup--item-at-point) pos-startup--items))
+               (push (format "%-54s %s %s %s" (pos-startup--label)
+                             (substring closed 1 11)
+                             (org-get-todo-state)
+                             (org-link-display-format
+                              (org-get-heading t t t t)))
+                     lines))))
+         nil 'file)))
+    (pos-startup--list (format "Finished in the last %d days"
+                               pos-startup-finished-days)
+                       (nreverse lines))))
+
 (defun pos-startup-view (root view)
   "Return VIEW, one of `pos-startup-views', of the Org files under ROOT.
 Text: a title, then one line for each item, labelled by its scope."
@@ -453,6 +492,7 @@ Text: a title, then one line for each item, labelled by its scope."
       ("reviews-to-schedule" (pos-startup--reviews-to-schedule))
       ("stuck" (pos-startup--stuck))
       ("intray" (pos-startup--intray))
+      ("finished" (pos-startup--finished))
       ("all"
        (let ((org-agenda-overriding-header "All TODO items"))
          (pos-startup--or-none (pos-startup--agenda #'org-todo-list))))
@@ -560,17 +600,20 @@ given once."
 (defun pos-startup-batch ()
   "Print the start-up report of `pos-directory'.
 Each --view NAME in `command-line-args-left' names a view to print in
-place of the default ones.  With --json, print `pos-startup-data' as
+place of the default ones, and --weekly names those of
+`pos-startup-weekly-views'.  With --json, print `pos-startup-data' as
 JSON and a newline in place of the text.  Exit 2 on any other
 argument."
   (let (views json)
     (while command-line-args-left
       (let ((argument (pop command-line-args-left)))
         (cond ((equal argument "--json") (setq json t))
+              ((equal argument "--weekly")
+               (setq views (append (reverse pos-startup-weekly-views) views)))
               ((and (equal argument "--view") command-line-args-left
                     (member (car command-line-args-left) pos-startup-views))
                (push (pop command-line-args-left) views))
-              (t (message "Usage: [--json] [--view %s] ..."
+              (t (message "Usage: [--json] [--weekly] [--view %s] ..."
                           (string-join pos-startup-views "|"))
                  (kill-emacs 2)))))
     ;; Each session opens here: the index is kept current as a matter

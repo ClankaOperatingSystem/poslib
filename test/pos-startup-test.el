@@ -507,11 +507,41 @@ open items and health's has one open and one done."
                        ("intray" . "NEXT Answer the letter")
                        ("intray" . "TODO Sort the shelf")))))))
 
+(ert-deftest pos-startup/the-finished-view-lists-what-was-closed-in-the-week ()
+  "The finished view lists each done item closed today or in the 7 days before.
+Each line has the scope, the date closed, the state and the title.
+Here Paid was closed today, Dropped seven days ago and Old eight days
+ago, which is outside the window.  Undated is done with no CLOSED
+date, and Open is not done; neither is listed."
+  (pos-test-with-files root
+      `(("tasks.org"
+         . ,(concat "* DONE Paid\nCLOSED: ["
+                    (substring (pos-startup-test-day 0) 1 -1) "]\n"
+                    "* CANCELLED Dropped\nCLOSED: ["
+                    (substring (pos-startup-test-day -7) 1 -1) "]\n"
+                    "* DONE Old\nCLOSED: ["
+                    (substring (pos-startup-test-day -8) 1 -1) "]\n"
+                    "* DONE Undated\n"
+                    "* TODO Open\n")))
+    (let ((text (pos-startup-view root "finished")))
+      (should (string-prefix-p "Finished in the last 7 days\n" text))
+      (should (equal (pos-startup-test-lines text)
+                     (list (cons "tasks"
+                                 (concat (substring (pos-startup-test-day 0) 1 -1)
+                                         " DONE Paid"))
+                           (cons "tasks"
+                                 (concat (substring (pos-startup-test-day -7) 1 -1)
+                                         " CANCELLED Dropped"))))))
+    (should (equal '("Paid" "Dropped")
+                   (mapcar (lambda (item) (alist-get 'title item))
+                           (pos-startup-view-items root "finished"))))))
+
 (ert-deftest pos-startup/an-empty-view-says-none ()
   "A view with no item says so, as does each empty list within a view.
 The tree here holds one empty intray and nothing else."
   (pos-test-with-files root '(("intray.org" . "* Unsorted\n"))
-    (dolist (view '("next" "waiting" "scheduled" "deadlines" "stuck" "intray" "all"))
+    (dolist (view '("next" "waiting" "scheduled" "deadlines" "stuck" "intray"
+                    "finished" "all"))
       (ert-info ((format "the %s view" view))
         (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view)))))
     (should (= 3 (length (split-string (pos-startup-view root "reviews")
@@ -747,6 +777,20 @@ One line.  The index goes to a cache of the test's own."
       (should (equal (concat (json-serialize
                               (pos-startup-data root '("next" "stuck")))
                              "\n")
+                     (with-output-to-string (pos-startup-batch))))
+      (should-not command-line-args-left))))
+
+(ert-deftest pos-startup/the-command-prints-the-views-of-a-weekly-review ()
+  "With --weekly the views are `pos-startup-weekly-views', in that order.
+A --view beside it adds its view where it is named.  Every view of
+the weekly ones is a view."
+  (should-not (seq-difference pos-startup-weekly-views pos-startup-views))
+  (pos-startup-test-with-tree
+    (let ((pos-directory root)
+          (pos-roam-cache-directory (make-temp-file "pos-startup-test-" t))
+          (command-line-args-left (list "--weekly" "--view" "all")))
+      (should (equal (pos-startup-report
+                      root (append pos-startup-weekly-views '("all")))
                      (with-output-to-string (pos-startup-batch))))
       (should-not command-line-args-left))))
 
