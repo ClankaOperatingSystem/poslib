@@ -29,14 +29,10 @@
 ;; the files every command reads.  The commands that write, the sweep
 ;; and the fixers, write only the corpus files of the root's own
 ;; repository, never those of a repository mounted within it.  The
-;; "uncovered" files are the Org files beneath the root the corpus
-;; does not read: in an attic or archives directory, a lock file, a
-;; product's.  The "intray" is the root's intray.org, where new and
-;; rescued tasks wait to be filed.  The "sweep" archives the DONE and
-;; CANCELLED entries of the writable files into the week's archive; it
-;; is pos-sweep.el's, specified in pos-sweep-test.el.  A "stranded"
-;; task is a task keyword in an uncovered file, which no sweep will
-;; ever reach.
+;; "intray" is the root's intray.org, where new and salvaged tasks
+;; wait to be filed.  The "sweep" archives the DONE and CANCELLED
+;; entries of the writable files into the week's archive; it is
+;; pos-sweep.el's, specified in pos-sweep-test.el.
 ;;
 ;; Pure rules, such as dedupe suggestions and excerpts, are tested on
 ;; values alone; the rest through files in a temporary root.  Run:
@@ -54,11 +50,9 @@
 
 (defmacro pos-test-configured (&rest body)
   "Evaluate BODY with the configuration of test/pos-config.el in force.
-Prose directories under meta; a refile rule each into a work and a
-body projects file."
+A refile rule each into a work and a body projects file."
   (declare (indent 0))
-  `(let ((pos-prose-directories '("meta/journal" "meta/specs"))
-         (pos-refile-rules '(("invoice\\|client" . "work/work-projects.org")
+  `(let ((pos-refile-rules '(("invoice\\|client" . "work/work-projects.org")
                              ("dentist\\|checkup" . "body/body-projects.org"))))
      ,@body))
 
@@ -142,66 +136,6 @@ the fixers, which ask for the writable files, leave it out."
     (should (equal '("intray.org")
                    (pos-test-relative (pos-files root t) root)))))
 
-(ert-deftest pos/uncovered-files-are-those-the-corpus-does-not-read ()
-  "The uncovered files are the Org files under the root the corpus leaves out.
-A file in an archives, attic, underscored or node_modules directory,
-and a file of a product repository: the places a task keyword would
-never be swept from.  A file nested below the root is read now, and
-is not uncovered; an archive file is not an Org file; a lock file,
-the dangling link Emacs leaves beside a file being edited, is passed
-over, since visiting it would wait on a question."
-  (pos-test-configured
-    (pos-test-with-files root
-        `(("intray.org" . "") ("life/life-areas.org" . "")
-          ("life/resources/book.org" . "")
-          ("life/resources/book.org_archive" . "")
-          ("archives/old.org" . "") ("attic/notes.org" . "")
-          ("_scratch/draft.org" . "") ("node_modules/m/z.org" . "")
-          ("vendor/lib/.git/HEAD" . ,pos-test-git-head)
-          ("vendor/lib/README.org" . ""))
-      (make-symbolic-link "someone@somewhere.1234"
-                          (expand-file-name ".#intray.org" root))
-      (should (equal '("_scratch/draft.org" "archives/old.org"
-                       "attic/notes.org" "node_modules/m/z.org"
-                       "vendor/lib/README.org")
-                     (pos-test-relative (pos-uncovered-org-files root)
-                                        root))))))
-
-(ert-deftest pos/the-archive-and-prose-directories-are-never-uncovered ()
-  "Files in the archive directory and `pos-prose-directories' are left out.
-An archive holds swept tasks, which keep their keywords; prose, such
-as a journal, may use a keyword as a word.  Neither is a place a task
-is stranded, so a file there that the corpus does not read, one in an
-attic, is not uncovered either.  A prose directory's sibling is not
-excluded with it."
-  (pos-test-configured
-    (pos-test-with-files root
-        '(("intray.org" . "")
-          ("archive/orgmode/2026-W35/intray.org_archive" . "")
-          ("archive/orgmode/attic/notes.org" . "")
-          ("meta/journal/attic/review.org" . "")
-          ("meta/specs/attic/spec.org" . "")
-          ("meta/tools/attic/notes.org" . ""))
-      (should (equal '("meta/tools/attic/notes.org")
-                     (pos-test-relative (pos-uncovered-org-files root)
-                                        root))))))
-
-(ert-deftest pos/hidden-directories-are-not-walked ()
-  "The uncovered walker does not enter a hidden directory, nor read a hidden file.
-A virtual environment or .git may hold Org files that are nobody's
-tasks; a hidden file or a lock file in a directory it does enter is
-left alone, as the corpus leaves it."
-  (pos-test-configured
-    (pos-test-with-files root
-        '(("intray.org" . "") ("attic/notes.org" . "")
-          ("attic/.draft.org" . "")
-          (".venv/lib/site-packages/x.org" . "") (".git/x.org" . ""))
-      (make-symbolic-link "someone@somewhere.1234"
-                          (expand-file-name "attic/.#notes.org" root))
-      (should (equal '("attic/notes.org")
-                     (pos-test-relative (pos-uncovered-org-files root)
-                                        root))))))
-
 ;;;; Keywords
 
 (ert-deftest pos/the-done-keywords-are-those-after-the-bar ()
@@ -242,9 +176,8 @@ the file says so, so an entry in that state is not."
 The test directory holds one of the shape a repository keeps, and
 `pos-load-config' returns non-nil for it.  A root without one is no
 error: the tools run with the defaults, and the result is nil."
-  (let (pos-prose-directories pos-refile-rules)
+  (let (pos-refile-rules)
     (should (pos-load-config pos-test-directory))
-    (should (equal '("meta/journal" "meta/specs") pos-prose-directories))
     (should (equal '(("invoice\\|client" . "work/work-projects.org")
                      ("dentist\\|checkup" . "body/body-projects.org"))
                    pos-refile-rules)))
@@ -559,44 +492,6 @@ that heading; the finding keeps it from being forgotten there."
                                          " with its parent")))
                      (pos-lint-merged-copy file))))))
 
-(ert-deftest pos/a-task-keyword-in-an-uncovered-file-is-stranded ()
-  "A task keyword in a file the corpus does not read is stranded.
-Lint reports it: the sweep never visits an attic or an underscored
-scratch directory, so DONE there would never archive and TODO never
-reach an agenda.  Archive files are not uncovered, so the swept tasks
-in them are not stranded; and a stray Org file in the archive
-directory is read by the corpus, so it is not stranded either."
-  (pos-test-configured
-    (pos-test-with-files root
-        '(("intray.org" . "* TODO read\n")
-          ("_scratch/old.org" . "* DONE old\n")
-          ("attic/notes.org" . "* Chapter\n** TODO write it\n")
-          ("archive/orgmode/2026-W35/intray.org_archive" . "* DONE swept\n")
-          ("archive/orgmode/2026-W35/notes.org" . "* TODO stray\n"))
-      (let ((old (expand-file-name "_scratch/old.org" root))
-            (notes (expand-file-name "attic/notes.org" root))
-            (outside "task keyword outside the agenda files (%s)"))
-        (should (equal (list (list old 1 (format outside "DONE"))
-                             (list notes 2 (format outside "TODO")))
-                       (pos-lint-stranded-tasks root)))))))
-
-(ert-deftest pos/a-task-in-a-methodologys-own-file-is-not-stranded ()
-  "A task in a methodology's own file is the method's, not a stranded one.
-A methodology a project uses may document itself in Org; the corpus
-does not read it, and nor does this check.  A task in an attic
-beside it still is stranded."
-  (pos-test-configured
-    (pos-test-with-files root
-        '((".clanka/config.yml"
-           . "pos: 2\nprojects: projects/\nchildren:\n  - path: projects/p\n")
-          ("projects/p/.clanka/config.yml"
-           . "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/adr\n")
-          ("projects/p/methodologies/adr/README.org" . "* NEXT Inside the methodology\n")
-          ("attic/notes.org" . "* TODO write it\n"))
-      (should (equal (list (list (expand-file-name "attic/notes.org" root) 1
-                                 "task keyword outside the agenda files (TODO)"))
-                     (pos-lint-stranded-tasks root))))))
-
 (ert-deftest pos/copies-of-one-task-in-two-files-name-each-other ()
   "Copies of one task heading in two corpus files each report the other.
 Headings compare lower-cased and trimmed, so Fix the gate and fix the
@@ -611,89 +506,7 @@ any other.  A plain heading, Finances, is no task and is not compared."
                                "duplicate task (also intray.org:1)"))
                    (pos-lint-duplicate-tasks root)))))
 
-;;;; Stranded tasks
-
-(ert-deftest pos/only-the-topmost-open-task-of-a-nest-is-rescued ()
-  "A stranded open task is listed once, at the top of its nest.
-Stranded means in a file the corpus does not read, an attic here.
-Rescue lists open tasks only: a done one stays where it is, for lint
-to report, while an open one's subtasks will move with it and are not
-listed again."
-  (pos-test-configured
-    (pos-test-with-files root
-        `(("intray.org" . "* Unsorted\n")
-          ("attic/notes.org" . ,(pos-test-lines "* Seminar"
-                                                "** TODO follow up"
-                                                "*** TODO nested"
-                                                "** DONE said hello")))
-      (should (equal (list (list (expand-file-name "attic/notes.org" root)
-                                 2 "follow up"))
-                     (pos-stranded-open-tasks root))))))
-
-(ert-deftest pos/a-rescued-task-lands-under-unsorted-linked-back ()
-  "A rescued task is moved under the intray's Unsorted, with a link back.
-The task is open in a file the corpus does not read.  The link names
-the file and the parent heading it came from, relative to the root,
-and goes after the planning line so Org still reads the schedule.
-Nested open tasks move with it; the file keeps the rest."
-  (pos-test-configured
-    (pos-test-with-files root
-        `(("intray.org" . ,(pos-test-lines "* Zettles"
-                                           "* Unsorted"
-                                           "** TODO already here"
-                                           "* Sorted"))
-          ("attic/notes.org"
-           . ,(pos-test-lines "* Seminar"
-                              "** TODO follow up"
-                              "SCHEDULED: <2026-09-14 Mon>"
-                              "some notes"
-                              "*** TODO nested"
-                              "** DONE said hello")))
-      (let ((pos-directory root))
-        (pos-refile-stranded)
-        (should (equal "* Seminar\n** DONE said hello\n"
-                       (pos-test-text root "attic/notes.org")))
-        (should (equal (pos-test-lines
-                        "* Zettles"
-                        "* Unsorted"
-                        "** TODO already here"
-                        "** TODO follow up"
-                        "SCHEDULED: <2026-09-14 Mon>"
-                        (concat "From [[file:attic/notes.org::*Seminar]"
-                                "[attic/notes.org: Seminar]]")
-                        "some notes"
-                        "*** TODO nested"
-                        "* Sorted")
-                       (pos-test-text root "intray.org")))))))
-
-(ert-deftest pos/rescue-makes-unsorted-when-the-intray-has-none ()
-  "An intray with no Unsorted heading gains one at its end for the rescue.
-A task from a file's top level has no parent to name, so its link
-names the file alone."
-  (pos-test-configured
-    (pos-test-with-files root
-        '(("intray.org" . "* Sorted\n")
-          ("attic/notes.org" . "* TODO top level task\n"))
-      (let ((pos-directory root))
-        (pos-refile-stranded)
-        (should (equal (pos-test-lines
-                        "* Sorted"
-                        "* Unsorted"
-                        "** TODO top level task"
-                        "From [[file:attic/notes.org][attic/notes.org]]")
-                       (pos-test-text root "intray.org")))))))
-
-(ert-deftest pos/a-dry-run-rescue-lists-the-tasks-and-moves-none ()
-  "A dry run returns what it would move and changes neither file."
-  (pos-test-configured
-    (pos-test-with-files root
-        '(("intray.org" . "* Unsorted\n")
-          ("attic/notes.org" . "* TODO a task\n"))
-      (let ((pos-directory root))
-        (should (equal 1 (length (pos-refile-stranded t))))
-        (should (equal "* TODO a task\n"
-                       (pos-test-text root "attic/notes.org")))
-        (should (equal "* Unsorted\n" (pos-test-text root "intray.org")))))))
+;;;; The intray's Unsorted
 
 (ert-deftest pos/unsorted-ends-before-the-next-top-heading ()
   "The end of Unsorted is before the next top-level heading, not the file's.

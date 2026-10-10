@@ -632,8 +632,7 @@ Every Org file of the corpus the root may write, at any depth: a book
 in a resources directory is swept with the top-level files.  Each
 file's archive is written under the week by the file's own path.  A
 done entry in a file the corpus does not read, in archives/ or in a
-product repository, is left where it is, for lint to report as
-stranded.  The counts and skipped headings are totalled."
+product repository, is left where it is.  The counts and skipped headings are totalled."
   (pos-test-with-files root
       `(("intray.org" . ,pos-sweep-test-intray)
         ("life/life-projects.org" . "* DONE shipped\n* TODO next\n")
