@@ -284,6 +284,27 @@ gather the heading of each line too."
   (pos-startup--or-none
    (concat title "\n" (mapconcat (lambda (line) (concat "  " line "\n")) lines ""))))
 
+(defun pos-startup--next ()
+  "Return the next view of `pos-startup--corpus'.
+Each NEXT item: those of projects, of responsibilities and of the
+root apart.  An item of a scope yet to be configured, which is of no
+kind, is in a fourth list, printed only when there is such an item."
+  (mapconcat
+   (lambda (pair)
+     (let* ((org-agenda-files (pos-startup--files-of-kind (car pair)))
+            (title (format "NEXT items of %s" (cdr pair)))
+            (org-agenda-overriding-header title))
+       (pos-startup--or-none
+        (if org-agenda-files
+            (pos-startup--agenda (lambda () (org-todo-list "NEXT")))
+          (concat title "\n")))))
+   (append '((project . "projects") (responsibility . "responsibilities")
+             (root . "the root"))
+           (when (seq-some #'pos-startup--has-next-p
+                           (pos-startup--files-of-kind nil))
+             '((nil . "scopes yet to be configured"))))
+   "\n"))
+
 (defun pos-startup--reviews ()
   "Return the reviews view of `pos-startup--corpus'.
 Headings tagged `pos-startup-review-tag' that are late or scheduled
@@ -341,6 +362,11 @@ and the root, named \".\" as its configuration names it."
        "\n"
        (pos-startup--list "Root with a review to be scheduled"
                           (unless (member "." reviewed) '(".")))))))
+
+(defun pos-startup--has-next-p (file)
+  "Return non-nil if FILE has a NEXT item."
+  (let ((pos-startup-next-action-states '("NEXT")))
+    (pos-startup--has-next-action-p file)))
 
 (defun pos-startup--has-next-action-p (file)
   "Return non-nil if FILE has an item that is a next action.
@@ -509,7 +535,8 @@ with no CLOSED date is not listed."
 
 (defun pos-startup-view (root view)
   "Return VIEW, one of `pos-startup-views', of the Org files under ROOT.
-Text: a title, then one line for each item, labelled by its scope."
+Text: a title, then one line for each item, labelled by its scope.
+A view of more than one list has a title for each."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (pos-startup--root root)
          (pos-startup--corpus (pos-startup--corpus root))
@@ -534,10 +561,7 @@ Text: a title, then one line for each item, labelled by its scope."
          (vc-handled-backends nil)
          (org-element-cache-persistent nil))
     (pcase view
-      ("next"
-       (let ((org-agenda-overriding-header "NEXT items"))
-         (pos-startup--or-none
-          (pos-startup--agenda (lambda () (org-todo-list "NEXT"))))))
+      ("next" (pos-startup--next))
       ("waiting"
        (let ((org-agenda-overriding-header "WAITING items"))
          (pos-startup--or-none
