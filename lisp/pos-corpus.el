@@ -26,16 +26,25 @@
 ;; which files those are and which scope each belongs to, from the
 ;; configurations alone, as doc/pos-directory.txt has it.
 ;;
-;; A scope is the root, a responsibility or a project.  A responsibility
-;; is a directory whose configuration says where its projects belong; a
-;; project is what lies there, a directory or a single Org file.  A
-;; directory's name carries no meaning by itself.  A directory a node's
-;; exclusions name is not entered; a repository with no configuration
-;; is a product, and is not entered either; one with a configuration
-;; is a node of the tree and is read, though it is written only by
-;; what its own configuration allows.  A symbolic link is neither read
-;; nor written.  A configuration that is refused is a finding, and
-;; nothing beneath it is read.
+;; A scope is the root, a responsibility, a project or a product.  A
+;; responsibility is a directory whose configuration says where its
+;; projects belong; a project is what lies there, a directory or a
+;; single Org file.  A directory's name carries no meaning by itself.
+;;
+;; Membership of the tree follows declarations: a parent knows its
+;; children and a child knows nothing above it.  The walk enters the
+;; ordinary directories of a node and each child the node declares
+;; under children, whatever the child is.  A declared child with a
+;; configuration is a node, read as its configuration says.  One with
+;; none is a product: its Org files are read as the product's, with
+;; the default exclusions, and nothing in it is written.  A directory
+;; with a configuration that no node declares is not in the tree; it
+;; is a finding and is not entered, and neither is a repository that
+;; no node declares.  A methodology is not entered.  A directory a
+;; node's exclusions name is not entered.  A repository of the tree
+;; is written only by what its own configuration allows.  A symbolic
+;; link is neither read nor written.  A configuration that is refused
+;; is a finding, and nothing beneath it is read.
 ;;
 ;; The rules are separate from the disk: `pos-corpus--walk' asks a
 ;; function for what is at each path, so the tests give it a listing
@@ -55,10 +64,10 @@
 (require 'pos-tree)
 
 (cl-defstruct (pos-scope (:constructor pos-scope--make) (:copier nil))
-  "A scope of the tree: the root, a responsibility or a project.
-KIND is the symbol root, responsibility or project, or nil for a node
-whose configuration says neither where its projects belong nor its
-methodologies, which is yet to be configured.  PATH is relative
+  "A scope of the tree: the root, a responsibility, a project or a product.
+KIND is the symbol root, responsibility, project or product, or nil
+for a node whose configuration says neither where its projects belong
+nor its methodologies, which is yet to be configured.  PATH is relative
 to the root, \".\" for the root itself; for a one-file project it is
 the file's path without its extension.  DIR is the directory the scope
 is, absolute, as a directory name; for a one-file project, the
@@ -74,8 +83,10 @@ ROOT is the root, a directory name.  SCOPES are its scopes, the root
 first, then in the order found.  ENTRIES are (FILE . SCOPE), each Org
 file read with the scope it belongs to, sorted by file.  FINDINGS are
 (PATH . DETAIL) for what was found and not read: a configuration that
-was refused.  UNWRITABLE are the paths, relative to the root, of the
-repositories within the tree, beneath which a command may not write."
+was refused, and a directory with a configuration that no node
+declares.  UNWRITABLE are the paths, relative to the root, of the
+repositories and the products within the tree, beneath which a
+command may not write."
   root scopes entries findings unwritable)
 
 ;;;; The rules
@@ -148,12 +159,20 @@ two-configurations, and :names, the names in it, sorted."
                          :config config :node node)))
              (push scope scopes)
              scope))
-         (descend (dir scope exclusions exclusions-node projects-of)
+         (declared-by (config path)
+           ;; The paths, relative to ROOT, of the children CONFIG, the
+           ;; configuration of the node at PATH, declares.
+           (mapcar (lambda (child)
+                     (let ((at (alist-get 'path child)))
+                       (if (member path '("" ".")) at (concat path "/" at))))
+                   (append (alist-get 'children config) nil)))
+         (descend (dir scope exclusions exclusions-node projects-of declared)
            ;; DIR is relative to ROOT, "" for it.  SCOPE owns what lies
            ;; here.  EXCLUSIONS are those in force, declared by the node
            ;; at EXCLUSIONS-NODE, a prefix with its slash or "".
            ;; PROJECTS-OF is the scope whose projects directory DIR is,
-           ;; or nil.
+           ;; or nil.  DECLARED are the paths of the children the node
+           ;; in force declares; within a product nothing is declared.
            (dolist (name (plist-get (funcall lister dir) :names))
              (let* ((path (if (equal dir "") name (concat dir "/" name)))
                     (info (funcall lister path)))
@@ -174,10 +193,14 @@ two-configurations, and :names, the names in it, sorted."
                      ;; A methodology's files are not the project's canon.
                      ((member path (pos-corpus--methodology-paths scope))
                       (when (plist-get info :repository) (push path unwritable)))
-                     ;; A repository with no configuration is a product.
-                     ((and (plist-get info :repository) (not text))
-                      (push path unwritable))
-                     (text
+                     ;; A product says nothing of what is in it: a
+                     ;; repository within it is not entered, and any
+                     ;; other directory is the product's.
+                     ((eq 'product (pos-scope-kind scope))
+                      (unless (plist-get info :repository)
+                        (descend path scope exclusions exclusions-node nil nil)))
+                     ;; A declared child with a configuration is a node.
+                     ((and text (member path declared))
                       (when (plist-get info :repository) (push path unwritable))
                       (when-let* ((config (read-config path text)))
                         (let* ((node (make-scope (pos-corpus--kind config) path config
@@ -187,20 +210,37 @@ two-configurations, and :names, the names in it, sorted."
                           (descend path node
                                    (if declares (pos-tree-exclusions config) exclusions)
                                    (if declares (concat path "/") exclusions-node)
-                                   nil))))
+                                   nil (declared-by config path)))))
+                     ;; One with none is a product, read under the
+                     ;; default exclusions and never written.
+                     ((member path declared)
+                      (push path unwritable)
+                      (descend path (make-scope 'product path nil (nearest-node scope))
+                               (pos-tree-exclusions nil) (concat path "/") nil nil))
+                     ;; A configuration that no node declares is not in
+                     ;; the tree.
+                     (text
+                      (when (plist-get info :repository) (push path unwritable))
+                      (push (cons path "undeclared: a configuration no node declares")
+                            findings))
+                     ;; Nor is a repository that no node declares.
+                     ((plist-get info :repository)
+                      (push path unwritable))
                      (projects-of
                       (descend path (make-scope 'project path nil (nearest-node projects-of))
-                               exclusions exclusions-node nil))
+                               exclusions exclusions-node nil declared))
                      (t
                       (descend path scope exclusions exclusions-node
                                (and (equal path (pos-corpus--projects-dir scope))
-                                    scope)))))))))))
+                                    scope)
+                               declared))))))))))
       (let* ((info (funcall lister ""))
              (text (plist-get info :config))
              (config (and text (read-config "" text)))
              (root-scope (make-scope 'root "." config nil)))
         (when (or config (not text))
-          (descend "" root-scope (pos-tree-exclusions config) "" nil))
+          (descend "" root-scope (pos-tree-exclusions config) "" nil
+                   (declared-by config "")))
         (pos-corpus--make
          :root (file-name-as-directory root)
          :scopes (nreverse scopes)
@@ -250,7 +290,8 @@ enters what they allow and lists every Org file, with its scope."
   (cdr (assoc (expand-file-name file) (pos-corpus-entries corpus))))
 
 (defun pos-corpus-scopes-of-kind (corpus kind)
-  "Return the scopes of CORPUS of KIND: root, responsibility or project."
+  "Return the scopes of CORPUS of KIND.
+KIND is root, responsibility, project or product."
   (seq-filter (lambda (scope) (eq (pos-scope-kind scope) kind))
               (pos-corpus-scopes corpus)))
 

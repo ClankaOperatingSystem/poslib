@@ -42,18 +42,26 @@
 (defconst pos-startup-test-responsibility "pos: 2\nprojects: projects/\n"
   "The configuration of a responsibility whose projects lie in projects/.")
 
+(defun pos-startup-test-declaring (&rest paths)
+  "Return the configuration of a responsibility that declares PATHS.
+Each is a child with no remote.  Its projects lie in projects/."
+  (concat pos-startup-test-responsibility "children:\n"
+          (mapconcat (lambda (path) (format "  - path: %s\n" path)) paths "")))
+
 (defmacro pos-startup-test-with-tree (&rest body)
   "Evaluate BODY with `root' holding the shared tree of cases.
 Each entry is there for a rule, which the docstring of the test that
 pins it names.  A scope is known by its configuration alone: the
-root's places its projects in projects/, and each responsibility has
-one of its own."
+root's places its projects in projects/ and declares its children,
+and each responsibility has one of its own."
   (declare (indent 0))
   `(pos-test-with-files root
        `(;; The root's configuration, which makes projects/ its projects
          ;; directory; its own files: an intray, and names that are not
          ;; read.
-         (".pos/config.yaml" . ,pos-startup-test-responsibility)
+         (".pos/config.yaml"
+          . ,(pos-startup-test-declaring "home" "garden" "kitchen" "cellar"
+                                         "health" "tools/widget" "twice"))
          ("intray.org" . "* Unsorted\n** NEXT Answer the letter\n** TODO Sort the shelf\n")
          ("notes.txt" . "Not an Org file.\n")
          (".#lock.org" . "* NEXT Locked\n")
@@ -107,7 +115,7 @@ one of its own."
           . ,(concat "* TODO Review the shed :review:\nSCHEDULED: "
                      (pos-startup-test-day 0) "\n"))
          ;; Responsibilities elsewhere: health, and teeth within it.
-         ("health/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("health/.clanka/config.yml" . ,(pos-startup-test-declaring "teeth"))
          ("health/intray.org"
           . ,(concat "* Unsorted\n** TODO Book [[https://example.org][the dentist]]\n"
                      "** DONE Buy floss\n"
@@ -327,7 +335,7 @@ mend-the-gate is a project of the root."
       (should (equal (mapcar #'car (pos-startup-test-lines (nth 2 parts)))
                      '("intray")))))
   (pos-test-with-files root
-      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+      `((".pos/config.yaml" . ,(pos-startup-test-declaring "orchard"))
         ("projects/mend-the-gate.org" . "* NEXT Buy a hinge\n")
         ("orchard/.pos/config.yaml" . ,pos-startup-test-responsibility)
         ("orchard/index.org" . "* NEXT Order the saplings\n")
@@ -352,7 +360,8 @@ lists.  The fourth list is printed only when it has an item.  Here
 new's configuration says neither where its projects belong nor its
 methodologies; with its item not NEXT, three lists are printed."
   (pos-test-with-files root
-      '(("new/.pos/config.yaml" . "pos: 2\n")
+      '((".pos/config.yaml" . "pos: 2\nchildren:\n  - path: new\n")
+        ("new/.pos/config.yaml" . "pos: 2\n")
         ("new/notes.org" . "* NEXT Decide what new is\n"))
     (let ((parts (split-string (pos-startup-view root "next") "\n\n" t)))
       (should (= 4 (length parts)))
@@ -361,7 +370,8 @@ methodologies; with its item not NEXT, three lists are printed."
                              (format "%-54s " "new/notes")
                              "NEXT Decide what new is\n")))))
   (pos-test-with-files root
-      '(("new/.pos/config.yaml" . "pos: 2\n")
+      '((".pos/config.yaml" . "pos: 2\nchildren:\n  - path: new\n")
+        ("new/.pos/config.yaml" . "pos: 2\n")
         ("new/notes.org" . "* TODO Decide what new is\n"))
     (should (= 3 (length (split-string (pos-startup-view root "next")
                                        "\n\n" t))))))
@@ -504,9 +514,9 @@ work/index.org, scheduled on 2030-03-04; work's own review is
 scheduled on 2030-03-11."
   (declare (indent 1))
   `(pos-test-with-files root
-       `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+       `((".pos/config.yaml" . ,(pos-startup-test-declaring "work"))
          ("intray.org" . "* Unsorted\n")
-         ("work/.pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("work/.pos/config.yaml" . ,(pos-startup-test-declaring "shop" "yard"))
          ("work/index.org"
           . ,(concat "* TODO Review work :review:\nSCHEDULED: <2030-03-11 Mon>\n"
                      "* TODO Review the shop :review:\nSCHEDULED: <2030-03-04 Mon>\n"
@@ -548,7 +558,7 @@ tag; each time shop is listed as having no review."
                      "* TODO Review the shop :review:\n"
                      "* TODO Review the shop\nSCHEDULED: <2030-03-04 Mon>\n"))
     (pos-test-with-files root
-        `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+        `((".pos/config.yaml" . ,(pos-startup-test-declaring "shop"))
           ("index.org" . ,(concat heading ":PROPERTIES:\n:COVERS:   shop\n:END:\n"))
           ("shop/.pos/config.yaml" . ,pos-startup-test-responsibility)
           ("shop/index.org" . "* TODO Sweep the floor\n"))
@@ -567,7 +577,7 @@ no scope from there."
       (should-not (member "." scopes))
       (should (member "work/shop" scopes))))
   (pos-test-with-files root
-      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+      `((".pos/config.yaml" . ,(pos-startup-test-declaring "home office"))
         ("index.org"
          . ,(concat "* TODO Review the office :review:\nSCHEDULED: <2030-03-04 Mon>\n"
                     ":PROPERTIES:\n:COVERS:   home%20office/\n:END:\n"))

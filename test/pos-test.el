@@ -68,6 +68,10 @@ body projects file."
 (defconst pos-test-child-config "pos: 2\nprojects: projects/\n"
   "The configuration of a child repository: a node of the root's tree.")
 
+(defconst pos-test-root-config
+  "pos: 2\nchildren:\n  - path: child\n    remote: git@example.org:child.git\n"
+  "The configuration of a root that declares the child repository.")
+
 (defun pos-test-lines (&rest lines)
   "Return LINES as the text of a file: each ended by a newline."
   (mapconcat (lambda (line) (concat line "\n")) lines ""))
@@ -129,6 +133,7 @@ plans; but its own configuration governs its files, so the sweep and
 the fixers, which ask for the writable files, leave it out."
   (pos-test-with-files root
       `(("intray.org" . "")
+        (".pos/config.yaml" . ,pos-test-root-config)
         ("child/.git/HEAD" . ,pos-test-git-head)
         ("child/.clanka/config.yml" . ,pos-test-child-config)
         ("child/intray.org" . "") ("child/projects/p.org" . ""))
@@ -1026,6 +1031,7 @@ changed and the group is counted unwritable."
     (pos-test-with-files root
         `(("intray.org" . ,intray)
           ("life/life-areas.org" . ,areas)
+          (".pos/config.yaml" . ,pos-test-root-config)
           ("child/.git/HEAD" . ,pos-test-git-head)
           ("child/.clanka/config.yml" . ,pos-test-child-config)
           ("child/notes.org" . ,notes)
@@ -1048,6 +1054,7 @@ but the root may not write them, so neither copy is cut and the group
 is counted unwritable rather than resolved."
   (pos-test-with-files root
       `(("intray.org" . "* TODO fix the gate\n")
+        (".pos/config.yaml" . ,pos-test-root-config)
         ("child/.git/HEAD" . ,pos-test-git-head)
         ("child/.clanka/config.yml" . ,pos-test-child-config)
         ("child/intray.org" . "* TODO fix the gate\n")
@@ -1199,6 +1206,7 @@ target; but the root may not write it, so the entry stays in the
 intray and the row counts as unwritable."
   (pos-test-with-files root
       `(("intray.org" . "* Unsorted\n** TODO a\n")
+        (".pos/config.yaml" . ,pos-test-root-config)
         ("child/.git/HEAD" . ,pos-test-git-head)
         ("child/.clanka/config.yml" . ,pos-test-child-config)
         ("child/projects/p.org" . "* Inbox\n")

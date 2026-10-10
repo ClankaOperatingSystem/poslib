@@ -337,8 +337,9 @@ project's files.  A scope whose entry has no sweep is passed over for
 the nearest above it that has one."
   (pos-test-with-files root
       `((".clanka/config.yml"
-         . ,(pos-sweep-test-config
-             (pos-sweep-test-entry "." "sweep: weekly" "path: history/")))
+         . ,(concat (pos-sweep-test-config
+                     (pos-sweep-test-entry "." "sweep: weekly" "path: history/"))
+                    "children:\n  - path: health\n  - path: work\n"))
         ("intray.org" . "") ("life/notes.org" . "")
         ("health/.clanka/config.yml"
          . ,(pos-sweep-test-config
@@ -456,8 +457,9 @@ responsibility's file under its own sealed entry goes beneath its
 _sweep/."
   (pos-test-with-files root
       `((".clanka/config.yml"
-         . ,(pos-sweep-test-config
-             (pos-sweep-test-entry "." "sweep: weekly" "path: history/")))
+         . ,(concat (pos-sweep-test-config
+                     (pos-sweep-test-entry "." "sweep: weekly" "path: history/"))
+                    "children:\n  - path: health\n"))
         ("intray.org" . "* DONE finished\n")
         ("health/.clanka/config.yml"
          . ,(pos-sweep-test-config (pos-sweep-test-entry "." "sweep: sealed")))
