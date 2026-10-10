@@ -607,6 +607,8 @@ A view of more than one list has a title for each."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (pos-startup--root root)
          (pos-startup--corpus (pos-startup--corpus root))
+         ;; A file the root may not write keeps its own keywords.
+         (pos-visit-corpus pos-startup--corpus)
          (org-agenda-files (pos-corpus-files pos-startup--corpus))
          (org-todo-keywords pos-todo-keywords)
          ;; Label each line by its scope: the default is the file's

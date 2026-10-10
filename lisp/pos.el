@@ -74,13 +74,31 @@ it, which that repository's own configuration governs."
   "Return the done keywords of `pos-todo-keywords'."
   (cdr (member "|" (cdr (car pos-todo-keywords)))))
 
+(defvar pos-visit-corpus nil
+  "The corpus whose files are being visited, or nil.
+A command that reads a corpus binds it, so that `pos-visit' knows
+which files the root may not write.")
+
+(defun pos-visit--own-keywords-p (file)
+  "Return non-nil if the keywords FILE was written with stand.
+A file of `pos-visit-corpus' that the root may not write: one of
+another repository of the tree, or of a product."
+  (and pos-visit-corpus
+       (pos-corpus-owner pos-visit-corpus file)
+       (not (pos-corpus-writable-p pos-visit-corpus file))))
+
 (defun pos-visit (file)
   "Return a buffer visiting FILE, with the one TODO sequence in force.
 Org reads `org-todo-keywords' when a buffer enters Org mode, so the
 sequence is bound for that moment and the user's own setting is left
-as it is.  A buffer already visiting FILE is returned as it is."
-  (let ((org-todo-keywords pos-todo-keywords))
-    (find-file-noselect file)))
+as it is.  A buffer already visiting FILE is returned as it is.  A
+file of `pos-visit-corpus' that the root may not write is visited
+with no sequence bound: its own #+TODO line stands, and with none,
+the user's setting."
+  (if (pos-visit--own-keywords-p file)
+      (find-file-noselect file)
+    (let ((org-todo-keywords pos-todo-keywords))
+      (find-file-noselect file))))
 
 ;;;; The root and its settings
 
@@ -197,13 +215,17 @@ The files are those of the corpus a command may write."
          (pos--finding file (format "stale keyword %s (not in the sequence)" word)))))))
 
 (defun pos-lint-todo-line (file)
-  "Report #+TODO lines in FILE."
+  "Report #+TODO lines in FILE.
+None is reported in a file the root may not write, by
+`pos-visit--own-keywords-p': the line is that file's own to keep, and
+`pos-normalise-keywords' could not remove it."
   (with-current-buffer (pos-visit file)
     (save-excursion
       (goto-char (point-min))
       (let ((case-fold-search t)
             (findings nil))
-        (while (re-search-forward "^#\\+\\(SEQ_\\|TYP_\\)?TODO:" nil t)
+        (while (and (not (pos-visit--own-keywords-p file))
+                    (re-search-forward "^#\\+\\(SEQ_\\|TYP_\\)?TODO:" nil t))
           (push (pos--finding file "#+TODO line overrides the one sequence; run pos-normalise-keywords")
                 findings))
         (nreverse findings)))))
@@ -429,12 +451,13 @@ check bin/ does not hold, are each a finding at the methodology."
 Interactively, show them in a compilation buffer."
   (interactive)
   (let* ((root (file-name-as-directory pos-directory))
+         (pos-visit-corpus (pos-corpus root))
          (findings
           (sort (append
                  (mapcan (lambda (file)
                            (mapcan (lambda (check) (funcall check file))
                                    pos-lint-checks))
-                         (pos-files root))
+                         (pos-corpus-files pos-visit-corpus))
                  (mapcan (lambda (check) (funcall check root))
                          pos-lint-repo-checks))
                 (lambda (a b)
