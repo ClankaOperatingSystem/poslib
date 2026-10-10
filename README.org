@@ -7,9 +7,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-sweep.el= :: the weekly sweep of done items into the archive
   each scope's configuration names: a plan, reviewed, then applied;
   and the sealing of a closed week.
-- =lisp/pos-corpus.el= :: the corpus: every Org file a tree's
-  configurations allow, each with the scope it belongs to, from one
-  walk that every command reads.
+- =lisp/pos-corpus.el= :: the corpus: every Org file the tree's
+  declarations reach, a product's among them, each with the scope it
+  belongs to, from one walk that every command reads.
 - =lisp/pos-capture.el= :: capture to an intray.
 - =lisp/pos-state.el= :: an item's state set with Org's own command, the
   item named by its ID or by file and line, and the change recorded in
