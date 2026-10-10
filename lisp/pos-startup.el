@@ -72,6 +72,13 @@
   :type 'string
   :group 'pos)
 
+(defcustom pos-startup-review-covers-property "COVERS"
+  "The property of a review heading that names other scopes it covers.
+Its value is paths apart by spaces, each from the directory of the
+heading's file to a scope.  A space within a path is written %20."
+  :type 'string
+  :group 'pos)
+
 (defcustom pos-startup-active-statuses '("COMMITTED" "WIP")
   "Values of a project file's STATUS property that make it active.
 An active project is expected to have a review scheduled."
@@ -164,22 +171,63 @@ projects.  A file not named project.org adds its own base name."
        (when (re-search-forward "^:STATUS:[ \t]+\\(\\S-+\\)" end t)
          (match-string-no-properties 1))))))
 
-(defun pos-startup--reviewed-scopes ()
-  "Return the paths of the scopes of `pos-startup--corpus' with a review scheduled.
-That is, a project, a responsibility or the root holding an open,
-scheduled heading tagged `pos-startup-review-tag'."
-  (let (scopes)
+(defun pos-startup--scope-named (name file)
+  "Return the scope of `pos-startup--corpus' that NAME, written in FILE, names.
+NAME is a path from FILE's directory.  Nil if it is no scope's."
+  (let ((path (directory-file-name
+               (file-relative-name
+                (expand-file-name name (file-name-directory file))
+                pos-startup--root))))
+    (seq-find (lambda (scope) (string= path (pos-scope-path scope)))
+              (pos-corpus-scopes pos-startup--corpus))))
+
+(defun pos-startup--reviews-of-scopes ()
+  "Return (COVERED . UNKNOWN), what the reviews of `pos-startup--corpus' cover.
+A review is an open, scheduled heading tagged
+`pos-startup-review-tag', in a file of a project, a responsibility
+or the root.  It covers the scope its file belongs to and each scope
+its `pos-startup-review-covers-property' names, and no other: a
+review of a scope is not one of the scopes beneath it.
+
+COVERED is an alist of (PATH . DATE): each scope covered, with the
+earliest date, as YYYY-MM-DD, a review of it is scheduled on.
+UNKNOWN is a list of (LINE SCOPE . MORE) for each path named that is
+no scope's, in the order found: the line of text that reports it,
+the scope of the review's file, and the path, file, line and title
+as an alist."
+  (let (covered unknown)
     (pcase-dolist (`(,file . ,scope) (pos-corpus-entries pos-startup--corpus))
       (when (memq (pos-scope-kind scope) '(project responsibility root))
         (with-current-buffer (pos-visit file)
           (org-map-entries
            (lambda ()
-             (when (and (member pos-startup-review-tag (org-get-tags nil t))
-                        (org-entry-is-todo-p)
-                        (org-get-scheduled-time (point)))
-               (cl-pushnew (pos-scope-path scope) scopes :test #'string=)))
+             (when-let* (((member pos-startup-review-tag (org-get-tags nil t)))
+                         ((org-entry-is-todo-p))
+                         (time (org-get-scheduled-time (point)))
+                         (date (format-time-string "%Y-%m-%d" time)))
+               (let ((paths (list (pos-scope-path scope))))
+                 (dolist (name (org-entry-get-multivalued-property
+                                nil pos-startup-review-covers-property))
+                   (let ((named (pos-startup--scope-named name file))
+                         (title (org-link-display-format
+                                 (substring-no-properties
+                                  (org-get-heading t t t t)))))
+                     (if named
+                         (push (pos-scope-path named) paths)
+                       (push `(,(format "%-54s %s  %s %s" (pos-startup--label)
+                                        name (org-get-todo-state) title)
+                               ,scope
+                               (covers . ,name)
+                               (file . ,(file-relative-name file pos-startup--root))
+                               (line . ,(line-number-at-pos))
+                               (title . ,title))
+                             unknown))))
+                 (dolist (path paths)
+                   (let ((had (assoc path covered)))
+                     (cond ((not had) (push (cons path date) covered))
+                           ((string< date (cdr had)) (setcdr had date))))))))
            nil 'file))))
-    scopes))
+    (cons covered (nreverse unknown))))
 
 (defun pos-startup--responsibilities ()
   "Return the path of each responsibility of `pos-startup--corpus', sorted."
@@ -333,9 +381,13 @@ the root's apart.  The root's reviews are of the whole tree."
 (defun pos-startup--reviews-to-schedule ()
   "Return the view of the scopes of `pos-startup--corpus' with no review scheduled.
 Active projects, by `pos-startup-active-statuses', responsibilities,
-and the root, named \".\" as its configuration names it."
-  (let ((reviewed (pos-startup--reviewed-scopes))
-        projects)
+and the root, named \".\" as its configuration names it: each that no
+review covers, by `pos-startup--reviews-of-scopes'.  A fourth list,
+printed only when it has a line, gives each path a review names that
+is no scope's."
+  (let* ((reviews (pos-startup--reviews-of-scopes))
+         (reviewed (mapcar #'car (car reviews)))
+         projects)
     (dolist (file (pos-startup--files-of-kind 'project))
       (let* ((status (pos-startup--file-status file))
              (owner (pos-corpus-owner pos-startup--corpus file))
@@ -361,7 +413,16 @@ and the root, named \".\" as its configuration names it."
                           responsibilities)
        "\n"
        (pos-startup--list "Root with a review to be scheduled"
-                          (unless (member "." reviewed) '(".")))))))
+                          (unless (member "." reviewed) '(".")))
+       (when (cdr reviews)
+         (concat
+          "\n"
+          (pos-startup--list
+           "Reviews that name a path that is no scope's"
+           (mapcar (pcase-lambda (`(,line ,scope . ,more))
+                     (pos-startup--scope-row scope nil more)
+                     line)
+                   (cdr reviews)))))))))
 
 (defun pos-startup--has-next-p (file)
   "Return non-nil if FILE has a NEXT item."
@@ -451,9 +512,12 @@ none."
   "Return the projects view of `pos-startup--corpus'.
 Each active project, by `pos-startup-active-statuses': its STATUS,
 the date of its next review, its next action and its outcome, each
-read from the project's files and none written anywhere else.  What
-a project lacks is shown as a dash."
-  (let (projects)
+read from the project's files and none written anywhere else, but
+that a review elsewhere that names the project is a review of it,
+by `pos-startup--reviews-of-scopes'.  What a project lacks is shown
+as a dash."
+  (let ((covered (car (pos-startup--reviews-of-scopes)))
+        projects)
     (dolist (file (pos-startup--files-of-kind 'project))
       (let* ((owner (pos-corpus-owner pos-startup--corpus file))
              (path (pos-scope-path owner))
@@ -471,7 +535,10 @@ a project lacks is shown as a dash."
      "Projects"
      (mapcan
       (lambda (project)
-        (pcase-let ((`(,path ,owner ,status ,outcome ,next ,review) project))
+        (pcase-let* ((`(,path ,owner ,status ,outcome ,next ,own) project)
+                     (named (cdr (assoc path covered)))
+                     (review (if (and own named (string< own named)) own
+                               (or named own))))
           (pos-startup--scope-row
            owner status
            `((review . ,(or review :null)) (next . ,(or next :null))
@@ -612,7 +679,9 @@ A list with an element for each line `pos-startup-view' prints, in
 its order.  In a view of items each is an alist as
 `pos-startup--item-at-point' gives it.  In reviews-to-schedule,
 stuck and projects, which list scopes, each has scope, scope_kind
-and status; in projects, review, next and outcome too."
+and status; in projects, review, next and outcome too.  A line of
+reviews-to-schedule for a path that is no scope's has the scope of
+the review's file, and covers, file, line and title."
   (let ((pos-startup--gathering t)
         (pos-startup--items nil))
     (pos-startup-view root view)

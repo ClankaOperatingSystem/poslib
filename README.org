@@ -42,6 +42,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   by its scope.
   The next view lists the items of projects, of responsibilities and
   of the root apart.
+  A review is a scheduled heading tagged =review=; it covers the scope
+  of its file and each scope its =COVERS= property names.
   The same views as JSON give each item's file, line, ID, state,
   dates, properties and body.
   The views of a weekly review are one set, with what was finished
