@@ -43,6 +43,7 @@
 ;;; Code:
 
 (require 'pos-bytes)
+(require 'pos-path)
 (require 'pos-cid)
 (require 'pos-ledger)
 (require 'pos-links)
@@ -173,7 +174,7 @@ Org files of the scope's garden."
     (dolist (pair files)
       (let ((file (cdr pair)) resolved)
         (dolist (link (unless (seq-some (lambda (c)
-                                          (and (pos-ledger--within-p (car pair) c)
+                                          (and (pos-path-within-p (car pair) c)
                                                (pos-ledger-capsule-p
                                                 (if (equal c rel) source
                                                   (concat base (substring c (1+ (length rel))))))))
@@ -187,8 +188,8 @@ Org files of the scope's garden."
              (if (funcall inside abs)
                  (let ((target (funcall in-archive abs)))
                    (cond
-                    ((seq-some (lambda (c) (and (pos-ledger--within-p (car pair) c)
-                                                (pos-ledger--within-p target c)))
+                    ((seq-some (lambda (c) (and (pos-path-within-p (car pair) c)
+                                                (pos-path-within-p target c)))
                                collections)
                      (list offset text "internal" text))
                     ((assoc target files) (list offset text "cid" :file target suffix))
@@ -286,13 +287,13 @@ is a directory, they are read as written from there."
     (when (or (file-exists-p destination) (file-symlink-p destination))
       (pos-ledger--refuse 'destination "Destination exists: %s" destination))
     (let ((rel (file-relative-name destination archive)))
-      (unless (pos-ledger--safe-p rel)
+      (unless (pos-path-safe-p rel)
         (pos-ledger--refuse 'destination "Unsafe destination: %s" rel))
       (when (seq-some (lambda (part) (string-prefix-p "." part)) (split-string rel "/"))
         (pos-ledger--refuse 'hidden "Hidden files are not sealed: %s" rel))
       (pcase-let* ((`(,known ,head ,events ,files ,_ ,collections ,items)
                     (pos-ledger-history archive))
-                   (_ (let ((within (seq-find (lambda (i) (pos-ledger--within-p rel i))
+                   (_ (let ((within (seq-find (lambda (i) (pos-path-within-p rel i))
                                               (append items collections))))
                         (when within
                           (pos-ledger--refuse 'sealed "Destination is within sealed %s: %s"
