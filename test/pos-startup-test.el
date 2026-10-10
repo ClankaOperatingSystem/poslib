@@ -315,6 +315,14 @@ its description."
                      ("alpha" . "NEXT Draft the outline")
                      ("intray" . "NEXT Answer the letter"))))))
 
+(ert-deftest pos-startup/the-roots-own-project-file-is-labelled-as-the-root ()
+  "An item of project.org at the root is labelled with a dot.
+A project that is a repository of its own is read from its own root,
+where its file has no directory and no other name to be labelled by."
+  (pos-test-with-files root '(("project.org" . "* NEXT Draft the outline\n"))
+    (should (equal '(("." . "NEXT Draft the outline"))
+                   (pos-startup-test-lines (pos-startup-view root "next"))))))
+
 (ert-deftest pos-startup/next-items-are-listed-apart-by-kind ()
   "The next view lists its items apart by the kind of their scope.
 Those of projects, of responsibilities and of the root, in that
