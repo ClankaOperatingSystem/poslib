@@ -28,11 +28,12 @@
 ;; for first, so that what links to it is known.
 ;;
 ;; - `pos-referrers': the links that lead to a path or into it.
-;; - `pos-referrers-ids': each Org ID of a tree and the files that hold it.
+;; - `pos-referrers-ids': each Org ID of a tree and where it is held.
 
 ;;; Code:
 
 (require 'cl-lib)
+(require 'org)
 (require 'pos-ledger)
 (require 'pos-links)
 (require 'pos-corpus)
@@ -45,17 +46,69 @@
       (setq line (1+ line) start (1+ start)))
     line))
 
+(defun pos-referrers--anchor ()
+  "Return the search option that names where point's ID property is held.
+\"\" for a file's own ID, before its first heading.  For a heading's,
+:: and # with its CUSTOM_ID if it has one, else :: and * with its
+title."
+  (if (org-before-first-heading-p)
+      ""
+    (let ((custom (org-entry-get nil "CUSTOM_ID")))
+      (if custom
+          (concat "::#" custom)
+        (concat "::*" (substring-no-properties (org-get-heading t t t t)))))))
+
 (defun pos-referrers-ids (corpus)
-  "Return a hash table from each Org ID in CORPUS to the files that hold it.
-An ID is the value of an ID property, of a file or of a heading."
-  (let ((ids (make-hash-table :test #'equal)))
+  "Return a hash table from each Org ID in CORPUS to where it is held.
+An ID is the value of an ID property, of a file or of a heading.  Each
+place is (FILE . ANCHOR), ANCHOR as `pos-referrers--anchor' gives it."
+  (let ((ids (make-hash-table :test #'equal))
+        (property "^[ \t]*:ID:[ \t]+\\(\\S-+\\)[ \t]*$"))
     (dolist (file (pos-corpus-files corpus))
-      (let ((text (decode-coding-string (pos-ledger-read file) 'utf-8))
-            (start 0))
-        (while (string-match "^[ \t]*:ID:[ \t]+\\(\\S-+\\)[ \t]*$" text start)
-          (setq start (match-end 0))
-          (cl-pushnew file (gethash (match-string 1 text) ids) :test #'equal))))
+      (let ((text (decode-coding-string (pos-ledger-read file) 'utf-8)))
+        (when (string-match-p property text)
+          (with-temp-buffer
+            (insert text)
+            ;; This file alone: no #+SETUPFILE and no mode hooks.
+            (cl-letf (((symbol-function 'org-file-contents) (lambda (&rest _) "")))
+              (let ((org-mode-hook nil)) (org-mode)))
+            (goto-char (point-min))
+            (while (re-search-forward property nil t)
+              (let ((id (match-string-no-properties 1)))
+                (cl-pushnew (cons file (save-excursion (pos-referrers--anchor)))
+                            (gethash id ids) :test #'equal)))))))
     ids))
+
+(defun pos-referrers--links (corpus path)
+  "Return the links in CORPUS that lead to PATH, absolute, or into it.
+Each is (FILE OFFSET TEXT TARGET SUFFIX): the file that holds the link,
+the byte offset of the link as written, TEXT, the file it leads to,
+and the search option that goes with it.  For a file link SUFFIX is
+the link's own; for an id link it is the anchor of the ID.  Unsorted."
+  (let* ((base (file-name-as-directory path))
+         (inside (lambda (file) (or (equal file path) (string-prefix-p base file))))
+         (ids (pos-referrers-ids corpus))
+         links)
+    (dolist (file (pos-corpus-files corpus))
+      (unless (funcall inside file)
+        (let ((bytes (pos-ledger-read file))
+              (here (file-name-directory file)))
+          (pcase-dolist (`(,offset ,text ,target ,suffix) (pos-links-in-file file))
+            (let ((target (directory-file-name (expand-file-name target here))))
+              (when (funcall inside target)
+                (push (list file offset text target suffix) links))))
+          (let ((start 0))
+            (while (string-match "\\[\\[\\(id:\\([^]\n]+\\)\\)\\]" bytes start)
+              (setq start (match-end 0))
+              (let ((offset (match-beginning 1))
+                    (text (decode-coding-string (match-string 1 bytes) 'utf-8)))
+                (pcase-dolist (`(,target . ,anchor)
+                               (gethash (decode-coding-string
+                                         (match-string 2 bytes) 'utf-8)
+                                        ids))
+                  (when (funcall inside target)
+                    (push (list file offset text target anchor) links)))))))))
+    links))
 
 (defun pos-referrers (root path)
   "Return the links in the tree at ROOT that lead to PATH or into it.
@@ -65,37 +118,25 @@ leads to, absolute.  A file link leads where its path does, read from
 its file's directory.  An id link leads to each file of the corpus
 that holds the ID.  A link in a file that is itself PATH or within it
 is not one.  Sorted by file, then line."
-  (let* ((corpus (pos-corpus root))
-         (path (directory-file-name (expand-file-name path root)))
-         (base (file-name-as-directory path))
-         (inside (lambda (file) (or (equal file path) (string-prefix-p base file))))
-         (ids (pos-referrers-ids corpus))
-         links)
-    (dolist (file (pos-corpus-files corpus))
-      (unless (funcall inside file)
-        (let ((bytes (pos-ledger-read file))
-              (here (file-name-directory file)))
-          (pcase-dolist (`(,offset ,text ,target) (pos-links-in-file file))
-            (let ((target (directory-file-name (expand-file-name target here))))
-              (when (funcall inside target)
-                (push (list file (pos-referrers--line bytes offset) text target)
-                      links))))
-          (let ((start 0))
-            (while (string-match "\\[\\[\\(id:\\([^]\n]+\\)\\)\\]" bytes start)
-              (setq start (match-end 0))
-              (let ((text (decode-coding-string (match-string 1 bytes) 'utf-8))
-                    (line (pos-referrers--line bytes (match-beginning 0))))
-                (dolist (target (gethash (decode-coding-string
-                                          (match-string 2 bytes) 'utf-8)
-                                         ids))
-                  (when (funcall inside target)
-                    (push (list file line text target) links)))))))))
-    (sort links (lambda (a b)
-                  (or (string< (car a) (car b))
-                      (and (equal (car a) (car b))
-                           (or (< (nth 1 a) (nth 1 b))
-                               (and (= (nth 1 a) (nth 1 b))
-                                    (string< (nth 3 a) (nth 3 b))))))))))
+  (let ((bytes (make-hash-table :test #'equal)))
+    (sort (mapcar
+           (lambda (link)
+             (pcase-let ((`(,file ,offset ,text ,target) link))
+               (list file
+                     (pos-referrers--line
+                      (or (gethash file bytes)
+                          (puthash file (pos-ledger-read file) bytes))
+                      offset)
+                     text target)))
+           (pos-referrers--links
+            (pos-corpus root)
+            (directory-file-name (expand-file-name path root))))
+          (lambda (a b)
+            (or (string< (car a) (car b))
+                (and (equal (car a) (car b))
+                     (or (< (nth 1 a) (nth 1 b))
+                         (and (= (nth 1 a) (nth 1 b))
+                              (string< (nth 3 a) (nth 3 b))))))))))
 
 (provide 'pos-referrers)
 ;;; pos-referrers.el ends here
