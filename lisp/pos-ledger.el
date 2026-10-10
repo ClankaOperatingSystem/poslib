@@ -44,6 +44,10 @@
 (require 'pos-cid)
 (require 'pos-path)
 
+(define-obsolete-function-alias 'pos-ledger-json #'pos-bytes-json "2026-10")
+(define-obsolete-function-alias 'pos-ledger-sha #'pos-bytes-sha "2026-10")
+(define-obsolete-function-alias 'pos-ledger-read #'pos-bytes-read "2026-10")
+
 (defconst pos-ledger-integrity "archive-integrity"
   "The folder beside an archive holding its ledger and checkpoints.")
 
