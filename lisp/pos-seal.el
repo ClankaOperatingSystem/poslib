@@ -50,6 +50,8 @@
 (declare-function pos-index-bytes "pos-index" (uri &optional directory))
 (declare-function pos-search-command "pos-search" (args))
 (declare-function pos-referrers "pos-referrers" (root path))
+(declare-function pos-relink-plan "pos-relink" (root seal-plan))
+(declare-function pos-relink-apply "pos-relink" (plan expected))
 
 ;;;; Items
 
@@ -1254,10 +1256,14 @@ and skipped, each an archive with the reason."
   write-new DESTINATION [--links-from DIR] [--apply]
       print the plan to seal a new record, read from standard input;
       its links read as written from DESTINATION, or from DIR
+  relink ROOT PLAN
+      print the plan to rewrite the links to the item PLAN seals, a
+      seal plan in a file, in the Org files of the tree at ROOT; made
+      before PLAN is applied, and applied after it
   apply PLAN HASH
       apply a reviewed plan; PLAN is a file holding the plan exactly
-      as seal or write-new printed it, and HASH is the SHA-256 of that
-      file's bytes in lower-case hex, as sha256sum PLAN prints it
+      as seal, write-new or relink printed it, and HASH is the SHA-256
+      of that file's bytes in lower-case hex, as sha256sum PLAN prints it
   check ROOT
       report every archive under ROOT, as JSON
   checkpoint ROOT
@@ -1328,12 +1334,25 @@ Exit 0 done or clean, 1 findings, 2 refused.
                             (event . ,(car result)) (root . ,(cdr result))))
                       plan))
                    'utf-8)))))
+        (`("relink" ,root ,plan-file)
+         (require 'pos-relink)
+         (princ (decode-coding-string
+                 (pos-ledger-json
+                  (pos-relink-plan root (pos-ledger-parse (pos-ledger-read plan-file))))
+                 'utf-8)))
         (`("apply" ,plan-file ,hash)
-         (let* ((plan (pos-ledger-parse (pos-ledger-read plan-file)))
-                (result (pos-seal-apply plan hash)))
-           (princ (decode-coding-string
-                   (pos-ledger-json `((event . ,(car result)) (root . ,(cdr result))))
-                   'utf-8))))
+         (let ((plan (pos-ledger-parse (pos-ledger-read plan-file))))
+           (if (equal (alist-get 'operation plan) "relink")
+               (progn
+                 (require 'pos-relink)
+                 (princ (decode-coding-string
+                         (pos-ledger-json
+                          `((rewritten . ,(vconcat (pos-relink-apply plan hash)))))
+                         'utf-8)))
+             (let ((result (pos-seal-apply plan hash)))
+               (princ (decode-coding-string
+                       (pos-ledger-json `((event . ,(car result)) (root . ,(cdr result))))
+                       'utf-8))))))
         (`("check" ,root)
          (let ((report (vconcat (pos-ledger-check root))))
            (princ (decode-coding-string (pos-ledger-json report) 'utf-8))

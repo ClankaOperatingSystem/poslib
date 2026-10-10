@@ -485,6 +485,58 @@ Planning an item that holds Org or Markdown files is poslib's, since Org
 interpretation is; pyposlib refuses to plan it (=interpretation=), and
 applies any plan.
 
+** Relinking
+
+Sealing rewrites the links in the item's own files. The links to the
+item from the rest of the tree are rewritten by a second plan, the
+relink plan. A seal applied without it leaves those links leading where
+nothing is.
+
+=links-into ROOT PATH= prints each link in the Org files of the tree at
+ROOT that leads to PATH or into it, as =FILE:LINE: LINK -> FILE=, and
+writes nothing. The files are the tree's corpus, as
+=doc/pos-directory.txt= has it: archives, attics, and hidden and
+underscore directories are not looked in. Two kinds of link are found:
+
+- links of type =file=, each read from its file's directory;
+- links of type =id=, each followed to the file of the corpus that holds
+  that =ID= property, of the file or of a heading. The files are read
+  for it; no index is asked.
+
+=relink ROOT PLAN= prints the relink plan for PLAN, a seal plan in a
+file. It is made while the item lies at the seal plan's =source=, so
+that both plans are reviewed before anything changes, and it writes
+nothing. An =ID= of the item that another file of the corpus also holds
+is refused (=unresolved=). The plan is:
+
+- =schema= 1 and =operation= =relink=;
+- =root=, =source= and =destination=, the last two the seal plan's;
+- =seal_sha256=, the SHA-256 of the seal plan's canonical JSON;
+- =files=, for each file the root may write that holds such a link: its
+  path from the root as =file=, its =sha256=, and =links=, each with its
+  byte =offset=, the link as written as =from=, the =path= within the
+  item it leads to, empty for the item itself, and the =suffix= to
+  follow it;
+- =unwritable=, each such link in a file the root may not write, by
+  =file=, =line= and =link=. These are not rewritten.
+
+A =file= link's =suffix= is its own search option. An =id= link's is
+empty for a file's own ID; for a heading's it is =::#= and the heading's
+=CUSTOM_ID= if it has one, else =::*= and the heading's title without
+its state and tags.
+
+=apply PLAN HASH= applies a relink plan after the seal:
+
+1. The plan's hash must be the one reviewed, else =plan=.
+2. The item's link is the one =link DESTINATION= prints; a destination
+   not sealed is refused (=unsealed=).
+3. Each file must have its recorded SHA-256, else =plan=; all are
+   checked before any is written.
+4. Each link is replaced whole, in Org the raw link, by the item's
+   link, then =/= and =path= if it is not empty, then =suffix=.
+
+It prints the files rewritten, as =rewritten=.
+
 ** Application
 
 1. The plan's hash must be the one reviewed, else =plan=.
