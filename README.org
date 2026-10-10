@@ -68,6 +68,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   in the week.
   The projects view is the list of projects: each active project's
   status, next review, next action and outcome, read from its files.
+- =lisp/pos-views.el= :: the same views in a buffer, for a person at the
+  keyboard: each line leads to its item, and an item's state is set
+  from its line.
 - =lisp/pos-roam.el= :: the org-roam index of a tree, brought up to date
   before a command reads it: where the =id:= links to a heading are, for
   dedupe to point them at the copy it keeps. The user's own index serves
