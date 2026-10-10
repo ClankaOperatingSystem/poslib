@@ -74,6 +74,15 @@ lead to."
                      (pos-referrers root "projects/paint/project.org")))
       (should-not (pos-referrers root "life")))))
 
+(ert-deftest pos-referrers/links-on-one-line-to-one-file-are-in-a-fixed-order ()
+  "Two links on a line that lead to one file are in the order of their text."
+  (pos-test-with-files root
+      '(("intray.org" . "[[id:note]] [[file:old/a.org]] [[file:./old/a.org]]\n")
+        ("old/a.org" . ":PROPERTIES:\n:ID: note\n:END:\n"))
+    (should (equal '("file:./old/a.org" "file:old/a.org" "id:note")
+                   (mapcar (lambda (link) (nth 2 link))
+                           (pos-referrers root "old"))))))
+
 (ert-deftest pos-referrers/an-id-two-files-hold-leads-to-both ()
   "An id link leads to each file that holds the ID.
 Here two files of the path hold twin, so the link is listed twice,

@@ -88,7 +88,7 @@ the link, the line it is on, the link as written and the file it
 leads to, absolute.  A file link leads where its path does, read from
 its file's directory.  An id link leads to each file of the corpus
 that holds the ID.  A link in a file that is itself PATH or within it
-is not one.  Sorted by file, then line."
+is not one.  Sorted by file, then line, then target, then text."
   (let ((bytes (make-hash-table :test #'equal)))
     (sort (mapcar
            (lambda (link)
@@ -107,7 +107,9 @@ is not one.  Sorted by file, then line."
                 (and (equal (car a) (car b))
                      (or (< (nth 1 a) (nth 1 b))
                          (and (= (nth 1 a) (nth 1 b))
-                              (string< (nth 3 a) (nth 3 b))))))))))
+                              (or (string< (nth 3 a) (nth 3 b))
+                                  (and (equal (nth 3 a) (nth 3 b))
+                                       (string< (nth 2 a) (nth 2 b))))))))))))
 
 (provide 'pos-referrers)
 ;;; pos-referrers.el ends here
