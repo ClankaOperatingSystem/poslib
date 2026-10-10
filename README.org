@@ -33,6 +33,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-startup.el= :: what a session opens with: prompts, then views
   of what is next, scheduled, due and to be reviewed, each item labelled
   by its scope.
+  The same views as JSON give each item's file, line, ID, state,
+  dates, properties and body.
 - =lisp/pos-roam.el= :: the org-roam index of a tree, brought up to date
   before a command reads it: where the =id:= links to a heading are, for
   dedupe to point them at the copy it keeps. The user's own index serves

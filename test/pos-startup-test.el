@@ -619,6 +619,103 @@ makes reads that; called by itself, a view walks."
 The root here does not exist, and is never looked at."
   (should-error (pos-startup-report "/nonexistent/" '("bogus")) :type 'user-error))
 
+;;;; The views as data
+
+(ert-deftest pos-startup/a-view-as-data-has-an-item-for-each-line ()
+  "The data of a view lists what its text lists, in the same order.
+Every view of items of the shared tree has as many items as lines.  In the
+next view each item's scope, state and title are its line's; alpha's
+second file is labelled alpha/notes and belongs to the scope alpha."
+  (pos-startup-test-with-tree
+    (dolist (view (seq-difference pos-startup-views
+                                  '("reviews-to-schedule" "stuck")))
+      (ert-info ((format "the %s view" view))
+        (should (= (length (pos-startup-test-lines (pos-startup-view root view)))
+                   (length (pos-startup-view-items root view))))))
+    (should (equal (mapcar (lambda (item)
+                             (list (alist-get 'scope item) (alist-get 'file item)
+                                   (alist-get 'state item) (alist-get 'title item)))
+                           (seq-filter
+                            (lambda (item)
+                              (string-prefix-p "projects/alpha" (alist-get 'scope item)))
+                            (pos-startup-view-items root "next")))
+                   '(("projects/alpha" "projects/alpha/notes.org" "NEXT"
+                      "Read [[https://example.org][the paper]]")
+                     ("projects/alpha" "projects/alpha/project.org" "NEXT"
+                      "Draft the outline"))))))
+
+(ert-deftest pos-startup/an-item-carries-what-its-heading-has ()
+  "An item has its place, ID, state, title, tags, dates, properties and body.
+The dates are as written.  The properties are the drawer's, in the
+order of their names, which Org gives in capitals, without the
+CATEGORY Org works out.  The body is the entry's own text: not
+its planning line, its drawers or its children.  What an item lacks
+is :null, and an item with no tags has an empty vector."
+  (pos-test-with-files root
+      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+        ("projects/paint/project.org"
+         . ,(concat "#+TITLE: Paint\n\n* Tasks\n"
+                    "** NEXT Choose the colour :home:shop:\n"
+                    "DEADLINE: <2030-03-01 Fri> SCHEDULED: <2030-02-01 Fri +1w>\n"
+                    ":PROPERTIES:\n:ID:       colour\n:Effort:   0:10\n:END:\n"
+                    ":LOGBOOK:\n- State \"NEXT\" from \"TODO\" [2030-01-01 Tue 09:00]\n:END:\n"
+                    "Ask at the shop.\n\nTake the swatch.\n"
+                    "*** TODO A child\nIts own text.\n"
+                    "** NEXT Bare\n")))
+    (let ((items (pos-startup-view-items root "next")))
+      (should (equal (nth 0 items)
+                     '((scope . "projects/paint") (scope_kind . "project")
+                       (file . "projects/paint/project.org") (line . 4)
+                       (id . "colour") (state . "NEXT")
+                       (title . "Choose the colour") (tags . ["home" "shop"])
+                       (scheduled . "<2030-02-01 Fri +1w>")
+                       (deadline . "<2030-03-01 Fri>") (closed . :null)
+                       (properties . ((EFFORT . "0:10") (ID . "colour")))
+                       (body . "Ask at the shop.\n\nTake the swatch."))))
+      (should (equal (nth 1 items)
+                     '((scope . "projects/paint") (scope_kind . "project")
+                       (file . "projects/paint/project.org") (line . 18)
+                       (id . :null) (state . "NEXT") (title . "Bare") (tags . [])
+                       (scheduled . :null) (deadline . :null) (closed . :null)
+                       (properties . nil) (body . "")))))))
+
+(ert-deftest pos-startup/a-view-of-scopes-as-data-names-each-scope ()
+  "A view of scopes gives each scope, its kind and its status.
+The views are reviews-to-schedule and stuck.  In the tree, the scopes
+with no review are those the text names: three projects with their
+STATUS, then two responsibilities, which have none.  beta is begun with
+no next action."
+  (pos-startup-test-with-tree
+    (should (equal (pos-startup-view-items root "reviews-to-schedule")
+                   '(((scope . "health/projects/checkup") (scope_kind . "project")
+                      (status . "COMMITTED"))
+                     ((scope . "home/projects/roof") (scope_kind . "project")
+                      (status . "WIP"))
+                     ((scope . "projects/beta") (scope_kind . "project")
+                      (status . "WIP"))
+                     ((scope . "garden") (scope_kind . "responsibility")
+                      (status . :null))
+                     ((scope . "health/teeth") (scope_kind . "responsibility")
+                      (status . :null)))))
+    (should (equal (pos-startup-view-items root "stuck")
+                   '(((scope . "projects/beta") (scope_kind . "project")
+                      (status . "WIP")))))))
+
+(ert-deftest pos-startup/the-data-of-a-report-names-what-was-read-and-each-view ()
+  "The data has the count of files, what was not read, and each view asked.
+It is what `json-serialize' takes.  The tree has 16 files that are
+read and one configuration refused, twice/.  A view named twice is
+given once."
+  (pos-startup-test-with-tree
+    (let* ((data (pos-startup-data root '("stuck" "intray" "stuck")))
+           (json (json-parse-string (json-serialize data))))
+      (should (equal 16 (gethash "files_read" json)))
+      (should (equal "twice" (gethash "path" (aref (gethash "not_read" json) 0))))
+      (should (equal '("intray" "stuck")
+                     (sort (hash-table-keys (gethash "views" json)) #'string<)))
+      (should (equal 3 (length (gethash "intray" (gethash "views" json))))))
+    (should-error (pos-startup-data root '("bogus")) :type 'user-error)))
+
 ;;;; The command
 
 (ert-deftest pos-startup/the-command-prints-each-view-it-is-given ()
@@ -639,6 +736,19 @@ test's own."
             (should (equal (pos-startup-report root views)
                            (with-output-to-string (pos-startup-batch))))
             (should-not command-line-args-left)))))))
+
+(ert-deftest pos-startup/the-command-prints-the-data-as-json ()
+  "With --json the output is `pos-startup-data' of the views named, as JSON.
+One line.  The index goes to a cache of the test's own."
+  (pos-startup-test-with-tree
+    (let ((pos-directory root)
+          (pos-roam-cache-directory (make-temp-file "pos-startup-test-" t))
+          (command-line-args-left (list "--view" "next" "--json" "--view" "stuck")))
+      (should (equal (concat (json-serialize
+                              (pos-startup-data root '("next" "stuck")))
+                             "\n")
+                     (with-output-to-string (pos-startup-batch))))
+      (should-not command-line-args-left))))
 
 (provide 'pos-startup-test)
 ;;; pos-startup-test.el ends here
