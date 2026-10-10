@@ -44,7 +44,7 @@
 ;;
 ;; `pos-remote-http' is the protocol's wire.  A refusal signals
 ;; `pos-ledger-refused' with the kind the keeper names.  Nothing here
-;; seals: `pos-seal' does not yet call it.
+;; seals: `pos-seal' calls it for an archive a keeper keeps.
 
 ;;; Code:
 
