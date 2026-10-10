@@ -39,11 +39,40 @@
   (pos-test-file-string (expand-file-name "intray.org" root)))
 
 (ert-deftest pos-capture/files-the-task-at-the-end-of-unsorted ()
-  "A captured task is filed at the end of Unsorted, trimmed, as a TODO."
+  "A captured task is filed at the end of Unsorted, trimmed, as a TODO.
+Its properties follow it, before the next heading."
   (pos-capture-test-with-intray "* Unsorted\n** TODO here\n* Sorted\n"
     (should (equal 3 (pos-capture root "  Make time for sketching ")))
-    (should (equal "* Unsorted\n** TODO here\n** TODO Make time for sketching\n* Sorted\n"
-                   (pos-capture-test-intray root)))))
+    (should (string-match-p
+             (concat "\\`\\* Unsorted\n\\*\\* TODO here\n"
+                     "\\*\\* TODO Make time for sketching\n"
+                     ":PROPERTIES:\n\\(?::[A-Z]+:.*\n\\)+:END:\n"
+                     "\\* Sorted\n\\'")
+             (pos-capture-test-intray root)))))
+
+(ert-deftest pos-capture/gives-the-task-an-id-and-the-time-of-capture ()
+  "A captured task has an ID, a new Org ID, and CREATED, an inactive timestamp.
+Two captures have different IDs.  No ID is written to
+`org-id-locations-file'."
+  (pos-capture-test-with-intray "* Unsorted\n"
+    (let ((org-id-locations-file (expand-file-name "locations" root))
+          ids)
+      (dolist (title '("First" "Second"))
+        (pos-capture root title))
+      (with-current-buffer (pos-visit (expand-file-name "intray.org" root))
+        (org-map-entries
+         (lambda ()
+           (when (org-get-todo-state)
+             (push (org-entry-get (point) "ID") ids)
+             (should (string-match-p
+                      (concat "\\`\\[[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} "
+                              "[[:alpha:]]+ [0-9]\\{2\\}:[0-9]\\{2\\}\\]\\'")
+                      (org-entry-get (point) "CREATED")))))
+         nil 'file))
+      (should (= 2 (length ids)))
+      (should (seq-every-p #'org-uuidgen-p ids))
+      (should-not (equal (nth 0 ids) (nth 1 ids)))
+      (should-not (file-exists-p org-id-locations-file)))))
 
 (ert-deftest pos-capture/refuses-an-empty-or-multi-line-title ()
   "An empty or multi-line title is refused and the intray is unchanged."
