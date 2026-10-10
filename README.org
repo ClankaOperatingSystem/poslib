@@ -40,6 +40,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-startup.el= :: what a session opens with: prompts, then views
   of what is next, scheduled, due and to be reviewed, each item labelled
   by its scope.
+  The next view lists the items of projects, of responsibilities and
+  of the root apart.
   The same views as JSON give each item's file, line, ID, state,
   dates, properties and body.
   The views of a weekly review are one set, with what was finished

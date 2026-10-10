@@ -301,13 +301,70 @@ The label is the file's directory without its projects segments,
 then the file's base name unless that is project; a link is shown as
 its description."
   (pos-startup-test-with-tree
-    (let ((text (pos-startup-view root "next")))
-      (should (string-prefix-p "NEXT items\n" text))
-      (should (equal (pos-startup-test-lines text)
-                     '(("home/roof" . "NEXT Call the roofer")
-                       ("intray" . "NEXT Answer the letter")
-                       ("alpha/notes" . "NEXT Read the paper")
-                       ("alpha" . "NEXT Draft the outline")))))))
+    (should (equal (pos-startup-test-lines (pos-startup-view root "next"))
+                   '(("home/roof" . "NEXT Call the roofer")
+                     ("alpha/notes" . "NEXT Read the paper")
+                     ("alpha" . "NEXT Draft the outline")
+                     ("intray" . "NEXT Answer the letter"))))))
+
+(ert-deftest pos-startup/next-items-are-listed-apart-by-kind ()
+  "The next view lists its items apart by the kind of their scope.
+Those of projects, of responsibilities and of the root, in that
+order.  Each list has its title, and one with no item says so.  An item is
+listed under the kind of the scope its file belongs to.  In the tree,
+roof is a project of home and alpha one of the root; the root's
+intray has an item; no responsibility has one.  Here orchard, a
+responsibility, has an item of its own and a project with one, and
+mend-the-gate is a project of the root."
+  (pos-startup-test-with-tree
+    (let ((parts (split-string (pos-startup-view root "next") "\n\n" t)))
+      (should (= 3 (length parts)))
+      (should (string-prefix-p "NEXT items of projects\n" (nth 0 parts)))
+      (should (equal (mapcar #'car (pos-startup-test-lines (nth 0 parts)))
+                     '("home/roof" "alpha/notes" "alpha")))
+      (should (equal (nth 1 parts) "NEXT items of responsibilities\n  (none)"))
+      (should (string-prefix-p "NEXT items of the root\n" (nth 2 parts)))
+      (should (equal (mapcar #'car (pos-startup-test-lines (nth 2 parts)))
+                     '("intray")))))
+  (pos-test-with-files root
+      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+        ("projects/mend-the-gate.org" . "* NEXT Buy a hinge\n")
+        ("orchard/.pos/config.yaml" . ,pos-startup-test-responsibility)
+        ("orchard/index.org" . "* NEXT Order the saplings\n")
+        ("orchard/projects/prune-the-trees/project.org"
+         . "* NEXT Sharpen the saw\n"))
+    (should (equal (mapcar (lambda (part)
+                             (cons (car (split-string part "\n"))
+                                   (pos-startup-test-lines part)))
+                           (split-string (pos-startup-view root "next")
+                                         "\n\n" t))
+                   '(("NEXT items of projects"
+                      ("orchard/prune-the-trees" . "NEXT Sharpen the saw")
+                      ("mend-the-gate" . "NEXT Buy a hinge"))
+                     ("NEXT items of responsibilities"
+                      ("orchard/index" . "NEXT Order the saplings"))
+                     ("NEXT items of the root"))))))
+
+(ert-deftest pos-startup/a-next-item-of-a-scope-of-no-kind-is-listed ()
+  "A NEXT item of a scope yet to be configured is in a list of its own.
+Such a scope is of no kind, so its item belongs to none of the three
+lists.  The fourth list is printed only when it has an item.  Here
+new's configuration says neither where its projects belong nor its
+methodologies; with its item not NEXT, three lists are printed."
+  (pos-test-with-files root
+      '(("new/.pos/config.yaml" . "pos: 2\n")
+        ("new/notes.org" . "* NEXT Decide what new is\n"))
+    (let ((parts (split-string (pos-startup-view root "next") "\n\n" t)))
+      (should (= 4 (length parts)))
+      (should (equal (nth 3 parts)
+                     (concat "NEXT items of scopes yet to be configured\n  "
+                             (format "%-54s " "new/notes")
+                             "NEXT Decide what new is\n")))))
+  (pos-test-with-files root
+      '(("new/.pos/config.yaml" . "pos: 2\n")
+        ("new/notes.org" . "* TODO Decide what new is\n"))
+    (should (= 3 (length (split-string (pos-startup-view root "next")
+                                       "\n\n" t))))))
 
 (ert-deftest pos-startup/the-waiting-view-lists-each-waiting-item ()
   "The waiting view lists each WAITING item, labelled by its scope.
@@ -578,12 +635,14 @@ date, and Open is not done; neither is listed."
   "A view with no item says so, as does each empty list within a view.
 The tree here holds one empty intray and nothing else."
   (pos-test-with-files root '(("intray.org" . "* Unsorted\n"))
-    (dolist (view '("next" "waiting" "scheduled" "deadlines" "stuck" "projects"
+    (dolist (view '("waiting" "scheduled" "deadlines" "stuck" "projects"
                     "intray" "finished" "all"))
       (ert-info ((format "the %s view" view))
         (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view)))))
-    (should (= 3 (length (split-string (pos-startup-view root "reviews")
-                                       "  (none)\n" t))))
+    (dolist (view '("next" "reviews"))
+      (ert-info ((format "the %s view" view))
+        (should (= 3 (length (split-string (pos-startup-view root view)
+                                           "  (none)\n" t))))))
     ;; The root has no review, so the third list names it.
     (let ((parts (mapcar #'string-trim-right
                          (split-string (pos-startup-view root "reviews-to-schedule")
