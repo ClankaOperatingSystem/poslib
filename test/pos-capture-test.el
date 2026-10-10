@@ -74,6 +74,31 @@ Two captures have different IDs.  No ID is written to
       (should-not (equal (nth 0 ids) (nth 1 ids)))
       (should-not (file-exists-p org-id-locations-file)))))
 
+(ert-deftest pos-capture/writes-a-body-after-the-properties ()
+  "A body is the task's text, trimmed, after its properties.
+It may have several paragraphs.  What follows Unsorted stays after
+it.  A blank body writes nothing."
+  (pos-capture-test-with-intray "* Unsorted\n* Sorted\n"
+    (pos-capture root "Call the roofer" "\nThe gutter leaks.\n\n- by the door\n\n")
+    (should (string-match-p
+             (concat "\\`\\* Unsorted\n\\*\\* TODO Call the roofer\n"
+                     ":PROPERTIES:\n\\(?::[A-Z]+:.*\n\\)+:END:\n"
+                     "The gutter leaks\\.\n\n- by the door\n"
+                     "\\* Sorted\n\\'")
+             (pos-capture-test-intray root))))
+  (pos-capture-test-with-intray "* Unsorted\n"
+    (pos-capture root "Call the roofer" "  \n ")
+    (should (string-match-p ":END:\n\\'" (pos-capture-test-intray root)))))
+
+(ert-deftest pos-capture/refuses-a-body-that-would-make-a-heading ()
+  "A body with a line beginning with a star is refused.
+So is one with a control character.  The intray is unchanged."
+  (pos-capture-test-with-intray "* Unsorted\n"
+    (should-error (pos-capture root "a task" "text\n* A heading") :type 'user-error)
+    (should-error (pos-capture root "a task" "** Deeper") :type 'user-error)
+    (should-error (pos-capture root "a task" "bell\a") :type 'user-error)
+    (should (equal "* Unsorted\n" (pos-capture-test-intray root)))))
+
 (ert-deftest pos-capture/refuses-an-empty-or-multi-line-title ()
   "An empty or multi-line title is refused and the intray is unchanged."
   (pos-capture-test-with-intray "* Unsorted\n"
