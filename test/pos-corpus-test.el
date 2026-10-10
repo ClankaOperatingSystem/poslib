@@ -86,6 +86,12 @@ need not be listed; it is a plain directory."
 (defconst pos-corpus-test-responsibility "pos: 2\nprojects: projects/\n"
   "The configuration of a responsibility whose projects lie in projects/.")
 
+(defun pos-corpus-test-declaring (&rest paths)
+  "Return the configuration of a responsibility that declares PATHS.
+Each is a child with no remote.  Its projects lie in projects/."
+  (concat pos-corpus-test-responsibility "children:\n"
+          (mapconcat (lambda (path) (format "  - path: %s\n" path)) paths "")))
+
 (defconst pos-corpus-test-project
   (concat "pos: 2\nmethodologies: methodologies\nchildren:\n"
           "  - path: methodologies/adr\n"
@@ -98,7 +104,8 @@ Its own Org files are not the project's canon.  A mounted one is a
 repository the root's commands do not write, as before; the corpus
 names both, with their directories."
   (let ((corpus (pos-corpus-test-walk
-                 `(("p" dir :config ,pos-corpus-test-project)
+                 `(("" dir :config ,(pos-corpus-test-declaring "p"))
+                   ("p" dir :config ,pos-corpus-test-project)
                    ("p/project.org" file)
                    ("p/methodologies/adr/README.org" file)
                    ("p/methodologies/adr/skills/adr-record/SKILL.md" file)
@@ -155,7 +162,9 @@ or a dot are not entered, at any depth."
 A node that declares its own replaces it beneath itself; one that
 declares none inherits."
   (let ((corpus (pos-corpus-test-walk
-                 `(("" dir :config "pos: 2\nprojects: projects/\nexclude:\n  - vendor\n  - \"tmp*\"\n  - stray/deep\n")
+                 `(("" dir :config ,(concat "pos: 2\nprojects: projects/\n"
+                                           "exclude:\n  - vendor\n  - \"tmp*\"\n  - stray/deep\n"
+                                           "children:\n  - path: work\n  - path: lab\n"))
                    ("archives/now-read.org" file) ("vendor/v.org" file)
                    ("tmpfiles/t.org" file) ("stray/deep/s.org" file) ("stray/kept.org" file)
                    ("work" dir :config ,pos-corpus-test-responsibility)
@@ -169,12 +178,13 @@ declares none inherits."
 ;;;; Scopes
 
 (ert-deftest pos-corpus/a-configured-directory-is-a-responsibility-that-owns-what-lies-beneath ()
-  "A configured directory is a responsibility and owns its files.
+  "A declared, configured directory is a responsibility and owns its files.
 Its configuration says where its projects belong; a responsibility
-within it is a scope of its own."
+it declares within it is a scope of its own."
   (let ((corpus (pos-corpus-test-walk
-                 `(("intray.org" file)
-                   ("health" dir :config ,pos-corpus-test-responsibility)
+                 `(("" dir :config ,(pos-corpus-test-declaring "health"))
+                   ("intray.org" file)
+                   ("health" dir :config ,(pos-corpus-test-declaring "teeth"))
                    ("health/intray.org" file) ("health/notes/n.org" file)
                    ("health/teeth" dir :config ,pos-corpus-test-responsibility)
                    ("health/teeth/intray.org" file)))))
@@ -191,7 +201,7 @@ within it is a scope of its own."
 A directory or a single Org file, named by its path; a project's files
 are its own, and a project may hold a configuration of its own kind."
   (let ((corpus (pos-corpus-test-walk
-                 `(("" dir :config ,pos-corpus-test-responsibility)
+                 `(("" dir :config ,(pos-corpus-test-declaring "projects/beta" "health"))
                    ("projects/alpha/project.org" file) ("projects/alpha/notes/n.org" file)
                    ("projects/solo.org" file)
                    ("projects/beta" dir :config "pos: 2\nmethodologies: methodologies/\n")
@@ -226,28 +236,79 @@ Its files belong to the scope above, and nothing in it is a scope."
   "A node yet to be configured is read and is a scope of no kind.
 Its configuration says neither where its projects belong nor its
 methodologies."
-  (let ((corpus (pos-corpus-test-walk '(("new" dir :config "pos: 2\n")
-                                        ("new/a.org" file)))))
+  (let ((corpus (pos-corpus-test-walk
+                 `(("" dir :config ,(pos-corpus-test-declaring "new"))
+                   ("new" dir :config "pos: 2\n")
+                   ("new/a.org" file)))))
     (should (equal '(("new/a.org" . "new")) (pos-corpus-test-files corpus)))
     (should (equal '((nil . "new")) (pos-corpus-test-scopes corpus)))))
 
 ;;;; Repositories and writing
 
-(ert-deftest pos-corpus/a-repository-with-no-configuration-is-a-product-and-not-entered ()
-  "A repository within the tree is a product unless it has a configuration.
-A product's files are not read."
-  (should (equal '(("a.org" . "."))
-                 (pos-corpus-test-files
-                  (pos-corpus-test-walk '(("a.org" file)
-                                          ("vendor/lib" dir :repository t)
-                                          ("vendor/lib/README.org" file)))))))
+(ert-deftest pos-corpus/a-declared-child-with-no-configuration-is-a-product-and-is-read ()
+  "A declared child with no configuration is a product, a leaf scope.
+Its Org files are read as the product's, a repository or a directory
+of this one, and none is written.  The default exclusions hold in
+it, whatever the declaring node excludes.  A repository within it is
+not entered, and a configuration within it makes no scope."
+  (let ((corpus (pos-corpus-test-walk
+                 `(("" dir :config ,(concat (pos-corpus-test-declaring "vendor/lib" "kit")
+                                            "exclude:\n  - docs\n"))
+                   ("a.org" file)
+                   ("vendor/lib" dir :repository t)
+                   ("vendor/lib/README.org" file)
+                   ("vendor/lib/docs/guide.org" file)
+                   ("vendor/lib/archives/old.org" file)
+                   ("vendor/lib/sub" dir :repository t)
+                   ("vendor/lib/sub/s.org" file)
+                   ("vendor/lib/inner" dir :config ,pos-corpus-test-responsibility)
+                   ("vendor/lib/inner/i.org" file)
+                   ("kit/todo.org" file)))))
+    (should (equal '(("a.org" . ".") ("kit/todo.org" . "kit")
+                     ("vendor/lib/README.org" . "vendor/lib")
+                     ("vendor/lib/docs/guide.org" . "vendor/lib")
+                     ("vendor/lib/inner/i.org" . "vendor/lib"))
+                   (pos-corpus-test-files corpus)))
+    (should (equal '((product . "kit") (product . "vendor/lib"))
+                   (pos-corpus-test-scopes corpus)))
+    (should (pos-corpus-writable-p corpus "/r/a.org"))
+    (should-not (pos-corpus-writable-p corpus "/r/vendor/lib/README.org"))
+    (should-not (pos-corpus-writable-p corpus "/r/kit/todo.org"))
+    (should-not (pos-corpus-findings corpus))))
+
+(ert-deftest pos-corpus/what-no-node-declares-is-not-in-the-tree ()
+  "A repository or a configured directory that no node declares is not entered.
+The configured directory is a finding, a repository or not; the bare
+repository is passed over.  A child is declared by the node directly
+above it: the root's declaration of deep does not declare what lies
+within deep."
+  (let ((corpus (pos-corpus-test-walk
+                 `(("" dir :config ,(pos-corpus-test-declaring "deep"))
+                   ("a.org" file)
+                   ("stray" dir :config ,pos-corpus-test-responsibility)
+                   ("stray/s.org" file)
+                   ("clone" dir :repository t :config ,pos-corpus-test-responsibility)
+                   ("clone/c.org" file)
+                   ("vendor/lib" dir :repository t)
+                   ("vendor/lib/README.org" file)
+                   ("deep" dir :config ,pos-corpus-test-responsibility)
+                   ("deep/d.org" file)
+                   ("deep/inner" dir :config ,pos-corpus-test-responsibility)
+                   ("deep/inner/i.org" file)))))
+    (should (equal '(("a.org" . ".") ("deep/d.org" . "deep"))
+                   (pos-corpus-test-files corpus)))
+    (should (equal '(("clone" . "undeclared: a configuration no node declares")
+                     ("deep/inner" . "undeclared: a configuration no node declares")
+                     ("stray" . "undeclared: a configuration no node declares"))
+                   (pos-corpus-findings corpus)))))
 
 (ert-deftest pos-corpus/a-configured-repository-is-read-and-not-written ()
-  "A repository with a configuration is read and not written.
+  "A declared repository with a configuration is read and not written.
 It is a node of the tree: its files are read and owned by it, and no
 command of this root writes them; the root's own files may be written."
   (let ((corpus (pos-corpus-test-walk
-                 `(("a.org" file)
+                 `(("" dir :config ,(pos-corpus-test-declaring "child"))
+                   ("a.org" file)
                    ("child" dir :repository t :config ,pos-corpus-test-responsibility)
                    ("child/intray.org" file) ("child/projects/p.org" file)))))
     (should (equal '(("a.org" . ".") ("child/intray.org" . "child")
@@ -264,7 +325,8 @@ command of this root writes them; the root's own files may be written."
   "A refused configuration, or a node with two, is a finding and a leaf.
 It is reported and not entered; the rest of the tree is read."
   (let ((corpus (pos-corpus-test-walk
-                 '(("a.org" file)
+                 `(("" dir :config ,(pos-corpus-test-declaring "bad" "twice"))
+                   ("a.org" file)
                    ("bad" dir :config "pos: 2\nprojects: p/\nmethodologies: m/\n")
                    ("bad/b.org" file)
                    ("twice" dir :config two-configurations)
@@ -285,10 +347,16 @@ The finding names the root."
 
 (ert-deftest pos-corpus/the-disk-is-listed-as-the-rules-expect ()
   "Given a real directory, the walk finds what the rules say.
-Files and owners, a product left out, a link not read, and two
-configurations refused."
+Files and owners, a declared product read as its own, a link not
+read, two configurations refused, and a configured directory that
+no node declares left out."
   (pos-test-with-files root
-      `(("intray.org" . "")
+      `((".pos/config.yaml"
+         . ,(concat "pos: 2\nchildren:\n  - path: health\n  - path: twice\n"
+                    "  - path: vendor/lib\n    remote: git@example.org:lib.git\n"))
+        ("stray/.pos/config.yaml" . ,pos-corpus-test-responsibility)
+        ("stray/s.org" . "")
+        ("intray.org" . "")
         ("projects/alpha/project.org" . "")
         ("health/.clanka/config.yml" . ,pos-corpus-test-responsibility)
         ("health/intray.org" . "")
@@ -304,12 +372,17 @@ configurations refused."
       (should (equal '(("health/intray.org" . "health")
                        ("health/projects/checkup.org" . "health/projects/checkup")
                        ("intray.org" . ".")
-                       ("projects/alpha/project.org" . "."))
+                       ("projects/alpha/project.org" . ".")
+                       ("vendor/lib/README.org" . "vendor/lib"))
                      (mapcar (lambda (entry)
                                (cons (file-relative-name (car entry) root)
                                      (pos-scope-path (cdr entry))))
                              (pos-corpus-entries corpus))))
-      (should (equal '("twice") (mapcar #'car (pos-corpus-findings corpus))))
+      (should (equal '("stray" "twice") (mapcar #'car (pos-corpus-findings corpus))))
+      (should (eq 'product
+                  (pos-scope-kind
+                   (pos-corpus-owner
+                    corpus (expand-file-name "vendor/lib/README.org" root)))))
       (should (equal '("vendor/lib") (pos-corpus-unwritable corpus)))
       (should (equal (file-name-as-directory (expand-file-name "health" root))
                      (pos-scope-dir (pos-corpus-owner corpus (expand-file-name "health/intray.org" root))))))))
