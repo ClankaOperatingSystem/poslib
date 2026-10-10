@@ -153,14 +153,15 @@ has bound this.")
 (defun pos-startup--label ()
   "Return a label naming the scope of the current Org file.
 The file's directory relative to the root, without the segments named
-projects.  A file not named project.org adds its own base name."
+projects.  A file not named project.org adds its own base name.  The
+project.org of the root itself, as in a project that is a repository
+of its own, is labelled \".\", as the root's configuration names it."
   (let* ((file (file-relative-name (or buffer-file-name "") pos-startup--root))
          (scope (remove "projects"
                         (split-string (or (file-name-directory file) "") "/" t)))
-         (base (file-name-base file)))
-    (mapconcat #'identity
-               (append scope (unless (string= base "project") (list base)))
-               "/")))
+         (base (file-name-base file))
+         (parts (append scope (unless (string= base "project") (list base)))))
+    (if parts (mapconcat #'identity parts "/") ".")))
 
 (defun pos-startup--file-status (file)
   "Return the STATUS property FILE has before its first heading, or nil."
