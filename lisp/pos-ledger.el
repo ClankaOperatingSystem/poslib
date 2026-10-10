@@ -21,7 +21,8 @@
 ;;; Commentary:
 
 ;; Reads and checks archive ledgers as doc/formats.org specifies, in
-;; lockstep with pyposlib.  Writing them is not here yet.
+;; lockstep with pyposlib, and makes a new event's bytes.  `pos-seal'
+;; writes them to the ledger.
 ;;
 ;; - `pos-ledger-inventory': what an archive holds.
 ;; - `pos-ledger-history': what its ledger enrolled.
