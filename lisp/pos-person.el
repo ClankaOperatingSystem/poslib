@@ -41,6 +41,7 @@
 ;; `pos-waiting-on-property'.  The change of state is recorded as
 ;; `pos-set-state' records it, which says since when.
 ;;
+;; - `pos-person-entities': the people recorded, and their identities.
 ;; - `pos-person-add': command.
 ;; - `pos-person-identity': command.
 ;; - `pos-person-identity-rename': command.
@@ -203,6 +204,32 @@ while BODY runs.  Return what BODY returns."
     (make-directory (file-name-directory file) t)
     (write-region text nil file nil 'silent nil 'excl)))
 
+;;;; The people recorded
+
+(defun pos-person--linked-ids (entity)
+  "Return the IDs that the person-entity file ENTITY links to."
+  (let ((text (pos-person--file-text entity))
+        (start 0)
+        ids)
+    (while (string-match "\\[\\[id:\\([^]]+\\)\\]" text start)
+      (push (match-string 1 text) ids)
+      (setq start (match-end 0)))
+    (nreverse ids)))
+
+(defun pos-person-entities (root)
+  "Return the people recorded in the tree at ROOT, each (NAME FILE . IDS).
+NAME is the person's name, FILE their person-entity and IDS the IDs
+of their identities, as FILE links to them.  Sorted by FILE.  None
+for a root with no configuration."
+  (let* ((root (file-name-as-directory (expand-file-name root)))
+         (config (pos-person--config-directory root)))
+    (mapcar (lambda (file)
+              (cons (or (pos-person--file-title file) (file-name-base file))
+                    (cons file (pos-person--linked-ids file))))
+            (and config
+                 (pos-person--org-files
+                  (expand-file-name pos-person-entities-directory config))))))
+
 ;;;; Adding a person
 
 (defun pos-person-add (root name)
@@ -232,16 +259,6 @@ digit, and a person recorded already."
     file))
 
 ;;;; An identity in a scope
-
-(defun pos-person--linked-ids (entity)
-  "Return the IDs that the person-entity file ENTITY links to."
-  (let ((text (pos-person--file-text entity))
-        (start 0)
-        ids)
-    (while (string-match "\\[\\[id:\\([^]]+\\)\\]" text start)
-      (push (match-string 1 text) ids)
-      (setq start (match-end 0)))
-    (nreverse ids)))
 
 (defun pos-person--link (root entity id name where)
   "Add to the file ENTITY a link to the identity ID, named NAME, in WHERE.

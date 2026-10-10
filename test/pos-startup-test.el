@@ -403,6 +403,61 @@ plain heading; a NEXT item beside it belongs to the next view alone."
     (should-not (string-match-p "Hear from the roofer"
                                 (pos-startup-view root "next")))))
 
+(ert-deftest pos-startup/the-waiting-view-lists-items-by-the-person-waited-on ()
+  "A person with a WAITING item has a list, and the rest come last.
+An item waits on the person whose person-entity links to the
+identity its WAITING_ON property names.  Ada has identities in two
+scopes and one list; Cy, who is waited on for nothing, has none.  An
+item with no property, and one that links to no person recorded, are
+listed as waiting on no person.  As data, each item names the person."
+  (pos-test-with-files root
+      '((".pos/config.yaml" . "pos: 2\nprojects: projects/\n")
+        (".pos/person-entities/ada-brook.org"
+         . ":PROPERTIES:\n:ID: ada\n:END:\n#+TITLE: Ada Brook\n\n- [[id:ada-root][Ada-Brook@root]], in =.=\n- [[id:ada-roof][Ada-Brook@projects.roof]], in =projects/roof.org=\n")
+        (".pos/person-entities/cy-dale.org"
+         . ":PROPERTIES:\n:ID: cy\n:END:\n#+TITLE: Cy Dale\n\n- [[id:cy-root][Cy-Dale@root]], in =.=\n")
+        ("intray.org"
+         . "* WAITING Hear from the roofer\n:PROPERTIES:\n:WAITING_ON: [[id:ada-root][Ada-Brook@root]]\n:END:\n* WAITING Hear from the council\n* WAITING Hear from a stranger\n:PROPERTIES:\n:WAITING_ON: [[id:nobody][Nobody]]\n:END:\n* NEXT Answer the letter\n:PROPERTIES:\n:WAITING_ON: [[id:ada-root][Ada-Brook@root]]\n:END:\n")
+        ("projects/roof.org"
+         . "* WAITING Agree the price\n:PROPERTIES:\n:WAITING_ON: [[id:ada-roof][Ada-Brook@projects.roof]]\n:END:\n* People\n** Ada-Brook@projects.roof\n:PROPERTIES:\n:ID: ada-roof\n:END:\n"))
+    (let ((lists (split-string (pos-startup-view root "waiting") "\n\n" t)))
+      (should (equal (mapcar (lambda (text) (car (split-string text "\n"))) lists)
+                     '("WAITING on Ada Brook" "WAITING on no person")))
+      (should (equal (mapcar #'pos-startup-test-lines lists)
+                     '((("intray" . "WAITING Hear from the roofer")
+                        ("roof" . "WAITING Agree the price"))
+                       (("intray" . "WAITING Hear from the council")
+                        ("intray" . "WAITING Hear from a stranger"))))))
+    (should (equal (mapcar (lambda (item)
+                             (cons (alist-get 'title item)
+                                   (alist-get 'waiting_on item)))
+                           (pos-startup-view-items root "waiting"))
+                   '(("Hear from the roofer" . "Ada Brook")
+                     ("Agree the price" . "Ada Brook")
+                     ("Hear from the council" . :null)
+                     ("Hear from a stranger" . :null))))))
+
+(ert-deftest pos-startup/a-person-with-nothing-waiting-leaves-one-waiting-list ()
+  "With people recorded and no item waiting on one, the one list is as before.
+Every person waited on being named, the last list says there are none."
+  (pos-test-with-files root
+      '((".pos/config.yaml" . "pos: 2\n")
+        (".pos/person-entities/ada-brook.org"
+         . ":PROPERTIES:\n:ID: ada\n:END:\n#+TITLE: Ada Brook\n\n- [[id:ada-root][Ada-Brook@root]], in =.=\n")
+        ("intray.org" . "* WAITING Hear from the council\n"))
+    (should (equal (pos-startup-view root "waiting")
+                   (concat "WAITING items\n"
+                           "  intray                                                 "
+                           "WAITING Hear from the council\n"))))
+  (pos-test-with-files root
+      '((".pos/config.yaml" . "pos: 2\n")
+        (".pos/person-entities/ada-brook.org"
+         . ":PROPERTIES:\n:ID: ada\n:END:\n#+TITLE: Ada Brook\n\n- [[id:ada-root][Ada-Brook@root]], in =.=\n")
+        ("intray.org"
+         . "* WAITING Hear from the roofer\n:PROPERTIES:\n:WAITING_ON: [[id:ada-root][Ada-Brook@root]]\n:END:\n"))
+    (should (string-suffix-p "\n\nWAITING on no person\n  (none)\n"
+                             (pos-startup-view root "waiting")))))
+
 (ert-deftest pos-startup/the-someday-view-lists-each-someday-item ()
   "The someday view lists each SOMEDAY item, labelled by its scope.
 SOMEDAY is an open keyword of the one sequence.  The item is in no
