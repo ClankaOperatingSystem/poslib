@@ -328,6 +328,93 @@ read without the line that follows it."
       (should (equal "an-id"
                      (pos-person--file-id (expand-file-name "a.org" root)))))))
 
+(defun pos-person-test--findings (root)
+  "Return the person findings of ROOT, each (FILE LINE MESSAGE).
+FILE is relative to ROOT."
+  (mapcar (lambda (finding)
+            (cons (file-relative-name (car finding) root) (cdr finding)))
+          (pos-person-lint root)))
+
+(ert-deftest pos-person/records-the-commands-made-have-no-finding ()
+  "People, identities and waiting items as the commands write them are clean.
+An item of the root may wait on an identity of a scope beneath it."
+  (pos-person-test-with-tree
+    (pos-person-add root "Ada Brook")
+    (pos-person-identity root "Ada Brook" ".")
+    (pos-person-wait-on root "projects/mend-roof.org:1" "Ada Brook")
+    (pos-person-wait-on root "projects/paint-hall/project.org:1" "Ada Brook")
+    (let ((home (pos-person-identity root "Ada Brook" "home")))
+      (pos-test-write-files
+       root `(("intray.org"
+               . ,(concat "* WAITING Hear back\n:PROPERTIES:\n:WAITING_ON: [[id:"
+                          (nth 1 home) "][Ada-Brook@home]]\n:END:\n")))))
+    (should-not (pos-person-test--findings root))))
+
+(ert-deftest pos-person/the-lint-of-a-tree-checks-its-person-records ()
+  "The findings are among those `pos-lint' gives for the tree."
+  (pos-person-test-with-tree
+    (pos-test-write-files
+     root '((".pos/person-identities/eve.org" . "#+TITLE: Eve@root\n")))
+    (let ((pos-directory root))
+      (should (equal (pos-lint)
+                     (list (list (expand-file-name ".pos/person-identities/eve.org" root)
+                                 1 "person-identity has no ID")))))))
+
+(ert-deftest pos-person/an-identity-belongs-to-a-person-and-is-named-for-it ()
+  "An identity no entity links to, one misnamed and one that links are found.
+A difference of case in the name is none.  An identity with no ID is found."
+  (pos-person-test-with-tree
+    (pos-test-write-files
+     root '((".pos/person-entities/ada-brook.org"
+             . ":PROPERTIES:\n:ID: ada\n:END:\n#+TITLE: Ada Brook\n\n- [[id:ada-home][Ada-Brook@Home]], in =home=\n- [[id:ada-roof][Ada]], in =projects/mend-roof.org=\n")
+            ("home/.clanka/person-identities/ada-brook.org"
+             . ":PROPERTIES:\n:ID: ada-home\n:END:\n#+TITLE: Ada-Brook@Home\n\nSee [[id:ada][Ada Brook]].\n")
+            ("home/.clanka/person-identities/cy-dale.org"
+             . ":PROPERTIES:\n:ID: cy-home\n:END:\n#+TITLE: Cy-Dale@home\n")
+            (".pos/person-identities/eve.org" . "#+TITLE: Eve@root\n")
+            ("projects/mend-roof.org"
+             . "* NEXT Buy slates\n* People\n** Ada on the roof\n:PROPERTIES:\n:ID: ada-roof\n:END:\n")))
+    (should (equal (pos-person-test--findings root)
+                   '((".pos/person-identities/eve.org" 1 "person-identity has no ID")
+                     ("home/.clanka/person-identities/ada-brook.org" 1
+                      "person-identity links to something; it links to nothing")
+                     ("home/.clanka/person-identities/cy-dale.org" 1
+                      "person-identity that no person-entity links to")
+                     ("projects/mend-roof.org" 3
+                      "person-identity is not named for its person and scope: Ada-Brook@projects.mend-roof"))))))
+
+(ert-deftest pos-person/an-entity-links-to-identities ()
+  "A link in a person-entity to an ID no identity has is found, at its line."
+  (pos-person-test-with-tree
+    (pos-test-write-files
+     root '((".pos/person-entities/ada-brook.org"
+             . ":PROPERTIES:\n:ID: ada\n:END:\n#+TITLE: Ada Brook\n\n- [[id:gone][Ada-Brook@shed]], in =shed=\n")))
+    (should (equal (pos-person-test--findings root)
+                   '((".pos/person-entities/ada-brook.org" 6
+                      "link to no person-identity: gone"))))))
+
+(ert-deftest pos-person/an-item-waits-on-an-identity-of-its-scope-or-beneath ()
+  "WAITING_ON that links to no identity, or to one of another scope, is found.
+A project's item may not wait on the root's identity, nor home's on
+a project's of the root."
+  (pos-person-test-with-tree
+    (pos-person-add root "Ada Brook")
+    (let ((top (nth 1 (pos-person-identity root "Ada Brook" ".")))
+          (roof (nth 1 (pos-person-identity root "Ada Brook" "projects/mend-roof"))))
+      (pos-test-write-files
+       root `(("projects/paint-hall/notes.org"
+               . ,(concat "* WAITING Ask\n:PROPERTIES:\n:WAITING_ON: [[id:" top "][Ada]]\n:END:\n"
+                          "* WAITING Ask again\n:PROPERTIES:\n:WAITING_ON: Ada\n:END:\n"))
+              ("home/index.org"
+               . ,(concat "* Tasks\n** WAITING Ask\n:PROPERTIES:\n:WAITING_ON: [[id:" roof "][Ada]]\n:END:\n")))))
+    (should (equal (pos-person-test--findings root)
+                   '(("home/index.org" 2
+                      "WAITING_ON links to an identity of another scope: projects/mend-roof")
+                     ("projects/paint-hall/notes.org" 1
+                      "WAITING_ON links to an identity of another scope: .")
+                     ("projects/paint-hall/notes.org" 5
+                      "WAITING_ON does not link to a person-identity"))))))
+
 (ert-deftest pos-person/the-shell-entry-runs-each-command ()
   "The entry prints what each command made, relative to the root."
   (pos-person-test-with-tree
