@@ -14,6 +14,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-state.el= :: an item's state set with Org's own command, the
   item named by its ID or by file and line, and the change recorded in
   the item's =LOGBOOK= drawer.
+- =lisp/pos-item.el= :: an item's scheduled date, deadline and tags set
+  with Org's own commands, the item named in the same way.
 - =lisp/pos-place.el= :: an item placed under a heading, in its file or
   another, with its properties, body and children; the move recorded
   in its =LOGBOOK= drawer, and the links that name its old place listed.
