@@ -495,6 +495,44 @@ is complete.  A NEXT item in the root's intray is no project's."
       (should (equal (pos-startup-test-lines text)
                      '(("projects/floor" . "WIP") ("projects/paint" . "WIP")))))))
 
+(ert-deftest pos-startup/the-projects-view-gives-each-active-project-as-its-files-have-it ()
+  "The projects view lists each active project with what its files say.
+Its STATUS, the date of its earliest open review, its first next
+action and the first paragraph under its Outcome heading, on one
+line.  Here paint has all four, its next action in a second file and
+its later review not shown; floor, a single file, has a status alone
+and shows dashes; well is complete and is not listed."
+  (pos-test-with-files root
+      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+        ("projects/paint/project.org"
+         . ,(concat ":PROPERTIES:\n:STATUS:   WIP\n:END:\n#+TITLE: Paint\n\n"
+                    "* Outcome\n\nThe hall is painted\nin [[https://example.org][one colour]].\n\n"
+                    "A second paragraph.\n"
+                    "* TODO Review paint :review:\nSCHEDULED: <2030-02-08 Fri>\n"
+                    "* TODO Review paint early :review:\nSCHEDULED: <2030-02-01 Fri +1w>\n"
+                    "* DONE Old review :review:\nSCHEDULED: <2030-01-01 Tue>\n"))
+        ("projects/paint/notes.org" . "* TODO Later\n* WAITING Hear from the shop\n")
+        ("projects/floor.org" . ":PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n* TODO Measure\n")
+        ("projects/well/project.org" . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n"))
+    (should (equal (concat
+                    "Projects\n"
+                    "  projects/floor                                         COMMITTED review -\n"
+                    "    next: -\n"
+                    "    outcome: -\n"
+                    "  projects/paint                                         WIP       review 2030-02-01\n"
+                    "    next: Hear from the shop\n"
+                    "    outcome: The hall is painted in one colour.\n")
+                   (replace-regexp-in-string
+                    " +$" "" (pos-startup-view root "projects"))))
+    (should (equal (pos-startup-view-items root "projects")
+                   '(((scope . "projects/floor") (scope_kind . "project")
+                      (status . "COMMITTED") (review . :null) (next . :null)
+                      (outcome . :null))
+                     ((scope . "projects/paint") (scope_kind . "project")
+                      (status . "WIP") (review . "2030-02-01")
+                      (next . "Hear from the shop")
+                      (outcome . "The hall is painted in one colour.")))))))
+
 (ert-deftest pos-startup/the-intray-view-lists-what-is-captured-and-not-placed ()
   "The intray view lists each open item under Unsorted in an intray.org.
 Each is labelled by its scope.  In the tree, the root's intray has two
@@ -540,8 +578,8 @@ date, and Open is not done; neither is listed."
   "A view with no item says so, as does each empty list within a view.
 The tree here holds one empty intray and nothing else."
   (pos-test-with-files root '(("intray.org" . "* Unsorted\n"))
-    (dolist (view '("next" "waiting" "scheduled" "deadlines" "stuck" "intray"
-                    "finished" "all"))
+    (dolist (view '("next" "waiting" "scheduled" "deadlines" "stuck" "projects"
+                    "intray" "finished" "all"))
       (ert-info ((format "the %s view" view))
         (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view)))))
     (should (= 3 (length (split-string (pos-startup-view root "reviews")
@@ -658,7 +696,7 @@ next view each item's scope, state and title are its line's; alpha's
 second file is labelled alpha/notes and belongs to the scope alpha."
   (pos-startup-test-with-tree
     (dolist (view (seq-difference pos-startup-views
-                                  '("reviews-to-schedule" "stuck")))
+                                  '("reviews-to-schedule" "stuck" "projects")))
       (ert-info ((format "the %s view" view))
         (should (= (length (pos-startup-test-lines (pos-startup-view root view)))
                    (length (pos-startup-view-items root view))))))

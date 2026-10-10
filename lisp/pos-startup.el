@@ -101,7 +101,7 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
 
 (defconst pos-startup-views
   '("next" "waiting" "someday" "scheduled" "deadlines" "reviews"
-    "reviews-to-schedule" "stuck" "intray" "finished" "all")
+    "reviews-to-schedule" "stuck" "projects" "intray" "finished" "all")
   "The names of the views, in the order they are printed.")
 
 (defconst pos-startup-default-views
@@ -189,13 +189,15 @@ scheduled heading tagged `pos-startup-review-tag'."
 
 ;;;; Items
 
-(defun pos-startup--scope-row (scope &optional status)
+(defun pos-startup--scope-row (scope &optional status more)
   "Gather SCOPE, a `pos-scope', as a line of a view of scopes.
-STATUS is its project file's STATUS, or nil."
+STATUS is its project file's STATUS, or nil.  MORE is an alist of
+what else the view says of the scope."
   (when pos-startup--gathering
     (push `((scope . ,(pos-scope-path scope))
             (scope_kind . ,(symbol-name (pos-scope-kind scope)))
-            (status . ,(or status :null)))
+            (status . ,(or status :null))
+            ,@more)
           pos-startup--items)))
 
 (defun pos-startup--item-at-point ()
@@ -376,6 +378,86 @@ has an item in one of `pos-startup-next-action-states'."
                                projects)
                    (lambda (a b) (string< (car a) (car b))))))))
 
+(defun pos-startup--outcome ()
+  "Return the first paragraph under the current buffer's Outcome heading.
+The heading is a top-level one titled Outcome.  One line, or nil if
+there is no such heading or no text under it."
+  (org-with-wide-buffer
+   (goto-char (point-min))
+   (when (re-search-forward "^\\* Outcome[ \t]*$" nil t)
+     (let ((end (save-excursion (outline-next-heading) (point))))
+       (org-end-of-meta-data t)
+       (when (< (point) end)
+         (let ((paragraph (car (split-string
+                                (buffer-substring-no-properties (point) end)
+                                "\n[ \t]*\n" t))))
+           (and paragraph
+                (org-link-display-format
+                 (string-join (split-string paragraph "[ \t\n]+" t) " ")))))))))
+
+(defun pos-startup--project-facts (file)
+  "Return (STATUS OUTCOME NEXT REVIEW) as FILE, a project's file, has them.
+STATUS is the file's; OUTCOME is `pos-startup--outcome'; NEXT is the
+title of its first item in one of `pos-startup-next-action-states';
+REVIEW is the earliest date, as YYYY-MM-DD, an open heading tagged
+`pos-startup-review-tag' is scheduled on.  Each is nil if FILE has
+none."
+  (let ((status (pos-startup--file-status file))
+        next review)
+    (with-current-buffer (pos-visit file)
+      (org-map-entries
+       (lambda ()
+         (when (and (not next)
+                    (member (org-get-todo-state) pos-startup-next-action-states))
+           (setq next (org-link-display-format
+                       (substring-no-properties (org-get-heading t t t t)))))
+         (when (and (member pos-startup-review-tag (org-get-tags nil t))
+                    (org-entry-is-todo-p))
+           (let ((time (org-get-scheduled-time (point))))
+             (when time
+               (let ((date (format-time-string "%Y-%m-%d" time)))
+                 (when (or (not review) (string< date review))
+                   (setq review date)))))))
+       nil 'file)
+      (list status (pos-startup--outcome) next review))))
+
+(defun pos-startup--projects ()
+  "Return the projects view of `pos-startup--corpus'.
+Each active project, by `pos-startup-active-statuses': its STATUS,
+the date of its next review, its next action and its outcome, each
+read from the project's files and none written anywhere else.  What
+a project lacks is shown as a dash."
+  (let (projects)
+    (dolist (file (pos-startup--files-of-kind 'project))
+      (let* ((owner (pos-corpus-owner pos-startup--corpus file))
+             (path (pos-scope-path owner))
+             (project (or (assoc path projects)
+                          (car (push (list path owner nil nil nil nil) projects))))
+             (facts (pos-startup--project-facts file)))
+        (dotimes (i 4)
+          (let ((fact (nth i facts)) (had (nth (+ 2 i) project)))
+            (setf (nth (+ 2 i) project)
+                  ;; The earliest review of the project's files.
+                  (if (and (= i 3) fact had)
+                      (if (string< fact had) fact had)
+                    (or had fact)))))))
+    (pos-startup--list
+     "Projects"
+     (mapcan
+      (lambda (project)
+        (pcase-let ((`(,path ,owner ,status ,outcome ,next ,review) project))
+          (pos-startup--scope-row
+           owner status
+           `((review . ,(or review :null)) (next . ,(or next :null))
+             (outcome . ,(or outcome :null))))
+          (list (format "%-54s %-9s review %-10s" path status (or review "-"))
+                (format "  next: %s" (or next "-"))
+                (format "  outcome: %s" (or outcome "-")))))
+      (sort (seq-filter (lambda (project)
+                          (member (nth 2 project) pos-startup-active-statuses))
+                        projects)
+            (lambda (a b) (string< (car a) (car b))))))))
+
 (defun pos-startup--intray ()
   "Return the intray view of `pos-startup--corpus'.
 Each open item under Unsorted in a file named intray.org: what has
@@ -491,6 +573,7 @@ Text: a title, then one line for each item, labelled by its scope."
       ("reviews" (pos-startup--reviews))
       ("reviews-to-schedule" (pos-startup--reviews-to-schedule))
       ("stuck" (pos-startup--stuck))
+      ("projects" (pos-startup--projects))
       ("intray" (pos-startup--intray))
       ("finished" (pos-startup--finished))
       ("all"
@@ -503,8 +586,9 @@ Text: a title, then one line for each item, labelled by its scope."
   "Return what VIEW of the Org files under ROOT lists, as data.
 A list with an element for each line `pos-startup-view' prints, in
 its order.  In a view of items each is an alist as
-`pos-startup--item-at-point' gives it.  In reviews-to-schedule and
-stuck, which list scopes, each has scope, scope_kind and status."
+`pos-startup--item-at-point' gives it.  In reviews-to-schedule,
+stuck and projects, which list scopes, each has scope, scope_kind
+and status; in projects, review, next and outcome too."
   (let ((pos-startup--gathering t)
         (pos-startup--items nil))
     (pos-startup-view root view)
