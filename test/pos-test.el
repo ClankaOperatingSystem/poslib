@@ -496,6 +496,29 @@ removes it.  The match is case-insensitive, as Org's is."
       (should (equal (list (list file 2 text))
                      (pos-lint-todo-line file))))))
 
+(ert-deftest pos/a-todo-line-inside-a-block-is-text-and-is-left ()
+  "A #+TODO line inside an example or a source block sets no keywords.
+It is text the document shows.  Lint does not report it and
+normalising does not remove it; the line outside the blocks is
+reported and removed."
+  (let ((text (pos-test-lines "#+TITLE: How keywords work"
+                              "#+begin_example"
+                              "#+TODO: TODO(t) | DONE(d!)"
+                              "#+end_example"
+                              "#+begin_src org"
+                              "#+SEQ_TODO: OPEN | SHUT"
+                              "#+end_src"
+                              "#+TODO: BACKLOG | DONE"
+                              "* TODO a")))
+    (pos-test-with-files root `(("notes.org" . ,text))
+      (let ((file (expand-file-name "notes.org" root)))
+        (should (equal '(8) (mapcar #'cadr (pos-lint-todo-line file))))
+        (should (equal '(:lines-removed 1 :respelled 0)
+                       (pos-normalise-keywords-in-file file)))
+        (should (equal (replace-regexp-in-string
+                        "#\\+TODO: BACKLOG | DONE\n" "" text)
+                       (pos-test-text root "notes.org")))))))
+
 (ert-deftest pos/a-product-s-own-keyword-line-stands-and-is-no-finding ()
   "A #+TODO line in a file the root may not write is that file's own.
 Lint reports the line in the root's own file and not in the
