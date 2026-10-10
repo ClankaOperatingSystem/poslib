@@ -67,6 +67,18 @@ An active project is expected to have a review scheduled."
   :type '(repeat string)
   :group 'pos)
 
+(defcustom pos-startup-stuck-statuses '("WIP")
+  "Values of a project file's STATUS property that make it begun.
+A begun project is expected to have a next action."
+  :type '(repeat string)
+  :group 'pos)
+
+(defcustom pos-startup-next-action-states '("NEXT" "WAITING")
+  "The states of an item that is a project's next action.
+A WAITING item is one: the project's next move is someone else's."
+  :type '(repeat string)
+  :group 'pos)
+
 (defconst pos-startup-prompts
   "START-UP PROMPTS
 Purpose: What are we here to do in this session?
@@ -78,12 +90,12 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
 
 (defconst pos-startup-views
   '("next" "waiting" "someday" "scheduled" "deadlines" "reviews"
-    "reviews-to-schedule" "intray" "all")
+    "reviews-to-schedule" "stuck" "intray" "all")
   "The names of the views, in the order they are printed.")
 
 (defconst pos-startup-default-views
   '("next" "waiting" "scheduled" "deadlines" "reviews" "reviews-to-schedule"
-    "intray")
+    "stuck" "intray")
   "The views `pos-startup-report' prints when none is named.")
 
 (defvar pos-startup--root nil
@@ -227,6 +239,39 @@ and the root, named \".\" as its configuration names it."
      (pos-startup--list "Root with a review to be scheduled"
                         (unless (member "." reviewed) '("."))))))
 
+(defun pos-startup--has-next-action-p (file)
+  "Return non-nil if FILE has an item that is a next action.
+Its state is one of `pos-startup-next-action-states'."
+  (with-current-buffer (pos-visit file)
+    (catch 'found
+      (org-map-entries
+       (lambda ()
+         (when (member (org-get-todo-state) pos-startup-next-action-states)
+           (throw 'found t)))
+       nil 'file)
+      nil)))
+
+(defun pos-startup--stuck ()
+  "Return the view of the projects of `pos-startup--corpus' with no next action.
+Begun projects, by `pos-startup-stuck-statuses', none of whose files
+has an item in one of `pos-startup-next-action-states'."
+  (let (projects)
+    (dolist (file (pos-startup--files-of-kind 'project))
+      (let* ((path (pos-scope-path (pos-corpus-owner pos-startup--corpus file)))
+             (project (or (assoc path projects)
+                          (car (push (list path nil nil) projects)))))
+        (setf (nth 1 project) (or (nth 1 project) (pos-startup--file-status file)))
+        (setf (nth 2 project) (or (nth 2 project)
+                                  (pos-startup--has-next-action-p file)))))
+    (pos-startup--list
+     "Projects with no next action"
+     (mapcar (lambda (project) (format "%-54s %s" (nth 0 project) (nth 1 project)))
+             (sort (seq-filter (lambda (project)
+                                 (and (member (nth 1 project) pos-startup-stuck-statuses)
+                                      (not (nth 2 project))))
+                               projects)
+                   (lambda (a b) (string< (car a) (car b))))))))
+
 (defun pos-startup--intray ()
   "Return the intray view of `pos-startup--corpus'.
 Each open item under Unsorted in a file named intray.org: what has
@@ -312,6 +357,7 @@ Text: a title, then one line for each item, labelled by its scope."
           (pos-startup--agenda (lambda () (org-agenda-list nil nil 1))))))
       ("reviews" (pos-startup--reviews))
       ("reviews-to-schedule" (pos-startup--reviews-to-schedule))
+      ("stuck" (pos-startup--stuck))
       ("intray" (pos-startup--intray))
       ("all"
        (let ((org-agenda-overriding-header "All TODO items"))
