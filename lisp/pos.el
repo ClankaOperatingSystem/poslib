@@ -138,19 +138,32 @@ reported, and ignored."
 
 ;;;; Normalising keywords
 
+(defun pos--next-todo-line ()
+  "Move past the next #+TODO line in force; return non-nil if there is one.
+A line is in force where Org reads it as a keyword.  One inside an
+example or a source block is text the document shows, and is passed
+over."
+  (let ((case-fold-search t) found)
+    (while (and (not found)
+                (re-search-forward "^#\\+\\(SEQ_\\|TYP_\\)?TODO:" nil t))
+      (setq found (save-excursion
+                    (beginning-of-line)
+                    (eq 'keyword (org-element-type (org-element-at-point))))))
+    found))
+
 (defun pos-normalise-keywords-in-file (file)
   "Remove #+TODO lines from FILE; respell CANCELED as CANCELLED.
-Return (:lines-removed N :respelled N)."
+A #+TODO line is one `pos--next-todo-line' finds.  Return
+\(:lines-removed N :respelled N)."
   (let ((lines-removed 0)
         (respelled 0)
         (make-backup-files nil))
     (with-current-buffer (pos-visit file)
       (save-excursion
         (goto-char (point-min))
-        (let ((case-fold-search t))
-          (while (re-search-forward "^#\\+\\(SEQ_\\|TYP_\\)?TODO:" nil t)
-            (delete-region (line-beginning-position) (line-beginning-position 2))
-            (setq lines-removed (1+ lines-removed))))
+        (while (pos--next-todo-line)
+          (delete-region (line-beginning-position) (line-beginning-position 2))
+          (setq lines-removed (1+ lines-removed)))
         (goto-char (point-min))
         (let ((case-fold-search nil))
           (while (re-search-forward "^\\*+ \\(CANCELED\\)\\b" nil t)
@@ -215,17 +228,16 @@ The files are those of the corpus a command may write."
          (pos--finding file (format "stale keyword %s (not in the sequence)" word)))))))
 
 (defun pos-lint-todo-line (file)
-  "Report #+TODO lines in FILE.
+  "Report #+TODO lines in FILE, each as `pos--next-todo-line' has it.
 None is reported in a file the root may not write, by
 `pos-visit--own-keywords-p': the line is that file's own to keep, and
 `pos-normalise-keywords' could not remove it."
   (with-current-buffer (pos-visit file)
     (save-excursion
       (goto-char (point-min))
-      (let ((case-fold-search t)
-            (findings nil))
+      (let ((findings nil))
         (while (and (not (pos-visit--own-keywords-p file))
-                    (re-search-forward "^#\\+\\(SEQ_\\|TYP_\\)?TODO:" nil t))
+                    (pos--next-todo-line))
           (push (pos--finding file "#+TODO line overrides the one sequence; run pos-normalise-keywords")
                 findings))
         (nreverse findings)))))
