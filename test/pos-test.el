@@ -488,6 +488,30 @@ removes it.  The match is case-insensitive, as Org's is."
       (should (equal (list (list file 2 text))
                      (pos-lint-todo-line file))))))
 
+(ert-deftest pos/a-product-s-own-keyword-line-stands-and-is-no-finding ()
+  "A #+TODO line in a file the root may not write is that file's own.
+Lint reports the line in the root's own file and not in the
+product's, which `pos-normalise-keywords' could not change.  The
+product's file is read with its own keywords: SPIKE is a state
+there, and in the root's file, where the one sequence holds, it is
+the first word of a title."
+  (pos-test-with-files root
+      '((".pos/config.yaml" . "pos: 2\nchildren:\n  - path: kit\n")
+        ("notes.org" . "#+TODO: SPIKE | SHIPPED\n* SPIKE try it here\n")
+        ("kit/todo.org" . "#+TODO: SPIKE | SHIPPED\n* SPIKE try it there\n"))
+    (let ((pos-directory root))
+      (should (equal (concat "notes.org:1: #+TODO line overrides the one sequence;"
+                             " run pos-normalise-keywords\n")
+                     (pos-lint-format
+                      (seq-filter (lambda (finding)
+                                    (string-prefix-p "#+TODO" (nth 2 finding)))
+                                  (pos-lint))
+                      root))))
+    (let ((pos-visit-corpus (pos-corpus root)))
+      (with-current-buffer (pos-visit (expand-file-name "kit/todo.org" root))
+        (goto-char (point-max))
+        (should (equal "SPIKE" (org-get-todo-state)))))))
+
 (ert-deftest pos/a-merged-copy-left-by-dedupe-is-a-finding ()
   "A \"Merged copy from\" heading is reported until a person reconciles it.
 Dedupe folds a dropped copy's differing body under the kept one with
