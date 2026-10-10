@@ -26,12 +26,15 @@
 ;;; Code:
 
 (require 'org)
+(require 'org-id)
 (require 'subr-x)
 (require 'pos)
 
 (defun pos-capture (root title)
   "File TITLE as a TODO under Unsorted in ROOT's intray; return its line.
-Refuse bad titles, symlinks, unsaved or stale buffers and foreign locks."
+The item has an ID property, a new Org ID, and a CREATED property, the
+time of capture as an inactive timestamp.  Refuse bad titles,
+symlinks, unsaved or stale buffers and foreign locks."
   (interactive "DRoot: \nsTask: ")
   (unless (and (stringp title)
                (not (string-empty-p (string-trim title)))
@@ -62,6 +65,13 @@ Refuse bad titles, symlinks, unsaved or stale buffers and foreign locks."
                   (pos-goto-unsorted-end)
                   (let ((line (line-number-at-pos)))
                     (insert "** TODO " (string-trim title) "\n")
+                    (forward-line -1)
+                    ;; Not `org-id-get-create', which also writes the
+                    ;; ID to `org-id-locations-file'.
+                    (org-entry-put (point) "ID" (org-id-new))
+                    (org-entry-put (point) "CREATED"
+                                   (format-time-string
+                                    (org-time-stamp-format t t)))
                     (save-buffer)
                     line)))
             (unlock-buffer)))))))
