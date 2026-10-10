@@ -90,10 +90,12 @@ once."
   (move-marker org-log-note-return-to (point))
   ;; `org-store-log-note' reads the note from the current buffer and
   ;; kills it.
+  ;; `org-todo' has already shown a repeating item's next date;
+  ;; `org-store-log-note' would show `org-log-post-message' again.
+  (setq org-log-post-message nil)
   (with-current-buffer (generate-new-buffer " *pos-state note*")
     (insert (or note ""))
-    (org-store-log-note))
-  (setq org-log-post-message nil))
+    (org-store-log-note)))
 
 (defun pos-set-state (root target state &optional note)
   "Set the item TARGET names in the tree at ROOT to STATE, with NOTE.
