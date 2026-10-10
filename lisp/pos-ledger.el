@@ -421,28 +421,6 @@ ADD is an alist of path and entry; PREVIOUS a hash or nil."
                   ,@(when ledger-id `((ledger_id . ,ledger-id)))))))
     (cons (format "%08d-%s.json" number (pos-bytes-sha bytes)) bytes)))
 
-;;;; Configuration
-
-(defconst pos-ledger-config-directories '(".clanka" ".clankos" ".pos")
-  "The names a configuration directory may have.")
-
-(defconst pos-ledger-config-names '("config.yaml" "config.yml")
-  "The names a configuration file may have within its directory.")
-
-(defun pos-ledger-config-paths ()
-  "Return every path a node's configuration may have, relative to the node."
-  (mapcan (lambda (directory)
-            (mapcar (lambda (name) (concat directory "/" name))
-                    pos-ledger-config-names))
-          pos-ledger-config-directories))
-
-(defun pos-ledger-config-files (dir)
-  "Return the configuration files the node at DIR has, relative to it.
-One, as doc/pos-directory.txt allows, or none; two are refused by
-whoever reads them."
-  (seq-filter (lambda (file) (file-exists-p (expand-file-name file dir)))
-              (pos-ledger-config-paths)))
-
 ;;;; Kept archives
 
 (defun pos-ledger--entry (archive)
@@ -454,8 +432,8 @@ there whose scope is the scope's path from the node, or nil: for a
 scope it does not name, or beneath no node.  Refuse `config' for a
 configuration that is refused, and for two in one node."
   (let* ((scope (file-name-directory (directory-file-name (expand-file-name archive))))
-         (node (locate-dominating-file scope #'pos-ledger-config-files))
-         (files (and node (pos-ledger-config-files node))))
+         (node (locate-dominating-file scope #'pos-path-config-files))
+         (files (and node (pos-path-config-files node))))
     (when (cdr files)
       (pos-ledger-refuse 'config "Configuration refused (two-configurations): %s"
                          node))

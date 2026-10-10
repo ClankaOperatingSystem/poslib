@@ -20,10 +20,13 @@
 
 ;;; Commentary:
 
-;; The two rules for a path written in a ledger or a configuration.
+;; The two rules for a path written in a ledger or a configuration, and
+;; where a node's configuration is, as doc/pos-directory.txt names it.
 ;;
 ;; - `pos-path-safe-p': whether a path is relative and only goes down.
 ;; - `pos-path-within-p': whether a path is another or lies beneath it.
+;; - `pos-path-config-paths': every path a node's configuration may have.
+;; - `pos-path-config-files': the configuration files a node has.
 
 ;;; Code:
 
@@ -40,6 +43,26 @@ It has no empty part, no part that is . or .., and no backslash."
 (defun pos-path-within-p (path container)
   "Return non-nil if PATH is CONTAINER or beneath it."
   (or (equal path container) (string-prefix-p (concat container "/") path)))
+
+(defconst pos-path-config-directories '(".clanka" ".clankos" ".pos")
+  "The names a configuration directory may have.")
+
+(defconst pos-path-config-names '("config.yaml" "config.yml")
+  "The names a configuration file may have within its directory.")
+
+(defun pos-path-config-paths ()
+  "Return every path a node's configuration may have, relative to the node."
+  (mapcan (lambda (directory)
+            (mapcar (lambda (name) (concat directory "/" name))
+                    pos-path-config-names))
+          pos-path-config-directories))
+
+(defun pos-path-config-files (dir)
+  "Return the configuration files the node at DIR has, relative to it.
+One, as doc/pos-directory.txt allows, or none; two are refused by
+whoever reads them."
+  (seq-filter (lambda (file) (file-exists-p (expand-file-name file dir)))
+              (pos-path-config-paths)))
 
 (provide 'pos-path)
 ;;; pos-path.el ends here
