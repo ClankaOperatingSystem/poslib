@@ -769,21 +769,25 @@ is complete.  A NEXT item in the root's intray is no project's."
 (ert-deftest pos-startup/the-projects-view-gives-each-active-project-as-its-files-have-it ()
   "The projects view lists each active project with what its files say.
 Its STATUS, the date of its earliest open review, its first next
-action and the first paragraph under its Outcome heading, on one
-line.  Here paint has all four, its next action in a second file and
-its later review not shown; floor, a single file, has a status alone
-and shows dashes; well is complete and is not listed."
+action and its OUTCOME property, on one line.  Here paint has all
+four, its outcome continued on an OUTCOME+ line, its next action in
+a second file and its later review not shown; floor, a single file,
+has a status alone and an Outcome heading, which is not read, and
+shows dashes; well is complete and is not listed."
   (pos-test-with-files root
       `((".pos/config.yaml" . ,pos-startup-test-responsibility)
         ("projects/paint/project.org"
-         . ,(concat ":PROPERTIES:\n:STATUS:   WIP\n:END:\n#+TITLE: Paint\n\n"
-                    "* Outcome\n\nThe hall is painted\nin [[https://example.org][one colour]].\n\n"
-                    "A second paragraph.\n"
+         . ,(concat ":PROPERTIES:\n:STATUS:   WIP\n"
+                    ":OUTCOME:  The hall is painted\n"
+                    ":OUTCOME+: in [[https://example.org][one colour]].\n"
+                    ":END:\n#+TITLE: Paint\n\n"
                     "* TODO Review paint :review:\nSCHEDULED: <2030-02-08 Fri>\n"
                     "* TODO Review paint early :review:\nSCHEDULED: <2030-02-01 Fri +1w>\n"
                     "* DONE Old review :review:\nSCHEDULED: <2030-01-01 Tue>\n"))
         ("projects/paint/notes.org" . "* TODO Later\n* WAITING Hear from the shop\n")
-        ("projects/floor.org" . ":PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n* TODO Measure\n")
+        ("projects/floor.org"
+         . ,(concat ":PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n"
+                    "* Outcome\n\nThe floor is level.\n* TODO Measure\n"))
         ("projects/well/project.org" . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n"))
     (should (equal (concat
                     "Projects\n"

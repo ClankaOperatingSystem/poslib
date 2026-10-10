@@ -61,22 +61,22 @@ made when it is not there.  The file's name is returned."
 
 (ert-deftest pos-project/the-file-has-what-every-project-has ()
   "The file has an ID, STATUS COMMITTED, CREATED, an outcome and a review.
-The outcome is the text given, under a top-level Outcome heading.
+The outcome is the line given, in the file's OUTCOME property.
 The review is a TODO tagged review, scheduled on the date given.  A
 next action, when one is given, is a NEXT item before the review.
 Titles and the outcome are trimmed."
   (pos-project-test-with-tree
     (let ((file (pos-project-create root "." "paint-the-hall" " Paint the hall "
-                                    "The hall is painted.\n\nIn one colour.\n"
+                                    " The hall is painted. "
                                     "2030-02-01" " Choose the colour ")))
       (should (string-match-p
                (concat "\\`:PROPERTIES:\n"
                        ":ID:       [-[:xdigit:]]\\{36\\}\n"
                        ":STATUS:   COMMITTED\n"
+                       ":OUTCOME:  The hall is painted\\.\n"
                        ":CREATED:  \\[[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [[:alpha:]]+\\]\n"
                        ":END:\n"
                        "#\\+TITLE: Paint the hall\n\n"
-                       "\\* Outcome\n\nThe hall is painted\\.\n\nIn one colour\\.\n\n"
                        "\\* NEXT Choose the colour\n"
                        "\\* TODO Review Paint the hall :review:\n"
                        "SCHEDULED: <2030-02-01 Fri>\n\\'")
@@ -104,8 +104,8 @@ It has a review, so it is not among those with a review to schedule."
 Refused: a scope that is not the root or a responsibility, here a
 plain directory and a path not in the tree; a name with a capital, a
 space or a slash; a name taken by a file or by a directory; a title
-or a next action of two lines; a blank outcome, and one with a line
-that begins with a star; a review that is not a date."
+or a next action of two lines; a blank outcome, and one of two
+lines; a review that is not a date."
   (pos-project-test-with-tree
     (dolist (arguments
              '(("shed" "a" "Title" "Outcome." "2030-02-01")
@@ -118,7 +118,7 @@ that begins with a star; a review that is not a date."
                ("." "a" "Two\nlines" "Outcome." "2030-02-01")
                ("." "a" "Title" "Outcome." "2030-02-01" "Two\nlines")
                ("." "a" "Title" "  " "2030-02-01")
-               ("." "a" "Title" "Text\n* A heading" "2030-02-01")
+               ("." "a" "Title" "Two\nlines" "2030-02-01")
                ("." "a" "Title" "Outcome." "next week")))
       (ert-info ((format "%S" arguments))
         (should-error (apply #'pos-project-create root arguments)
@@ -159,13 +159,14 @@ the one it has are returned."
       (should (equal "DONE" (nth 2 (pos-project-set-status root "projects/paint"
                                                            "DONE"))))
       (should (string-match-p
-               (concat "\\`:PROPERTIES:\n:ID: .*\n:STATUS:   DONE\n:CREATED: .*\n:END:\n"
+               (concat "\\`:PROPERTIES:\n:ID: .*\n:STATUS:   DONE\n"
+                       ":OUTCOME:  Painted\\.\n:CREATED: .*\n:END:\n"
                        ":LOGBOOK:\n"
                        "- Status \"DONE\" +from \"WIP\" +" pos-project-test-stamp "\n"
                        "- Status \"WIP\" +from \"COMMITTED\" +" pos-project-test-stamp
                        " \\\\\\\\\n  Bought the paint\n"
                        ":END:\n"
-                       "#\\+TITLE: Paint\n\n\\* Outcome\n\nPainted\\.\n")
+                       "#\\+TITLE: Paint\n\n\\* TODO Review Paint :review:\n")
                (pos-test-file-string file))))))
 
 (ert-deftest pos-project/a-status-that-cannot-be-set-is-refused ()

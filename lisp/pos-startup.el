@@ -566,21 +566,18 @@ has an item in one of `pos-startup-next-action-states'."
                    (lambda (a b) (string< (car a) (car b))))))))
 
 (defun pos-startup--outcome ()
-  "Return the first paragraph under the current buffer's Outcome heading.
-The heading is a top-level one titled Outcome.  One line, or nil if
-there is no such heading or no text under it."
+  "Return the OUTCOME property the current buffer has before its first heading.
+One line, with OUTCOME+ lines joined to it as Org joins them and each
+link shown as its description.  Nil if the file has none, or a blank
+one."
   (org-with-wide-buffer
    (goto-char (point-min))
-   (when (re-search-forward "^\\* Outcome[ \t]*$" nil t)
-     (let ((end (save-excursion (outline-next-heading) (point))))
-       (org-end-of-meta-data t)
-       (when (< (point) end)
-         (let ((paragraph (car (split-string
-                                (buffer-substring-no-properties (point) end)
-                                "\n[ \t]*\n" t))))
-           (and paragraph
-                (org-link-display-format
-                 (string-join (split-string paragraph "[ \t\n]+" t) " ")))))))))
+   (let ((outcome (and (org-before-first-heading-p)
+                       (org-entry-get (point) "OUTCOME"))))
+     (and outcome
+          (not (string-empty-p (string-trim outcome)))
+          (org-link-display-format
+           (string-join (split-string outcome "[ \t\n]+" t) " "))))))
 
 (defun pos-startup--project-facts (file)
   "Return (STATUS OUTCOME NEXT REVIEW) as FILE, a project's file, has them.
