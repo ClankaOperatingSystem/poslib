@@ -494,6 +494,112 @@ named either."
       (should (equal (nth 2 parts)
                      "Root with a review to be scheduled\n  (none)\n")))))
 
+;; The tree of the tests of a review that names scopes: work holds the
+;; reviews of shop, a responsibility beneath it, and of ledger, a
+;; project of its own; yard is beneath work and no review names it.
+(defmacro pos-startup-test-with-covers (covers &rest body)
+  "Evaluate BODY with `root' a tree whose review of the shop has COVERS.
+COVERS is the value of the COVERS property of a heading of
+work/index.org, scheduled on 2030-03-04; work's own review is
+scheduled on 2030-03-11."
+  (declare (indent 1))
+  `(pos-test-with-files root
+       `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("intray.org" . "* Unsorted\n")
+         ("work/.pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("work/index.org"
+          . ,(concat "* TODO Review work :review:\nSCHEDULED: <2030-03-11 Mon>\n"
+                     "* TODO Review the shop :review:\nSCHEDULED: <2030-03-04 Mon>\n"
+                     ":PROPERTIES:\n:COVERS:   " ,covers "\n:END:\n"))
+         ("work/projects/ledger.org"
+          . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Add the column\n")
+         ("work/shop/.pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("work/shop/index.org" . "* TODO Sweep the floor\n")
+         ("work/yard/.pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("work/yard/index.org" . "* TODO Stack the timber\n"))
+     ,@body))
+
+(ert-deftest pos-startup/a-review-covers-the-scopes-it-names ()
+  "A review covers its file's scope and each scope its COVERS names.
+The paths are from the directory of the review's file, apart by
+spaces.  Here a review in work/index.org names shop, a responsibility
+beneath work, and projects/ledger, a project of work, so neither is
+listed as having no review.  Nothing is inherited: yard is beneath
+work, whose own review does not cover it, and the root has no review,
+so both are listed.  The projects view gives ledger the date of the
+review that names it."
+  (pos-startup-test-with-covers "shop projects/ledger"
+    (should (equal (pos-startup-view-items root "reviews-to-schedule")
+                   '(((scope . "work/yard") (scope_kind . "responsibility")
+                      (status . :null))
+                     ((scope . ".") (scope_kind . "root") (status . :null)))))
+    (should (= 3 (length (split-string (pos-startup-view root "reviews-to-schedule")
+                                       "\n\n" t))))
+    (should (equal (alist-get 'review
+                              (car (pos-startup-view-items root "projects")))
+                   "2030-03-04"))))
+
+(ert-deftest pos-startup/a-review-that-is-not-scheduled-covers-nothing ()
+  "A heading covers the scopes it names only while it is a review.
+That is, open, scheduled and tagged `pos-startup-review-tag'.  Here
+the heading that names shop is DONE, then has no date, then has no
+tag; each time shop is listed as having no review."
+  (dolist (heading '("* DONE Review the shop :review:\nSCHEDULED: <2030-03-04 Mon>\n"
+                     "* TODO Review the shop :review:\n"
+                     "* TODO Review the shop\nSCHEDULED: <2030-03-04 Mon>\n"))
+    (pos-test-with-files root
+        `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+          ("index.org" . ,(concat heading ":PROPERTIES:\n:COVERS:   shop\n:END:\n"))
+          ("shop/.pos/config.yaml" . ,pos-startup-test-responsibility)
+          ("shop/index.org" . "* TODO Sweep the floor\n"))
+      (should (member "shop"
+                      (mapcar (lambda (row) (alist-get 'scope row))
+                              (pos-startup-view-items root "reviews-to-schedule")))))))
+
+(ert-deftest pos-startup/a-path-is-read-from-the-reviews-file ()
+  "A path a review names is from its file's directory, not from the root.
+Here work/index.org names the root as .. and a directory whose name
+has a space as %20; shop, written from the root as work/shop, names
+no scope from there."
+  (pos-startup-test-with-covers ".. work/shop"
+    (let ((scopes (mapcar (lambda (row) (alist-get 'scope row))
+                          (pos-startup-view-items root "reviews-to-schedule"))))
+      (should-not (member "." scopes))
+      (should (member "work/shop" scopes))))
+  (pos-test-with-files root
+      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+        ("index.org"
+         . ,(concat "* TODO Review the office :review:\nSCHEDULED: <2030-03-04 Mon>\n"
+                    ":PROPERTIES:\n:COVERS:   home%20office/\n:END:\n"))
+        ("home office/.pos/config.yaml" . ,pos-startup-test-responsibility)
+        ("home office/index.org" . "* TODO Clear the desk\n"))
+    (should-not (pos-startup-view-items root "reviews-to-schedule"))))
+
+(ert-deftest pos-startup/a-path-that-is-no-scopes-is-reported ()
+  "A path a review names that is no scope's is a line of a fourth list.
+The line has the label of the review's file, the path as written and
+the heading; as data it has the scope of the review's file.  The
+scope meant is still listed as having no review.  Here work's review
+names shpo, and work/yard/index.org, a file and no scope."
+  (pos-startup-test-with-covers "shpo yard/index.org"
+    (let ((parts (split-string (pos-startup-view root "reviews-to-schedule")
+                               "\n\n" t)))
+      (should (= 4 (length parts)))
+      (should (equal (nth 3 parts)
+                     (concat "Reviews that name a path that is no scope's\n"
+                             (format "  %-54s %s\n" "work/index"
+                                     "shpo  TODO Review the shop")
+                             (format "  %-54s %s\n" "work/index"
+                                     "yard/index.org  TODO Review the shop")))))
+    (let ((rows (pos-startup-view-items root "reviews-to-schedule")))
+      (should (member "work/shop" (mapcar (lambda (row) (alist-get 'scope row))
+                                          rows)))
+      (should (equal (car (last rows 2))
+                     '((scope . "work") (scope_kind . "responsibility")
+                       (status . :null) (covers . "shpo")
+                       (file . "work/index.org") (line . 3)
+                       (title . "Review the shop")))))))
+
 (ert-deftest pos-startup/the-root-pair-reviews-the-whole-tree ()
   "The root's reviews are listed as the root's, and a root without one is named.
 A root holds its reviews in any Org file of its own, here life.org:
