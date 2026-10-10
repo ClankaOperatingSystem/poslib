@@ -53,6 +53,7 @@
 ;; - `pos-tree-apply': do a plan, and return the plan that remains.
 ;; - `pos-tree-install': do only what a plan installs and links.
 ;; - `pos-tree-batch': the command line.
+;; - `pos-tree-refuse': signal a refusal, for this module and its callers.
 
 ;;; Code:
 
@@ -66,7 +67,7 @@
 
 (define-error 'pos-tree-refused "Tree configuration refused")
 
-(defun pos-tree--refuse (kind format &rest args)
+(defun pos-tree-refuse (kind format &rest args)
   "Signal a refusal of KIND, with a message from FORMAT and ARGS."
   (signal 'pos-tree-refused (list kind (apply #'format format args))))
 
@@ -85,7 +86,7 @@ Refuse a path that does not stay beneath its node."
                     (substring value 0 -1)
                   value)))
       (unless (pos-path-safe-p path)
-        (pos-tree--refuse 'bad-path "Not a path for %s: %s" what value))
+        (pos-tree-refuse 'bad-path "Not a path for %s: %s" what value))
       path)))
 
 (defun pos-tree--mapping-p (value)
@@ -122,7 +123,7 @@ after WHERE, the mapping's place in the file, and the key is left
 unread: a file written for a newer reader is read with that key's
 default."
   (unless (pos-tree--mapping-p value)
-    (pos-tree--refuse 'not-a-mapping "%s is not a mapping" what))
+    (pos-tree-refuse 'not-a-mapping "%s is not a mapping" what))
   (dolist (pair value)
     (unless (assoc (car pair) keys)
       (push (format "unknown-key: %s%s" (if where (concat where ".") "") (car pair))
@@ -133,9 +134,9 @@ default."
                          (typed (and pair (pos-tree--typed (cdr pair) type))))
               (cond
                (typed (list (cons (intern name) (car typed))))
-               (pair (pos-tree--refuse 'wrong-type "%s: %s is not a %s"
-                                       what name type))
-               (required (pos-tree--refuse 'missing-key "%s lacks %s" what name)))))
+               (pair (pos-tree-refuse 'wrong-type "%s: %s is not a %s"
+                                      what name type))
+               (required (pos-tree-refuse 'missing-key "%s lacks %s" what name)))))
           keys))
 
 (defun pos-tree--distinct (paths what)
@@ -143,7 +144,7 @@ default."
   (let ((seen nil))
     (dolist (path paths)
       (when (member path seen)
-        (pos-tree--refuse 'bad-path "%s is named twice: %s" what path))
+        (pos-tree-refuse 'bad-path "%s is named twice: %s" what path))
       (push path seen))))
 
 (defun pos-tree--children (entries)
@@ -157,13 +158,13 @@ default."
                           ("branch" string nil))
                         (format "children[%d]" index))
               (unless (pos-path-safe-p .path)
-                (pos-tree--refuse 'bad-path "Not a child's path: %s" .path))
+                (pos-tree-refuse 'bad-path "Not a child's path: %s" .path))
               ;; A branch is a repository's: a child with no remote is
               ;; a directory of this one.
               (when (and (not .remote) .branch)
-                (pos-tree--refuse 'bad-value
-                                  "A child with no remote has no branch: %s"
-                                  .path))
+                (pos-tree-refuse 'bad-value
+                                 "A child with no remote has no branch: %s"
+                                 .path))
               `((path . ,.path) (remote . ,(or .remote :null))
                 (branch . ,(if .remote (or .branch "master") :null)))))
           entries)))
@@ -171,8 +172,8 @@ default."
       (dolist (b children)
         (when (and (not (eq a b))
                    (pos-path-within-p (alist-get 'path b) (alist-get 'path a)))
-          (pos-tree--refuse 'bad-path "A child's path is another's or beneath it: %s"
-                            (alist-get 'path b)))))
+          (pos-tree-refuse 'bad-path "A child's path is another's or beneath it: %s"
+                           (alist-get 'path b)))))
     children))
 
 (defun pos-tree--check-methodologies (at children)
@@ -185,10 +186,10 @@ clankos."
         (let ((name (and (> (length path) (length at))
                          (substring path (1+ (length at))))))
           (when (or (not name) (string-match-p "/" name))
-            (pos-tree--refuse 'bad-path "A methodology is one part beneath %s: %s"
-                              at path))
+            (pos-tree-refuse 'bad-path "A methodology is one part beneath %s: %s"
+                             at path))
           (when (equal name "clankos")
-            (pos-tree--refuse 'bad-value "The name clankos is reserved: %s" path)))))))
+            (pos-tree-refuse 'bad-value "The name clankos is reserved: %s" path)))))))
 
 (defun pos-tree-methodologies (config)
   "Return the methodologies CONFIG declares, each (NAME . PATH), by name.
@@ -209,8 +210,8 @@ is relative to the node.  None for a node that is no project."
   "Refuse if PATH, a WHAT's scope, is one of CHILDREN or beneath one."
   (dolist (child children)
     (when (pos-path-within-p path (alist-get 'path child))
-      (pos-tree--refuse 'bad-path "%s is in a child, which declares its own: %s"
-                        what path))))
+      (pos-tree-refuse 'bad-path "%s is in a child, which declares its own: %s"
+                       what path))))
 
 (defun pos-tree--worktrees (entries children)
   "Return the worktrees in ENTRIES, a sequence, checked, defaults filled in.
@@ -226,12 +227,12 @@ CHILDREN are the repository's children, already checked."
               (unless (and (pos-path-safe-p .path)
                            (string-match "\\`\\(?:\\(.+\\)/\\)?_worktrees/[^/]+\\'"
                                          .path))
-                (pos-tree--refuse 'bad-path "Not a worktree's path: %s" .path))
+                (pos-tree-refuse 'bad-path "Not a worktree's path: %s" .path))
               (when-let* ((scope (match-string 1 .path)))
                 (pos-tree--own-scope scope children "A worktree"))
               (unless (eq (null .of) (not (null .remote)))
-                (pos-tree--refuse 'bad-value "A worktree has one of of and remote: %s"
-                                  .path))
+                (pos-tree-refuse 'bad-value "A worktree has one of of and remote: %s"
+                                 .path))
               (cond
                (.remote `((path . ,.path) (remote . ,.remote)
                           (branch . ,(or .branch "master"))))
@@ -239,11 +240,11 @@ CHILDREN are the repository's children, already checked."
                                  (and (equal (alist-get 'path child) .of)
                                       (stringp (alist-get 'remote child))))
                                children))
-                (pos-tree--refuse 'bad-value
-                                  "A worktree is of no declared child with a remote: %s"
-                                  .of))
+                (pos-tree-refuse 'bad-value
+                                 "A worktree is of no declared child with a remote: %s"
+                                 .of))
                ((not .branch)
-                (pos-tree--refuse 'missing-key "A worktree of a child lacks branch"))
+                (pos-tree-refuse 'missing-key "A worktree of a child lacks branch"))
                (t `((path . ,.path) (of . ,.of) (branch . ,.branch))))))
           entries)))
     (pos-tree--distinct (mapcar (lambda (w) (alist-get 'path w)) worktrees)
@@ -264,30 +265,30 @@ CHILDREN are the repository's children, already checked."
                         (format "archives[%d]" index))
               (unless (equal .scope ".")
                 (unless (pos-path-safe-p .scope)
-                  (pos-tree--refuse 'bad-path "Not a scope's path: %s" .scope))
+                  (pos-tree-refuse 'bad-path "Not a scope's path: %s" .scope))
                 (pos-tree--own-scope .scope children "An archive"))
               (unless (member .kept '("committed" "uncommitted" "remote"))
-                (pos-tree--refuse 'bad-value "An archive is not kept %s" .kept))
+                (pos-tree-refuse 'bad-value "An archive is not kept %s" .kept))
               (when (and .ledger
                          (not (let ((case-fold-search nil))
                                 (string-match-p pos-tree--uuid-regexp .ledger))))
-                (pos-tree--refuse 'bad-value "Not a ledger's id: %s" .ledger))
+                (pos-tree-refuse 'bad-value "Not a ledger's id: %s" .ledger))
               (when (and .sweep (not (member .sweep '("weekly" "sealed"))))
-                (pos-tree--refuse 'bad-value "Done items are swept weekly or sealed, not %s"
-                                  .sweep))
+                (pos-tree-refuse 'bad-value "Done items are swept weekly or sealed, not %s"
+                                 .sweep))
               (when (and .path (not (equal .sweep "weekly")))
-                (pos-tree--refuse 'bad-value "Only a weekly sweep has a path: %s" .scope))
+                (pos-tree-refuse 'bad-value "Only a weekly sweep has a path: %s" .scope))
               (let ((ledger (and .ledger `((ledger . ,.ledger))))
                     (sweep (append (and .sweep `((sweep . ,.sweep)))
                                    (and .path `((path . ,(pos-tree--location .path "path")))))))
                 (cond
                  ((not (equal .kept "remote"))
                   (when .url
-                    (pos-tree--refuse 'bad-value "Only a remote archive has a url: %s"
-                                      .scope))
+                    (pos-tree-refuse 'bad-value "Only a remote archive has a url: %s"
+                                     .scope))
                   `((scope . ,.scope) (kept . ,.kept) ,@ledger ,@sweep))
                  (.url `((scope . ,.scope) (kept . ,.kept) ,@ledger (url . ,.url) ,@sweep))
-                 (t (pos-tree--refuse 'missing-key "A remote archive lacks url"))))))
+                 (t (pos-tree-refuse 'missing-key "A remote archive lacks url"))))))
           entries)))
     (pos-tree--distinct (mapcar (lambda (a) (alist-get 'scope a)) archives)
                         "An archive's scope")
@@ -295,7 +296,7 @@ CHILDREN are the repository's children, already checked."
       (dolist (archive archives)
         (when-let* ((ledger (alist-get 'ledger archive)))
           (when (member ledger seen)
-            (pos-tree--refuse 'bad-value "A ledger is named twice: %s" ledger))
+            (pos-tree-refuse 'bad-value "A ledger is named twice: %s" ledger))
           (push ledger seen))))
     archives))
 
@@ -314,7 +315,7 @@ without it the entry would read as a name.  Nil for nil."
     (vconcat
      (seq-map (lambda (entry)
                 (unless (pos-tree--typed entry 'string)
-                  (pos-tree--refuse 'wrong-type "exclude: an entry is not a string"))
+                  (pos-tree-refuse 'wrong-type "exclude: an entry is not a string"))
                 (if (string-match-p "/" entry)
                     (let ((path (pos-tree--location entry "exclude")))
                       (if (string-match-p "/" path) path (concat path "/")))
@@ -369,13 +370,13 @@ message, for a file doc/pos-directory.txt does not allow."
                                        :object-key-type 'string
                                        :sequence-type 'array
                                        :string-values t)
-                  (error (pos-tree--refuse 'not-yaml "Not readable as YAML")))))
+                  (error (pos-tree-refuse 'not-yaml "Not readable as YAML")))))
     (unless (pos-tree--mapping-p parsed)
-      (pos-tree--refuse 'not-a-mapping "The file is not a mapping"))
+      (pos-tree-refuse 'not-a-mapping "The file is not a mapping"))
     (let ((version (car (pos-tree--typed (cdr (assoc "pos" parsed)) 'integer))))
       (when (and version (/= version 2))
-        (pos-tree--refuse 'unknown-version "Not a version this reader knows: %s"
-                          version)))
+        (pos-tree-refuse 'unknown-version "Not a version this reader knows: %s"
+                         version)))
     (let* ((top (pos-tree--mapping
                  parsed "The file"
                  '(("pos" integer t) ("projects" string nil)
@@ -391,8 +392,8 @@ message, for a file doc/pos-directory.txt does not allow."
            (children (pos-tree--children (alist-get 'children top)))
            (server (assq 'server top)))
       (when (and projects methodologies)
-        (pos-tree--refuse 'bad-value
-                          "A node says where its projects belong or its methodologies, not both"))
+        (pos-tree-refuse 'bad-value
+                         "A node says where its projects belong or its methodologies, not both"))
       (when methodologies
         (pos-tree--check-methodologies methodologies children))
       ;; A tool with no YAML reader finds the image by its line.
@@ -402,8 +403,8 @@ message, for a file doc/pos-directory.txt does not allow."
                              (string-match-p
                               (concat "^image: " (regexp-quote image) "$")
                               text)))))
-        (pos-tree--refuse 'bad-value
-                          "The image is not on one line, as image: NAME, unquoted"))
+        (pos-tree-refuse 'bad-value
+                         "The image is not on one line, as image: NAME, unquoted"))
       `((kind . ,(cond (projects "responsibility") (methodologies "project")
                        (t :null)))
         (projects . ,(or projects :null))
@@ -442,7 +443,7 @@ written."
               (pos-path-safe-p (if (and (> (length value) 1) (string-suffix-p "/" value))
                                    (substring value 0 -1)
                                  value)))
-    (pos-tree--refuse 'bad-path "Not a path or a URL for %s: %s" what value))
+    (pos-tree-refuse 'bad-path "Not a path or a URL for %s: %s" what value))
   value)
 
 (defun pos-tree--kinds (entries)
@@ -456,10 +457,10 @@ written."
                      ("derived" string nil) ("entrance" string nil))
                    (format "canon[%d]" index))
          (when (member .kind names)
-           (pos-tree--refuse 'bad-value "A kind is declared twice: %s" .kind))
+           (pos-tree-refuse 'bad-value "A kind is declared twice: %s" .kind))
          (push .kind names)
          (unless (member .derived '(nil "true" "false"))
-           (pos-tree--refuse 'bad-value "derived is true or false: %s" .kind))
+           (pos-tree-refuse 'bad-value "derived is true or false: %s" .kind))
          `((kind . ,.kind)
            (at . ,(pos-tree--declared-path .at "at"))
            (format . ,(or .format :null))
@@ -474,11 +475,11 @@ written."
   (seq-map (lambda (name)
              (let ((typed (pos-tree--typed name 'string)))
                (unless typed
-                 (pos-tree--refuse 'wrong-type "A check is not a string"))
+                 (pos-tree-refuse 'wrong-type "A check is not a string"))
                (when (string-match-p "/" (car typed))
-                 (pos-tree--refuse 'bad-value
-                                   "A check is a name in bin/, not a path: %s"
-                                   (car typed)))
+                 (pos-tree-refuse 'bad-value
+                                  "A check is a name in bin/, not a path: %s"
+                                  (car typed)))
                (car typed)))
            names))
 
@@ -495,13 +496,13 @@ strings, one for each key this reader does not know.  Signal
                                        :object-key-type 'string
                                        :sequence-type 'array
                                        :string-values t)
-                  (error (pos-tree--refuse 'not-yaml "Not readable as YAML")))))
+                  (error (pos-tree-refuse 'not-yaml "Not readable as YAML")))))
     (unless (pos-tree--mapping-p parsed)
-      (pos-tree--refuse 'not-a-mapping "The declaration is not a mapping"))
+      (pos-tree-refuse 'not-a-mapping "The declaration is not a mapping"))
     (let ((version (car (pos-tree--typed (cdr (assoc "methodology" parsed)) 'integer))))
       (when (and version (/= version 1))
-        (pos-tree--refuse 'unknown-version "Not a version this reader knows: %s"
-                          version)))
+        (pos-tree-refuse 'unknown-version "Not a version this reader knows: %s"
+                         version)))
     (let ((top (pos-tree--mapping
                 parsed "The declaration"
                 '(("methodology" integer t) ("canon" sequence nil)
@@ -562,8 +563,8 @@ That is, if its info/exclude holds the line this tool writes for PATH."
   "Return the one of FILES, the configuration paths found in a node, or nil.
 Signal `pos-tree-refused' if there are two."
   (when (cdr files)
-    (pos-tree--refuse 'two-configurations "Two configurations: %s"
-                      (string-join files ", ")))
+    (pos-tree-refuse 'two-configurations "Two configurations: %s"
+                     (string-join files ", ")))
   (car files))
 
 (defun pos-tree-config-file (dir)
@@ -655,7 +656,7 @@ repository that have a configuration of their own, each (DIR . CONFIG)."
     (when (or starts ends)
       (unless (and (= (length starts) 1) (= (length ends) 1)
                    (< (car starts) (car ends)))
-        (pos-tree--refuse 'archive-excludes "Damaged archive exclude block"))
+        (pos-tree-refuse 'archive-excludes "Damaged archive exclude block"))
       (cons (car starts) (min (length text) (car ends))))))
 
 (defun pos-tree--archive-text (dir paths)
@@ -665,7 +666,7 @@ anchored, directory-only Git patterns."
   (let* ((file (pos-tree--exclude-file dir))
          (old (with-temp-buffer
                 (when (file-symlink-p file)
-                  (pos-tree--refuse 'archive-excludes "The exclude file is a symbolic link"))
+                  (pos-tree-refuse 'archive-excludes "The exclude file is a symbolic link"))
                 (when (file-exists-p file) (insert-file-contents file))
                 (buffer-string)))
          (bounds (pos-tree--archive-block old))
@@ -982,11 +983,11 @@ for each file."
   "Refuse SOURCE, a directory to install from, unless it is one.
 It names its version, and each of its skills is named clankos-NAME."
   (unless (pos-tree--version source)
-    (pos-tree--refuse 'bad-source "The source names no version: %s" source))
+    (pos-tree-refuse 'bad-source "The source names no version: %s" source))
   (dolist (name (pos-tree--held source "skills"))
     (unless (string-prefix-p "clankos-" name)
-      (pos-tree--refuse 'bad-source "A skill's name does not begin clankos-: %s"
-                        name))))
+      (pos-tree-refuse 'bad-source "A skill's name does not begin clankos-: %s"
+                       name))))
 
 (defun pos-tree--auto (dir)
   "Return the auto directory of the repository at DIR, or nil.
@@ -1256,7 +1257,7 @@ if ROOT is not a repository, or SOURCE not a source."
          (pos-tree--findings nil)
          (pos-tree--warnings-found nil))
     (unless (pos-tree--repository-p dir)
-      (pos-tree--refuse 'not-a-repository "Not a repository: %s" root))
+      (pos-tree-refuse 'not-a-repository "Not a repository: %s" root))
     (when pos-tree--source (pos-tree--check-source pos-tree--source))
     (condition-case err
         (pos-tree--installs (pos-tree--mounts dir (pos-tree--config dir nil)))
@@ -1275,7 +1276,7 @@ if ROOT is not a repository, or SOURCE not a source."
   (let* ((process-environment (cons "GIT_TERMINAL_PROMPT=0" process-environment))
          (result (apply #'pos-tree--git dir args)))
     (unless (eq (car result) 0)
-      (pos-tree--refuse 'failed "git %s: %s" (string-join args " ") (cdr result)))))
+      (pos-tree-refuse 'failed "git %s: %s" (string-join args " ") (cdr result)))))
 
 (defun pos-tree--do (root action &optional source)
   "Do ACTION, of a plan for the tree at ROOT, a directory name.
@@ -1285,7 +1286,7 @@ SOURCE is the directory an install copies."
       ("install"
        (let ((auto (expand-file-name .path root)))
          (unless source
-           (pos-tree--refuse 'failed "No source to install from: %s" .path))
+           (pos-tree-refuse 'failed "No source to install from: %s" .path))
          (cond
           ((and (file-directory-p auto) (not (file-symlink-p auto)))
            (delete-directory auto t))
@@ -1328,20 +1329,20 @@ SOURCE is the directory an install copies."
       ("link"
        (let ((link (expand-file-name .path root)))
          (when (or (file-symlink-p link) (file-exists-p link))
-           (pos-tree--refuse 'failed "Something is at %s" .path))
+           (pos-tree-refuse 'failed "Something is at %s" .path))
          (make-directory (file-name-directory link) t)
          (condition-case err
              (make-symbolic-link .target link)
            (file-error
-            (pos-tree--refuse 'failed "Cannot make a symbolic link at %s: %s"
-                              .path (error-message-string err))))))
+            (pos-tree-refuse 'failed "Cannot make a symbolic link at %s: %s"
+                             .path (error-message-string err))))))
       ("unlink"
        (let ((link (expand-file-name .path root)))
          (unless (or (file-symlink-p link)
                      (equal (file-name-nondirectory link) pos-tree--note))
-           (pos-tree--refuse 'failed "Not a link or a note: %s" .path))
+           (pos-tree-refuse 'failed "Not a link or a note: %s" .path))
          (delete-file link)))
-      (_ (pos-tree--refuse 'failed "Not an action this tool does: %s" .do)))))
+      (_ (pos-tree-refuse 'failed "Not an action this tool does: %s" .do)))))
 
 (defun pos-tree-apply (root plan &optional source)
   "Do the actions of PLAN in the tree at ROOT, and return the plan that remains.
@@ -1354,7 +1355,7 @@ network."
   (let ((dir (file-name-as-directory (expand-file-name root)))
         (fresh (pos-tree-plan root source)))
     (unless (equal (pos-bytes-json fresh) (pos-bytes-json plan))
-      (pos-tree--refuse 'stale-plan "The tree no longer gives this plan"))
+      (pos-tree-refuse 'stale-plan "The tree no longer gives this plan"))
     (seq-doseq (action (alist-get 'actions fresh))
       (pos-tree--do dir action (and source (expand-file-name source))))
     (pos-tree-plan root source)))

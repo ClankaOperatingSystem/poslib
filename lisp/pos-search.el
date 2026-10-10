@@ -103,14 +103,14 @@ a mode not in MODES, `pos-search-modes' by default, and `request' for
 an expression that does not parse."
   (let ((modes (or modes pos-search-modes)))
     (unless (member mode modes)
-      (pos-ledger--refuse 'mode "Not a mode this keeper searches in, %s: %s" modes mode))
+      (pos-ledger-refuse 'mode "Not a mode this keeper searches in, %s: %s" modes mode))
     (if (equal mode "literal")
         (lambda (line) (string-search query line))
       (let ((regexp (condition-case err
                         (pos-search--regexp query)
                       (invalid-regexp
-                       (pos-ledger--refuse 'request "Not a regular expression: %s"
-                                           (error-message-string err))))))
+                       (pos-ledger-refuse 'request "Not a regular expression: %s"
+                                          (error-message-string err))))))
         (lambda (line) (string-match-p regexp line))))))
 
 (defun pos-search-lines (bytes)
@@ -145,10 +145,10 @@ protocol wants of literal and regex.  MODE is literal where nil; LIMIT,
 a positive integer, keeps the first hits, `pos-search-limit' where nil;
 MODES is what is served, `pos-search-modes' by default."
   (unless (and (stringp query) (not (string-empty-p query)))
-    (pos-ledger--refuse 'request "Expected q, the query"))
+    (pos-ledger-refuse 'request "Expected q, the query"))
   (let ((limit (or limit pos-search-limit)))
     (unless (and (integerp limit) (> limit 0))
-      (pos-ledger--refuse 'request "limit is a positive integer: %S" limit))
+      (pos-ledger-refuse 'request "limit is a positive integer: %S" limit))
     (let ((hit-p (pos-search-matcher query (or mode "literal") modes))
           hits (left limit))
       (cl-loop for (ref . read) in sources
@@ -183,7 +183,7 @@ CID, then the path beneath that holder where the file is not the whole."
 Beneath a directory that is.  Refuse `absent' where nothing in CIDS has it."
   (let ((bases (mapcar #'car (seq-filter (lambda (pair) (equal (cdr pair) within)) cids))))
     (unless bases
-      (pos-ledger--refuse 'absent "The ledger enrols nothing under %s" within))
+      (pos-ledger-refuse 'absent "The ledger enrols nothing under %s" within))
     (lambda (path)
       (seq-some (lambda (base) (or (equal base ".") (pos-path-within-p path base)))
                 bases))))
@@ -233,8 +233,8 @@ only where none does."
                   (when keeper
                     (let ((search (alist-get 'search (pos-remote-describe keeper))))
                       (when (or (null search) (eq search :null))
-                        (pos-ledger--refuse 'absent "The keeper of %s does not search: %s"
-                                            archive url))))
+                        (pos-ledger-refuse 'absent "The keeper of %s does not search: %s"
+                                           archive url))))
                   (let ((hits (condition-case err
                                   (if keeper
                                       (append (alist-get 'hits (pos-remote-search
@@ -251,7 +251,7 @@ only where none does."
                         (push (cons archive hits) answers)
                         (when left (setq left (- left (length hits)))))))))
     (unless enrolled
-      (pos-ledger--refuse 'absent "No archive under %s enrols anything under %s" root within))
+      (pos-ledger-refuse 'absent "No archive under %s enrols anything under %s" root within))
     (nreverse answers)))
 
 ;;;; The command
@@ -275,7 +275,7 @@ for the caller to print the usage."
       (let ((limit (cdr (assoc "--limit" options))))
         (when limit
           (unless (and (string-match-p "\\`[0-9]+\\'" limit) (> (string-to-number limit) 0))
-            (pos-ledger--refuse 'request "limit is a positive integer: %s" limit))
+            (pos-ledger-refuse 'request "limit is a positive integer: %s" limit))
           (setq limit (string-to-number limit)))
         (let ((answers (pos-search-scope root query (cdr (assoc "--mode" options)) limit
                                          (cdr (assoc "--within" options)))))

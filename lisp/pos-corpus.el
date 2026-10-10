@@ -142,7 +142,7 @@ two-configurations, and :names, the names in it, sorted."
            ;; and the caller does not enter the directory.
            (condition-case err
                (if (eq text 'two-configurations)
-                   (pos-tree--refuse 'two-configurations "The node has two configurations")
+                   (pos-tree-refuse 'two-configurations "The node has two configurations")
                  (pos-tree-read-config text))
              (pos-tree-refused
               (push (cons (if (equal path "") "." path)

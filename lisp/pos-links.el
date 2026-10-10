@@ -61,8 +61,8 @@ files hold (unresolved)."
     (cond
      ((null places) (cons (concat pos-links-no-file id) ""))
      ((cdr places)
-      (pos-ledger--refuse 'unresolved "Two files hold the ID %s: %s" id
-                          (mapconcat #'car (reverse places) ", ")))
+      (pos-ledger-refuse 'unresolved "Two files hold the ID %s: %s" id
+                         (mapconcat #'car (reverse places) ", ")))
      (t (car places)))))
 
 (defun pos-links--org (&optional ids)
@@ -215,7 +215,7 @@ FROM must be at OFFSET."
                    (from (encode-coding-string from 'utf-8))
                    (to (encode-coding-string to 'utf-8)))
         (unless (equal from (substring out offset (+ offset (length from))))
-          (pos-ledger--refuse 'plan "Link not where it was planned, at byte %d" offset))
+          (pos-ledger-refuse 'plan "Link not where it was planned, at byte %d" offset))
         (setq out (concat (substring out 0 offset) to
                           (substring out (+ offset (length from)))))))
     out))
@@ -240,7 +240,7 @@ FROM must be at OFFSET."
                       (seq-find (lambda (c) (pos-path-within-p rel c)) collections)
                       (and (assoc rel entries) rel))))
         (unless item
-          (pos-ledger--refuse 'unsealed "Link to an archived path not sealed: %s" target))
+          (pos-ledger-refuse 'unsealed "Link to an archived path not sealed: %s" target))
         (let ((path (expand-file-name item archive)))
           (concat "ipfs://"
                   (cond ((pos-ledger-kept archive)
@@ -322,7 +322,7 @@ is cited."
 The link is the one a sealed item's link to PATH is rewritten to."
   (let ((target (directory-file-name (expand-file-name path))))
     (unless (pos-links--archive-of target)
-      (pos-ledger--refuse 'unsealed "Not a path in an archive: %s" target))
+      (pos-ledger-refuse 'unsealed "Not a path in an archive: %s" target))
     (pos-links--sealed target)))
 
 (provide 'pos-links)

@@ -141,7 +141,7 @@ As (ISSUER CLIENT SCOPES), SCOPES a list."
          (scopes (and (listp told) (alist-get 'scopes_supported told))))
     (unless (and (stringp issuer) (stringp client) (vectorp scopes)
                  (seq-every-p #'stringp scopes))
-      (pos-ledger--refuse 'access "This keeper does not say how to sign in: %s" origin))
+      (pos-ledger-refuse 'access "This keeper does not say how to sign in: %s" origin))
     (list issuer client (append scopes nil))))
 
 (defun pos-signin--endpoints (issuer)
@@ -153,7 +153,7 @@ As (ISSUER CLIENT SCOPES), SCOPES a list."
          (authorization (and (listp told) (alist-get 'authorization_endpoint told)))
          (token (and (listp told) (alist-get 'token_endpoint told))))
     (unless (and (stringp authorization) (stringp token))
-      (pos-ledger--refuse 'remote "The issuer does not say where to sign in: %s" issuer))
+      (pos-ledger-refuse 'remote "The issuer does not say where to sign in: %s" issuer))
     (cons authorization token)))
 
 ;;;; Tokens
@@ -292,11 +292,11 @@ within TIMEOUT seconds; refuse `access' otherwise."
             (accept-process-output nil 0.2)))
       (delete-process server))
     (unless found
-      (pos-ledger--refuse 'access "Nobody signed in before the wait ran out"))
+      (pos-ledger-refuse 'access "Nobody signed in before the wait ran out"))
     (unless (and (equal (cadr (assoc "state" found)) state) (assoc "code" found))
-      (pos-ledger--refuse 'access "Signing in was refused: %s"
-                          (or (cadr (assoc "error" found))
-                              "the answer was not the one asked for")))
+      (pos-ledger-refuse 'access "Signing in was refused: %s"
+                         (or (cadr (assoc "error" found))
+                             "the answer was not the one asked for")))
     (cons (cadr (assoc "code" found)) redirect)))
 
 (defun pos-signin (url &optional timeout)
@@ -343,7 +343,7 @@ expires_at and opened, whether a browser was."
                                         ("code_verifier" . ,verifier)))
                              asked)))
         (unless granted
-          (pos-ledger--refuse 'access "The issuer gave no token for the code: %s" issuer))
+          (pos-ledger-refuse 'access "The issuer gave no token for the code: %s" issuer))
         (setq kept (pos-signin--load))
         (setcar kept (cons (cons key granted)
                            (seq-remove (lambda (pair) (equal (car pair) key))
