@@ -35,6 +35,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   by its scope.
   The same views as JSON give each item's file, line, ID, state,
   dates, properties and body.
+  The views of a weekly review are one set, with what was finished
+  in the week.
 - =lisp/pos-roam.el= :: the org-roam index of a tree, brought up to date
   before a command reads it: where the =id:= links to a heading are, for
   dedupe to point them at the copy it keeps. The user's own index serves
