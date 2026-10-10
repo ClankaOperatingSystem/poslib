@@ -49,6 +49,7 @@
 
 (declare-function pos-index-bytes "pos-index" (uri &optional directory))
 (declare-function pos-search-command "pos-search" (args))
+(declare-function pos-referrers "pos-referrers" (root path))
 
 ;;;; Items
 
@@ -1274,6 +1275,9 @@ and skipped, each an archive with the reason."
   fetch LINK
       print the bytes of the archived file LINK names, an ipfs:// link,
       from a scope above the current directory: on disk or its keeper's
+  links-into ROOT PATH
+      print each link in the Org files of the tree at ROOT that leads
+      to PATH or into it, by file or by ID, as FILE:LINE: LINK -> FILE
   search ROOT QUERY [--mode MODE] [--limit N] [--within CID]
       print each line QUERY is found on in the archives under ROOT, on
       disk or at their keepers, as LINK:LINE:TEXT; exit 1 with none
@@ -1354,6 +1358,14 @@ Exit 0 done or clean, 1 findings, 2 refused.
          (require 'pos-index)
          ;; The file's bytes as they are: `princ' would encode them.
          (send-string-to-terminal (pos-index-bytes link)))
+        (`("links-into" ,root ,path)
+         (require 'pos-referrers)
+         (let ((root (file-name-as-directory (expand-file-name root))))
+           (pcase-dolist (`(,file ,line ,text ,target)
+                          (pos-referrers root path))
+             (princ (format "%s:%d: %s -> %s\n"
+                            (file-relative-name file root) line text
+                            (file-relative-name target root))))))
         (`("search" ,root ,query . ,options)
          (require 'pos-search)
          (let ((status (pos-search-command (cons root (cons query options)))))
