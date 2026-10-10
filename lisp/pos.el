@@ -216,11 +216,72 @@ The files are those of the corpus a command may write."
      (when (string-prefix-p "Merged copy from " (org-get-heading t t t t))
        (pos--finding file "merged copy awaiting reconciliation with its parent")))))
 
+(defun pos-lint-clarified-in-intray (file)
+  "Report items under Unsorted in FILE, an intray.org, that are not TODO.
+An intray holds what is captured and not yet clarified.  An item that
+is NEXT, WAITING or SOMEDAY has been clarified and belongs where its
+work is; a done one is finished and waits to be retired."
+  (when (string= "intray.org" (file-name-nondirectory file))
+    (pos--map-headings
+     file
+     (lambda ()
+       (let ((state (org-get-todo-state)))
+         (when (and state (not (string= state "TODO"))
+                    (string= "Unsorted" (or (car (org-get-outline-path)) "")))
+           (pos--finding
+            file
+            (format (if (org-entry-is-done-p)
+                        "%s item in the intray: finished, to be retired"
+                      "%s item in the intray: clarified, to be placed")
+                    state))))))))
+
+(defun pos--entry-text ()
+  "Return the text of the entry at point, without its children.
+The planning line and the drawers are part of it."
+  (save-excursion
+    (org-back-to-heading t)
+    (forward-line 1)
+    (buffer-substring-no-properties
+     (point) (save-excursion (outline-next-heading) (point)))))
+
+(defun pos-lint-waiting-without-who-or-when (file)
+  "Report WAITING items in FILE that do not say who or what, or since when.
+An item says who or what it waits on in a DELEGATED_TO property or
+in its own text.  It says since when in the record of its change to
+WAITING, as `pos-set-state' writes it, or in a date in its own text,
+a timestamp or YYYY-MM-DD."
+  (pos--map-headings
+   file
+   (lambda ()
+     (when (equal (org-get-todo-state) "WAITING")
+       (let* ((text (pos--entry-text))
+              (end (save-excursion (outline-next-heading) (point)))
+              (own (save-excursion
+                     (org-end-of-meta-data t)
+                     (string-trim
+                      (buffer-substring-no-properties
+                       (min (point) end) end))))
+              (who (or (org-entry-get nil "DELEGATED_TO")
+                       (not (string-empty-p own))))
+              (since (or (string-match-p "^[ \t]*- State \"WAITING\"" text)
+                         (string-match-p
+                          "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" own))))
+         (cond ((and who since) nil)
+               (who (pos--finding
+                     file "WAITING item does not say since when"))
+               (since (pos--finding
+                       file "WAITING item does not say who or what it waits on"))
+               (t (pos--finding
+                   file (concat "WAITING item does not say who or what it"
+                                " waits on, or since when")))))))))
+
 (defvar pos-lint-checks
   '(pos-lint-done-with-open-children
     pos-lint-stale-keyword
     pos-lint-todo-line
-    pos-lint-merged-copy)
+    pos-lint-merged-copy
+    pos-lint-clarified-in-intray
+    pos-lint-waiting-without-who-or-when)
   "Per-file checks: file to findings.")
 
 (defcustom pos-prose-directories nil

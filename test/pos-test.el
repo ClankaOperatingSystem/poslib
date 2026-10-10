@@ -408,6 +408,69 @@ A word never in any sequence, like LATER, is just a word."
                                  "stale keyword BACKLOG (not in the sequence)"))
                      (pos-lint-stale-keyword file))))))
 
+(ert-deftest pos/an-intray-item-that-is-not-todo-is-a-finding ()
+  "An item under Unsorted in an intray.org that is not TODO is reported.
+NEXT, WAITING and SOMEDAY items have been clarified; DONE and
+CANCELLED ones are finished.  A TODO item is what an intray holds.  A
+heading with no state, an item under another heading of the intray,
+and an item of a file not named intray.org are not reported."
+  (pos-test-with-files root
+      `(("intray.org" . ,(pos-test-lines "* Unsorted"
+                                         "** TODO fine"
+                                         "** NEXT call"
+                                         "** SOMEDAY weld"
+                                         "** DONE paid"
+                                         "** CANCELLED dropped"
+                                         "** A note"
+                                         "* Sorted"
+                                         "** NEXT elsewhere"))
+        ("tasks.org" . "* Unsorted\n** NEXT not an intray\n"))
+    (let ((file (expand-file-name "intray.org" root)))
+      (should (equal (list (list file 3 "NEXT item in the intray: clarified, to be placed")
+                           (list file 4 "SOMEDAY item in the intray: clarified, to be placed")
+                           (list file 5 "DONE item in the intray: finished, to be retired")
+                           (list file 6 "CANCELLED item in the intray: finished, to be retired"))
+                     (pos-lint-clarified-in-intray file)))
+      (should-not (pos-lint-clarified-in-intray
+                   (expand-file-name "tasks.org" root))))))
+
+(ert-deftest pos/a-waiting-item-that-does-not-say-who-or-when-is-a-finding ()
+  "A WAITING item says who or what it waits on, and since when.
+Who or what is a DELEGATED_TO property or the item's own text.  Since
+when is the record of its change to WAITING or a date in its own
+text.  Here bare says neither; roofer says who and not when; logged
+has the record and no text; smith has the property and the record;
+letter says both in its text.  A child's text is not the item's."
+  (pos-test-with-files root
+      `(("tasks.org"
+         . ,(pos-test-lines
+             "* WAITING bare"
+             "** TODO a child"
+             "On the roofer since 2026-10-01."
+             "* WAITING roofer"
+             "On the roofer to ring back."
+             "* WAITING logged"
+             ":LOGBOOK:"
+             "- State \"WAITING\"    from \"TODO\"       [2026-10-01 Thu 09:00]"
+             ":END:"
+             "* WAITING smith"
+             ":PROPERTIES:"
+             ":DELEGATED_TO: smith"
+             ":END:"
+             ":LOGBOOK:"
+             "- State \"WAITING\"    from \"NEXT\"       [2026-10-02 Fri 09:00]"
+             ":END:"
+             "* WAITING letter"
+             "Asked the council on [2026-10-03 Sat]."
+             "* NEXT not waiting")))
+    (let ((file (expand-file-name "tasks.org" root)))
+      (should (equal (list (list file 1 (concat "WAITING item does not say who or"
+                                                " what it waits on, or since when"))
+                           (list file 4 "WAITING item does not say since when")
+                           (list file 6 (concat "WAITING item does not say who or"
+                                                " what it waits on")))
+                     (pos-lint-waiting-without-who-or-when file))))))
+
 (ert-deftest pos/a-todo-line-in-a-file-is-a-finding ()
   "A #+TODO line in a file of the corpus is reported, with the fix to run.
 It overrides the one sequence for that file; `pos-normalise-keywords'
