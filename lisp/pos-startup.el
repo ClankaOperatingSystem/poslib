@@ -34,7 +34,13 @@
 ;;
 ;; - `pos-startup-report': the prompts and the views, as text.
 ;; - `pos-startup-view': one view, as text.
-;; - `pos-startup-batch': shell entry; --view NAME, repeated, picks views.
+;; - `pos-startup-view-items': one view, as data: what each line is of.
+;; - `pos-startup-data': the report as data, for `json-serialize'.
+;; - `pos-startup-batch': shell entry; --view NAME, repeated, picks views;
+;;   --json prints the data.
+;;
+;; The data of a view is gathered while its text is made, an item for
+;; each line, so the two forms cannot differ in what they list.
 
 ;;; Code:
 
@@ -106,6 +112,12 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
 The tree is walked once for it; `pos-startup-view' walks when nothing
 has bound this.")
 
+(defvar pos-startup--gathering nil
+  "Non-nil while a view's lines are also gathered as data.")
+
+(defvar pos-startup--items nil
+  "What is gathered while `pos-startup--gathering', latest first.")
+
 ;;;; Files and scopes
 
 (defun pos-startup--corpus (root)
@@ -163,11 +175,77 @@ scheduled heading tagged `pos-startup-review-tag'."
                 (pos-corpus-scopes-of-kind pos-startup--corpus 'responsibility))
         #'string<))
 
+;;;; Items
+
+(defun pos-startup--scope-row (scope &optional status)
+  "Gather SCOPE, a `pos-scope', as a line of a view of scopes.
+STATUS is its project file's STATUS, or nil."
+  (when pos-startup--gathering
+    (push `((scope . ,(pos-scope-path scope))
+            (scope_kind . ,(symbol-name (pos-scope-kind scope)))
+            (status . ,(or status :null)))
+          pos-startup--items)))
+
+(defun pos-startup--item-at-point ()
+  "Return the heading at point as data.
+An alist for `json-serialize': the scope and its kind, the file
+relative to the root, the heading's line, its ID, state, title and
+tags, its SCHEDULED, DEADLINE and CLOSED as written, the properties
+of its drawer by name, named in capitals, and its body, the text of
+the entry itself without its planning line and drawers.  What an
+item lacks is :null."
+  (org-with-wide-buffer
+   (org-back-to-heading t)
+   (let* ((file (buffer-file-name))
+          (scope (pos-corpus-owner pos-startup--corpus file))
+          (end (save-excursion (outline-next-heading) (point)))
+          (text (lambda (value)
+                  (if value (substring-no-properties value) :null))))
+     `((scope . ,(pos-scope-path scope))
+       (scope_kind . ,(symbol-name (pos-scope-kind scope)))
+       (file . ,(file-relative-name file pos-startup--root))
+       (line . ,(line-number-at-pos))
+       (id . ,(funcall text (org-entry-get nil "ID")))
+       (state . ,(funcall text (org-get-todo-state)))
+       (title . ,(funcall text (org-get-heading t t t t)))
+       (tags . ,(vconcat (mapcar #'substring-no-properties
+                                 (org-get-tags nil t))))
+       (scheduled . ,(funcall text (org-entry-get nil "SCHEDULED")))
+       (deadline . ,(funcall text (org-entry-get nil "DEADLINE")))
+       (closed . ,(funcall text (org-entry-get nil "CLOSED")))
+       ;; Org adds CATEGORY, which it works out, to what the drawer has.
+       (properties . ,(mapcar (lambda (property)
+                                (cons (intern (car property))
+                                      (substring-no-properties (cdr property))))
+                              (sort (assoc-delete-all
+                                     "CATEGORY"
+                                     (org-entry-properties nil 'standard))
+                                    (lambda (a b) (string< (car a) (car b))))))
+       (body . ,(save-excursion
+                  (org-end-of-meta-data t)
+                  (string-trim (buffer-substring-no-properties
+                                (min (point) end) end))))))))
+
+(defun pos-startup--gather-agenda ()
+  "Gather the heading of each line of the agenda in the current buffer."
+  (save-excursion
+    (goto-char (point-min))
+    (while (not (eobp))
+      (let ((marker (get-text-property (point) 'org-hd-marker)))
+        (when marker
+          (push (with-current-buffer (marker-buffer marker)
+                  (save-excursion
+                    (goto-char marker)
+                    (pos-startup--item-at-point)))
+                pos-startup--items)))
+      (forward-line 1))))
+
 ;;;; Views
 
 (defun pos-startup--agenda (function)
   "Return what the agenda command FUNCTION displays, as text.
-A link is given as its description."
+A link is given as its description.  While `pos-startup--gathering',
+gather the heading of each line too."
   (let ((buffer (generate-new-buffer " *pos-startup*")))
     (unwind-protect
         (progn
@@ -177,6 +255,7 @@ A link is given as its description."
                 (org-agenda-window-setup 'current-window))
             (funcall function)
             (with-current-buffer (get-buffer org-agenda-buffer-name)
+              (when pos-startup--gathering (pos-startup--gather-agenda))
               (org-link-display-format
                (buffer-substring-no-properties (point-min) (point-max))))))
       (when (buffer-live-p buffer) (kill-buffer buffer))
@@ -223,21 +302,31 @@ and the root, named \".\" as its configuration names it."
   (let ((reviewed (pos-startup--reviewed-scopes))
         projects)
     (dolist (file (pos-startup--files-of-kind 'project))
-      (let ((status (pos-startup--file-status file))
-            (scope (pos-scope-path (pos-corpus-owner pos-startup--corpus file))))
+      (let* ((status (pos-startup--file-status file))
+             (owner (pos-corpus-owner pos-startup--corpus file))
+             (scope (pos-scope-path owner)))
         (when (and (member status pos-startup-active-statuses)
                    (not (member scope reviewed)))
+          (pos-startup--scope-row owner status)
           (push (format "%-54s %s" scope status) projects))))
-    (concat
-     (pos-startup--list "Projects with a review to be scheduled"
-                        (nreverse projects))
-     "\n"
-     (pos-startup--list "Responsibilities with a review to be scheduled"
-                        (seq-remove (lambda (scope) (member scope reviewed))
-                                    (pos-startup--responsibilities)))
-     "\n"
-     (pos-startup--list "Root with a review to be scheduled"
-                        (unless (member "." reviewed) '("."))))))
+    (let ((responsibilities
+           (seq-remove (lambda (scope) (member scope reviewed))
+                       (pos-startup--responsibilities))))
+      (dolist (kind '(responsibility root))
+        (dolist (scope (sort (pos-corpus-scopes-of-kind pos-startup--corpus kind)
+                             (lambda (a b)
+                               (string< (pos-scope-path a) (pos-scope-path b)))))
+          (unless (member (pos-scope-path scope) reviewed)
+            (pos-startup--scope-row scope))))
+      (concat
+       (pos-startup--list "Projects with a review to be scheduled"
+                          (nreverse projects))
+       "\n"
+       (pos-startup--list "Responsibilities with a review to be scheduled"
+                          responsibilities)
+       "\n"
+       (pos-startup--list "Root with a review to be scheduled"
+                          (unless (member "." reviewed) '(".")))))))
 
 (defun pos-startup--has-next-action-p (file)
   "Return non-nil if FILE has an item that is a next action.
@@ -257,15 +346,18 @@ Begun projects, by `pos-startup-stuck-statuses', none of whose files
 has an item in one of `pos-startup-next-action-states'."
   (let (projects)
     (dolist (file (pos-startup--files-of-kind 'project))
-      (let* ((path (pos-scope-path (pos-corpus-owner pos-startup--corpus file)))
+      (let* ((owner (pos-corpus-owner pos-startup--corpus file))
+             (path (pos-scope-path owner))
              (project (or (assoc path projects)
-                          (car (push (list path nil nil) projects)))))
+                          (car (push (list path nil nil owner) projects)))))
         (setf (nth 1 project) (or (nth 1 project) (pos-startup--file-status file)))
         (setf (nth 2 project) (or (nth 2 project)
                                   (pos-startup--has-next-action-p file)))))
     (pos-startup--list
      "Projects with no next action"
-     (mapcar (lambda (project) (format "%-54s %s" (nth 0 project) (nth 1 project)))
+     (mapcar (lambda (project)
+               (pos-startup--scope-row (nth 3 project) (nth 1 project))
+               (format "%-54s %s" (nth 0 project) (nth 1 project)))
              (sort (seq-filter (lambda (project)
                                  (and (member (nth 1 project) pos-startup-stuck-statuses)
                                       (not (nth 2 project))))
@@ -284,6 +376,8 @@ been captured and not yet placed."
            (lambda ()
              (when (and (org-entry-is-todo-p)
                         (string= "Unsorted" (car (org-get-outline-path))))
+               (when pos-startup--gathering
+                 (push (pos-startup--item-at-point) pos-startup--items))
                (push (format "%-54s %s %s" (pos-startup--label)
                              (org-get-todo-state)
                              (org-link-display-format
@@ -365,6 +459,17 @@ Text: a title, then one line for each item, labelled by its scope."
       (_ (user-error "Unknown view: %s (one of %s)"
                      view (string-join pos-startup-views ", "))))))
 
+(defun pos-startup-view-items (root view)
+  "Return what VIEW of the Org files under ROOT lists, as data.
+A list with an element for each line `pos-startup-view' prints, in
+its order.  In a view of items each is an alist as
+`pos-startup--item-at-point' gives it.  In reviews-to-schedule and
+stuck, which list scopes, each has scope, scope_kind and status."
+  (let ((pos-startup--gathering t)
+        (pos-startup--items nil))
+    (pos-startup-view root view)
+    (nreverse pos-startup--items)))
+
 (defun pos-startup--table (rows)
   "Return ROWS, lists of strings, as lines with their columns aligned."
   (let ((widths nil))
@@ -427,22 +532,55 @@ VIEWS defaults to `pos-startup-default-views'."
               (mapconcat (lambda (view) (concat "\n" (pos-startup-view root view)))
                          views "")))))
 
+(defun pos-startup-data (root &optional views)
+  "Return VIEWS of ROOT's Org files as data, for `json-serialize'.
+VIEWS defaults to `pos-startup-default-views'.  An alist: files_read,
+the count of files; not_read, a vector with path and reason for each
+configuration refused; views, each view's name with the vector of
+what `pos-startup-view-items' gives for it.  A view named twice is
+given once."
+  (let ((views (or views pos-startup-default-views)))
+    (dolist (view views)
+      (unless (member view pos-startup-views)
+        (user-error "Unknown view: %s (one of %s)"
+                    view (string-join pos-startup-views ", "))))
+    (let* ((root (file-name-as-directory (expand-file-name root)))
+           (pos-startup--corpus (pos-corpus root)))
+      `((files_read . ,(length (pos-corpus-files pos-startup--corpus)))
+        (not_read . ,(vconcat
+                      (mapcar (lambda (finding)
+                                `((path . ,(format "%s" (car finding)))
+                                  (reason . ,(format "%s" (cdr finding)))))
+                              (pos-corpus-findings pos-startup--corpus))))
+        (views . ,(mapcar (lambda (view)
+                            (cons (intern view)
+                                  (vconcat (pos-startup-view-items root view))))
+                          (seq-uniq views)))))))
+
 (defun pos-startup-batch ()
   "Print the start-up report of `pos-directory'.
 Each --view NAME in `command-line-args-left' names a view to print in
-place of the default ones.  Exit 2 on any other argument."
-  (let (views)
+place of the default ones.  With --json, print `pos-startup-data' as
+JSON and a newline in place of the text.  Exit 2 on any other
+argument."
+  (let (views json)
     (while command-line-args-left
       (let ((argument (pop command-line-args-left)))
-        (if (and (equal argument "--view") command-line-args-left
-                 (member (car command-line-args-left) pos-startup-views))
-            (push (pop command-line-args-left) views)
-          (message "Usage: [--view %s] ..." (string-join pos-startup-views "|"))
-          (kill-emacs 2))))
+        (cond ((equal argument "--json") (setq json t))
+              ((and (equal argument "--view") command-line-args-left
+                    (member (car command-line-args-left) pos-startup-views))
+               (push (pop command-line-args-left) views))
+              (t (message "Usage: [--json] [--view %s] ..."
+                          (string-join pos-startup-views "|"))
+                 (kill-emacs 2)))))
     ;; Each session opens here: the index is kept current as a matter
     ;; of course, so that a later command finds it ready.
     (pos-roam-sync pos-directory)
-    (princ (pos-startup-report pos-directory (nreverse views)))))
+    (if json
+        (princ (concat (json-serialize
+                        (pos-startup-data pos-directory (nreverse views)))
+                       "\n"))
+      (princ (pos-startup-report pos-directory (nreverse views))))))
 
 (provide 'pos-startup)
 ;;; pos-startup.el ends here
