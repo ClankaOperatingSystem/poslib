@@ -50,6 +50,8 @@
 (declare-function pos-index-bytes "pos-index" (uri &optional directory))
 (declare-function pos-search-command "pos-search" (args))
 (declare-function pos-referrers "pos-referrers" (root path))
+(declare-function pos-salvage "pos-salvage" (root source &optional dry-run))
+(declare-function pos-salvage-report "pos-salvage" (root tasks dry-run))
 (declare-function pos-relink-plan "pos-relink" (root seal-plan))
 (declare-function pos-relink-apply "pos-relink" (plan expected))
 
@@ -1270,6 +1272,10 @@ and skipped, each an archive with the reason."
   write-new DESTINATION [--links-from DIR] [--apply]
       print the plan to seal a new record, read from standard input;
       its links read as written from DESTINATION, or from DIR
+  salvage ROOT SOURCE [--dry-run]
+      copy each open task of SOURCE, a file or directory about to be
+      sealed, to the intray of the tree at ROOT, and close the
+      original; run before the seal is planned
   relink ROOT PLAN
       print the plan to rewrite the links to the item PLAN seals, a
       seal plan in a file, in the Org files of the tree at ROOT; made
@@ -1348,6 +1354,18 @@ Exit 0 done or clean, 1 findings, 2 refused.
                             (event . ,(car result)) (root . ,(cdr result))))
                       plan))
                    'utf-8)))))
+        (`("salvage" ,root ,source . ,rest)
+         (unless (member rest '(nil ("--dry-run")))
+           (message "Usage: salvage ROOT SOURCE [--dry-run]")
+           (kill-emacs 2))
+         (require 'pos-salvage)
+         (let ((root (file-name-as-directory (expand-file-name root))))
+           (condition-case err
+               (princ (pos-salvage-report
+                       root (pos-salvage root source (and rest t)) (and rest t)))
+             (user-error
+              (message "salvage: %s" (error-message-string err))
+              (kill-emacs 2)))))
         (`("relink" ,root ,plan-file)
          (require 'pos-relink)
          (princ (decode-coding-string

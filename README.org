@@ -36,6 +36,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   is sealed.
 - =lisp/pos-referrers.el= :: the links in a tree's Org files that lead
   to a path or into it, by file or by ID.
+- =lisp/pos-salvage.el= :: the open tasks of what is about to be
+  sealed, each copied to the intray and closed where it stood, the two
+  citing each other.
 - =lisp/pos-relink.el= :: the links to a sealed item from the rest of
   the tree, rewritten to cite it: a plan made from the seal plan,
   reviewed, then applied after the seal.
