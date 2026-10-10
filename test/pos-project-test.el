@@ -139,5 +139,63 @@ The path is relative to the root."
                      (with-output-to-string (pos-project-batch))))
       (should-not command-line-args-left))))
 
+(defconst pos-project-test-stamp
+  "\\[[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [[:alpha:]]+ [0-9]\\{2\\}:[0-9]\\{2\\}\\]"
+  "A regexp matching an inactive timestamp with a time.")
+
+(ert-deftest pos-project/a-status-is-set-and-the-change-recorded ()
+  "The STATUS is changed in the project's file, and the change recorded.
+The record is a line at the head of a LOGBOOK drawer beneath the
+file's properties, with the time and the note; a second change is
+recorded above the first.  The rest of the file is as it was.  The
+project is named by its path, and the file, the status it had and
+the one it has are returned."
+  (pos-project-test-with-tree
+    (let ((file (pos-project-create root "." "paint" "Paint" "Painted."
+                                    "2030-02-01")))
+      (should (equal (list file "COMMITTED" "WIP")
+                     (pos-project-set-status root "projects/paint" "WIP"
+                                             " Bought the paint ")))
+      (should (equal "DONE" (nth 2 (pos-project-set-status root "projects/paint"
+                                                           "DONE"))))
+      (should (string-match-p
+               (concat "\\`:PROPERTIES:\n:ID: .*\n:STATUS:   DONE\n:CREATED: .*\n:END:\n"
+                       ":LOGBOOK:\n"
+                       "- Status \"DONE\" +from \"WIP\" +" pos-project-test-stamp "\n"
+                       "- Status \"WIP\" +from \"COMMITTED\" +" pos-project-test-stamp
+                       " \\\\\\\\\n  Bought the paint\n"
+                       ":END:\n"
+                       "#\\+TITLE: Paint\n\n\\* Outcome\n\nPainted\\.\n")
+               (pos-test-file-string file))))))
+
+(ert-deftest pos-project/a-status-that-cannot-be-set-is-refused ()
+  "A refusal is a `user-error' and writes nothing.
+Refused: a status not in `pos-project-statuses'; the status the
+project has; a path that is not a project's; a project none of whose
+files has a STATUS, here taken; a note of two lines."
+  (pos-project-test-with-tree
+    (let* ((file (pos-project-create root "." "paint" "Paint" "Painted."
+                                     "2030-02-01"))
+           (text (pos-test-file-string file)))
+      (dolist (arguments '(("projects/paint" "BEGUN")
+                           ("projects/paint" "COMMITTED")
+                           ("projects/absent" "WIP")
+                           ("home" "WIP")
+                           ("projects/taken" "WIP")
+                           ("projects/paint" "WIP" "two\nlines")))
+        (ert-info ((format "%S" arguments))
+          (should-error (apply #'pos-project-set-status root arguments)
+                        :type 'user-error)))
+      (should (equal text (pos-test-file-string file))))))
+
+(ert-deftest pos-project/the-command-sets-a-status ()
+  "The command takes status and the arguments, and prints what changed."
+  (pos-project-test-with-tree
+    (pos-project-create root "." "paint" "Paint" "Painted." "2030-02-01")
+    (let ((pos-directory root)
+          (command-line-args-left (list "status" "projects/paint" "WIP")))
+      (should (equal "projects/paint.org: STATUS WIP, was COMMITTED\n"
+                     (with-output-to-string (pos-project-batch)))))))
+
 (provide 'pos-project-test)
 ;;; pos-project-test.el ends here

@@ -27,9 +27,13 @@
 ;; scheduled review, and its next action when one is known.  The
 ;; start-up views read each of these from the file.
 ;;
+;; A project's STATUS is changed in its file, with the change and its
+;; time recorded in a LOGBOOK drawer beneath the file's properties.
+;;
 ;; - `pos-project-create': command.
+;; - `pos-project-set-status': command.
 ;; - `pos-project-batch': shell entry; create WITHIN NAME TITLE OUTCOME
-;;   REVIEW [NEXT].
+;;   REVIEW [NEXT], or status PROJECT STATUS [NOTE].
 
 ;;; Code:
 
@@ -39,6 +43,13 @@
 (require 'subr-x)
 (require 'pos)
 (require 'pos-corpus)
+(require 'pos-place)
+
+(defcustom pos-project-statuses '("COMMITTED" "WIP" "DONE")
+  "The values a project file's STATUS property takes.
+COMMITTED is a project not begun, WIP one begun, DONE one closed."
+  :type '(repeat string)
+  :group 'pos)
 
 (defun pos-project--one-line-p (text)
   "Return non-nil if TEXT is a string of one line that is not blank."
@@ -117,22 +128,111 @@ OUTCOME with a line that begins with a star."
                     nil file nil 'silent nil 'excl)
       file)))
 
+(defconst pos-project--status-line "^:STATUS:[ \t]+\\(\\S-+\\)[ \t]*$"
+  "A regexp matching a STATUS property's line, its value in group 1.")
+
+(defun pos-project--status-file (corpus project)
+  "Return the file of PROJECT, a scope's path, in CORPUS that has its STATUS.
+The file is one of the project's with a STATUS property before its
+first heading.  Refuse a path that is not a project's, and a project
+with no such file."
+  (let ((files (mapcar #'car
+                       (seq-filter
+                        (lambda (entry)
+                          (and (eq 'project (pos-scope-kind (cdr entry)))
+                               (equal project (pos-scope-path (cdr entry)))))
+                        (pos-corpus-entries corpus)))))
+    (unless files
+      (user-error "Not a project of the tree: %s" project))
+    (or (seq-find
+         (lambda (file)
+           (with-current-buffer (pos-visit file)
+             (org-with-wide-buffer
+              (goto-char (point-min))
+              (re-search-forward
+               pos-project--status-line
+               (save-excursion
+                 (or (re-search-forward "^\\*+ " nil t) (point-max)))
+               t))))
+         files)
+        (user-error "No file of %s has a STATUS" project))))
+
+(defun pos-project-set-status (root project status &optional note)
+  "Set the STATUS of PROJECT in the tree at ROOT to STATUS, with NOTE.
+PROJECT is the project's path as the views print it, as
+\"projects/paint\".  STATUS is one of `pos-project-statuses'.  NOTE
+is one line, or nil.  The change is recorded, with its time, at the
+head of a LOGBOOK drawer beneath the file's properties.  Return (FILE
+PREVIOUS STATUS).  Refuse the status the project has, and what
+`pos-set-state' refuses of the file."
+  (unless (member status pos-project-statuses)
+    (user-error "Unknown status: %s (one of %s)"
+                status (string-join pos-project-statuses ", ")))
+  (when (and note (not (pos-project--one-line-p note)))
+    (user-error "A note is one nonempty line"))
+  (let* ((root (file-name-as-directory (expand-file-name root)))
+         (corpus (pos-corpus root))
+         (file (pos-project--status-file corpus project))
+         (enable-local-variables nil)
+         (enable-local-eval nil)
+         (make-backup-files nil)
+         (auto-save-default nil)
+         (create-lockfiles t)
+         (vc-handled-backends nil))
+    (with-current-buffer (pos-place--buffer root corpus file)
+      (org-with-wide-buffer
+       (goto-char (point-min))
+       (re-search-forward pos-project--status-line)
+       (let ((previous (match-string-no-properties 1)))
+         (when (equal previous status)
+           (user-error "The project is already %s" status))
+         (unwind-protect
+             (progn
+               (lock-buffer)
+               (atomic-change-group
+                 (replace-match status t t nil 1)
+                 (re-search-forward "^:END:[ \t]*\n")
+                 (if (looking-at-p ":LOGBOOK:[ \t]*\n")
+                     (forward-line 1)
+                   (insert ":LOGBOOK:\n:END:\n")
+                   (forward-line -1))
+                 (insert (format "- Status %-12s from %-12s %s%s\n"
+                                 (format "\"%s\"" status)
+                                 (format "\"%s\"" previous)
+                                 (format-time-string
+                                  (org-time-stamp-format t t))
+                                 (if note
+                                     (concat " \\\\\n  " (string-trim note))
+                                   "")))
+                 (save-buffer)
+                 (list file previous status)))
+           (unlock-buffer)))))))
+
 (defun pos-project-batch ()
   "Run a project command from `command-line-args-left' on `pos-directory'.
-The one command is create WITHIN NAME TITLE OUTCOME REVIEW [NEXT], as
-`pos-project-create' takes them; it prints the file made, relative
-to the root.  Exit 2 on any other arguments."
+create WITHIN NAME TITLE OUTCOME REVIEW [NEXT], as
+`pos-project-create' takes them, prints the file made, relative to
+the root.  status PROJECT STATUS [NOTE], as `pos-project-set-status'
+takes them, prints the file, the status it had and the one it has.
+Exit 2 on any other arguments."
   (let ((root (file-name-as-directory (expand-file-name pos-directory)))
         (arguments (prog1 command-line-args-left
                      (setq command-line-args-left nil))))
-    (if (and (equal (car arguments) "create")
-             (memq (length arguments) '(6 7)))
-        (princ (format "%s\n"
-                       (file-relative-name
-                        (apply #'pos-project-create root (cdr arguments))
-                        root)))
-      (message "Usage: create WITHIN NAME TITLE OUTCOME REVIEW [NEXT]")
-      (kill-emacs 2))))
+    (pcase arguments
+      ((and `("create" . ,rest) (guard (memq (length rest) '(5 6))))
+       (princ (format "%s\n"
+                      (file-relative-name
+                       (apply #'pos-project-create root rest) root))))
+      ((and `("status" . ,rest) (guard (memq (length rest) '(2 3))))
+       (pcase-let ((`(,file ,previous ,status)
+                    (apply #'pos-project-set-status root rest)))
+         (princ (format "%s: STATUS %s, was %s\n"
+                        (file-relative-name file root) status previous))))
+      (_ (message "%s\n%s"
+                  "Usage: create WITHIN NAME TITLE OUTCOME REVIEW [NEXT]"
+                  (format "       status PROJECT %s [NOTE]"
+                          (string-join pos-project-statuses "|")))
+         (kill-emacs 2)))))
 
 (provide 'pos-project)
 ;;; pos-project.el ends here
