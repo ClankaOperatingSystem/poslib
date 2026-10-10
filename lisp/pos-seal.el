@@ -144,12 +144,26 @@ Return (ADD LINKS ORIGINALS RUMOURS): the entries of the rewritten files,
 every path link with its resolution, the SHA-256 of each file rewritten,
 and the rumours to seal first.  COLLECTIONS are the item's; DATE dates
 the rumours.  A file's links are read from its directory, or for a file
-item, from WRITTEN-AT if given."
+item, from WRITTEN-AT if given.  An id link in an Org file is read as a
+link to the file that holds its ID, among the item's files and the
+Org files of the scope's garden."
   (let* ((scope (file-name-directory archive))
          (base (file-name-as-directory source))
          (inside (lambda (abs) (or (equal abs source) (string-prefix-p base abs))))
          (in-archive (lambda (abs) (if (equal abs source) rel
                                      (concat rel "/" (substring abs (length base))))))
+         ;; Where each ID is held, read only when a file of the item
+         ;; has an id link.
+         (ids (when (seq-some
+                     (lambda (pair)
+                       (and (string-suffix-p ".org" (cdr pair))
+                            (string-search "[[id:" (pos-ledger-read (cdr pair)))))
+                     files)
+                (pos-links-ids
+                 (seq-uniq
+                  (append (pos-links-org-files (pos-links-garden scope))
+                          (seq-filter (lambda (file) (string-suffix-p ".org" file))
+                                      (mapcar #'cdr files)))))))
          rumours plans)
     ;; Each file: its links, as (OFFSET TEXT KIND . TO-OR-TARGET).  A
     ;; capsule's are left as written.
@@ -161,7 +175,7 @@ item, from WRITTEN-AT if given."
                                                 (if (equal c rel) source
                                                   (concat base (substring c (1+ (length rel))))))))
                                         collections)
-                        (pos-links-in-file file)))
+                        (pos-links-in-file file ids)))
           (pcase-let* ((`(,offset ,text ,path ,suffix ,whole-offset ,whole) link)
                        (abs (expand-file-name path (if (and written-at (equal file source))
                                                        written-at

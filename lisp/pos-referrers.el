@@ -33,7 +33,6 @@
 ;;; Code:
 
 (require 'cl-lib)
-(require 'org)
 (require 'pos-ledger)
 (require 'pos-links)
 (require 'pos-corpus)
@@ -46,38 +45,10 @@
       (setq line (1+ line) start (1+ start)))
     line))
 
-(defun pos-referrers--anchor ()
-  "Return the search option that names where point's ID property is held.
-\"\" for a file's own ID, before its first heading.  For a heading's,
-:: and # with its CUSTOM_ID if it has one, else :: and * with its
-title."
-  (if (org-before-first-heading-p)
-      ""
-    (let ((custom (org-entry-get nil "CUSTOM_ID")))
-      (if custom
-          (concat "::#" custom)
-        (concat "::*" (substring-no-properties (org-get-heading t t t t)))))))
-
 (defun pos-referrers-ids (corpus)
   "Return a hash table from each Org ID in CORPUS to where it is held.
-An ID is the value of an ID property, of a file or of a heading.  Each
-place is (FILE . ANCHOR), ANCHOR as `pos-referrers--anchor' gives it."
-  (let ((ids (make-hash-table :test #'equal))
-        (property "^[ \t]*:ID:[ \t]+\\(\\S-+\\)[ \t]*$"))
-    (dolist (file (pos-corpus-files corpus))
-      (let ((text (decode-coding-string (pos-ledger-read file) 'utf-8)))
-        (when (string-match-p property text)
-          (with-temp-buffer
-            (insert text)
-            ;; This file alone: no #+SETUPFILE and no mode hooks.
-            (cl-letf (((symbol-function 'org-file-contents) (lambda (&rest _) "")))
-              (let ((org-mode-hook nil)) (org-mode)))
-            (goto-char (point-min))
-            (while (re-search-forward property nil t)
-              (let ((id (match-string-no-properties 1)))
-                (cl-pushnew (cons file (save-excursion (pos-referrers--anchor)))
-                            (gethash id ids) :test #'equal)))))))
-    ids))
+As `pos-links-ids' gives it for the corpus's files."
+  (pos-links-ids (pos-corpus-files corpus)))
 
 (defun pos-referrers--links (corpus path)
   "Return the links in CORPUS that lead to PATH, absolute, or into it.
