@@ -30,10 +30,16 @@
 ;; A project's STATUS is changed in its file, with the change and its
 ;; time recorded in a LOGBOOK drawer beneath the file's properties.
 ;;
+;; A project that outgrows one file is promoted: NAME.org becomes
+;; NAME/project.org, and the path links that the move would break are
+;; rewritten, those in the file and those to it.  A link by ID needs
+;; no rewriting.
+;;
 ;; - `pos-project-create': command.
 ;; - `pos-project-set-status': command.
+;; - `pos-project-promote': command.
 ;; - `pos-project-batch': shell entry; create WITHIN NAME TITLE OUTCOME
-;;   REVIEW [NEXT], or status PROJECT STATUS [NOTE].
+;;   REVIEW [NEXT], status PROJECT STATUS [NOTE], or promote PROJECT.
 
 ;;; Code:
 
@@ -43,6 +49,8 @@
 (require 'subr-x)
 (require 'pos)
 (require 'pos-corpus)
+(require 'pos-ledger)
+(require 'pos-links)
 (require 'pos-place)
 
 (defcustom pos-project-statuses '("COMMITTED" "WIP" "DONE")
@@ -208,12 +216,100 @@ PREVIOUS STATUS).  Refuse the status the project has, and what
                  (list file previous status)))
            (unlock-buffer)))))))
 
+(defun pos-project--relink (file rewrite)
+  "Return (BYTES . COUNT) for FILE with its path links rewritten.
+REWRITE is called with the path of each link whose path is relative
+and returns the path to write in its place, or nil to leave it.
+BYTES is the file's bytes afterwards and COUNT the links changed."
+  (let (rewrites)
+    (dolist (link (pos-links-in-file file))
+      (pcase-let ((`(,offset ,text ,path) link))
+        (unless (or (file-name-absolute-p path) (string-prefix-p "~" path))
+          (let ((new (funcall rewrite path))
+                (at (string-search path text)))
+            (when (and new at (not (equal new path)))
+              (push (list offset text
+                          (concat (substring text 0 at) new
+                                  (substring text (+ at (length path)))))
+                    rewrites))))))
+    (cons (pos-links-rewrite (pos-ledger-read file) rewrites)
+          (length rewrites))))
+
+(defun pos-project--write (file bytes)
+  "Write BYTES to FILE and bring a buffer visiting it up to date."
+  (let ((coding-system-for-write 'no-conversion)
+        (make-backup-files nil))
+    (write-region bytes nil file nil 'silent))
+  (let ((buffer (get-file-buffer file)))
+    (when buffer
+      (with-current-buffer buffer (revert-buffer t t)))))
+
+(defun pos-project-promote (root project)
+  "Promote PROJECT, a one-file project of the tree at ROOT, to a directory.
+PROJECT is the project's path as the views print it, as
+\"projects/paint\": the file projects/paint.org becomes
+projects/paint/project.org, so the project's path stays as it was.
+Each relative path link in the file is rewritten to lead where it
+led, and each path link to the file, in a file the root may write,
+is rewritten to the new place.  Return (FILE . REWRITTEN): the new
+file, and (FILE . COUNT) for each file with links rewritten, the new
+file among them.  Refuse a path that is not a one-file project's, a
+project the root may not write, and an unsaved buffer of any file to
+be written."
+  (let* ((root (file-name-as-directory (expand-file-name root)))
+         (corpus (pos-corpus root))
+         (old (expand-file-name (concat project ".org") root))
+         (owner (pos-corpus-owner corpus old))
+         (directory (file-name-as-directory (expand-file-name project root)))
+         (new (expand-file-name "project.org" directory))
+         (others (remove old (pos-files root t)))
+         rewritten)
+    (unless (and owner (eq 'project (pos-scope-kind owner))
+                 (equal project (pos-scope-path owner)))
+      (user-error "Not a one-file project of the tree: %s" project))
+    (unless (pos-corpus-writable-p corpus old)
+      (user-error "Not a project this root may write: %s" project))
+    (when (file-exists-p directory)
+      (user-error "There is already a directory %s" project))
+    (dolist (file (cons old others))
+      (let ((buffer (get-file-buffer file)))
+        (when (and buffer (buffer-modified-p buffer))
+          (user-error "Save the modified buffer of %s first"
+                      (file-relative-name file root)))))
+    ;; The file's own links, read where they were written and written
+    ;; for where the file will be.
+    (let ((moved (pos-project--relink
+                  old
+                  (lambda (path)
+                    (file-relative-name
+                     (expand-file-name path (file-name-directory old))
+                     directory)))))
+      (make-directory directory)
+      (pos-project--write new (car moved))
+      (let ((buffer (get-file-buffer old)))
+        (when buffer (kill-buffer buffer)))
+      (delete-file old)
+      (when (> (cdr moved) 0) (push (cons new (cdr moved)) rewritten)))
+    (dolist (file others)
+      (let* ((here (file-name-directory file))
+             (changed (pos-project--relink
+                       file
+                       (lambda (path)
+                         (and (equal old (expand-file-name path here))
+                              (file-relative-name new here))))))
+        (when (> (cdr changed) 0)
+          (pos-project--write file (car changed))
+          (push (cons file (cdr changed)) rewritten))))
+    (cons new (nreverse rewritten))))
+
 (defun pos-project-batch ()
   "Run a project command from `command-line-args-left' on `pos-directory'.
 create WITHIN NAME TITLE OUTCOME REVIEW [NEXT], as
 `pos-project-create' takes them, prints the file made, relative to
 the root.  status PROJECT STATUS [NOTE], as `pos-project-set-status'
 takes them, prints the file, the status it had and the one it has.
+promote PROJECT, as `pos-project-promote' takes it, prints the new
+file, then \"Links rewritten: FILE: COUNT\" for each file changed.
 Exit 2 on any other arguments."
   (let ((root (file-name-as-directory (expand-file-name pos-directory)))
         (arguments (prog1 command-line-args-left
@@ -228,10 +324,17 @@ Exit 2 on any other arguments."
                     (apply #'pos-project-set-status root rest)))
          (princ (format "%s: STATUS %s, was %s\n"
                         (file-relative-name file root) status previous))))
-      (_ (message "%s\n%s"
+      (`("promote" ,project)
+       (pcase-let ((`(,file . ,rewritten) (pos-project-promote root project)))
+         (princ (format "%s\n" (file-relative-name file root)))
+         (pcase-dolist (`(,changed . ,count) rewritten)
+           (princ (format "Links rewritten: %s: %d\n"
+                          (file-relative-name changed root) count)))))
+      (_ (message "%s\n%s\n%s"
                   "Usage: create WITHIN NAME TITLE OUTCOME REVIEW [NEXT]"
                   (format "       status PROJECT %s [NOTE]"
-                          (string-join pos-project-statuses "|")))
+                          (string-join pos-project-statuses "|"))
+                  "       promote PROJECT")
          (kill-emacs 2)))))
 
 (provide 'pos-project)
