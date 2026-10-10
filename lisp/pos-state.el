@@ -97,6 +97,51 @@ once."
     (insert (or note ""))
     (org-store-log-note)))
 
+(defun pos-state--at-item (root target what function)
+  "Call FUNCTION at the heading of the item TARGET names in the tree at ROOT.
+TARGET is the item's ID, or FILE:LINE, the file relative to ROOT and
+the line of the heading.  FUNCTION is called with the file, in its
+buffer, widened, with the file locked; what it changes is saved, or
+undone if it signals.  Return its value.  WHAT names the change in a
+refusal, as \"setting a state\".  Refuse a file the root may not
+write, symlinks, unsaved or stale buffers, foreign locks, and a line
+that is no item."
+  (let* ((root (file-name-as-directory (expand-file-name root)))
+         (corpus (pos-corpus root))
+         (place (pos-state--place root corpus target))
+         (file (car place))
+         (enable-local-variables nil)
+         (enable-local-eval nil)
+         (make-backup-files nil)
+         (auto-save-default nil)
+         (create-lockfiles t)
+         (vc-handled-backends nil))
+    (unless (pos-corpus-writable-p corpus file)
+      (user-error "Not a file this root may write: %s"
+                  (file-relative-name file root)))
+    (when (file-symlink-p file)
+      (user-error "The file is a symlink: %s" (file-relative-name file root)))
+    (when (stringp (file-locked-p file))
+      (user-error "The file is locked by another editor; save it there first"))
+    (with-current-buffer (pos-visit file)
+      (when (buffer-modified-p)
+        (user-error "Save the file's modified buffer before %s" what))
+      (unless (verify-visited-file-modtime (current-buffer))
+        (user-error "The file changed on disk; revert its buffer first"))
+      (org-with-wide-buffer
+       (goto-char (point-min))
+       (forward-line (1- (cdr place)))
+       (unless (and (org-at-heading-p) (org-get-todo-state))
+         (user-error "No item at %s:%d"
+                     (file-relative-name file root) (cdr place)))
+       (unwind-protect
+           (progn
+             (lock-buffer)
+             (atomic-change-group
+               (prog1 (funcall function file)
+                 (save-buffer))))
+         (unlock-buffer))))))
+
 (defun pos-set-state (root target state &optional note)
   "Set the item TARGET names in the tree at ROOT to STATE, with NOTE.
 TARGET is the item's ID, or FILE:LINE, the file relative to ROOT and
@@ -112,56 +157,25 @@ symlinks, unsaved or stale buffers and foreign locks."
   (when (and note (or (string-empty-p (string-trim note))
                       (string-match-p "[[:cntrl:]]" note)))
     (user-error "A note is one nonempty line"))
-  (let* ((root (file-name-as-directory (expand-file-name root)))
-         (corpus (pos-corpus root))
-         (place (pos-state--place root corpus target))
-         (file (car place))
-         (enable-local-variables nil)
-         (enable-local-eval nil)
-         (make-backup-files nil)
-         (auto-save-default nil)
-         (create-lockfiles t)
-         (vc-handled-backends nil)
-         (org-log-done 'time)
-         (org-log-repeat 'time)
-         (org-log-into-drawer t)
-         (org-todo-repeat-to-state nil)
-         (org-enforce-todo-dependencies nil)
-         (org-enforce-todo-checkbox-dependencies nil))
-    (unless (pos-corpus-writable-p corpus file)
-      (user-error "Not a file this root may write: %s"
-                  (file-relative-name file root)))
-    (when (file-symlink-p file)
-      (user-error "The file is a symlink: %s" (file-relative-name file root)))
-    (when (stringp (file-locked-p file))
-      (user-error "The file is locked by another editor; save it there first"))
-    (with-current-buffer (pos-visit file)
-      (when (buffer-modified-p)
-        (user-error "Save the file's modified buffer before setting a state"))
-      (unless (verify-visited-file-modtime (current-buffer))
-        (user-error "The file changed on disk; revert its buffer first"))
-      (org-with-wide-buffer
-       (goto-char (point-min))
-       (forward-line (1- (cdr place)))
-       (unless (and (org-at-heading-p) (org-get-todo-state))
-         (user-error "No item at %s:%d"
-                     (file-relative-name file root) (cdr place)))
+  (let ((org-log-done 'time)
+        (org-log-repeat 'time)
+        (org-log-into-drawer t)
+        (org-todo-repeat-to-state nil)
+        (org-enforce-todo-dependencies nil)
+        (org-enforce-todo-checkbox-dependencies nil))
+    (pos-state--at-item
+     root target "setting a state"
+     (lambda (file)
        (let ((previous (org-get-todo-state)))
          (when (equal previous state)
            (user-error "The item is already %s" state))
-         (unwind-protect
-             (progn
-               (lock-buffer)
-               (atomic-change-group
-                 (org-todo state)
-                 (org-back-to-heading t)
-                 (pos-state--log state previous (and note (string-trim note)))
-                 (org-back-to-heading t)
-                 (save-buffer)
-                 (list file (line-number-at-pos)
-                       (substring-no-properties (org-get-todo-state))
-                       (substring-no-properties (org-get-heading t t t t)))))
-           (unlock-buffer)))))))
+         (org-todo state)
+         (org-back-to-heading t)
+         (pos-state--log state previous (and note (string-trim note)))
+         (org-back-to-heading t)
+         (list file (line-number-at-pos)
+               (substring-no-properties (org-get-todo-state))
+               (substring-no-properties (org-get-heading t t t t))))))))
 
 (defun pos-state-batch ()
   "Set the state of an item of `pos-directory' and print the item.
