@@ -149,7 +149,7 @@ Each hit names its file by its own CID, there being no item."
   "Record what KEEPER was asked, QUERY MODE LIMIT and WITHIN; answer its hits."
   (push (list query mode limit within) (pos-search-test-keeper-asked keeper))
   (if (and within (not (equal within "bafkept")))
-      (pos-ledger--refuse 'absent "The ledger enrols nothing under %s" within)
+      (pos-ledger-refuse 'absent "The ledger enrols nothing under %s" within)
     `((hits . ,(vconcat (pos-search-test-keeper-hits keeper))))))
 
 (defun pos-search-test-kept (dir)

@@ -34,6 +34,8 @@
 
 ;;; Code:
 
+(require 'pos-bytes)
+(require 'pos-path)
 (require 'pos-cid)
 (require 'pos-ledger)
 (require 'pos-links)
@@ -101,7 +103,7 @@ folder beside its archive; other hidden entries are prefixed dot."
                     (concat (or parent "") pos-ledger-integrity "/checkpoints"))
                    (t (concat (or parent "") "dot" name)))))
         (when (file-exists-p (expand-file-name new stage))
-          (pos-ledger--refuse 'destination "Rename would overwrite: %s" new))
+          (pos-ledger-refuse 'destination "Rename would overwrite: %s" new))
         (make-directory (file-name-directory (expand-file-name new stage)) t)
         (rename-file (expand-file-name found stage) (expand-file-name new stage))
         (push (cons found new) renames)))
@@ -130,7 +132,7 @@ shape shows them, and the directories INCLUDE names."
           (pos-migrate--walk stage))))
     ;; A collection holds all within it: none is declared inside another.
     (sort (seq-remove (lambda (c) (seq-some (lambda (o) (and (not (equal o c))
-                                                             (pos-ledger--within-p c o)))
+                                                             (pos-path-within-p c o)))
                                             found))
                       found)
           #'string<)))
@@ -141,7 +143,7 @@ shape shows them, and the directories INCLUDE names."
          (readme (expand-file-name "README.org" dir))
          (line (concat pos-ledger-declaration "\n")))
     (if (file-exists-p readme)
-        (let ((bytes (pos-ledger-read readme)))
+        (let ((bytes (pos-bytes-read readme)))
           (unless (pos-ledger--declared-p dir)
             (let ((at (if (string-match "\\`\\(?:#\\+[^\n]*\n\\)*" bytes) (match-end 0) 0)))
               (pos-migrate--write-over readme (concat (substring bytes 0 at) line
@@ -218,13 +220,13 @@ TARGET's path is given from ROOT, the archive's scope."
 (defun pos-migrate--in-capsule-p (rel collections stage)
   "Return non-nil if REL lies in one of COLLECTIONS in STAGE that is a capsule.
 A capsule's links are left as written."
-  (seq-some (lambda (c) (and (pos-ledger--within-p rel c)
+  (seq-some (lambda (c) (and (pos-path-within-p rel c)
                              (pos-ledger-capsule-p (expand-file-name c stage))))
             collections))
 
 (defun pos-migrate--item-of (rel collections)
   "Return the item holding REL: its outermost of COLLECTIONS, else REL."
-  (or (seq-find (lambda (c) (pos-ledger--within-p rel c)) collections) rel))
+  (or (seq-find (lambda (c) (pos-path-within-p rel c)) collections) rel))
 
 (defun pos-migrate--stage (archive stage)
   "Copy ARCHIVE, less its legacy ledger, to STAGE, writable."
@@ -283,11 +285,11 @@ dates rumours; LEDGER-ID names a ledger that has none."
                                   scope))
          (history (pos-ledger-history archive)))
     (unless (seq-some (lambda (e) (not (assq 'cid (cdr e)))) (car history))
-      (pos-ledger--refuse 'converted "Nothing to migrate in %s" archive))
+      (pos-ledger-refuse 'converted "Nothing to migrate in %s" archive))
     (let ((changed (nth 1 (pos-ledger--differences (car history) (pos-ledger-inventory archive)))))
       (when changed
-        (pos-ledger--refuse 'differs "Enrolled evidence changed in %s: %S" archive changed)))
-    (pcase-let* ((inventory-sha (pos-ledger-sha (pos-ledger-json (pos-ledger-inventory archive))))
+        (pos-ledger-refuse 'differs "Enrolled evidence changed in %s: %S" archive changed)))
+    (pcase-let* ((inventory-sha (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory archive))))
                  (`(,discard ,remove ,renames ,collections ,declarations)
                   (pos-migrate--prepare archive stage exclude include))
                  (files (seq-filter (lambda (rel)
@@ -324,14 +326,14 @@ dates rumours; LEDGER-ID names a ledger that has none."
               (push
                (cond
                 ((and inside (let ((t-rel (pos-migrate--through (pos-migrate--rel abs archive)
-                                                                 renames)))
+                                                                renames)))
                                (file-exists-p (expand-file-name t-rel stage))))
                  (let* ((target (pos-migrate--through (pos-migrate--rel abs archive) renames))
                         (item (pos-migrate--item-of rel collections))
                         (titem (pos-migrate--item-of target collections)))
                    (cond ((equal target rel) (list rel link "internal" text))
-                         ((seq-some (lambda (c) (and (pos-ledger--within-p rel c)
-                                                     (pos-ledger--within-p target c)))
+                         ((seq-some (lambda (c) (and (pos-path-within-p rel c)
+                                                     (pos-path-within-p target c)))
                                     collections)
                           (list rel link "internal" text))
                          ((and (file-directory-p (expand-file-name target stage))
@@ -346,7 +348,7 @@ dates rumours; LEDGER-ID names a ledger that has none."
                    (cond
                     ((and other (not inside) (pos-links-within-scope-p other scope))
                      (unless (pos-migrate--converted-p other)
-                       (pos-ledger--refuse 'order "Migrate %s first: %s links to it" other rel))
+                       (pos-ledger-refuse 'order "Migrate %s first: %s links to it" other rel))
                      (list rel link "cid" (concat (pos-links--sealed abs) suffix)))
                     (t (let ((r (pos-migrate--rumour abs scope date)))
                          (unless (assoc (car r) rumours) (push r rumours))
@@ -381,8 +383,8 @@ dates rumours; LEDGER-ID names a ledger that has none."
       (dolist (r rumours)
         (let ((there (expand-file-name (car r) stage)))
           (if (file-exists-p there)
-              (unless (equal (pos-ledger-read there) (encode-coding-string (cdr r) 'utf-8))
-                (pos-ledger--refuse 'destination "Rumour destination exists: %s" (car r)))
+              (unless (equal (pos-bytes-read there) (encode-coding-string (cdr r) 'utf-8))
+                (pos-ledger-refuse 'destination "Rumour destination exists: %s" (car r)))
             (make-directory (file-name-directory there) t)
             (pos-migrate--write-over there (encode-coding-string (cdr r) 'utf-8)))))
       (let ((cids (mapcar (lambda (r) (cons (car r) (pos-cid-file (expand-file-name (car r) stage))))
@@ -391,12 +393,12 @@ dates rumours; LEDGER-ID names a ledger that has none."
             (done nil) (resolved nil))
         (while pending
           (let ((item (seq-find (lambda (i) (seq-every-p (lambda (d) (or (not (equal (car d) i))
-                                                                           (equal (cdr d) i)
-                                                                           (member (cdr d) done)
-                                                                           (not (member (cdr d) pending))))
+                                                                         (equal (cdr d) i)
+                                                                         (member (cdr d) done)
+                                                                         (not (member (cdr d) pending))))
                                                          deps))
                                 pending)))
-            (unless item (pos-ledger--refuse 'loop "Links still loop among %S" pending))
+            (unless item (pos-ledger-refuse 'loop "Links still loop among %S" pending))
             (setq pending (delete item pending))
             (let ((by-file nil))
               (dolist (l links)
@@ -429,7 +431,7 @@ dates rumours; LEDGER-ID names a ledger that has none."
                   (dolist (e all)
                     (push (list rel (nth 0 e) (nth 1 e) (nth 3 e) (nth 2 e)) resolved))
                   (when edits
-                    (pos-migrate--write-over file (pos-links-rewrite (pos-ledger-read file) edits)))))
+                    (pos-migrate--write-over file (pos-links-rewrite (pos-bytes-read file) edits)))))
               (push item done)
               (push (cons item (pos-migrate--cid stage item)) cids))))
         ;; The canon links that name paths the migration moves.
@@ -462,7 +464,7 @@ dates rumours; LEDGER-ID names a ledger that has none."
                                                               (string< (car a) (car b))))))))
             (canon . ,(vconcat canon))
             (final_inventory_sha256
-             . ,(pos-ledger-sha (pos-ledger-json (pos-ledger-inventory stage))))
+             . ,(pos-bytes-sha (pos-bytes-json (pos-ledger-inventory stage))))
             (event . ,event)))))))
 
 (defun pos-migrate--cid (stage item)
@@ -489,7 +491,7 @@ Each of MOVES is (OLD . NEW), paths from ROOT."
                       edits)))))
         (when edits
           (push `((file . ,(pos-migrate--rel file root))
-                  (sha256 . ,(pos-ledger-sha (pos-ledger-read file)))
+                  (sha256 . ,(pos-bytes-sha (pos-bytes-read file)))
                   (edits . ,(vconcat (nreverse edits))))
                 out))))
     (nreverse out)))
@@ -516,7 +518,7 @@ LEDGER-ID names a ledger that has none."
                  (not (assoc rel convert))
                  (not (assoc rel (seq-filter (lambda (e) (assq 'cid (cdr e))) known))))
         (push (cons rel (funcall entry rel)) add)))
-    (let ((bytes (pos-ledger-json
+    (let ((bytes (pos-bytes-json
                   `((schema . 2) (kind . "conversion") (previous . ,(or head :null))
                     (ledger_id . ,(or (pos-seal--last-id files) ledger-id (pos-seal--uuid)))
                     (remove . ,(vconcat remove)) (rename . ,(sort rename (lambda (a b) (string< (car a) (car b)))))
@@ -524,7 +526,7 @@ LEDGER-ID names a ledger that has none."
                     (add . ,(sort add (lambda (a b) (string< (car a) (car b)))))
                     (collections . ,(vconcat collections))
                     (root . ,(cdr (assoc "." cids)))))))
-      `((name . ,(format "%08d-%s.json" (1+ events) (pos-ledger-sha bytes)))
+      `((name . ,(format "%08d-%s.json" (1+ events) (pos-bytes-sha bytes)))
         (text . ,(decode-coding-string bytes 'utf-8))))))
 
 ;;;; Application
@@ -535,7 +537,7 @@ LEDGER-ID names a ledger that has none."
     (pcase-let ((`(,discard ,remove ,renames ,collections ,declarations)
                  (pos-migrate--prepare .archive build (append .exclude nil)
                                        (append .include nil))))
-      (unless (equal (pos-ledger-json
+      (unless (equal (pos-bytes-json
                       `((discard . ,(vconcat discard)) (remove . ,(vconcat remove))
                         (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r))))
                                                      renames)))
@@ -543,10 +545,10 @@ LEDGER-ID names a ledger that has none."
                         (declarations . ,(vconcat (mapcar (lambda (d) `((readme . ,(car d))
                                                                         (kind . ,(cdr d))))
                                                           declarations)))))
-                     (pos-ledger-json
+                     (pos-bytes-json
                       `((discard . ,.discard) (remove . ,.remove) (renames . ,.renames)
                         (collections . ,.collections) (declarations . ,.declarations))))
-        (pos-ledger--refuse 'plan "Archive differs from its plan: %s" .archive)))
+        (pos-ledger-refuse 'plan "Archive differs from its plan: %s" .archive)))
     (seq-doseq (r .rumours)
       (let-alist r
         (let ((there (expand-file-name .destination build)))
@@ -560,10 +562,10 @@ LEDGER-ID names a ledger that has none."
                                      .links)))
             (file (expand-file-name rel build)))
         (when edits
-          (pos-migrate--write-over file (pos-links-rewrite (pos-ledger-read file) edits)))))
-    (unless (equal (pos-ledger-sha (pos-ledger-json (pos-ledger-inventory build)))
+          (pos-migrate--write-over file (pos-links-rewrite (pos-bytes-read file) edits)))))
+    (unless (equal (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory build)))
                    .final_inventory_sha256)
-      (pos-ledger--refuse 'plan "Rebuilt archive differs from its plan: %s" .archive))))
+      (pos-ledger-refuse 'plan "Rebuilt archive differs from its plan: %s" .archive))))
 
 (defun pos-migrate--protect (dir)
   "Remove the write bits of every file under DIR."
@@ -576,11 +578,11 @@ LEDGER-ID names a ledger that has none."
 Rebuild the archive as planned, swap it in, move its ledger beside it,
 close the ledger with the conversion event and repair canon.  Resume if
 interrupted.  Return (EVENT-FILE . ROOT)."
-  (unless (equal (pos-ledger-sha (pos-ledger-json plan)) expected)
-    (pos-ledger--refuse 'plan "Reviewed plan hash mismatch"))
+  (unless (equal (pos-bytes-sha (pos-bytes-json plan)) expected)
+    (pos-ledger-refuse 'plan "Reviewed plan hash mismatch"))
   (let-alist plan
     (unless (and (eql .schema 1) (equal .operation "migrate"))
-      (pos-ledger--refuse 'plan "Not a migration plan"))
+      (pos-ledger-refuse 'plan "Not a migration plan"))
     (let* ((scope (file-name-directory .archive))
            (work (expand-file-name (concat "_migrate/" (file-name-nondirectory .archive)) scope))
            (build (expand-file-name "build" work))
@@ -591,9 +593,9 @@ interrupted.  Return (EVENT-FILE . ROOT)."
            (bytes (encode-coding-string .event.text 'utf-8)))
       ;; 1. Rebuild, then swap: previous holds the archive as it was.
       (unless (file-exists-p previous)
-        (unless (equal (pos-ledger-sha (pos-ledger-json (pos-ledger-inventory .archive)))
+        (unless (equal (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory .archive)))
                        .inventory_sha256)
-          (pos-ledger--refuse 'plan "Archive changed since review: %s" .archive))
+          (pos-ledger-refuse 'plan "Archive changed since review: %s" .archive))
         (pos-migrate--rebuild plan build)
         (rename-file .archive previous))
       (when (file-exists-p build)
@@ -619,8 +621,8 @@ interrupted.  Return (EVENT-FILE . ROOT)."
       (seq-doseq (c .canon)
         (let ((root .root))
          (let-alist c
-          (let* ((file (expand-file-name .file root)) (now (pos-ledger-read file)))
-            (cond ((equal (pos-ledger-sha now) .sha256)
+          (let* ((file (expand-file-name .file root)) (now (pos-bytes-read file)))
+            (cond ((equal (pos-bytes-sha now) .sha256)
                    (pos-migrate--write-over
                     file (pos-links-rewrite now (mapcar (lambda (e) (let-alist e (list .offset .from .to)))
                                                         .edits))))
@@ -628,9 +630,9 @@ interrupted.  Return (EVENT-FILE . ROOT)."
                                               (string-match-p (regexp-quote .to)
                                                               (decode-coding-string now 'utf-8))))
                                 .edits))
-                  (t (pos-ledger--refuse 'plan "Canon changed since review: %s" file)))))))
-      (pos-seal--checkpoint .archive (pos-ledger-sha bytes))
-      (cons event (alist-get 'root (pos-ledger-parse bytes))))))
+                  (t (pos-ledger-refuse 'plan "Canon changed since review: %s" file)))))))
+      (pos-seal--checkpoint .archive (pos-bytes-sha bytes))
+      (cons event (alist-get 'root (pos-bytes-parse bytes))))))
 
 ;;;; Command line
 
@@ -645,7 +647,7 @@ applies it.  Exit 0 done, 2 refused."
          ;; After ROOT, +DIR includes a collection and DIR excludes one.
          (let ((names (cdr rest)))
            (princ (decode-coding-string
-                   (pos-ledger-json
+                   (pos-bytes-json
                     (pos-migrate-plan
                      archive (car rest)
                      (seq-remove (lambda (n) (string-prefix-p "+" n)) names) nil nil
@@ -653,9 +655,9 @@ applies it.  Exit 0 done, 2 refused."
                              (seq-filter (lambda (n) (string-prefix-p "+" n)) names))))
                    'utf-8))))
         (`("apply" ,plan-file ,hash)
-         (let ((result (pos-migrate-apply (pos-ledger-parse (pos-ledger-read plan-file)) hash)))
+         (let ((result (pos-migrate-apply (pos-bytes-parse (pos-bytes-read plan-file)) hash)))
            (princ (decode-coding-string
-                   (pos-ledger-json `((event . ,(car result)) (root . ,(cdr result))))
+                   (pos-bytes-json `((event . ,(car result)) (root . ,(cdr result))))
                    'utf-8))))
         (_ (message "Usage: plan ARCHIVE [ROOT [DIR... +DIR...]] | apply PLAN HASH")
            (kill-emacs 2)))

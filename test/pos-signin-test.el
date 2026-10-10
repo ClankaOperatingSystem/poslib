@@ -45,7 +45,7 @@
 
 (defun pos-signin-test-json (value)
   "Return (200 . BYTES) answering VALUE."
-  (cons 200 (pos-ledger-json value)))
+  (cons 200 (pos-bytes-json value)))
 
 (defun pos-signin-test-fetch (url &optional form)
   "Answer URL, and FORM if it is a POST, as the issuer and its keepers."
@@ -220,7 +220,7 @@ Each keeper's requests then carry the token recorded."
     (pos-signin-test-with-issuer
       (let-alist (cdr named)
         (make-directory (file-name-directory (pos-signin-file)) t)
-        (pos-test-write-bytes (pos-signin-file) (pos-ledger-json .file) #o600)
+        (pos-test-write-bytes (pos-signin-file) (pos-bytes-json .file) #o600)
         (seq-doseq (carried .carried)
           (ert-info ((alist-get 'url carried))
             (should (equal (alist-get 'token carried)

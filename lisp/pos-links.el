@@ -36,6 +36,8 @@
 (require 'org-element)
 (require 'markdown-mode)
 (require 'url-util)
+(require 'pos-bytes)
+(require 'pos-path)
 (require 'pos-cid)
 (require 'pos-ledger)
 
@@ -59,8 +61,8 @@ files hold (unresolved)."
     (cond
      ((null places) (cons (concat pos-links-no-file id) ""))
      ((cdr places)
-      (pos-ledger--refuse 'unresolved "Two files hold the ID %s: %s" id
-                          (mapconcat #'car (reverse places) ", ")))
+      (pos-ledger-refuse 'unresolved "Two files hold the ID %s: %s" id
+                         (mapconcat #'car (reverse places) ", ")))
      (t (car places)))))
 
 (defun pos-links--org (&optional ids)
@@ -135,7 +137,7 @@ them, each leading to the file that holds its ID."
   (let ((org (string-suffix-p ".org" file)) (md (string-suffix-p ".md" file)))
     (when (or org md)
       (with-temp-buffer
-        (insert (decode-coding-string (pos-ledger-read file) 'utf-8))
+        (insert (decode-coding-string (pos-bytes-read file) 'utf-8))
         ;; Read this file alone: no #+SETUPFILE, which may name another
         ;; file or a URL, and no mode hooks.
         (cl-letf (((symbol-function 'org-file-contents) (lambda (&rest _) "")))
@@ -164,7 +166,7 @@ place is (FILE . ANCHOR), ANCHOR as `pos-links--anchor' gives it."
   (let ((ids (make-hash-table :test #'equal))
         (property "^[ \t]*:ID:[ \t]+\\(\\S-+\\)[ \t]*$"))
     (dolist (file files)
-      (let ((text (decode-coding-string (pos-ledger-read file) 'utf-8)))
+      (let ((text (decode-coding-string (pos-bytes-read file) 'utf-8)))
         (when (string-match-p property text)
           (with-temp-buffer
             (insert text)
@@ -213,7 +215,7 @@ FROM must be at OFFSET."
                    (from (encode-coding-string from 'utf-8))
                    (to (encode-coding-string to 'utf-8)))
         (unless (equal from (substring out offset (+ offset (length from))))
-          (pos-ledger--refuse 'plan "Link not where it was planned, at byte %d" offset))
+          (pos-ledger-refuse 'plan "Link not where it was planned, at byte %d" offset))
         (setq out (concat (substring out 0 offset) to
                           (substring out (+ offset (length from)))))))
     out))
@@ -234,11 +236,11 @@ FROM must be at OFFSET."
   (let* ((archive (pos-links--archive-of target))
          (rel (file-relative-name target archive)))
     (pcase-let ((`(,entries ,_ ,_ ,_ ,_ ,collections ,items) (pos-ledger-history archive)))
-      (let ((item (or (seq-find (lambda (i) (pos-ledger--within-p rel i)) items)
-                      (seq-find (lambda (c) (pos-ledger--within-p rel c)) collections)
+      (let ((item (or (seq-find (lambda (i) (pos-path-within-p rel i)) items)
+                      (seq-find (lambda (c) (pos-path-within-p rel c)) collections)
                       (and (assoc rel entries) rel))))
         (unless item
-          (pos-ledger--refuse 'unsealed "Link to an archived path not sealed: %s" target))
+          (pos-ledger-refuse 'unsealed "Link to an archived path not sealed: %s" target))
         (let ((path (expand-file-name item archive)))
           (concat "ipfs://"
                   (cond ((pos-ledger-kept archive)
@@ -279,16 +281,16 @@ Nothing outside the garden is read: only that it lies there is said."
   (cond
    ((pos-links-outside-garden-p target scope) "outside the garden, and was not read")
    ((file-directory-p target) "a directory")
-   (t (let ((bytes (pos-ledger-read target))
+   (t (let ((bytes (pos-bytes-read target))
             (title (pos-links--title target)))
-        (format "a file of %d bytes, SHA-256 =%s=%s" (length bytes) (pos-ledger-sha bytes)
+        (format "a file of %d bytes, SHA-256 =%s=%s" (length bytes) (pos-bytes-sha bytes)
                 (if title (format ", titled \"%s\"" title) ""))))))
 
 (defun pos-links--title (file)
   "Return FILE's title, from an Org #+TITLE or a Markdown heading, or nil."
   (when (file-regular-p file)
     (with-temp-buffer
-      (insert (decode-coding-string (pos-ledger-read file) 'utf-8))
+      (insert (decode-coding-string (pos-bytes-read file) 'utf-8))
       (goto-char (point-min))
       (when (re-search-forward (if (string-suffix-p ".md" file) "^# +\\(.+\\)$"
                                  "^#\\+TITLE: *\\(.+\\)$")
@@ -320,7 +322,7 @@ is cited."
 The link is the one a sealed item's link to PATH is rewritten to."
   (let ((target (directory-file-name (expand-file-name path))))
     (unless (pos-links--archive-of target)
-      (pos-ledger--refuse 'unsealed "Not a path in an archive: %s" target))
+      (pos-ledger-refuse 'unsealed "Not a path in an archive: %s" target))
     (pos-links--sealed target)))
 
 (provide 'pos-links)

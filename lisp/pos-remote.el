@@ -44,7 +44,7 @@
 ;;
 ;; `pos-remote-http' is the protocol's wire.  A refusal signals
 ;; `pos-ledger-refused' with the kind the keeper names.  Nothing here
-;; seals: `pos-seal' does not yet call it.
+;; seals: `pos-seal' calls it for an archive a keeper keeps.
 
 ;;; Code:
 
@@ -53,6 +53,7 @@
 (require 'url)
 (require 'url-http)
 (require 'url-util)
+(require 'pos-bytes)
 (require 'pos-ledger)
 (require 'pos-signin)
 
@@ -119,8 +120,8 @@ none, as a keeper of version 1 alone does.  Refused as
                       (list (or (alist-get 'protocol described) 1)))))
          (shared (seq-filter (lambda (v) (memq v offered)) pos-remote-versions)))
     (unless shared
-      (pos-ledger--refuse 'version "The keeper serves protocol versions %S; this client speaks %S"
-                          offered pos-remote-versions))
+      (pos-ledger-refuse 'version "The keeper serves protocol versions %S; this client speaks %S"
+                         offered pos-remote-versions))
     (apply #'max shared)))
 
 ;;;; Whose an event is
@@ -131,7 +132,7 @@ EVENTS is an alist of name and bytes, in order.  It is the ledger_id of
 the last of them that has one: in a valid chain every event that has
 one has the same, and none follows one that has."
   (seq-some (lambda (event)
-              (let ((id (alist-get 'ledger_id (pos-ledger-parse (cdr event)))))
+              (let ((id (alist-get 'ledger_id (pos-bytes-parse (cdr event)))))
                 (and (stringp id) id)))
             (reverse events)))
 
@@ -198,16 +199,16 @@ that has not answered in `pos-remote-timeout' seconds is refused."
                      (cl-letf (((symbol-function 'url-http-handle-authentication)
                                 (lambda (_proxy) t)))
                        (url-retrieve-synchronously url t t pos-remote-timeout))
-                   (error (pos-ledger--refuse 'remote "%s: %s" url
-                                              (error-message-string err))))))
+                   (error (pos-ledger-refuse 'remote "%s: %s" url
+                                             (error-message-string err))))))
     (unless buffer
-      (pos-ledger--refuse 'remote "%s: no answer" url))
+      (pos-ledger-refuse 'remote "%s: no answer" url))
     (unwind-protect
         (with-current-buffer buffer
           (goto-char (point-min))
           (unless (and (looking-at "HTTP/[0-9.]+ \\([0-9]+\\)")
                        (bound-and-true-p url-http-end-of-headers))
-            (pos-ledger--refuse 'remote "%s: no answer" url))
+            (pos-ledger-refuse 'remote "%s: no answer" url))
           (let ((status (string-to-number (match-string 1))))
             (goto-char url-http-end-of-headers)
             (forward-line 1)
@@ -236,7 +237,7 @@ The boundary is taken from the bytes, so equal parts are equal bodies."
                           (cons (encode-coding-string (car part) 'utf-8)
                                 (string-to-unibyte (cdr part))))
                         parts))
-         (boundary (concat "pos-" (pos-ledger-sha (mapconcat #'cdr parts "")))))
+         (boundary (concat "pos-" (pos-bytes-sha (mapconcat #'cdr parts "")))))
     (cons (string-to-unibyte
            (concat (mapconcat
                     (lambda (part)
@@ -273,14 +274,14 @@ is asked once more with a token already kept that it takes."
       (if (memq status '(200 201))
           answer
         (let ((named (ignore-errors
-                       (alist-get 'refused (pos-ledger-parse (cdr answer))))))
+                       (alist-get 'refused (pos-bytes-parse (cdr answer))))))
           (if (and (eql status 401) (null given))
-              (pos-ledger--refuse
+              (pos-ledger-refuse
                'access "Not signed in to this keeper; sign in with: sign-in %s" url)
-            (pos-ledger--refuse (cond ((stringp named) (intern named))
-                                      ((alist-get status pos-remote--kinds))
-                                      (t 'remote))
-                                "%s %s answered %d" method path status)))))))
+            (pos-ledger-refuse (cond ((stringp named) (intern named))
+                                     ((alist-get status pos-remote--kinds))
+                                     (t 'remote))
+                               "%s %s answered %d" method path status)))))))
 
 (defun pos-remote--call (archive method path &optional body content-type)
   "Return the body ARCHIVE's keeper answers METHOD on PATH with.
@@ -290,14 +291,14 @@ is that, without the status."
 
 (cl-defmethod pos-remote-describe ((archive pos-remote-http))
   "Return what the keeper of ARCHIVE has of its ledger, over HTTP."
-  (pos-ledger-parse (pos-remote--call archive "GET" "/")))
+  (pos-bytes-parse (pos-remote--call archive "GET" "/")))
 
 (cl-defmethod pos-remote-held ((archive pos-remote-http) cids)
   "Return which of CIDS the keeper of ARCHIVE lacks, over HTTP."
   (append (alist-get 'missing
-                     (pos-ledger-parse
+                     (pos-bytes-parse
                       (pos-remote--call archive "POST" "/blocks"
-                                        (pos-ledger-json (vconcat cids))
+                                        (pos-bytes-json (vconcat cids))
                                         "application/json")))
           nil))
 
@@ -319,11 +320,11 @@ files; under version 2 FILES is nil and nothing follows the later events."
   (let ((sent (pos-remote--multipart
                (append (list (cons "name" (encode-coding-string name 'utf-8))
                              (cons "event" event)
-                             (cons "claims" (pos-ledger-json claims)))
+                             (cons "claims" (pos-bytes-json claims)))
                        following
                        (sort (copy-sequence files)
                              (lambda (a b) (string< (car a) (car b))))))))
-    (pos-ledger-parse
+    (pos-bytes-parse
      (pos-remote--call archive "POST" "/events" (car sent) (cdr sent)))))
 
 (cl-defmethod pos-remote-read ((archive pos-remote-http) cid &optional path)
@@ -338,7 +339,7 @@ files; under version 2 FILES is nil and nothing follows the later events."
   "Return where QUERY is found in ARCHIVE, over HTTP.
 MODE, LIMIT and WITHIN go as query parameters after q, in that order,
 each left out where nil."
-  (pos-ledger-parse
+  (pos-bytes-parse
    (pos-remote--call
     archive "GET"
     (concat "/search?"

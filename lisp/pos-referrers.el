@@ -33,6 +33,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'pos-bytes)
 (require 'pos-ledger)
 (require 'pos-links)
 (require 'pos-corpus)
@@ -62,7 +63,7 @@ the link's own; for an id link it is the anchor of the ID.  Unsorted."
          links)
     (dolist (file (pos-corpus-files corpus))
       (unless (funcall inside file)
-        (let ((bytes (pos-ledger-read file))
+        (let ((bytes (pos-bytes-read file))
               (here (file-name-directory file)))
           (pcase-dolist (`(,offset ,text ,target ,suffix) (pos-links-in-file file))
             (let ((target (directory-file-name (expand-file-name target here))))
@@ -96,7 +97,7 @@ is not one.  Sorted by file, then line, then target, then text."
                (list file
                      (pos-referrers--line
                       (or (gethash file bytes)
-                          (puthash file (pos-ledger-read file) bytes))
+                          (puthash file (pos-bytes-read file) bytes))
                       offset)
                      text target)))
            (pos-referrers--links

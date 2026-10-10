@@ -34,6 +34,7 @@
 ;;; Code:
 
 (require 'ol)
+(require 'pos-bytes)
 (require 'pos-cid)
 (require 'pos-ledger)
 (require 'pos-remote)
@@ -66,15 +67,15 @@ An alist of CID and the paths, relative to SCOPE, that have it."
         (let ((coding-system-for-write 'binary))
           (with-temp-file file
             (set-buffer-multibyte nil)
-            (insert (pos-ledger-json `((schema . 1) (cids . ,index)))))))
+            (insert (pos-bytes-json `((schema . 1) (cids . ,index)))))))
       index)))
 
 (defun pos-index--load (scope)
   "Return SCOPE's saved index, or nil if there is none."
   (let ((file (expand-file-name pos-index-file scope)))
     (when (file-exists-p file)
-      (mapcar (lambda (pair) (cons (pos-ledger--key (car pair)) (cdr pair)))
-              (alist-get 'cids (pos-ledger-parse (pos-ledger-read file)))))))
+      (mapcar (lambda (pair) (cons (pos-bytes-key (car pair)) (cdr pair)))
+              (alist-get 'cids (pos-bytes-parse (pos-bytes-read file)))))))
 
 (defun pos-index--parse (uri)
   "Return (CID . PATH) from URI, ipfs://CID or ipfs://CID/PATH.
@@ -203,23 +204,23 @@ must have the CID its ledger enrols it under, else `entry'.  Refuse
 `absent' if URI is no such link or no scope has such a file; a
 directory is not a file."
   (unless (string-match-p "\\`ipfs://[^/?#:]" uri)
-    (pos-ledger--refuse 'absent "Not an ipfs:// link: %s" uri))
+    (pos-ledger-refuse 'absent "Not an ipfs:// link: %s" uri))
   (let* ((scopes (pos-index--scopes (or directory default-directory)))
          (file (seq-some (lambda (scope)
                            (let ((found (ignore-errors (pos-index-resolve scope uri))))
                              (and found (file-name-absolute-p found)
                                   (file-regular-p found) found)))
                          scopes)))
-    (or (and file (pos-ledger-read file))
+    (or (and file (pos-bytes-read file))
         (seq-some (lambda (scope)
                     (pcase (pos-index--kept-read scope uri)
                       (`(,bytes ,file-cid ,_)
                        (unless (equal file-cid (pos-cid-bytes bytes))
-                         (pos-ledger--refuse
+                         (pos-ledger-refuse
                           'entry "The keeper's bytes are not those of %s" file-cid))
                        bytes)))
                   scopes)
-        (pos-ledger--refuse 'absent "No archived file for %s" uri))))
+        (pos-ledger-refuse 'absent "No archived file for %s" uri))))
 
 (org-link-set-parameters "ipfs" :follow #'pos-index-follow)
 

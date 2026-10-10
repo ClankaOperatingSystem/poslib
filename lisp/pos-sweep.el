@@ -52,6 +52,7 @@
 (require 'org)
 (require 'org-archive)
 (require 'pos)
+(require 'pos-bytes)
 (require 'pos-corpus)
 (require 'pos-seal)
 
@@ -411,7 +412,7 @@ A scope in another repository of the tree is left to that repository."
   "Apply PLANS, as `pos-sweep-close' gives them, each under its own hash.
 Return the event file of each."
   (mapcar (lambda (plan)
-            (car (pos-seal-apply plan (pos-ledger-sha (pos-ledger-json plan)))))
+            (car (pos-seal-apply plan (pos-bytes-sha (pos-bytes-json plan)))))
           plans))
 
 ;;;; Command line
@@ -461,7 +462,7 @@ any other option or a second name, so that no word is passed over."
                             "\n"))))
           (`("close")
            (princ (decode-coding-string
-                   (pos-ledger-json (vconcat (pos-sweep-close root))) 'utf-8))
+                   (pos-bytes-json (vconcat (pos-sweep-close root))) 'utf-8))
            (princ "\n"))
           (`("close" "--apply")
            (dolist (event (pos-sweep-close-apply (pos-sweep-close root)))
