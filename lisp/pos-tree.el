@@ -59,7 +59,6 @@
 
 (require 'cl-lib)
 (require 'pos-bytes)
-(require 'pos-ledger)
 (require 'pos-path)
 (require 'seq)
 (require 'subr-x)
@@ -571,7 +570,7 @@ Signal `pos-tree-refused' if there are two."
   "Return the configuration file of the node at DIR, relative, or nil.
 Signal `pos-tree-refused' if it has two."
   (pos-tree--one-config
-   (pos-ledger-config-files dir)))
+   (pos-path-config-files dir)))
 
 (defvar pos-tree--warnings-found nil
   "The warnings of the configurations read for the plan being made.
@@ -588,7 +587,7 @@ for a file that is refused, and for two configurations."
                                            (or (apply #'pos-tree--git-line
                                                       dir "ls-tree" "--name-only"
                                                       "-r" branch "--"
-                                                      (pos-ledger-config-paths))
+                                                      (pos-path-config-paths))
                                                "")
                                            "\n" t))))
                          (pos-tree--git-line dir "show" (concat branch ":" file)))
@@ -708,7 +707,7 @@ or nil at its root."
           (cond
            ((equal name "archives") (push (if prefix (directory-file-name prefix) ".") scopes))
            ((and (not (pos-tree-unwalked-p path exclusions))
-                 (not (pos-tree--repository-p full)) (not (pos-ledger-config-files full)))
+                 (not (pos-tree--repository-p full)) (not (pos-path-config-files full)))
             (setq scopes (append (pos-tree--archive-scopes full boundaries exclusions
                                                            (concat path "/"))
                                  scopes)))))))
@@ -728,7 +727,7 @@ or nil at its root."
       (unless (let ((at base) boundary)
                 (dolist (part (unless (equal scope ".") (split-string scope "/")))
                   (setq at (expand-file-name part at))
-                  (when (or (pos-tree--repository-p at) (pos-ledger-config-files at))
+                  (when (or (pos-tree--repository-p at) (pos-path-config-files at))
                     (setq boundary t)))
                 boundary)
         (let* ((path (expand-file-name "archives" (expand-file-name scope base)))
@@ -797,7 +796,7 @@ with its final slash, or nil for REPO."
        ((pos-tree--repository-p full)
         (unless (pos-tree--tracked-p repo path)
           (pos-tree--find "undeclared" (pos-tree--rel full))))
-       ((pos-ledger-config-files full)
+       ((pos-path-config-files full)
         (pos-tree--find "undeclared" (pos-tree--rel full) "a configuration"))
        (t (pos-tree--undeclared repo mounted local exclusions
                                 (concat path "/") node))))))
