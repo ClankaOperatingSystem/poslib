@@ -437,10 +437,13 @@ check bin/ does not hold, are each a finding at the methodology."
                  findings)))))
     (nreverse findings)))
 
+(autoload 'pos-person-lint "pos-person")
+
 (defvar pos-lint-repo-checks
   '(pos-lint-stranded-tasks
     pos-lint-duplicate-tasks
-    pos-lint-methodology-checks)
+    pos-lint-methodology-checks
+    pos-person-lint)
   "Whole-tree checks: root to findings.")
 
 (defun pos-lint-format (findings root)

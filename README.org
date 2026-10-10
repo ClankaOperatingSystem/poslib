@@ -26,7 +26,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   in each scope that refers to them; an identity renamed, with the text
   of each link to it; and an item made to wait on a person, by a link
   to their identity in the item's scope, and released when what it
-  waited for comes.
+  waited for comes. The lint reports an identity that belongs to no
+  person, is misnamed or links to anything, and an item that waits on
+  what is no identity or on one of another scope.
 - =lisp/pos-cid.el= :: IPFS CIDs of files and trees, computed locally.
 - =lisp/pos-ledger.el= :: archive integrity ledgers, read and checked.
 - =lisp/pos-links.el= :: the links in Org and Markdown files: found,

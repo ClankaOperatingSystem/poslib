@@ -47,6 +47,7 @@
 ;; - `pos-person-identity-rename': command.
 ;; - `pos-person-wait-on': command.
 ;; - `pos-person-arrived': command.
+;; - `pos-person-lint': a check of `pos-lint-repo-checks'.
 ;; - `pos-person-batch': shell entry; add NAME, identity PERSON SCOPE,
 ;;   rename ID NAME, wait TARGET PERSON [NOTE], or arrived TARGET
 ;;   [STATE [NOTE]].
@@ -562,6 +563,127 @@ Refuse an item that is not WAITING and the STATE WAITING."
         (goto-char item)
         (org-entry-delete nil pos-waiting-on-property))
       (pos-set-state root (pos-person--item-place root item) state note))))
+
+;;;; Lint
+
+(defun pos-person--identities (corpus)
+  "Return the person-identities of CORPUS, each (ID FILE LINE NAME SCOPE TEXT).
+An identity is a file in the
+person-identities directory of a scope that has a configuration, or
+a heading with an ID under `pos-person-heading' in a file of a
+project that has none.  LINE is 1 for a file.  ID is nil for a file
+that has none.  SCOPE is the identity's scope and TEXT what it
+says: a file's text, or a heading's entry."
+  (let (identities)
+    (dolist (scope (pos-corpus-scopes corpus))
+      (when-let* (((pos-scope-config scope))
+                  (config (pos-person--config-directory (pos-scope-dir scope))))
+        (dolist (file (pos-person--org-files
+                       (expand-file-name pos-person-identities-directory config)))
+          (push (list (pos-person--file-id file) file 1
+                      (pos-person--file-title file) scope
+                      (pos-person--file-text file))
+                identities))))
+    (pcase-dolist (`(,file . ,scope) (pos-corpus-entries corpus))
+      (when (and (eq 'project (pos-scope-kind scope))
+                 (not (pos-scope-config scope)))
+        (with-current-buffer (pos-visit file)
+          (org-with-wide-buffer
+           (goto-char (point-min))
+           (let ((case-fold-search nil))
+             (when (re-search-forward
+                    (format "^\\* %s[ \t]*$" (regexp-quote pos-person-heading))
+                    nil t)
+               (let ((end (save-excursion (org-end-of-subtree t t) (point))))
+                 (while (re-search-forward "^\\*\\* " end t)
+                   (when-let* ((id (org-entry-get (point) "ID")))
+                     (push (list id file (line-number-at-pos)
+                                 (substring-no-properties
+                                  (org-get-heading t t t t))
+                                 scope
+                                 (buffer-substring-no-properties
+                                  (line-end-position)
+                                  (save-excursion
+                                    (or (outline-next-heading) (goto-char end))
+                                    (point))))
+                           identities))))))))))
+    (nreverse identities)))
+
+(defun pos-person--within-p (scope other)
+  "Return non-nil if the scope OTHER is SCOPE or lies beneath it."
+  (let ((path (pos-scope-path scope)))
+    (or (equal path ".")
+        (equal path (pos-scope-path other))
+        (string-prefix-p (concat path "/") (pos-scope-path other)))))
+
+(defun pos-person-lint (root)
+  "Report what is wrong with the person records of the tree at ROOT.
+Findings, each (FILE LINE MESSAGE): a person-identity that has no
+ID, that no person-entity links to, that is not named for its person
+and scope, a difference of case apart, or that links to anything; a
+link in a person-entity to no person-identity; and an item whose
+`pos-waiting-on-property' links to no person-identity, or to one of
+a scope that is neither the item's nor beneath it."
+  (let* ((root (file-name-as-directory (expand-file-name root)))
+         (corpus (pos-corpus root))
+         (people (pos-person-entities root))
+         (identities (pos-person--identities corpus))
+         findings)
+    (pcase-dolist (`(,id ,file ,line ,name ,scope ,text) identities)
+      (let ((person (and id (seq-find (lambda (person) (member id (cddr person)))
+                                      people))))
+        (cond
+         ((not id)
+          (push (list file line "person-identity has no ID") findings))
+         ((not person)
+          (push (list file line "person-identity that no person-entity links to")
+                findings))
+         (t
+          (let ((expected (pos-person-identity-name (car person) root scope)))
+            (unless (string-equal-ignore-case expected (or name ""))
+              (push (list file line
+                          (format "person-identity is not named for its person and scope: %s"
+                                  expected))
+                    findings)))))
+        (when (string-match-p "\\[\\[" text)
+          (push (list file line "person-identity links to something; it links to nothing")
+                findings))))
+    (pcase-dolist (`(,_name ,file . ,_ids) people)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (while (re-search-forward "\\[\\[id:\\([^]]+\\)\\]" nil t)
+          (unless (assoc (match-string 1) identities)
+            (push (list file (line-number-at-pos)
+                        (format "link to no person-identity: %s" (match-string 1)))
+                  findings)))))
+    (pcase-dolist (`(,file . ,scope) (pos-corpus-entries corpus))
+      (with-current-buffer (pos-visit file)
+        (org-with-wide-buffer
+         (goto-char (point-min))
+         (while (re-search-forward
+                 (format "^[ \t]*:%s:" (regexp-quote pos-waiting-on-property))
+                 nil t)
+           (unless (org-before-first-heading-p)
+             (let* ((value (org-entry-get (point) pos-waiting-on-property))
+                    (id (and value
+                             (string-match "\\[\\[id:\\([^]]+\\)\\]" value)
+                             (match-string 1 value)))
+                    (identity (and id (assoc id identities)))
+                    (line (save-excursion (org-back-to-heading t)
+                                          (line-number-at-pos))))
+               (cond
+                ((not identity)
+                 (push (list file line
+                             (format "%s does not link to a person-identity"
+                                     pos-waiting-on-property))
+                       findings))
+                ((not (pos-person--within-p scope (nth 4 identity)))
+                 (push (list file line
+                             (format "%s links to an identity of another scope: %s"
+                                     pos-waiting-on-property
+                                     (pos-scope-path (nth 4 identity))))
+                       findings)))))))))
+    (nreverse findings)))
 
 ;;;; The shell entry
 
