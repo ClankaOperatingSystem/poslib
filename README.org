@@ -19,7 +19,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   in its =LOGBOOK= drawer, and the links that name its old place listed.
 - =lisp/pos-project.el= :: a project's file made where its scope's
   projects go, with an ID, a status, an outcome, a review and a next
-  action.
+  action; its status changed, with a record; and a one-file project
+  promoted to a directory, with the path links kept whole.
 - =lisp/pos-cid.el= :: IPFS CIDs of files and trees, computed locally.
 - =lisp/pos-ledger.el= :: archive integrity ledgers, read and checked.
 - =lisp/pos-links.el= :: the links in Org and Markdown files: found,

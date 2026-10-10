@@ -197,5 +197,72 @@ files has a STATUS, here taken; a note of two lines."
       (should (equal "projects/paint.org: STATUS WIP, was COMMITTED\n"
                      (with-output-to-string (pos-project-batch)))))))
 
+(ert-deftest pos-project/a-one-file-project-is-promoted-to-a-directory ()
+  "NAME.org becomes NAME/project.org, and path links still lead where they led.
+In the project's file, a link to a sibling and one into the tree are
+rewritten for the deeper place; a link by ID, a web link and an
+absolute path are left.  In other files, a link to the project's
+file, with its search option, is rewritten to the new place; a link
+to another file is left.  The project's path is as it was, so the
+views name it as before."
+  (pos-test-with-files root
+      `((".pos/config.yaml" . "pos: 2\nprojects: projects/\n")
+        ("intray.org"
+         . ,(concat "* Unsorted\n"
+                    "See [[file:projects/paint.org::*Outcome][the outcome]]"
+                    " and [[file:projects/floor.org][floor]].\n"))
+        ("projects/floor.org"
+         . ":PROPERTIES:\n:STATUS:   WIP\n:END:\nBeside [[file:paint.org]].\n")
+        ("projects/paint.org"
+         . ,(concat ":PROPERTIES:\n:ID:       paint\n:STATUS:   WIP\n:END:\n"
+                    "* Outcome\nPainted.\n"
+                    "* NEXT Read [[file:floor.org][floor]],"
+                    " [[file:../intray.org::*Unsorted]],"
+                    " [[id:paint][itself]], [[https://example.org][the web]]"
+                    " and [[file:/etc/hosts]]\n")))
+    (let ((new (expand-file-name "projects/paint/project.org" root)))
+      (should (equal (list new
+                           (cons new 2)
+                           (cons (expand-file-name "intray.org" root) 1)
+                           (cons (expand-file-name "projects/floor.org" root) 1))
+                     (pos-project-promote root "projects/paint")))
+      (should-not (file-exists-p (expand-file-name "projects/paint.org" root)))
+      (should (equal (concat ":PROPERTIES:\n:ID:       paint\n:STATUS:   WIP\n:END:\n"
+                             "* Outcome\nPainted.\n"
+                             "* NEXT Read [[file:../floor.org][floor]],"
+                             " [[file:../../intray.org::*Unsorted]],"
+                             " [[id:paint][itself]], [[https://example.org][the web]]"
+                             " and [[file:/etc/hosts]]\n")
+                     (pos-test-file-string new)))
+      (should (equal (concat "* Unsorted\n"
+                             "See [[file:projects/paint/project.org::*Outcome][the outcome]]"
+                             " and [[file:projects/floor.org][floor]].\n")
+                     (pos-test-file-string (expand-file-name "intray.org" root))))
+      (should (string-suffix-p "Beside [[file:paint/project.org]].\n"
+                               (pos-test-file-string
+                                (expand-file-name "projects/floor.org" root))))
+      (should (equal '("projects/floor" "projects/paint")
+                     (mapcar (lambda (row) (alist-get 'scope row))
+                             (pos-startup-view-items root "projects")))))))
+
+(ert-deftest pos-project/what-is-not-a-one-file-project-is-not-promoted ()
+  "A refusal is a `user-error' and moves nothing.
+Refused: a project that is a directory already; a path that is no
+project's; a file that is not a project's, here the intray."
+  (pos-project-test-with-tree
+    (dolist (project '("projects/held" "projects/absent" "intray" "home"))
+      (ert-info (project)
+        (should-error (pos-project-promote root project) :type 'user-error)))
+    (should (file-exists-p (expand-file-name "projects/taken.org" root)))
+    (should-not (file-exists-p (expand-file-name "intray/project.org" root)))))
+
+(ert-deftest pos-project/the-command-promotes-a-project ()
+  "The command takes promote and a project, and prints what it did."
+  (pos-project-test-with-tree
+    (let ((pos-directory root)
+          (command-line-args-left (list "promote" "projects/taken")))
+      (should (equal "projects/taken/project.org\n"
+                     (with-output-to-string (pos-project-batch)))))))
+
 (provide 'pos-project-test)
 ;;; pos-project-test.el ends here
