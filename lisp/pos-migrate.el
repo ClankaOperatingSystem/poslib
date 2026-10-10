@@ -35,6 +35,7 @@
 ;;; Code:
 
 (require 'pos-bytes)
+(require 'pos-path)
 (require 'pos-cid)
 (require 'pos-ledger)
 (require 'pos-links)
@@ -131,7 +132,7 @@ shape shows them, and the directories INCLUDE names."
           (pos-migrate--walk stage))))
     ;; A collection holds all within it: none is declared inside another.
     (sort (seq-remove (lambda (c) (seq-some (lambda (o) (and (not (equal o c))
-                                                             (pos-ledger--within-p c o)))
+                                                             (pos-path-within-p c o)))
                                             found))
                       found)
           #'string<)))
@@ -219,13 +220,13 @@ TARGET's path is given from ROOT, the archive's scope."
 (defun pos-migrate--in-capsule-p (rel collections stage)
   "Return non-nil if REL lies in one of COLLECTIONS in STAGE that is a capsule.
 A capsule's links are left as written."
-  (seq-some (lambda (c) (and (pos-ledger--within-p rel c)
+  (seq-some (lambda (c) (and (pos-path-within-p rel c)
                              (pos-ledger-capsule-p (expand-file-name c stage))))
             collections))
 
 (defun pos-migrate--item-of (rel collections)
   "Return the item holding REL: its outermost of COLLECTIONS, else REL."
-  (or (seq-find (lambda (c) (pos-ledger--within-p rel c)) collections) rel))
+  (or (seq-find (lambda (c) (pos-path-within-p rel c)) collections) rel))
 
 (defun pos-migrate--stage (archive stage)
   "Copy ARCHIVE, less its legacy ledger, to STAGE, writable."
@@ -331,8 +332,8 @@ dates rumours; LEDGER-ID names a ledger that has none."
                         (item (pos-migrate--item-of rel collections))
                         (titem (pos-migrate--item-of target collections)))
                    (cond ((equal target rel) (list rel link "internal" text))
-                         ((seq-some (lambda (c) (and (pos-ledger--within-p rel c)
-                                                     (pos-ledger--within-p target c)))
+                         ((seq-some (lambda (c) (and (pos-path-within-p rel c)
+                                                     (pos-path-within-p target c)))
                                     collections)
                           (list rel link "internal" text))
                          ((and (file-directory-p (expand-file-name target stage))

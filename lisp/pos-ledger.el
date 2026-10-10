@@ -40,6 +40,7 @@
 (require 'subr-x)
 (require 'pos-bytes)
 (require 'pos-cid)
+(require 'pos-path)
 
 (defconst pos-ledger-integrity "archive-integrity"
   "The folder beside an archive holding its ledger and checkpoints.")
@@ -174,14 +175,6 @@ An archive not yet made holds nothing."
 
 ;;;; History
 
-(defun pos-ledger--safe-p (path)
-  "Return non-nil if PATH is a plain relative path."
-  (and (not (string-empty-p path))
-       (not (string-prefix-p "/" path))
-       (not (string-match-p "\\\\" path))
-       (not (seq-some (lambda (part) (member part '("" "." "..")))
-                      (split-string path "/")))))
-
 (defun pos-ledger--keys (object)
   "Return OBJECT's keys as sorted strings."
   (sort (mapcar (lambda (pair) (pos-bytes-key (car pair))) object) #'string<))
@@ -242,7 +235,7 @@ from its fingerprint, and adds only new paths."
                  (listp (alist-get 'rename event)) (listp (alist-get 'convert event))
                  (seq-every-p (lambda (p) (assoc p legacy)) remove)
                  (seq-every-p (lambda (p) (and (assoc (car p) legacy) (not (member (car p) remove))
-                                               (stringp (cdr p)) (pos-ledger--safe-p (cdr p))))
+                                               (stringp (cdr p)) (pos-path-safe-p (cdr p))))
                               rename)
                  (equal (length (seq-uniq (mapcar #'car moved))) (length moved)))
       (funcall bad))
@@ -264,20 +257,16 @@ from its fingerprint, and adds only new paths."
                           moved)))
       (dolist (pair (alist-get 'add event))
         (let ((name (pos-bytes-key (car pair))))
-          (unless (and (pos-ledger--safe-p name) (not (assoc name result))
+          (unless (and (pos-path-safe-p name) (not (assoc name result))
                        (pos-ledger--entry-p (cdr pair) 2))
             (funcall bad))
           (push (cons name (cdr pair)) result)))
       result)))
 
-(defun pos-ledger--within-p (path item)
-  "Return non-nil if PATH is ITEM or lies within it."
-  (or (equal path item) (string-prefix-p (concat item "/") path)))
-
 (defun pos-ledger--collections-p (value)
   "Return non-nil if VALUE is a sorted vector of distinct safe paths."
   (and (vectorp value)
-       (seq-every-p (lambda (p) (and (stringp p) (pos-ledger--safe-p p))) value)
+       (seq-every-p (lambda (p) (and (stringp p) (pos-path-safe-p p))) value)
        (equal (append value nil)
               (seq-uniq (sort (append value nil) #'string<)))))
 
@@ -370,18 +359,18 @@ nil nil)."
             (when (and (memq schema '(2 3)) (not conversion) (not to-blocks))
               (let ((item (alist-get 'item event)))
                 (unless (and (pos-ledger--cid-p root)
-                             (stringp item) (pos-ledger--safe-p item)
+                             (stringp item) (pos-path-safe-p item)
                              (pos-ledger--collections-p (alist-get 'collections event))
-                             (seq-every-p (lambda (p) (pos-ledger--within-p p item))
+                             (seq-every-p (lambda (p) (pos-path-within-p p item))
                                           (alist-get 'collections event))
                              (seq-every-p (lambda (pair)
-                                            (pos-ledger--within-p
+                                            (pos-path-within-p
                                              (pos-bytes-key (car pair)) item))
                                           (alist-get 'add event)))
                   (pos-ledger--refuse 'entry "Invalid root, item or collections: %s" path))
                 (when (eql schema 3)
                   (unless (and (pos-ledger--collections-p (alist-get 'empty event))
-                               (seq-every-p (lambda (p) (pos-ledger--within-p p item))
+                               (seq-every-p (lambda (p) (pos-path-within-p p item))
                                             (alist-get 'empty event)))
                     (pos-ledger--refuse 'entry "Invalid empty directories: %s" path)))
                 (push item items))
@@ -402,7 +391,7 @@ nil nil)."
                 (pos-ledger--refuse 'entry "Invalid ledger additions"))
               (dolist (pair add)
                 (let ((name (pos-bytes-key (car pair))))
-                  (unless (pos-ledger--safe-p name)
+                  (unless (pos-path-safe-p name)
                     (pos-ledger--refuse 'entry "Unsafe relative path: %s" name))
                   (when (or (equal (car (split-string name "/")) pos-ledger-directory)
                             (assoc name entries))

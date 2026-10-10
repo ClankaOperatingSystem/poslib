@@ -37,6 +37,7 @@
 (require 'markdown-mode)
 (require 'url-util)
 (require 'pos-bytes)
+(require 'pos-path)
 (require 'pos-cid)
 (require 'pos-ledger)
 
@@ -235,8 +236,8 @@ FROM must be at OFFSET."
   (let* ((archive (pos-links--archive-of target))
          (rel (file-relative-name target archive)))
     (pcase-let ((`(,entries ,_ ,_ ,_ ,_ ,collections ,items) (pos-ledger-history archive)))
-      (let ((item (or (seq-find (lambda (i) (pos-ledger--within-p rel i)) items)
-                      (seq-find (lambda (c) (pos-ledger--within-p rel c)) collections)
+      (let ((item (or (seq-find (lambda (i) (pos-path-within-p rel i)) items)
+                      (seq-find (lambda (c) (pos-path-within-p rel c)) collections)
                       (and (assoc rel entries) rel))))
         (unless item
           (pos-ledger--refuse 'unsealed "Link to an archived path not sealed: %s" target))
