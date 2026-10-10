@@ -166,7 +166,7 @@ Signal an error if git did not succeed."
 
 (defun pos-test-same-json (expected actual)
   "Check that EXPECTED and ACTUAL are the same JSON value."
-  (should (equal (pos-ledger-json expected) (pos-ledger-json actual))))
+  (should (equal (pos-bytes-json expected) (pos-bytes-json actual))))
 
 (defun pos-test-report-relative (report dir)
   "Return REPORT with its absolute paths made relative to DIR."
@@ -184,7 +184,7 @@ Signal an error if git did not succeed."
 
 (defun pos-test-approve (plan)
   "Apply PLAN as a reviewer approves it: with the hash of its own bytes."
-  (pos-seal-apply plan (pos-ledger-sha (pos-ledger-json plan))))
+  (pos-seal-apply plan (pos-bytes-sha (pos-bytes-json plan))))
 
 (defmacro pos-test-with-scope (&rest body)
   "Evaluate BODY with `scope' a temporary scope holding archives/ and an item."
@@ -227,9 +227,9 @@ played."
                        (authorization . ,(or (cdr (assoc "Authorization" headers)) :null))
                        ,@(when body
                            `((content_type . ,(cdr (assoc "Content-Type" headers)))
-                             (body_sha256 . ,(pos-ledger-sha body)))))))
-          (unless (equal (pos-ledger-json sent)
-                         (pos-ledger-json (alist-get 'request exchange)))
+                             (body_sha256 . ,(pos-bytes-sha body)))))))
+          (unless (equal (pos-bytes-json sent)
+                         (pos-bytes-json (alist-get 'request exchange)))
             (error "Not the request recorded: %S" sent))
           (cons (alist-get 'status (alist-get 'response exchange))
                 (encode-coding-string (alist-get 'body (alist-get 'response exchange))

@@ -48,6 +48,7 @@
 (require 'seq)
 (require 'subr-x)
 (require 'pos)
+(require 'pos-bytes)
 (require 'pos-corpus)
 (require 'pos-ledger)
 (require 'pos-links)
@@ -229,7 +230,7 @@ BYTES is the file's bytes afterwards and COUNT the links changed."
                           (concat (substring text 0 at) new
                                   (substring text (+ at (length path)))))
                     rewrites))))))
-    (cons (pos-links-rewrite (pos-ledger-read file) rewrites)
+    (cons (pos-links-rewrite (pos-bytes-read file) rewrites)
           (length rewrites))))
 
 (defun pos-project--write (file bytes)

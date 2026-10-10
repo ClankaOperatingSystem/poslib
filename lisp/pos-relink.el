@@ -37,6 +37,7 @@
 
 (require 'cl-lib)
 (require 'seq)
+(require 'pos-bytes)
 (require 'pos-ledger)
 (require 'pos-links)
 (require 'pos-corpus)
@@ -86,19 +87,19 @@ link whose ID two files hold."
                       (suffix . ,suffix))
                     (alist-get name files nil nil #'equal))
             (push `((file . ,name)
-                    (line . ,(pos-referrers--line (pos-ledger-read file) offset))
+                    (line . ,(pos-referrers--line (pos-bytes-read file) offset))
                     (link . ,text))
                   unwritable))))
       `((schema . 1) (operation . "relink")
         (root . ,(directory-file-name root))
         (source . ,.source) (destination . ,.destination)
-        (seal_sha256 . ,(pos-ledger-sha (pos-ledger-json seal-plan)))
+        (seal_sha256 . ,(pos-bytes-sha (pos-bytes-json seal-plan)))
         (files . ,(vconcat
                    (mapcar
                     (lambda (entry)
                       `((file . ,(car entry))
-                        (sha256 . ,(pos-ledger-sha
-                                    (pos-ledger-read (expand-file-name (car entry) root))))
+                        (sha256 . ,(pos-bytes-sha
+                                    (pos-bytes-read (expand-file-name (car entry) root))))
                         (links . ,(vconcat
                                    (sort (cdr entry)
                                          (lambda (a b)
@@ -122,7 +123,7 @@ search option.  Every file is checked against its SHA-256 before any
 is written.  Return the files rewritten, relative to the plan's root.
 Refuse a plan that is not a relink plan, a destination not sealed,
 and a file changed since the plan was made."
-  (unless (equal (pos-ledger-sha (pos-ledger-json plan)) expected)
+  (unless (equal (pos-bytes-sha (pos-bytes-json plan)) expected)
     (pos-ledger--refuse 'plan "Reviewed plan hash mismatch"))
   (let-alist plan
     (unless (and (eql .schema 1) (equal .operation "relink"))
@@ -131,8 +132,8 @@ and a file changed since the plan was made."
           writes)
       (seq-doseq (entry .files)
         (let* ((file (expand-file-name (alist-get 'file entry) .root))
-               (bytes (pos-ledger-read file)))
-          (unless (equal (pos-ledger-sha bytes) (alist-get 'sha256 entry))
+               (bytes (pos-bytes-read file)))
+          (unless (equal (pos-bytes-sha bytes) (alist-get 'sha256 entry))
             (pos-ledger--refuse 'plan "File changed since review: %s" file))
           (push (list file
                       (pos-links-rewrite

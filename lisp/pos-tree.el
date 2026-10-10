@@ -57,6 +57,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'pos-bytes)
 (require 'pos-ledger)
 (require 'seq)
 (require 'subr-x)
@@ -1363,7 +1364,7 @@ in which case what was done before it stays done.  Cloning uses the
 network."
   (let ((dir (file-name-as-directory (expand-file-name root)))
         (fresh (pos-tree-plan root source)))
-    (unless (equal (pos-ledger-json fresh) (pos-ledger-json plan))
+    (unless (equal (pos-bytes-json fresh) (pos-bytes-json plan))
       (pos-tree--refuse 'stale-plan "The tree no longer gives this plan"))
     (seq-doseq (action (alist-get 'actions fresh))
       (pos-tree--do dir action (and source (expand-file-name source))))
@@ -1420,7 +1421,7 @@ Exit 0 nothing to do, 1 something to do or to report, 2 refused.
 
 (defun pos-tree--print (plan)
   "Print PLAN as JSON and exit, with 0 for an empty plan and 1 otherwise."
-  (princ (decode-coding-string (pos-ledger-json plan) 'utf-8))
+  (princ (decode-coding-string (pos-bytes-json plan) 'utf-8))
   (kill-emacs (if (and (seq-empty-p (alist-get 'actions plan))
                        (seq-empty-p (alist-get 'findings plan)))
                   0
@@ -1439,8 +1440,8 @@ Exit 0 nothing to do, 1 something to do or to report, 2 refused.
          (pos-tree--print
           (pos-tree-apply
            root
-           (pos-ledger-parse
-            (pos-ledger-read (if (equal file "-") "/dev/stdin" file)))
+           (pos-bytes-parse
+            (pos-bytes-read (if (equal file "-") "/dev/stdin" file)))
            source)))
         (`(,(or "help" "-h" "--help")) (princ pos-tree-usage))
         (_ (message "%s" pos-tree-usage)

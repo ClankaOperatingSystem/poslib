@@ -40,6 +40,7 @@
 (require 'subr-x)
 (require 'url-parse)
 (require 'url-util)
+(require 'pos-bytes)
 (require 'pos-ledger)
 
 (defvar pos-remote-send-function)
@@ -87,13 +88,13 @@ The file pos/tokens.json under $XDG_CONFIG_HOME, or under ~/.config."
 (defun pos-signin--object (value)
   "Return VALUE, a JSON object, as an alist with string keys, or nil."
   (and (listp value)
-       (mapcar (lambda (pair) (cons (pos-ledger--key (car pair)) (cdr pair))) value)))
+       (mapcar (lambda (pair) (cons (pos-bytes-key (car pair)) (cdr pair))) value)))
 
 (defun pos-signin--load ()
   "Return what is kept, as (TOKENS . KEEPERS).
 Each an alist by string: TOKENS by \"ISSUER CLIENT\", KEEPERS by origin."
   (let ((kept (ignore-errors
-                (pos-ledger-parse (pos-ledger-read (pos-signin-file))))))
+                (pos-bytes-parse (pos-bytes-read (pos-signin-file))))))
     (cons (pos-signin--object (and (listp kept) (alist-get 'tokens kept)))
           (pos-signin--object (and (listp kept) (alist-get 'keepers kept))))))
 
@@ -109,7 +110,7 @@ Each an alist by string: TOKENS by \"ISSUER CLIENT\", KEEPERS by origin."
       (set-file-modes temp #o600)
       (with-temp-file temp
         (set-buffer-multibyte nil)
-        (insert (pos-ledger-json `((tokens . ,(car kept)) (keepers . ,(cdr kept))))))
+        (insert (pos-bytes-json `((tokens . ,(car kept)) (keepers . ,(cdr kept))))))
       (set-file-modes temp #o600)
       (rename-file temp file t))))
 
@@ -125,7 +126,7 @@ Each an alist by string: TOKENS by \"ISSUER CLIENT\", KEEPERS by origin."
 (defun pos-signin--json (answer)
   "Return the JSON object in ANSWER, a (STATUS . BYTES), if it is a 200."
   (and (eql (car answer) 200)
-       (ignore-errors (pos-ledger-parse (cdr answer)))))
+       (ignore-errors (pos-bytes-parse (cdr answer)))))
 
 (defun pos-signin--told (url)
   "Return how to sign in to the keeper at URL, or refuse `access'.

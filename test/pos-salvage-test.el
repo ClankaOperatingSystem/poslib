@@ -213,7 +213,7 @@ no longer an id link: sealing resolved it."
            (relink (pos-relink-plan root seal)))
       (pos-test-approve seal)
       (should (equal '("intray.org")
-                     (pos-relink-apply relink (pos-ledger-sha (pos-ledger-json relink)))))
+                     (pos-relink-apply relink (pos-bytes-sha (pos-bytes-json relink)))))
       (let ((item (pos-links-link sealed))
             (copied (pos-test-file-string intray))
             (kept (pos-test-file-string (expand-file-name "notes.org" sealed))))
