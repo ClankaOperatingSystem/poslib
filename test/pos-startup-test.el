@@ -465,6 +465,36 @@ is named, as \".\"."
     (should (string-suffix-p "Root with a review to be scheduled\n  .\n"
                              (pos-startup-view root "reviews-to-schedule")))))
 
+(ert-deftest pos-startup/a-begun-project-with-no-next-action-is-stuck ()
+  "The stuck view names each begun project with no next action.
+A project is begun when its file's STATUS is one of
+`pos-startup-stuck-statuses'; a next action is an item in one of
+`pos-startup-next-action-states', in any file of the project.  Here
+paint and floor are begun with TODO items alone, and floor is a
+single file; fence has a NEXT item; gate waits on someone; path has
+its NEXT item in a second file; pond is committed and not begun; well
+is complete.  A NEXT item in the root's intray is no project's."
+  (pos-test-with-files root
+      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+        ("intray.org" . "* Unsorted\n** NEXT Answer the letter\n")
+        ("projects/paint/project.org"
+         . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* TODO Choose the colour\n* DONE Buy brushes\n")
+        ("projects/floor.org" . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* TODO Measure the room\n")
+        ("projects/fence/project.org"
+         . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Count the posts\n")
+        ("projects/gate/project.org"
+         . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* WAITING Hear from the smith\n")
+        ("projects/path/project.org"
+         . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* TODO Lay the path\n")
+        ("projects/path/notes.org" . "* NEXT Order the gravel\n")
+        ("projects/pond/project.org"
+         . ":PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n* TODO Dig the pond\n")
+        ("projects/well/project.org" . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n"))
+    (let ((text (pos-startup-view root "stuck")))
+      (should (string-prefix-p "Projects with no next action\n" text))
+      (should (equal (pos-startup-test-lines text)
+                     '(("projects/floor" . "WIP") ("projects/paint" . "WIP")))))))
+
 (ert-deftest pos-startup/the-intray-view-lists-what-is-captured-and-not-placed ()
   "The intray view lists each open item under Unsorted in an intray.org.
 Each is labelled by its scope.  In the tree, the root's intray has two
@@ -481,7 +511,7 @@ open items and health's has one open and one done."
   "A view with no item says so, as does each empty list within a view.
 The tree here holds one empty intray and nothing else."
   (pos-test-with-files root '(("intray.org" . "* Unsorted\n"))
-    (dolist (view '("next" "waiting" "scheduled" "deadlines" "intray" "all"))
+    (dolist (view '("next" "waiting" "scheduled" "deadlines" "stuck" "intray" "all"))
       (ert-info ((format "the %s view" view))
         (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view)))))
     (should (= 3 (length (split-string (pos-startup-view root "reviews")
@@ -509,7 +539,7 @@ path, tools/widget/notes."
       (dolist (title '("NEXT items" "WAITING items" "Scheduled items, next 14 days"
                        "Deadlines, all open"
                        "Project reviews, late" "Projects with a review to be scheduled"
-                       "Intray, to be placed"))
+                       "Projects with no next action" "Intray, to be placed"))
         (ert-info ((format "the %s view" title))
           (should (string-match-p (concat "^" title) text))))
       (should-not (string-match-p "^All TODO items" text)))
