@@ -21,6 +21,10 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   projects go, with an ID, a status, an outcome, a review and a next
   action; its status changed, with a record; and a one-file project
   promoted to a directory, with the path links kept whole.
+- =lisp/pos-person.el= :: a person recorded once, in the root's
+  configuration directory, and given an identity with an ID of its own
+  in each scope that refers to them; an identity renamed, with the text
+  of each link to it.
 - =lisp/pos-cid.el= :: IPFS CIDs of files and trees, computed locally.
 - =lisp/pos-ledger.el= :: archive integrity ledgers, read and checked.
 - =lisp/pos-links.el= :: the links in Org and Markdown files: found,
