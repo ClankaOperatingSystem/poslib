@@ -349,7 +349,7 @@ the key."
         (should-not (string-match-p
                      (regexp-quote dir)
                      (decode-coding-string
-                      (pos-ledger-json (pos-tree-plan root)) 'utf-8)))))))
+                      (pos-bytes-json (pos-tree-plan root)) 'utf-8)))))))
 
 (ert-deftest pos-tree/a-child-s-configuration-is-read-from-its-branch-by-either-name ()
   "A mounted child that names itself .clanka/config.yml declares as any other."
@@ -602,9 +602,9 @@ One that is not excluded is, as before."
                   ".pos/config.yaml"
                   (pos-tree-test-config
                    (pos-tree-test-child "projects/child" child))))
-           (printed (pos-ledger-json (pos-tree-plan root))))
+           (printed (pos-bytes-json (pos-tree-plan root))))
       (should (equal (pos-tree-test-summary
-                      (pos-tree-apply root (pos-ledger-parse printed)))
+                      (pos-tree-apply root (pos-bytes-parse printed)))
                      nil))
       (should (file-exists-p (expand-file-name "projects/child/README" root))))))
 

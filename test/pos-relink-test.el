@@ -64,7 +64,7 @@
 
 (defun pos-relink-test-approve (plan)
   "Apply PLAN, a relink plan, with the hash of its own bytes."
-  (pos-relink-apply plan (pos-ledger-sha (pos-ledger-json plan))))
+  (pos-relink-apply plan (pos-bytes-sha (pos-bytes-json plan))))
 
 (ert-deftest pos-relink/the-plan-lists-each-link-into-the-item ()
   "The plan names each file with links into the item, and each link.
@@ -77,13 +77,13 @@ plan names the seal plan by the SHA-256 of its bytes."
   (pos-relink-test-with-garden
     (let ((plan (pos-relink-plan root seal)))
       (should (equal "relink" (alist-get 'operation plan)))
-      (should (equal (pos-ledger-sha (pos-ledger-json seal))
+      (should (equal (pos-bytes-sha (pos-bytes-json seal))
                      (alist-get 'seal_sha256 plan)))
       (should (equal [] (alist-get 'unwritable plan)))
       (should (= 1 (length (alist-get 'files plan))))
       (let ((entry (aref (alist-get 'files plan) 0)))
         (should (equal "intray.org" (alist-get 'file entry)))
-        (should (equal (pos-ledger-sha
+        (should (equal (pos-bytes-sha
                         (encode-coding-string pos-relink-test-intray 'utf-8))
                        (alist-get 'sha256 entry)))
         (should (equal '(("file:trial/notes.org::*Result" "notes.org" "::*Result")

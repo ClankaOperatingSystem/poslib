@@ -43,6 +43,7 @@
 
 (require 'cl-lib)
 (require 'subr-x)
+(require 'pos-bytes)
 (require 'pos-ledger)
 (require 'pos-cid)
 (require 'pos-remote)
@@ -161,7 +162,7 @@ MODES is what is served, `pos-search-modes' by default."
 
 (defun pos-search-by-path (paths)
   "Return PATHS in the archive's order: bytewise."
-  (sort (copy-sequence paths) #'pos-ledger--utf8<))
+  (sort (copy-sequence paths) #'pos-bytes-utf8<))
 
 (defun pos-search-reference (path cids items collections)
   "Return the ipfs:// link to the enrolled file at PATH, from CIDS.
@@ -206,9 +207,9 @@ CID, one of schema 1, is hashed from disk as link hashes it."
     (pos-search-found
      (mapcar (lambda (path)
                (cons (pos-search-reference path cids items collections)
-                     (lambda () (pos-ledger-read (expand-file-name path archive)))))
+                     (lambda () (pos-bytes-read (expand-file-name path archive)))))
              (seq-filter (lambda (path) (and (assoc path cids) (funcall chosen path)))
-                         (pos-search-by-path (mapcar (lambda (pair) (pos-ledger--key (car pair)))
+                         (pos-search-by-path (mapcar (lambda (pair) (pos-bytes-key (car pair)))
                                                      entries))))
      query mode limit pos-search-modes)))
 
