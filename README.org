@@ -110,9 +110,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   file beneath the root but those under =exclude=, and those of a
   repository with no configuration.
 - =pos-config.el= at the repository root; =pos-load-config= loads it.
-  Sets =pos-refile-rules=, where a refile plan proposes a heading go,
-  and =pos-prose-directories=, which the stranded-task scan leaves
-  alone. A setting it once set and no longer reads is reported.
+  Sets =pos-refile-rules=, where a refile plan proposes a heading go.
+  A setting it once set and no longer reads is reported.
 - Example: =test/pos-config.el=.
 
 * Check

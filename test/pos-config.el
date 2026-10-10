@@ -6,8 +6,7 @@
 
 ;;; Code:
 
-(setq pos-prose-directories '("meta/journal" "meta/specs")
-      pos-refile-rules '(("invoice\\|client" . "work/work-projects.org")
+(setq pos-refile-rules '(("invoice\\|client" . "work/work-projects.org")
                          ("dentist\\|checkup" . "body/body-projects.org")))
 
 ;;; pos-config.el ends here

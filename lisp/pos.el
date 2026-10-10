@@ -123,7 +123,9 @@ the user's setting."
     (pos-archive-directory
      . "where a scope's done items go is declared by its archive entry's sweep and path")
     (pos-roam-excluded-directories
-     . "the index covers the corpus, whose exclusions are declared under exclude in the configuration"))
+     . "the index covers the corpus, whose exclusions are declared under exclude in the configuration")
+    (pos-prose-directories
+     . "no scan reads outside the corpus; the open tasks of what is retired are salvaged before it is sealed"))
   "Settings pos-config.el once set, each with what replaced it.")
 
 (defun pos-load-config (&optional root)
@@ -323,48 +325,6 @@ it, or in a date in its own text, a timestamp or YYYY-MM-DD."
     pos-lint-waiting-without-who-or-when)
   "Per-file checks: file to findings.")
 
-(defcustom pos-prose-directories nil
-  "Root subdirectories of prose; not scanned for stranded tasks."
-  :type '(repeat string)
-  :group 'pos)
-
-(defun pos-uncovered-org-files (root)
-  "Return Org files under ROOT that are not in its corpus.
-A walk of its own, kept as it was: every Org file beneath ROOT but
-those in the archive, prose and hidden directories, less the files
-the corpus reads, and less the files of a methodology a project of the
-tree uses, which are the method's own and no task of this root.  A
-lock file, which Emacs leaves as a dangling link beside a file being
-edited, is not one; visiting it would wait on a question."
-  (let* ((corpus (pos-corpus root))
-         (covered (pos-corpus-files corpus))
-         (excluded (append
-                    (mapcar (lambda (dir)
-                              (file-name-as-directory (expand-file-name dir root)))
-                            (cons pos-sweep-default-path pos-prose-directories))
-                    (mapcar #'cddr (pos-corpus-methodologies corpus)))))
-    (seq-remove (lambda (file)
-                  (or (file-symlink-p file)
-                      (seq-some (lambda (dir) (string-prefix-p dir file)) excluded)))
-                (seq-difference
-                 (directory-files-recursively
-                  root "\\`[^.#].*\\.org\\'" nil
-                  (lambda (dir)
-                    (not (string-prefix-p "." (file-name-nondirectory dir)))))
-                 covered))))
-
-(defun pos-lint-stranded-tasks (root)
-  "Report task keywords in Org files under ROOT outside the sweep."
-  (mapcan (lambda (file)
-            (pos--map-headings
-             file
-             (lambda ()
-               (let ((keyword (org-get-todo-state)))
-                 (when keyword
-                   (pos--finding
-                    file (format "task keyword outside the agenda files (%s)" keyword)))))))
-          (pos-uncovered-org-files root)))
-
 (defun pos--task-headings (root)
   "Return (KEY FILE LINE) for keyword headings in the files of ROOT's corpus.
 KEY is the lower-cased heading text."
@@ -452,8 +412,7 @@ check bin/ does not hold, are each a finding at the methodology."
 (autoload 'pos-person-lint "pos-person")
 
 (defvar pos-lint-repo-checks
-  '(pos-lint-stranded-tasks
-    pos-lint-duplicate-tasks
+  '(pos-lint-duplicate-tasks
     pos-lint-methodology-checks
     pos-person-lint)
   "Whole-tree checks: root to findings.")
@@ -500,30 +459,7 @@ Interactively, show them in a compilation buffer."
     (princ (pos-lint-format findings (file-name-as-directory pos-directory)))
     (kill-emacs (if findings 1 0))))
 
-;;;; Rescuing stranded tasks
-
-(defun pos-stranded-open-tasks (root)
-  "Return (FILE LINE HEADING) for open tasks under ROOT outside the sweep.
-Topmost of a nest only."
-  (mapcan
-   (lambda (file)
-     (pos--map-headings
-      file
-      (lambda ()
-        (when (and (org-get-todo-state) (not (org-entry-is-done-p)))
-          (setq org-map-continue-from
-                (save-excursion (org-end-of-subtree t) (point)))
-          (list file (line-number-at-pos) (org-get-heading t t t t))))))
-   (pos-uncovered-org-files root)))
-
-(defun pos--backreference (root file)
-  "Return a link line to the parent of the heading at point in FILE.
-The link is relative to ROOT."
-  (let* ((relative (file-relative-name file root))
-         (parent (car (last (org-get-outline-path)))))
-    (if parent
-        (format "From [[file:%s::*%s][%s: %s]]" relative parent relative parent)
-      (format "From [[file:%s][%s]]" relative relative))))
+;;;; The intray's Unsorted
 
 (defun pos-goto-unsorted-end ()
   "Move point to the end of the Unsorted subtree; create it if missing."
@@ -534,65 +470,6 @@ The link is relative to ROOT."
     (unless (bolp) (insert "\n"))
     (insert "* Unsorted\n"))
   (unless (bolp) (insert "\n")))
-
-(defun pos-refile-stranded-in-file (root file intray)
-  "Move open tasks in FILE under Unsorted in INTRAY, linked back.
-Links are relative to ROOT.  Return the headings moved."
-  (let ((moved nil)
-        (make-backup-files nil))
-    (with-current-buffer (pos-visit file)
-      (org-map-entries
-       (lambda ()
-         (when (and (org-get-todo-state) (not (org-entry-is-done-p)))
-           (let ((backreference (pos--backreference root file))
-                 (heading (org-get-heading t t t t)))
-             (setq org-map-continue-from (point))
-             (org-cut-subtree)
-             (with-current-buffer intray
-               (pos-goto-unsorted-end)
-               (let ((start (point)))
-                 (org-paste-subtree 2)
-                 (goto-char start)
-                 (org-end-of-meta-data t)
-                 (insert backreference "\n")))
-             (push heading moved))))
-       nil 'file)
-      (save-buffer))
-    (nreverse moved)))
-
-(defun pos-refile-stranded-report (tasks dry-run)
-  "Return a report of TASKS, (FILE LINE HEADING) each; DRY-RUN words it."
-  (concat
-   (format "%s %d stranded task%s into intray.org"
-           (if dry-run "Would refile" "Refiled")
-           (length tasks) (if (= (length tasks) 1) "" "s"))
-   (mapconcat (lambda (task)
-                (pcase-let ((`(,file ,line ,heading) task))
-                  (format "\n  %s:%d %s"
-                          (file-relative-name file pos-directory) line heading)))
-              tasks "")))
-
-(defun pos-refile-stranded (&optional dry-run)
-  "Move open tasks from files outside the sweep into the intray.
-With DRY-RUN or prefix argument, only report.
-Return (FILE LINE HEADING) for each."
-  (interactive "P")
-  (let* ((root (file-name-as-directory pos-directory))
-         (tasks (pos-stranded-open-tasks root)))
-    (unless dry-run
-      (let ((intray (pos-visit (expand-file-name "intray.org" root)))
-            (make-backup-files nil))
-        (dolist (file (delete-dups (mapcar #'car tasks)))
-          (pos-refile-stranded-in-file root file intray))
-        (with-current-buffer intray (save-buffer))))
-    (message "%s" (pos-refile-stranded-report tasks dry-run))
-    tasks))
-
-(defun pos-refile-stranded-batch (dry-run)
-  "Run `pos-refile-stranded' with DRY-RUN; print the report."
-  (let ((tasks (pos-refile-stranded dry-run)))
-    (princ (pos-refile-stranded-report tasks dry-run))
-    (terpri)))
 
 ;;;; Duplicate tasks
 
