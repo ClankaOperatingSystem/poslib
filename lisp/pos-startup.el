@@ -50,6 +50,7 @@
 (require 'seq)
 (require 'pos)
 (require 'pos-corpus)
+(require 'pos-person)
 (require 'pos-roam)
 
 (defcustom pos-startup-scheduled-days 14
@@ -357,6 +358,65 @@ printed only when there is such an item."
              '((nil . "scopes yet to be configured"))))
    "\n"))
 
+(defun pos-startup--waiting-on ()
+  "Return the ID that the item at point links to as who it waits on, or nil."
+  (let ((value (org-entry-get nil pos-waiting-on-property)))
+    (and value
+         (string-match "\\[\\[id:\\([^]]+\\)\\]" value)
+         (match-string 1 value))))
+
+(defun pos-startup--waiting-list (title person keep)
+  "Return, under TITLE, the WAITING items that KEEP accepts.
+KEEP is called at each item's heading, and accepts the item by a
+value that is not nil.  While
+`pos-startup--gathering', each item gathered gains waiting_on:
+PERSON, a name, or :null when PERSON is nil."
+  (let* ((before pos-startup--items)
+         (org-agenda-overriding-header title)
+         (org-agenda-skip-function
+          (lambda ()
+            (unless (funcall keep)
+              (save-excursion (or (outline-next-heading) (point-max))))))
+         (text (pos-startup--or-none
+                (pos-startup--agenda (lambda () (org-todo-list "WAITING")))))
+         (items pos-startup--items))
+    (while (not (eq items before))
+      (setcar items (append (car items) `((waiting_on . ,(or person :null)))))
+      (setq items (cdr items)))
+    text))
+
+(defun pos-startup--waiting ()
+  "Return the waiting view of `pos-startup--corpus'.
+The WAITING items that wait on each person, a list for each person
+who has one, in the order of `pos-person-entities'; then those that
+link to no person recorded.  An item waits on the person whose
+person-entity links to the identity its `pos-waiting-on-property'
+names.  With no item that waits on a person, the one list is titled
+WAITING items."
+  (let* ((people (pos-person-entities pos-startup--root))
+         (owner (lambda ()
+                  (let ((id (pos-startup--waiting-on)))
+                    (and id (seq-find (lambda (person) (member id (cddr person)))
+                                      people)))))
+         (lists
+          (delq nil
+                (mapcar
+                 (lambda (person)
+                   (let* ((before pos-startup--items)
+                          (text (pos-startup--waiting-list
+                                 (format "WAITING on %s" (car person)) (car person)
+                                 (lambda () (eq person (funcall owner))))))
+                     (if (string-match-p "^  (none)$" text)
+                         (progn (setq pos-startup--items before) nil)
+                       text)))
+                 people))))
+    (string-join
+     (append lists
+             (list (pos-startup--waiting-list
+                    (if lists "WAITING on no person" "WAITING items") nil
+                    (lambda () (not (funcall owner))))))
+     "\n")))
+
 (defun pos-startup--reviews ()
   "Return the reviews view of `pos-startup--corpus'.
 Headings tagged `pos-startup-review-tag' that are late or scheduled
@@ -635,10 +695,7 @@ A view of more than one list has a title for each."
          (org-element-cache-persistent nil))
     (pcase view
       ("next" (pos-startup--next))
-      ("waiting"
-       (let ((org-agenda-overriding-header "WAITING items"))
-         (pos-startup--or-none
-          (pos-startup--agenda (lambda () (org-todo-list "WAITING"))))))
+      ("waiting" (pos-startup--waiting))
       ("someday"
        ;; Not committed to; read when a review asks what might be taken up.
        (let ((org-agenda-overriding-header "SOMEDAY items"))
@@ -683,7 +740,8 @@ A view of more than one list has a title for each."
   "Return what VIEW of the Org files under ROOT lists, as data.
 A list with an element for each line `pos-startup-view' prints, in
 its order.  In a view of items each is an alist as
-`pos-startup--item-at-point' gives it.  In reviews-to-schedule,
+`pos-startup--item-at-point' gives it; in waiting, each has
+waiting_on too, the person's name or :null.  In reviews-to-schedule,
 stuck and projects, which list scopes, each has scope, scope_kind
 and status; in projects, review, next and outcome too.  A line of
 reviews-to-schedule for a path that is no scope's has the scope of
