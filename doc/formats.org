@@ -496,6 +496,56 @@ Planning an item that holds Org or Markdown files is poslib's, since Org
 interpretation is; pyposlib refuses to plan it (=interpretation=), and
 applies any plan.
 
+** Salvage
+
+A document that leaves canon may hold tasks that are still open. Once
+it is sealed nothing reads them: an archive is no part of the corpus,
+and an open task in a sealed item is a record of what was open then.
+Salvage keeps the tasks. It is run on the material before its seal is
+planned, since it changes the files the seal's inventory hashes.
+
+=salvage ROOT SOURCE= reads each Org file of SOURCE, a file or a
+directory beneath ROOT: those a corpus reads by name, so no hidden
+file, lock file or symbolic link, nor a file in a hidden directory.
+An open task is a heading whose keyword is not a done one. Each
+topmost open task is salvaged; an open task beneath it goes with it.
+
+1. The task is copied, with everything beneath it, to the end of
+   =Unsorted= in =intray.org= at ROOT, as a second-level heading.
+   =Unsorted= is made if the intray lacks it.
+2. The copy keeps the task's state. It takes the task's =ID=, so that a
+   link to the task by its ID leads to the copy; a task with none is
+   given a new one.
+3. The copy says where it came from, on a line after its planning and
+   drawers: =Salvaged from LINK; nobody knew where it belonged.= LINK
+   is a =file= link to the original's file, from ROOT, with =::#= and
+   the heading's =CUSTOM_ID= if it has one, else =::*= and its title.
+   A title that holds a link has no search option.
+4. The original is left where it stood with the keyword =CANCELLED=, as
+   is each open task beneath it, and none of them keeps an =ID=. Nothing
+   is logged and no repeater is followed.
+5. The original says where the copy is, on a line after its planning
+   and drawers: =Salvaged to the intray: LINK=, an =id= link to the
+   copy.
+
+It prints the count, then =FILE:LINE: STATE TITLE= for each task as it
+stood, FILE from ROOT. With =--dry-run= it prints the same and writes
+nothing.
+
+Refused, with nothing written: a SOURCE that is not beneath ROOT, or
+that holds the intray; an intray that is missing or a symbolic link;
+and a file an editor holds locked, with unsaved changes, or in a buffer
+older than the file.
+
+What follows is the seal's own. The relink plan (Relinking) rewrites
+the copy's =file= link to the sealed item's link, as it does every link
+into the item, and sealing resolves the original's =id= link as it does
+any =id= link (Links). A retirement stopped after the salvage is
+finished by planning and applying the seal and the relink.
+
+A task that is dead is closed by hand before the salvage, and one whose
+place is known is placed there; salvage takes what is left.
+
 ** Relinking
 
 Sealing rewrites the links in the item's own files. The links to the
