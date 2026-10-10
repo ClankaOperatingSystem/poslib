@@ -77,7 +77,7 @@ response gives the result or the refusal recorded."
                             (authorization . ,(cdr (assoc "Authorization" headers)))
                             ,@(when body
                                 `((content_type . ,(cdr (assoc "Content-Type" headers)))
-                                  (body_sha256 . ,(pos-ledger-sha body))))))
+                                  (body_sha256 . ,(pos-bytes-sha body))))))
                     (let-alist (alist-get 'response exchange)
                       (cons .status (encode-coding-string .body 'utf-8 t)))))
                  (got (condition-case err
@@ -108,11 +108,11 @@ An alist of name and bytes: UNNAMED schema 1 events that name no
 ledger, then NAMED that name one."
   (let (events previous)
     (dotimes (i (+ unnamed named))
-      (let* ((event (pos-ledger-json
+      (let* ((event (pos-bytes-json
                      `((schema . 1) (previous . ,(or previous :null)) (add . ((,(format "%d.md" (1+ i)) . ((mode . 292) (size . 0)))))
                        ,@(when (>= i unnamed)
                            '((ledger_id . "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1"))))))
-             (hash (pos-ledger-sha event)))
+             (hash (pos-bytes-sha event)))
         (push (cons (format "%08d-%s.json" (1+ i) hash) event) events)
         (setq previous hash)))
     (nreverse events)))

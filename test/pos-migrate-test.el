@@ -36,7 +36,7 @@
     (pos-seal--write-new (expand-file-name (concat pos-ledger-directory "/" (car event)) archive)
                          (cdr event))
     (pos-migrate--protect archive)
-    (pos-ledger-sha (cdr event))))
+    (pos-bytes-sha (cdr event))))
 
 (defmacro pos-migrate-test-with-legacy (&rest body)
   "Evaluate BODY with `scope' holding a legacy archive of every kind of case."
@@ -63,7 +63,7 @@
 (defun pos-migrate-test-run (scope)
   "Plan and apply the migration of SCOPE's archive; return the plan."
   (let ((plan (pos-migrate-plan (expand-file-name "archives" scope) scope nil "2026-09-28")))
-    (pos-migrate-apply plan (pos-ledger-sha (pos-ledger-json plan)))
+    (pos-migrate-apply plan (pos-bytes-sha (pos-bytes-json plan)))
     plan))
 
 (ert-deftest pos-migrate/a-migrated-archive-checks-clean ()
@@ -83,13 +83,13 @@ Finder's junk goes; a retired scope's ledger moves beside its archive;
 canon's link to the renamed file follows it."
   (pos-migrate-test-with-legacy
     (pos-migrate-test-run scope)
-    (should (equal "*.pyc\n" (pos-ledger-read (expand-file-name
-                                               "archives/receipt/source/dot.gitignore" scope))))
+    (should (equal "*.pyc\n" (pos-bytes-read (expand-file-name
+                                              "archives/receipt/source/dot.gitignore" scope))))
     (should-not (file-exists-p (expand-file-name "archives/.DS_Store" scope)))
     (should (directory-files (expand-file-name "archives/old/archive-integrity/ledger" scope)
                              nil "\\.json\\'"))
     (should (string-match-p "archives/receipt/source/dot.gitignore"
-                            (pos-ledger-read (expand-file-name "canon.org" scope))))))
+                            (pos-bytes-read (expand-file-name "canon.org" scope))))))
 
 (ert-deftest pos-migrate/links-become-cids-rumours-or-annotations ()
   "Links within a receipt stay; links out of it cite or are annotated.
@@ -98,11 +98,11 @@ the earlier by CID, and the earlier's link forward is annotated; canon
 gets a rumour; a broken link is annotated."
   (pos-migrate-test-with-legacy
     (let* ((plan (pos-migrate-test-run scope))
-           (first (pos-ledger-read (expand-file-name "archives/2026-01-01-first.md" scope)))
-           (second (pos-ledger-read (expand-file-name "archives/2026-02-01-second.md" scope))))
+           (first (pos-bytes-read (expand-file-name "archives/2026-01-01-first.md" scope)))
+           (second (pos-bytes-read (expand-file-name "archives/2026-02-01-second.md" scope))))
       (should (member "receipt" (append (alist-get 'collections plan) nil)))
       (should (string-match-p "#\\+COLLECTION: t"
-                              (pos-ledger-read (expand-file-name "archives/receipt/README.org" scope))))
+                              (pos-bytes-read (expand-file-name "archives/receipt/README.org" scope))))
       (should (string-match-p "\\[later record: 2026-02-01-second.md\\]" first))
       (should (string-match-p "(ipfs://bafk" second))
       (should (string-match-p "\\[broken link: gone.md\\]" second))
@@ -112,9 +112,9 @@ gets a rumour; a broken link is annotated."
   "Applied again, the plan finds its work done; planning again is refused."
   (pos-migrate-test-with-legacy
     (let* ((plan (pos-migrate-test-run scope))
-           (before (pos-ledger-json (vconcat (pos-ledger-check scope)))))
-      (pos-migrate-apply plan (pos-ledger-sha (pos-ledger-json plan)))
-      (should (equal before (pos-ledger-json (vconcat (pos-ledger-check scope)))))
+           (before (pos-bytes-json (vconcat (pos-ledger-check scope)))))
+      (pos-migrate-apply plan (pos-bytes-sha (pos-bytes-json plan)))
+      (should (equal before (pos-bytes-json (vconcat (pos-ledger-check scope)))))
       (should-error (pos-migrate-plan (expand-file-name "archives" scope)) :type 'pos-ledger-refused))))
 
 (ert-deftest pos-migrate/a-link-into-a-containers-archive-cites-a-rumour ()
@@ -146,14 +146,14 @@ so its own verification holds."
              (previous (car (last (directory-files ledger t "\\.json\\'"))))
              (add (seq-filter (lambda (e) (string-prefix-p "capsules/" (car e)))
                               (pos-ledger-inventory archive)))
-             (event (pos-ledger-event add (pos-ledger-sha (pos-ledger-read previous)) 2
+             (event (pos-ledger-event add (pos-bytes-sha (pos-bytes-read previous)) 2
                                       "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1")))
         (pos-seal--write-new (expand-file-name (car event) ledger) (cdr event)))
       (pos-migrate--protect archive)
       (let ((plan (pos-migrate-test-run scope)))
         (should (member "capsules/snap" (append (alist-get 'collections plan) nil)))
         (should-not (file-exists-p (expand-file-name "README.org" cap)))
-        (should (equal text (decode-coding-string (pos-ledger-read (expand-file-name "a.md" cap))
+        (should (equal text (decode-coding-string (pos-bytes-read (expand-file-name "a.md" cap))
                                                   'utf-8)))))))
 
 (ert-deftest pos-migrate/a-link-to-a-withdrawn-record-cites-a-rumour ()

@@ -34,6 +34,7 @@
 ;;; Code:
 
 (require 'ol)
+(require 'pos-bytes)
 (require 'pos-cid)
 (require 'pos-ledger)
 (require 'pos-remote)
@@ -66,15 +67,15 @@ An alist of CID and the paths, relative to SCOPE, that have it."
         (let ((coding-system-for-write 'binary))
           (with-temp-file file
             (set-buffer-multibyte nil)
-            (insert (pos-ledger-json `((schema . 1) (cids . ,index)))))))
+            (insert (pos-bytes-json `((schema . 1) (cids . ,index)))))))
       index)))
 
 (defun pos-index--load (scope)
   "Return SCOPE's saved index, or nil if there is none."
   (let ((file (expand-file-name pos-index-file scope)))
     (when (file-exists-p file)
-      (mapcar (lambda (pair) (cons (pos-ledger--key (car pair)) (cdr pair)))
-              (alist-get 'cids (pos-ledger-parse (pos-ledger-read file)))))))
+      (mapcar (lambda (pair) (cons (pos-bytes-key (car pair)) (cdr pair)))
+              (alist-get 'cids (pos-bytes-parse (pos-bytes-read file)))))))
 
 (defun pos-index--parse (uri)
   "Return (CID . PATH) from URI, ipfs://CID or ipfs://CID/PATH.
@@ -210,7 +211,7 @@ directory is not a file."
                              (and found (file-name-absolute-p found)
                                   (file-regular-p found) found)))
                          scopes)))
-    (or (and file (pos-ledger-read file))
+    (or (and file (pos-bytes-read file))
         (seq-some (lambda (scope)
                     (pcase (pos-index--kept-read scope uri)
                       (`(,bytes ,file-cid ,_)

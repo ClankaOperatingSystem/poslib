@@ -42,6 +42,7 @@
 
 ;;; Code:
 
+(require 'pos-bytes)
 (require 'pos-cid)
 (require 'pos-ledger)
 (require 'pos-links)
@@ -124,7 +125,7 @@ PATH is relative to the archive, from REL for SOURCE."
 It is named by its text, so rumours of one target differ in name when
 they differ in word."
   (cons (format "rumours/%s-%s.org" date
-                (substring (pos-ledger-sha (encode-coding-string text 'utf-8)) 0 12))
+                (substring (pos-bytes-sha (encode-coding-string text 'utf-8)) 0 12))
         text))
 
 (defun pos-seal--rumour (target scope item date)
@@ -159,7 +160,7 @@ Org files of the scope's garden."
          (ids (when (seq-some
                      (lambda (pair)
                        (and (string-suffix-p ".org" (cdr pair))
-                            (string-search "[[id:" (pos-ledger-read (cdr pair)))))
+                            (string-search "[[id:" (pos-bytes-read (cdr pair)))))
                      files)
                 (pos-links-ids
                  (seq-uniq
@@ -233,17 +234,17 @@ Org files of the scope's garden."
                                      (concat "ipfs://" (cdr (assoc dest rumour-cids)) suffix)))
                               (_ l)))
                           (cdr ready)))
-                 (bytes (pos-ledger-read file))
+                 (bytes (pos-bytes-read file))
                  (changed (seq-filter (lambda (w) (not (equal (nth 1 w) (nth 3 w)))) rewrites))
                  (new (pos-links-rewrite bytes (mapcar (lambda (w) (list (nth 0 w) (nth 1 w)
                                                                          (nth 3 w)))
                                                        changed)))
                  (entry (list (cons 'cid (pos-cid-bytes new))
                               (cons 'mode (logand (pos-ledger--mode file) (lognot #o222)))
-                              (cons 'sha256 (pos-ledger-sha new))
+                              (cons 'sha256 (pos-bytes-sha new))
                               (cons 'size (length new)))))
             (when changed
-              (push (cons (car ready) (pos-ledger-sha bytes)) originals))
+              (push (cons (car ready) (pos-bytes-sha bytes)) originals))
             (dolist (w rewrites)
               (push `((file . ,(car ready)) (offset . ,(nth 0 w)) (from . ,(nth 1 w))
                       (kind . ,(nth 2 w)) (to . ,(nth 3 w)))
@@ -343,7 +344,7 @@ is a directory, they are read as written from there."
                                                 there))
                           t)
                          ((file-exists-p there)
-                          (unless (equal (pos-ledger-read there)
+                          (unless (equal (pos-bytes-read there)
                                          (encode-coding-string (alist-get 'text rumour) 'utf-8))
                             (pos-ledger--refuse 'destination "Rumour destination exists: %s"
                                                 there))
@@ -356,7 +357,7 @@ is a directory, they are read as written from there."
               (ledger_id . ,(or (pos-seal--last-id files) named ledger-id (pos-seal--uuid)))
               (add . ,add) (collections . ,(vconcat collections))
               (links . ,links) (originals . ,originals) (rumours . ,rumours)
-              (inventory_sha256 . ,(pos-ledger-sha (pos-ledger-json actual)))
+              (inventory_sha256 . ,(pos-bytes-sha (pos-bytes-json actual)))
               ,@(when kept `((kept . ,kept))))))))))
 
 (defun pos-seal-stage (bytes destination &optional ledger-id links-from)
@@ -381,7 +382,7 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
     (make-directory stage t)
     (let ((file (expand-file-name
                  (concat "new-"
-                         (substring (pos-ledger-sha
+                         (substring (pos-bytes-sha
                                      (encode-coding-string
                                       (file-relative-name (expand-file-name destination) archive)
                                       'utf-8))
@@ -425,18 +426,18 @@ With MODE, a recorded mode that has no write bit, the file has it."
   "Return the entries the item now at PLAN's destination has."
   (let-alist plan
     (mapcar (lambda (pair)
-              (let ((path (pos-ledger--key (car pair))))
+              (let ((path (pos-bytes-key (car pair))))
                 (cons path (pos-seal--entry (expand-file-name path .archive)))))
             .add)))
 
 (defun pos-seal--checkpoint (archive head)
   "Record HEAD for ARCHIVE in a checkpoint beside it."
-  (let* ((bytes (pos-ledger-json `((schema . 1) (heads . [,head]) (coverage . "archive"))))
+  (let* ((bytes (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "archive"))))
          (base (file-name-directory archive))
          (folder (if (file-directory-p (expand-file-name pos-ledger-integrity base))
                      (expand-file-name (concat pos-ledger-integrity "/checkpoints") base)
                    (expand-file-name pos-ledger-anchors base)))
-         (file (expand-file-name (concat (pos-ledger-sha bytes) ".json") folder)))
+         (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") folder)))
     (unless (file-exists-p file)
       (pos-seal--write-new file bytes))))
 
@@ -496,7 +497,7 @@ its hash, until it is converted."
                  (blocks (or (null head) (pos-ledger--event-cid-p head)))
                  (bytes
                   (if blocks
-                      (pos-ledger-block
+                      (pos-bytes-block
                        `((schema . 3)
                          (previous . ,(if head (pos-ledger--link head) :null))
                          (ledger_id . ,.ledger_id) (item . ,item) (add . ,add)
@@ -504,12 +505,12 @@ its hash, until it is converted."
                                                    (append add entries)
                                                    (append empty empties)))))
                          (collections . ,collections) (empty . ,(vconcat empty))))
-                    (pos-ledger-json
+                    (pos-bytes-json
                      `((schema . 2) (previous . ,(or head :null)) (ledger_id . ,.ledger_id)
                        (item . ,item)
                        (add . ,add) (root . ,(pos-cid-directory .archive))
                        (collections . ,collections)))))
-                 (name (if blocks (pos-ledger--event-cid bytes) (pos-ledger-sha bytes))))
+                 (name (if blocks (pos-ledger--event-cid bytes) (pos-bytes-sha bytes))))
       (list (format "%08d-%s.json" (1+ events) name) name bytes))))
 
 (defun pos-seal--event (plan destination add collections)
@@ -536,7 +537,7 @@ in order."
                       (nthcdr (1+ at) files))))
            (expected (append (mapcar (lambda (r) (alist-get 'destination r)) .rumours)
                              (list (file-relative-name .destination .archive))))
-           (sealed (mapcar (lambda (f) (alist-get 'item (pos-ledger-parse (pos-ledger-read f))))
+           (sealed (mapcar (lambda (f) (alist-get 'item (pos-bytes-parse (pos-bytes-read f))))
                            since)))
       (unless (equal sealed (seq-take expected (length sealed)))
         (pos-ledger--refuse 'plan "Ledger changed since review: %s" .archive))
@@ -547,12 +548,12 @@ in order."
   (let-alist plan
     (let ((rel (file-relative-name .destination .archive)))
       (pcase-dolist (`(,path . ,original) .originals)
-        (let* ((path (pos-ledger--key path))
+        (let* ((path (pos-bytes-key path))
                (file (if (equal path rel) .source
                        (expand-file-name (substring path (1+ (length rel))) .source)))
-               (bytes (pos-ledger-read file)))
+               (bytes (pos-bytes-read file)))
           (cond
-           ((equal (pos-ledger-sha bytes) original)
+           ((equal (pos-bytes-sha bytes) original)
             (let ((new (pos-links-rewrite
                         bytes (mapcar (lambda (l) (let-alist l (list .offset .from .to)))
                                       (seq-filter (lambda (l)
@@ -566,8 +567,8 @@ in order."
                   (set-buffer-multibyte nil)
                   (insert new)))
               (set-file-modes file modes)))
-           ((equal (pos-ledger-sha bytes)
-                   (alist-get 'sha256 (cdr (assoc path (mapcar (lambda (a) (cons (pos-ledger--key (car a)) (cdr a))) .add))))))
+           ((equal (pos-bytes-sha bytes)
+                   (alist-get 'sha256 (cdr (assoc path (mapcar (lambda (a) (cons (pos-bytes-key (car a)) (cdr a))) .add))))))
            (t (pos-ledger--refuse 'plan "Item changed since review: %s" file))))))))
 
 (defun pos-seal-apply (plan expected)
@@ -575,7 +576,7 @@ in order."
 Seal its rumours, then its item, rewriting the item's links first.
 Refuse if anything it relied on has changed; resume if interrupted.
 Return (EVENT-FILE . ROOT)."
-  (unless (equal (pos-ledger-sha (pos-ledger-json plan)) expected)
+  (unless (equal (pos-bytes-sha (pos-bytes-json plan)) expected)
     (pos-ledger--refuse 'plan "Reviewed plan hash mismatch"))
   (let-alist plan
     (unless (and (eql .schema 2) (equal .operation "seal"))
@@ -597,7 +598,7 @@ Return (EVENT-FILE . ROOT)."
                                    paths)
                            (lambda (a b) (string< (car a) (car b)))))))
       (when (and (null sealed) (not (file-exists-p .destination)))
-        (unless (equal (pos-ledger-sha (pos-ledger-json (pos-ledger-inventory .archive)))
+        (unless (equal (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory .archive)))
                        .inventory_sha256)
           (pos-ledger--refuse 'plan "Archive changed since review: %s" .archive)))
       ;; Rumours first: each an item of its own.
@@ -607,7 +608,7 @@ Return (EVENT-FILE . ROOT)."
             (unless (member .destination sealed)
               (unless (file-exists-p there)
                 (pos-seal--write-new there (encode-coding-string .text 'utf-8)))
-              (unless (equal (pos-ledger-read there) (encode-coding-string .text 'utf-8))
+              (unless (equal (pos-bytes-read there) (encode-coding-string .text 'utf-8))
                 (pos-ledger--refuse 'plan "Rumour differs from its plan: %s" there))
               (pos-seal--event plan there (funcall add-of (list .destination)) [])))))
       ;; Then the item, its links rewritten where it lies, then moved.
@@ -616,8 +617,8 @@ Return (EVENT-FILE . ROOT)."
           (pos-ledger--refuse 'plan "Neither before nor after the move: %s" .source))
         (pos-seal--rewrite-source plan)
         (pos-seal--drop-staging .source)
-        (unless (equal (pos-ledger-json .add)
-                       (pos-ledger-json
+        (unless (equal (pos-bytes-json .add)
+                       (pos-bytes-json
                         (sort (mapcar (lambda (pair)
                                         (cons (car pair) (pos-seal--entry (cdr pair))))
                                       (pos-seal--files .source rel))
@@ -626,20 +627,20 @@ Return (EVENT-FILE . ROOT)."
         (make-directory (file-name-directory .destination) t)
         (rename-file .source .destination))
       (pos-seal--leave-stage .source)
-      (unless (equal (pos-ledger-json .add)
-                     (pos-ledger-json (funcall add-of (mapcar (lambda (a) (pos-ledger--key (car a)))
-                                                              .add))))
+      (unless (equal (pos-bytes-json .add)
+                     (pos-bytes-json (funcall add-of (mapcar (lambda (a) (pos-bytes-key (car a)))
+                                                             .add))))
         (pos-ledger--refuse 'plan "Item changed after the move: %s" .destination))
       (unless (member rel sealed)
         (pos-seal--event plan .destination .add .collections))
       (dolist (pair .add)
-        (pos-seal--protect (expand-file-name (pos-ledger--key (car pair)) .archive)))
+        (pos-seal--protect (expand-file-name (pos-bytes-key (car pair)) .archive)))
       (seq-doseq (rumour .rumours)
         (pos-seal--protect (expand-file-name (alist-get 'destination rumour) .archive)))
       (let ((files (nth 3 (pos-ledger-history .archive))))
         (pos-seal--checkpoint .archive (nth 1 (pos-ledger-history .archive)))
         (cons (car (last files))
-              (alist-get 'root (pos-ledger-parse (pos-ledger-read (car (last files))))))))))
+              (alist-get 'root (pos-bytes-parse (pos-bytes-read (car (last files))))))))))
 
 ;;;; Sealing to a keeper
 
@@ -810,8 +811,8 @@ it resumes.  Return (EVENT-FILE . ROOT)."
                 (pos-seal--send-event keeper version file bytes files claims)
                 (pos-seal--write-new (expand-file-name file .ledger) bytes)))))
       (when (and (null sealed)
-                 (not (equal (pos-ledger-sha
-                              (pos-ledger-json
+                 (not (equal (pos-bytes-sha
+                              (pos-bytes-json
                                (pos-ledger--kept-entries
                                 .archive (car (pos-ledger-history .archive)))))
                              .inventory_sha256)))
@@ -824,7 +825,7 @@ it resumes.  Return (EVENT-FILE . ROOT)."
                    (cid (pos-cid-bytes bytes)))
               (funcall send .destination
                        `((,.destination . ((cid . ,cid) (mode . #o444)
-                                           (sha256 . ,(pos-ledger-sha bytes))
+                                           (sha256 . ,(pos-bytes-sha bytes))
                                            (size . ,(length bytes)))))
                        [] nil (list (cons cid bytes)))))))
       ;; Then the item, its links rewritten where it lies, and sent.
@@ -834,18 +835,18 @@ it resumes.  Return (EVENT-FILE . ROOT)."
         (pos-seal--rewrite-source plan)
         (pos-seal--drop-staging .source)
         (let ((entries (funcall entries-of)))
-          (unless (equal (pos-ledger-json .add) (pos-ledger-json entries))
+          (unless (equal (pos-bytes-json .add) (pos-bytes-json entries))
             (pos-ledger--refuse 'plan "Item changed since review: %s" .source))
           (funcall send rel .add .collections (pos-seal--empty .source rel)
                    (seq-uniq
                     (mapcar (lambda (pair)
                               (cons (alist-get 'cid (cdr (assoc (car pair) entries)))
-                                    (pos-ledger-read (cdr pair))))
+                                    (pos-bytes-read (cdr pair))))
                             (pos-seal--files .source rel))
                     (lambda (a b) (equal (car a) (car b)))))))
       ;; The keeper has the item and the ledger says so: the copy here goes.
       (when (or (file-exists-p .source) (file-symlink-p .source))
-        (unless (equal (pos-ledger-json .add) (pos-ledger-json (funcall entries-of)))
+        (unless (equal (pos-bytes-json .add) (pos-bytes-json (funcall entries-of)))
           (pos-ledger--refuse 'plan "Item changed since it was sealed: %s" .source))
         (if (file-directory-p .source)
             (delete-directory .source t)
@@ -854,7 +855,7 @@ it resumes.  Return (EVENT-FILE . ROOT)."
       (pcase-let ((`(,_ ,head ,_ ,files) (pos-ledger-history .archive)))
         (pos-seal--checkpoint .archive head)
         (cons (car (last files))
-              (alist-get 'root (pos-ledger-parse (pos-ledger-read (car (last files))))))))))
+              (alist-get 'root (pos-bytes-parse (pos-bytes-read (car (last files))))))))))
 
 ;;;; Checkpoints and repair
 
@@ -906,11 +907,11 @@ before checkpointing: %s" root))
                                      (directory-file-name (file-truename root)))
                                     "archives")
                              "archive" "tree"))
-               (bytes (pos-ledger-json `((schema . 1) (heads . ,(vconcat heads))
-                                         (coverage . ,coverage))))
-               (file (expand-file-name (concat (pos-ledger-sha bytes) ".json") home)))
+               (bytes (pos-bytes-json `((schema . 1) (heads . ,(vconcat heads))
+                                        (coverage . ,coverage))))
+               (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") home)))
           (cond ((not (file-exists-p file)) (pos-seal--write-new file bytes))
-                ((not (equal (pos-ledger-read file) bytes))
+                ((not (equal (pos-bytes-read file) bytes))
                  (pos-ledger--refuse 'checkpoint "Checkpoint conflict: %s" file)))))
       home)))
 
@@ -1029,12 +1030,12 @@ with the reason."
                 (pos-ledger--refuse
                  'root "The ledger does not account for the archive's CID: %s" archive))
               (let* ((head-file (car (last files)))
-                     (bytes (pos-ledger-block
+                     (bytes (pos-bytes-block
                              `((schema . 3) (kind . "conversion") (from . ,head)
                                (previous . ,(pos-ledger--link
                                              (pos-ledger--event-cid
                                               (pos-ledger--as-block
-                                               (pos-ledger-read head-file)))))
+                                               (pos-bytes-read head-file)))))
                                (ledger_id . ,(pos-seal--last-id files))
                                (empty . ,(vconcat empty)) (root . ,folded))))
                      (name (pos-ledger--event-cid bytes))
@@ -1056,20 +1057,20 @@ ADDED is, for each event in order, the paths it enrolled as the ledger
 now has them: an event before a schema 2 conversion enrolled paths that
 conversion may have renamed or removed.  FIRST is the index of the first
 schema 3 event, or nil."
-  (let* ((values (mapcar (lambda (file) (pos-ledger-parse (pos-ledger-read file)))
+  (let* ((values (mapcar (lambda (file) (pos-bytes-parse (pos-bytes-read file)))
                          files))
          (conversion (seq-position values nil
                                    (lambda (value _)
                                      (and (eql (alist-get 'schema value) 2)
                                           (equal (alist-get 'kind value) "conversion")))))
          (rename (and conversion
-                      (mapcar (lambda (pair) (cons (pos-ledger--key (car pair)) (cdr pair)))
+                      (mapcar (lambda (pair) (cons (pos-bytes-key (car pair)) (cdr pair)))
                               (alist-get 'rename (nth conversion values)))))
          (index -1))
     (cons (mapcar
            (lambda (value)
              (setq index (1+ index))
-             (let ((paths (mapcar (lambda (pair) (pos-ledger--key (car pair)))
+             (let ((paths (mapcar (lambda (pair) (pos-bytes-key (car pair)))
                                   (alist-get 'add value))))
                (when (and conversion (< index conversion))
                  (setq paths (mapcar (lambda (path) (or (cdr (assoc path rename)) path))
@@ -1145,7 +1146,7 @@ reason."
              (version (pos-remote-version described))
              (held (alist-get 'events described))
              (names (mapcar #'file-name-nondirectory files))
-             (events (cl-mapcar (lambda (name file) (cons name (pos-ledger-read file)))
+             (events (cl-mapcar (lambda (name file) (cons name (pos-bytes-read file)))
                                 names files))
              sent)
         (when (or (> held (length files))
@@ -1161,7 +1162,7 @@ reason."
                           (dolist (path paths)
                             (let ((cid (alist-get 'cid (cdr (assoc path entries)))))
                               (unless (or (member cid sent) (assoc cid batch))
-                                (push (cons cid (pos-ledger-read
+                                (push (cons cid (pos-bytes-read
                                                  (expand-file-name path archive)))
                                       batch))))
                           batch))))
@@ -1325,9 +1326,9 @@ Exit 0 done or clean, 1 findings, 2 refused.
            (kill-emacs 2))
          (let ((plan (pos-seal-plan source destination)))
            (princ (decode-coding-string
-                   (pos-ledger-json
+                   (pos-bytes-json
                     (if rest
-                        (let* ((hash (pos-ledger-sha (pos-ledger-json plan)))
+                        (let* ((hash (pos-bytes-sha (pos-bytes-json plan)))
                                (result (pos-seal-apply plan hash)))
                           `((plan . ,plan) (hash . ,hash)
                             (event . ,(car result)) (root . ,(cdr result))))
@@ -1346,9 +1347,9 @@ Exit 0 done or clean, 1 findings, 2 refused.
                            (buffer-string)))
                   (plan (pos-seal-stage bytes destination nil links-from)))
              (princ (decode-coding-string
-                     (pos-ledger-json
+                     (pos-bytes-json
                       (if rest
-                        (let* ((hash (pos-ledger-sha (pos-ledger-json plan)))
+                        (let* ((hash (pos-bytes-sha (pos-bytes-json plan)))
                                (result (pos-seal-apply plan hash)))
                           `((plan . ,plan) (hash . ,hash)
                             (event . ,(car result)) (root . ,(cdr result))))
@@ -1369,38 +1370,38 @@ Exit 0 done or clean, 1 findings, 2 refused.
         (`("relink" ,root ,plan-file)
          (require 'pos-relink)
          (princ (decode-coding-string
-                 (pos-ledger-json
-                  (pos-relink-plan root (pos-ledger-parse (pos-ledger-read plan-file))))
+                 (pos-bytes-json
+                  (pos-relink-plan root (pos-bytes-parse (pos-bytes-read plan-file))))
                  'utf-8)))
         (`("apply" ,plan-file ,hash)
-         (let ((plan (pos-ledger-parse (pos-ledger-read plan-file))))
+         (let ((plan (pos-bytes-parse (pos-bytes-read plan-file))))
            (if (equal (alist-get 'operation plan) "relink")
                (progn
                  (require 'pos-relink)
                  (princ (decode-coding-string
-                         (pos-ledger-json
+                         (pos-bytes-json
                           `((rewritten . ,(vconcat (pos-relink-apply plan hash)))))
                          'utf-8)))
              (let ((result (pos-seal-apply plan hash)))
                (princ (decode-coding-string
-                       (pos-ledger-json `((event . ,(car result)) (root . ,(cdr result))))
+                       (pos-bytes-json `((event . ,(car result)) (root . ,(cdr result))))
                        'utf-8))))))
         (`("check" ,root)
          (let ((report (vconcat (pos-ledger-check root))))
-           (princ (decode-coding-string (pos-ledger-json report) 'utf-8))
+           (princ (decode-coding-string (pos-bytes-json report) 'utf-8))
            (kill-emacs (if (pos-seal-findings-p report) 1 0))))
         (`("checkpoint" ,root)
-         (princ (pos-ledger-json `((checkpointed . ,(pos-seal-checkpoint root))))))
+         (princ (pos-bytes-json `((checkpointed . ,(pos-seal-checkpoint root))))))
         (`("repair" ,root)
-         (princ (pos-ledger-json (pos-seal-repair root))))
+         (princ (pos-bytes-json (pos-seal-repair root))))
         (`("convert" ,root)
-         (princ (decode-coding-string (pos-ledger-json (pos-seal-convert root))
+         (princ (decode-coding-string (pos-bytes-json (pos-seal-convert root))
                                       'utf-8)))
         (`("keep" ,root)
-         (princ (decode-coding-string (pos-ledger-json (pos-seal-keep root))
+         (princ (decode-coding-string (pos-bytes-json (pos-seal-keep root))
                                       'utf-8)))
         (`("recall" ,root)
-         (princ (decode-coding-string (pos-ledger-json (pos-seal-recall root))
+         (princ (decode-coding-string (pos-bytes-json (pos-seal-recall root))
                                       'utf-8)))
         (`("link" ,path)
          (princ (pos-links-link path))

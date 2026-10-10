@@ -23,8 +23,6 @@
 ;; Reads and checks archive ledgers as doc/formats.org specifies, in
 ;; lockstep with pyposlib.  Writing them is not here yet.
 ;;
-;; - `pos-ledger-json': DAG-JSON bytes of a value, and a newline.
-;; - `pos-ledger-block': the same without the newline, a block.
 ;; - `pos-ledger-inventory': what an archive holds.
 ;; - `pos-ledger-history': what its ledger enrolled.
 ;; - `pos-ledger-fold-cids': the archive's CIDs from the ledger alone.
@@ -40,6 +38,7 @@
 ;;; Code:
 
 (require 'subr-x)
+(require 'pos-bytes)
 (require 'pos-cid)
 
 (defconst pos-ledger-integrity "archive-integrity"
@@ -70,66 +69,6 @@ The environment's POS_ARCHIVE_OFFLINE, set to anything, says the same.")
 
 ;;;; DAG-JSON
 
-(defun pos-ledger--utf8< (a b)
-  "Return non-nil if the string A precedes B as UTF-8 bytes."
-  (string< (encode-coding-string a 'utf-8 t) (encode-coding-string b 'utf-8 t)))
-
-(defun pos-ledger--key (key)
-  "Return KEY, a symbol or string, as a string."
-  (if (symbolp key) (symbol-name key) key))
-
-(defun pos-ledger--string (string)
-  "Return STRING as a JSON string literal."
-  (concat "\""
-          (mapconcat
-           (lambda (c)
-             (pcase c
-               (?\" "\\\"") (?\\ "\\\\")
-               (?\b "\\b") (?\f "\\f") (?\n "\\n") (?\r "\\r") (?\t "\\t")
-               ((pred (> #x20)) (format "\\u%04x" c))
-               (_ (string c))))
-           string "")
-          "\""))
-
-(defun pos-ledger--encode (value)
-  "Return VALUE as canonical JSON text, without the final newline."
-  (cond
-   ((eq value :null) "null")
-   ((stringp value) (pos-ledger--string value))
-   ((integerp value)
-    (unless (<= (- (expt 2 63)) value (1- (expt 2 63)))
-      (error "No DAG-JSON for an integer of more than 64 bits: %S" value))
-    (number-to-string value))
-   ((vectorp value) (concat "[" (mapconcat #'pos-ledger--encode value ",") "]"))
-   ((listp value)
-    (concat "{"
-            (mapconcat (lambda (pair)
-                         (concat (pos-ledger--string (pos-ledger--key (car pair)))
-                                 ":" (pos-ledger--encode (cdr pair))))
-                       (sort (copy-sequence value)
-                             (lambda (a b) (pos-ledger--utf8< (pos-ledger--key (car a))
-                                                              (pos-ledger--key (car b)))))
-                       ",")
-            "}"))
-   (t (error "No canonical JSON for %S" value))))
-
-(defun pos-ledger-json (value)
-  "Return the canonical JSON bytes of VALUE, with its final newline."
-  (encode-coding-string (concat (pos-ledger--encode value) "\n") 'utf-8))
-
-(defun pos-ledger-parse (bytes)
-  "Return the JSON value in BYTES."
-  (json-parse-string (decode-coding-string bytes 'utf-8) :object-type 'alist
-                     :null-object :null :false-object :false))
-
-(defun pos-ledger-sha (bytes)
-  "Return the lower-case hex SHA-256 of BYTES."
-  (secure-hash 'sha256 bytes))
-
-(defun pos-ledger-block (value)
-  "Return VALUE as a DAG-JSON block: its canonical bytes, with no newline."
-  (encode-coding-string (pos-ledger--encode value) 'utf-8))
-
 (defun pos-ledger--plain-p (value)
   "Return non-nil if the JSON VALUE is only what a block may hold.
 No object repeats a key, and the key / is a link's alone: an object of
@@ -148,9 +87,9 @@ that one key and a CID."
   "Return the value of BYTES, refusing unless BYTES is its one DAG-JSON block.
 FILE names what was read, for the refusal."
   (let ((value (condition-case nil
-                   (let ((parsed (pos-ledger-parse bytes)))
+                   (let ((parsed (pos-bytes-parse bytes)))
                      (and (pos-ledger--plain-p parsed)
-                          (equal (pos-ledger-block parsed) bytes)
+                          (equal (pos-bytes-block parsed) bytes)
                           (list parsed)))
                  (error nil))))
     (unless value
@@ -177,13 +116,6 @@ FILE names what was read, for the refusal."
 
 ;;;; Files
 
-(defun pos-ledger-read (file)
-  "Return FILE's bytes."
-  (with-temp-buffer
-    (set-buffer-multibyte nil)
-    (insert-file-contents-literally file)
-    (buffer-string)))
-
 (defun pos-ledger--regular (file)
   "Return FILE's attributes, refusing all but a regular file of one link."
   (let ((attributes (file-attributes file)))
@@ -204,7 +136,7 @@ FILE names what was read, for the refusal."
 (defun pos-ledger-record (file)
   "Return FILE's entry: its SHA-256, size and mode less write bits."
   (let* ((before (pos-ledger--regular file))
-         (bytes (pos-ledger-read file))
+         (bytes (pos-bytes-read file))
          (after (pos-ledger--regular file)))
     (unless (and (equal (file-attribute-inode-number before)
                         (file-attribute-inode-number after))
@@ -213,7 +145,7 @@ FILE names what was read, for the refusal."
                         (file-attribute-modification-time after)))
       (pos-ledger--refuse 'changed "File changed while reading: %s" file))
     (list (cons 'mode (logand (pos-ledger--mode file) (lognot #o222)))
-          (cons 'sha256 (pos-ledger-sha bytes))
+          (cons 'sha256 (pos-bytes-sha bytes))
           (cons 'size (length bytes)))))
 
 (defun pos-ledger--entries (dir)
@@ -252,7 +184,7 @@ An archive not yet made holds nothing."
 
 (defun pos-ledger--keys (object)
   "Return OBJECT's keys as sorted strings."
-  (sort (mapcar (lambda (pair) (pos-ledger--key (car pair))) object) #'string<))
+  (sort (mapcar (lambda (pair) (pos-bytes-key (car pair))) object) #'string<))
 
 (defun pos-ledger--uuid-p (string)
   "Return non-nil if STRING is a UUID in canonical form."
@@ -298,9 +230,9 @@ Refuse unless it removes, renames or converts every legacy entry, each
 from its fingerprint, and adds only new paths."
   (let* ((legacy (seq-filter (lambda (e) (not (assq 'cid (cdr e)))) entries))
          (remove (append (alist-get 'remove event) nil))
-         (rename (mapcar (lambda (p) (cons (pos-ledger--key (car p)) (cdr p)))
+         (rename (mapcar (lambda (p) (cons (pos-bytes-key (car p)) (cdr p)))
                          (alist-get 'rename event)))
-         (convert (mapcar (lambda (p) (cons (pos-ledger--key (car p)) (cdr p)))
+         (convert (mapcar (lambda (p) (cons (pos-bytes-key (car p)) (cdr p)))
                           (alist-get 'convert event)))
          (kept (seq-remove (lambda (e) (member (car e) remove)) entries))
          (moved (mapcar (lambda (e) (cons (or (cdr (assoc (car e) rename)) (car e)) (cdr e)))
@@ -331,7 +263,7 @@ from its fingerprint, and adds only new paths."
                               (if new (cons (car e) (assq-delete-all 'from (copy-sequence new))) e)))
                           moved)))
       (dolist (pair (alist-get 'add event))
-        (let ((name (pos-ledger--key (car pair))))
+        (let ((name (pos-bytes-key (car pair))))
           (unless (and (pos-ledger--safe-p name) (not (assoc name result))
                        (pos-ledger--entry-p (cdr pair) 2))
             (funcall bad))
@@ -375,17 +307,17 @@ nil nil)."
       (dolist (name (pos-ledger--entries folder))
         (let* ((path (expand-file-name name folder))
                (_ (pos-ledger--regular path))
-               (bytes (pos-ledger-read path))
+               (bytes (pos-bytes-read path))
                (id (and (string-match pos-ledger--event-name name)
                         (= (1+ number) (string-to-number (match-string 1 name)))
                         (match-string 2 name)))
                (blocked (pos-ledger--event-cid-p id)))
           (setq number (1+ number))
           (unless (and id (equal id (if blocked (pos-ledger--event-cid bytes)
-                                      (pos-ledger-sha bytes))))
+                                      (pos-bytes-sha bytes))))
             (pos-ledger--refuse 'sequence "Ledger sequence/hash failure: %s" path))
           (let* ((event (if blocked (pos-ledger--strict bytes path)
-                          (pos-ledger-parse bytes)))
+                          (pos-bytes-parse bytes)))
                  (keys (and (listp event) (pos-ledger--keys event)))
                  (version (and (listp event) (alist-get 'schema event)))
                  (legacy (seq-some (lambda (e) (not (assq 'cid (cdr e)))) entries))
@@ -444,7 +376,7 @@ nil nil)."
                                           (alist-get 'collections event))
                              (seq-every-p (lambda (pair)
                                             (pos-ledger--within-p
-                                             (pos-ledger--key (car pair)) item))
+                                             (pos-bytes-key (car pair)) item))
                                           (alist-get 'add event)))
                   (pos-ledger--refuse 'entry "Invalid root, item or collections: %s" path))
                 (when (eql schema 3)
@@ -469,7 +401,7 @@ nil nil)."
               (unless (listp add)
                 (pos-ledger--refuse 'entry "Invalid ledger additions"))
               (dolist (pair add)
-                (let ((name (pos-ledger--key (car pair))))
+                (let ((name (pos-bytes-key (car pair))))
                   (unless (pos-ledger--safe-p name)
                     (pos-ledger--refuse 'entry "Unsafe relative path: %s" name))
                   (when (or (equal (car (split-string name "/")) pos-ledger-directory)
@@ -494,10 +426,10 @@ nil nil)."
 (defun pos-ledger-event (add previous number &optional ledger-id)
   "Return (NAME . BYTES), event NUMBER enrolling ADD after PREVIOUS.
 ADD is an alist of path and entry; PREVIOUS a hash or nil."
-  (let ((bytes (pos-ledger-json
+  (let ((bytes (pos-bytes-json
                 `((schema . 1) (previous . ,(or previous :null)) (add . ,add)
                   ,@(when ledger-id `((ledger_id . ,ledger-id)))))))
-    (cons (format "%08d-%s.json" number (pos-ledger-sha bytes)) bytes)))
+    (cons (format "%08d-%s.json" number (pos-bytes-sha bytes)) bytes)))
 
 ;;;; Configuration
 
@@ -543,7 +475,7 @@ configuration that is refused, and for two in one node."
              (config
               (condition-case err
                   (pos-tree-read-config
-                   (decode-coding-string (pos-ledger-read file) 'utf-8))
+                   (decode-coding-string (pos-bytes-read file) 'utf-8))
                 (pos-tree-refused
                  (pos-ledger--refuse 'config "Configuration refused (%s): %s"
                                      (cadr err) file))))
@@ -570,7 +502,7 @@ ledger has an event, so the entry says what the id is."
 (defun pos-ledger-identity (files)
   "Return the ledger_id of the last of the event FILES that has one."
   (seq-some (lambda (file)
-              (alist-get 'ledger_id (pos-ledger-parse (pos-ledger-read file))))
+              (alist-get 'ledger_id (pos-bytes-parse (pos-bytes-read file))))
             (reverse files)))
 
 (defun pos-ledger--as-named (archive files)
@@ -707,8 +639,8 @@ within are known by the names their events are enrolled under."
     (append
      (mapcan (lambda (file)
                (pos-ledger--regular file)
-               (let ((bytes (pos-ledger-read file)))
-                 (list (pos-ledger-sha bytes) (pos-ledger--event-cid bytes))))
+               (let ((bytes (pos-bytes-read file)))
+                 (list (pos-bytes-sha bytes) (pos-ledger--event-cid bytes))))
              (append
               (when (file-directory-p folder)
                 (directory-files folder t "\\.json\\'"))
@@ -736,10 +668,10 @@ within are known by the names their events are enrolled under."
         required present)
     (dolist (file (pos-ledger--checkpoint-files root archives))
       (pos-ledger--regular file)
-      (let* ((bytes (pos-ledger-read file))
+      (let* ((bytes (pos-bytes-read file))
              (value (and (equal (file-name-nondirectory file)
-                                (concat (pos-ledger-sha bytes) ".json"))
-                         (pos-ledger-parse bytes))))
+                                (concat (pos-bytes-sha bytes) ".json"))
+                         (pos-bytes-parse bytes))))
         (unless value
           (pos-ledger--refuse 'checkpoint "Checkpoint hash failure: %s" file))
         (unless (and (listp value)
@@ -776,7 +708,7 @@ entry records no CID, as a legacy ledger's do."
   (pos-cid-inventory
    (delq nil
          (mapcar (lambda (pair)
-                   (let ((path (pos-ledger--key (car pair)))
+                   (let ((path (pos-bytes-key (car pair)))
                          (entry (cdr pair)))
                      (unless (assq 'cid entry)
                        (pos-ledger--refuse 'entry "No CID enrolled for %s" path))
@@ -821,7 +753,7 @@ A capsule is a frozen snapshot, kept byte for byte: its manifest.json
 has schema_version 1, entries and an entrypoint."
   (let ((manifest (expand-file-name "manifest.json" directory)))
     (and (file-regular-p manifest)
-         (let ((value (ignore-errors (pos-ledger-parse (pos-ledger-read manifest)))))
+         (let ((value (ignore-errors (pos-bytes-parse (pos-bytes-read manifest)))))
            (and (listp value) value
                 (eql 1 (alist-get 'schema_version value))
                 (assq 'entries value) (assq 'entrypoint value))))))
@@ -832,7 +764,7 @@ Its README.org has the declaration line, or it is a capsule."
   (let ((readme (expand-file-name "README.org" directory)))
     (or (and (file-regular-p readme)
              (member (encode-coding-string pos-ledger-declaration 'utf-8)
-                     (split-string (pos-ledger-read readme) "\n")))
+                     (split-string (pos-bytes-read readme) "\n")))
         (pos-ledger-capsule-p directory))))
 
 (defun pos-ledger--undeclared (archive collections)

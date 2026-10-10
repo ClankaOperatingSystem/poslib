@@ -63,10 +63,10 @@ It comes back byte for byte as it was."
   (pos-index-test-with-sealed
     (pos-index-build scope)
     (let* ((file (expand-file-name pos-index-file scope))
-           (saved (pos-ledger-read file)))
+           (saved (pos-bytes-read file)))
       (delete-directory (file-name-directory file) t)
       (should (pos-index-resolve scope (concat "ipfs://" note-cid)))
-      (should (equal saved (pos-ledger-read file))))))
+      (should (equal saved (pos-bytes-read file))))))
 
 (ert-deftest pos-index/a-kept-archive-is-indexed-from-its-ledger ()
   "The index of a kept archive holds the CIDs its ledger folds to.

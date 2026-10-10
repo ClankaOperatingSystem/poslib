@@ -38,7 +38,7 @@
     (ert-info ((car named))
       (let-alist (cdr named)
         (should (equal (encode-coding-string .encoded 'utf-8 t)
-                       (pos-ledger-json .value)))))))
+                       (pos-bytes-json .value)))))))
 
 (ert-deftest pos-ledger/a-block-is-dag-json-written-one-way ()
   "Every fixture in fixtures/dag-json/ encodes, or is refused.
@@ -51,7 +51,7 @@ their value, refused."
             (pos-test-refused pos-ledger-refused .error
               (pos-ledger--strict (encode-coding-string .bytes 'utf-8 t) (car named)))
           (let ((block (encode-coding-string .encoded 'utf-8 t)))
-            (should (equal block (pos-ledger-block .value)))
+            (should (equal block (pos-bytes-block .value)))
             (should (equal .cid (pos-ledger--event-cid block)))
             (pos-test-same-json .value (pos-ledger--strict block (car named)))))))))
 

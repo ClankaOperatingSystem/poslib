@@ -65,7 +65,7 @@ Return the archive's true name."
   (make-directory (expand-file-name "archives" scope) t)
   (let ((plan (pos-seal-plan (expand-file-name item scope)
                              (expand-file-name (concat "archives/" item) scope))))
-    (pos-seal-apply plan (secure-hash 'sha256 (pos-ledger-json plan)))
+    (pos-seal-apply plan (secure-hash 'sha256 (pos-bytes-json plan)))
     (file-truename (expand-file-name "archives" scope))))
 
 ;;;; Finding
