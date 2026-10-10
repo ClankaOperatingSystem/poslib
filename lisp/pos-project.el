@@ -72,10 +72,10 @@ CREATED are times."
   (concat ":PROPERTIES:\n"
           ":ID:       " id "\n"
           ":STATUS:   COMMITTED\n"
+          ":OUTCOME:  " outcome "\n"
           ":CREATED:  " (format-time-string "[%Y-%m-%d %a]" created) "\n"
           ":END:\n"
           "#+TITLE: " title "\n\n"
-          "* Outcome\n\n" outcome "\n\n"
           (if next (concat "* NEXT " next "\n") "")
           "* TODO Review " title " :review:\n"
           "SCHEDULED: " (format-time-string "<%Y-%m-%d %a>" review) "\n"))
@@ -85,14 +85,13 @@ CREATED are times."
 WITHIN is the path of the root or a responsibility, \".\" for the
 root; the file is NAME.org in the directory its configuration gives
 for projects.  NAME is lower-case letters, digits and hyphens.
-TITLE is one line.  OUTCOME is the text under the Outcome heading
-and may have several paragraphs.  REVIEW is the date of the first
-review, YYYY-MM-DD.  NEXT, if not nil, is the title of the next
-action.  The file has a new Org ID, the STATUS COMMITTED and the
-date in CREATED.  Return the file's name.  Refuse a scope that is
-not in the tree, has no place for projects or is another
-repository's; a NAME that is taken, as a file or a directory; and an
-OUTCOME with a line that begins with a star."
+TITLE is one line.  OUTCOME is one line, the value of the file's
+OUTCOME property.  REVIEW is the date of the first review,
+YYYY-MM-DD.  NEXT, if not nil, is the title of the next action.  The
+file has a new Org ID, the STATUS COMMITTED and the date in CREATED.
+Return the file's name.  Refuse a scope that is not in the tree, has
+no place for projects or is another repository's; and a NAME that is
+taken, as a file or a directory."
   (unless (and (stringp name)
                (let ((case-fold-search nil))
                  (string-match-p "\\`[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\'" name)))
@@ -101,10 +100,8 @@ OUTCOME with a line that begins with a star."
     (user-error "A title is one nonempty line"))
   (when (and next (not (pos-project--one-line-p next)))
     (user-error "A next action is one nonempty line"))
-  (unless (and (stringp outcome) (not (string-empty-p (string-trim outcome))))
-    (user-error "A project has an outcome"))
-  (when (string-match-p "^\\*" outcome)
-    (user-error "A line of the outcome begins with a star"))
+  (unless (pos-project--one-line-p outcome)
+    (user-error "An outcome is one nonempty line"))
   (unless (and (stringp review)
                (string-match-p "\\`[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\'" review))
     (user-error "A review date is YYYY-MM-DD: %s" review))
