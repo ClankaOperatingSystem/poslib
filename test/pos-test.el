@@ -441,11 +441,12 @@ and an item of a file not named intray.org are not reported."
 
 (ert-deftest pos/a-waiting-item-that-does-not-say-who-or-when-is-a-finding ()
   "A WAITING item says who or what it waits on, and since when.
-Who or what is a DELEGATED_TO property or the item's own text.  Since
+Who or what is a WAITING_ON or DELEGATED_TO property or the item's
+own text.  Since
 when is the record of its change to WAITING or a date in its own
 text.  Here bare says neither; roofer says who and not when; logged
-has the record and no text; smith has the property and the record;
-letter says both in its text.  A child's text is not the item's."
+has the record and no text; smith and mason have a property and the
+record; letter says both in its text.  A child's text is not the item's."
   (pos-test-with-files root
       `(("tasks.org"
          . ,(pos-test-lines
@@ -461,6 +462,13 @@ letter says both in its text.  A child's text is not the item's."
              "* WAITING smith"
              ":PROPERTIES:"
              ":DELEGATED_TO: smith"
+             ":END:"
+             ":LOGBOOK:"
+             "- State \"WAITING\"    from \"NEXT\"       [2026-10-02 Fri 09:00]"
+             ":END:"
+             "* WAITING mason"
+             ":PROPERTIES:"
+             ":WAITING_ON: [[id:a-mason][Mason@yard]]"
              ":END:"
              ":LOGBOOK:"
              "- State \"WAITING\"    from \"NEXT\"       [2026-10-02 Fri 09:00]"

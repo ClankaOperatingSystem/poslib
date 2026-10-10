@@ -36,11 +36,19 @@
 ;; identity links to nothing, so a scope's records do not refer to
 ;; what is above the scope.
 ;;
+;; An item that waits on a person is WAITING and links to the
+;; person's identity in the item's own scope, in the property
+;; `pos-waiting-on-property'.  The change of state is recorded as
+;; `pos-set-state' records it, which says since when.
+;;
 ;; - `pos-person-add': command.
 ;; - `pos-person-identity': command.
 ;; - `pos-person-identity-rename': command.
+;; - `pos-person-wait-on': command.
+;; - `pos-person-arrived': command.
 ;; - `pos-person-batch': shell entry; add NAME, identity PERSON SCOPE,
-;;   or rename ID NAME.
+;;   rename ID NAME, wait TARGET PERSON [NOTE], or arrived TARGET
+;;   [STATE [NOTE]].
 
 ;;; Code:
 
@@ -50,6 +58,7 @@
 (require 'subr-x)
 (require 'pos)
 (require 'pos-corpus)
+(require 'pos-state)
 (require 'pos-tree)
 
 (defconst pos-person-entities-directory "person-entities"
@@ -441,6 +450,102 @@ or a foreign lock, before anything is written."
             (push (cons file count) changed)))))
     (cons holder (nreverse changed))))
 
+;;;; Waiting on a person
+
+(defun pos-person--item (root corpus target)
+  "Return a marker at the heading of the item TARGET names in CORPUS.
+CORPUS is the corpus of ROOT and TARGET is as `pos-set-state' takes
+it.  Refuse a file this root may not write, symlinks, unsaved or
+stale buffers, foreign locks and a line that is not an item's."
+  (let* ((place (pos-state--place root corpus target))
+         (file (car place)))
+    (unless (pos-corpus-writable-p corpus file)
+      (user-error "Not a file this root may write: %s"
+                  (file-relative-name file root)))
+    (with-current-buffer (pos-person--buffer root file)
+      (org-with-wide-buffer
+       (goto-char (point-min))
+       (forward-line (1- (cdr place)))
+       (unless (and (org-at-heading-p) (org-get-todo-state))
+         (user-error "No item at %s:%d"
+                     (file-relative-name file root) (cdr place)))
+       ;; An identity added just above the item is inserted here; the
+       ;; marker moves with the item.
+       (copy-marker (point) t)))))
+
+(defun pos-person--item-place (root item)
+  "Return FILE:LINE for the marker ITEM, FILE relative to ROOT."
+  (with-current-buffer (marker-buffer item)
+    (org-with-wide-buffer
+     (goto-char item)
+     (format "%s:%d" (file-relative-name buffer-file-name root)
+             (line-number-at-pos)))))
+
+(defun pos-person--item-now (item)
+  "Return (FILE LINE STATE TITLE) of the item at the marker ITEM."
+  (with-current-buffer (marker-buffer item)
+    (org-with-wide-buffer
+     (goto-char item)
+     (list buffer-file-name (line-number-at-pos)
+           (substring-no-properties (org-get-todo-state))
+           (substring-no-properties (org-get-heading t t t t))))))
+
+(defun pos-person--note-p (note)
+  "Return non-nil if NOTE is nil or one nonempty line."
+  (or (null note) (pos-person--one-line-p note)))
+
+(defun pos-person-wait-on (root target person &optional note)
+  "Make the item TARGET names in the tree at ROOT wait on PERSON.
+TARGET is the item's ID or FILE:LINE, as `pos-set-state' takes it.
+PERSON names a person-entity.  The item's `pos-waiting-on-property'
+becomes a link to PERSON's identity in the scope the item's file
+belongs to, which `pos-person-identity' makes when it is not there.
+The item is set to WAITING by `pos-set-state', with NOTE, one line
+or nil, in the record of the change.  An item that is WAITING
+already keeps its record, and NOTE is refused.  Return (FILE LINE
+STATE TITLE) as the item is afterwards."
+  (unless (pos-person--note-p note)
+    (user-error "A note is one nonempty line"))
+  (let* ((root (file-name-as-directory (expand-file-name root)))
+         (corpus (pos-corpus root))
+         (item (pos-person--item root corpus target))
+         (waiting (equal "WAITING" (nth 2 (pos-person--item-now item))))
+         (scope (pos-corpus-owner
+                 corpus (buffer-file-name (marker-buffer item)))))
+    (when (and waiting note)
+      (user-error "The item is WAITING already; its record takes no note"))
+    (pcase-let ((`(,_file ,id ,name ,_made)
+                 (pos-person-identity root person (pos-scope-path scope))))
+      (pos-person--writing (marker-buffer item)
+        (goto-char item)
+        (org-entry-put nil pos-waiting-on-property
+                       (format "[[id:%s][%s]]" id name))))
+    (if waiting
+        (pos-person--item-now item)
+      (pos-set-state root (pos-person--item-place root item) "WAITING" note))))
+
+(defun pos-person-arrived (root target &optional state note)
+  "Record that what the item TARGET names in the tree at ROOT waited on came.
+TARGET is as `pos-set-state' takes it.  The item's
+`pos-waiting-on-property' is removed and the item set by
+`pos-set-state' to STATE, NEXT when nil, with NOTE, one line or
+nil.  Return (FILE LINE STATE TITLE) as the item is afterwards.
+Refuse an item that is not WAITING and the STATE WAITING."
+  (let ((state (or state "NEXT")))
+    (unless (and (member state (pos-state--states))
+                 (not (equal state "WAITING")))
+      (user-error "Not a state for what has arrived: %s" state))
+    (unless (pos-person--note-p note)
+      (user-error "A note is one nonempty line"))
+    (let* ((root (file-name-as-directory (expand-file-name root)))
+           (item (pos-person--item root (pos-corpus root) target)))
+      (unless (equal "WAITING" (nth 2 (pos-person--item-now item)))
+        (user-error "The item is not WAITING"))
+      (pos-person--writing (marker-buffer item)
+        (goto-char item)
+        (org-entry-delete nil pos-waiting-on-property))
+      (pos-set-state root (pos-person--item-place root item) state note))))
+
 ;;;; The shell entry
 
 (defun pos-person-batch ()
@@ -451,6 +556,9 @@ relative to the root.  identity PERSON SCOPE, as
 \"made\" or \"there already\" after it.  rename ID NAME, as
 `pos-person-identity-rename' takes them, prints the identity's
 file, then \"Links renamed: FILE: COUNT\" for each file changed.
+wait TARGET PERSON [NOTE], as `pos-person-wait-on' takes them, and
+arrived TARGET [STATE [NOTE]], as `pos-person-arrived' takes them,
+print \"FILE:LINE: STATE TITLE\" for the item as it is afterwards.
 Exit 2 on any other arguments."
   (let ((root (file-name-as-directory (expand-file-name pos-directory)))
         (arguments (prog1 command-line-args-left
@@ -471,10 +579,22 @@ Exit 2 on any other arguments."
          (pcase-dolist (`(,renamed . ,count) changed)
            (princ (format "Links renamed: %s: %d\n"
                           (file-relative-name renamed root) count)))))
-      (_ (message "%s\n%s\n%s"
+      ((and `(,(and command (or "wait" "arrived")) . ,rest)
+            (guard (memq (length rest)
+                         (if (equal command "wait") '(2 3) '(1 2 3)))))
+       (pcase-let ((`(,file ,line ,state ,title)
+                    (apply (if (equal command "wait")
+                               #'pos-person-wait-on
+                             #'pos-person-arrived)
+                           root rest)))
+         (princ (format "%s:%d: %s %s\n" (file-relative-name file root)
+                        line state title))))
+      (_ (message "%s\n%s\n%s\n%s\n%s"
                   "Usage: add NAME"
                   "       identity PERSON SCOPE"
-                  "       rename ID NAME")
+                  "       rename ID NAME"
+                  "       wait TARGET PERSON [NOTE]"
+                  "       arrived TARGET [STATE [NOTE]]")
          (kill-emacs 2)))))
 
 (provide 'pos-person)

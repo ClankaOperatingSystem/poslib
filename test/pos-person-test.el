@@ -236,6 +236,86 @@ entity are all renamed, and each file changed is reported."
       (should (string-match-p "^#\\+TITLE: Ada-Brook@home$"
                               (pos-test-file-string (car home)))))))
 
+(ert-deftest pos-person/an-item-waits-on-an-identity-of-its-own-scope ()
+  "The item becomes WAITING and links to the person's identity in its scope.
+The identity is made when it is not there.  The change of state is
+recorded with the note, and the item as it is afterwards returned."
+  (pos-person-test-with-tree
+    (pos-person-add root "Ada Brook")
+    (let* ((file (expand-file-name "projects/mend-roof.org" root))
+           (now (pos-person-wait-on root "projects/mend-roof.org:1" "Ada Brook"
+                                    "Asked for a price"))
+           (text (pos-test-file-string file)))
+      (should (equal now (list file 1 "WAITING" "Buy slates")))
+      (should (string-match
+               (concat "\\`\\* WAITING Buy slates\n:PROPERTIES:\n:WAITING_ON: "
+                       "\\[\\[id:\\([-[:xdigit:]]\\{36\\}\\)\\]"
+                       "\\[Ada-Brook@projects\\.mend-roof\\]\\]\n:END:\n"
+                       ":LOGBOOK:\n- State \"WAITING\" +from \"NEXT\" +\\[[^]]+\\]"
+                       " \\\\\\\\\n +Asked for a price\n:END:\n"
+                       "\\* People\n\\*\\* Ada-Brook@projects\\.mend-roof\n")
+               text))
+      (should (string-match-p
+               (concat "^:ID: +" (regexp-quote (match-string 1 text)) "$")
+               text)))))
+
+(ert-deftest pos-person/an-item-below-a-people-heading-is-still-found ()
+  "An identity added above the item moves its line; the item is the one set."
+  (pos-person-test-with-tree
+    (pos-person-add root "Ada Brook")
+    (pos-test-write-files
+     root '(("projects/mend-roof.org" . "* People\n* NEXT Buy slates\n* NEXT Hire a ladder\n")))
+    (should (equal (cdr (pos-person-wait-on root "projects/mend-roof.org:2" "Ada Brook"))
+                   '(6 "WAITING" "Buy slates")))
+    (should (string-match-p "^\\* NEXT Hire a ladder$"
+                            (pos-test-file-string
+                             (expand-file-name "projects/mend-roof.org" root))))))
+
+(ert-deftest pos-person/a-waiting-item-gains-who-and-keeps-its-record ()
+  "An item WAITING already gains the link and no second record.
+A note is refused for it, since no change of state would hold it."
+  (pos-person-test-with-tree
+    (pos-person-add root "Ada Brook")
+    (pos-test-write-files root '(("home/index.org" . "* WAITING Hear back\n")))
+    (should-error (pos-person-wait-on root "home/index.org:1" "Ada Brook" "A note")
+                  :type 'user-error)
+    (should (equal (cdr (pos-person-wait-on root "home/index.org:1" "Ada Brook"))
+                   '(1 "WAITING" "Hear back")))
+    (let ((text (pos-test-file-string (expand-file-name "home/index.org" root))))
+      (should (string-match-p ":WAITING_ON: \\[\\[id:[^]]+\\]\\[Ada-Brook@home\\]\\]" text))
+      (should-not (string-match-p "LOGBOOK" text)))))
+
+(ert-deftest pos-person/waiting-needs-an-item-and-a-person ()
+  "A line that is no item's and a person with no entity are refused.
+Nothing is written."
+  (pos-person-test-with-tree
+    (should-error (pos-person-wait-on root "home/index.org:1" "Ada Brook")
+                  :type 'user-error)
+    (should-error (pos-person-wait-on root "projects/mend-roof.org:1" "Ada Brook")
+                  :type 'user-error)
+    (should (equal "* NEXT Buy slates\n"
+                   (pos-test-file-string
+                    (expand-file-name "projects/mend-roof.org" root))))))
+
+(ert-deftest pos-person/what-arrived-is-next-again-and-waits-on-nobody ()
+  "The link is removed and the item set to NEXT, or to the state given.
+An item that is not WAITING is refused, and so is the state WAITING."
+  (pos-person-test-with-tree
+    (pos-person-add root "Ada Brook")
+    (let ((file (expand-file-name "projects/mend-roof.org" root)))
+      (should-error (pos-person-arrived root "projects/mend-roof.org:1")
+                    :type 'user-error)
+      (pos-person-wait-on root "projects/mend-roof.org:1" "Ada Brook")
+      (should-error (pos-person-arrived root "projects/mend-roof.org:1" "WAITING")
+                    :type 'user-error)
+      (should (equal (pos-person-arrived root "projects/mend-roof.org:1")
+                     (list file 1 "NEXT" "Buy slates")))
+      (should-not (string-match-p "WAITING_ON" (pos-test-file-string file)))
+      (pos-person-wait-on root "projects/mend-roof.org:1" "Ada Brook")
+      (should (equal (nth 2 (pos-person-arrived root "projects/mend-roof.org:1"
+                                                "DONE" "Slates came"))
+                     "DONE")))))
+
 (ert-deftest pos-person/the-shell-entry-runs-each-command ()
   "The entry prints what each command made, relative to the root."
   (pos-person-test-with-tree
@@ -252,6 +332,10 @@ entity are all renamed, and each file changed is reported."
           (let ((id (match-string 1 line)))
             (should (string-suffix-p ", there already\n"
                                      (run "identity" "Ada Brook" "home")))
+            (should (equal (run "wait" "projects/mend-roof.org:1" "Ada Brook")
+                           "projects/mend-roof.org:1: WAITING Buy slates\n"))
+            (should (equal (run "arrived" "projects/mend-roof.org:1" "TODO")
+                           "projects/mend-roof.org:1: TODO Buy slates\n"))
             (should (equal (run "rename" id "Ada-Brook@house")
                            (concat "home/.clanka/person-identities/ada-brook.org\n"
                                    "Links renamed: .pos/person-entities/ada-brook.org: 1\n")))))))))

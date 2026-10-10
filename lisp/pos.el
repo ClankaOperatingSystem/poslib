@@ -266,12 +266,16 @@ The planning line and the drawers are part of it."
     (buffer-substring-no-properties
      (point) (save-excursion (outline-next-heading) (point)))))
 
+(defconst pos-waiting-on-property "WAITING_ON"
+  "The property of a WAITING item that links to the person it waits on.
+Its value is a link by ID to a person-identity of the item's scope.")
+
 (defun pos-lint-waiting-without-who-or-when (file)
   "Report WAITING items in FILE that do not say who or what, or since when.
-An item says who or what it waits on in a DELEGATED_TO property or
-in its own text.  It says since when in the record of its change to
-WAITING, as `pos-set-state' writes it, or in a date in its own text,
-a timestamp or YYYY-MM-DD."
+An item says who or what it waits on in a `pos-waiting-on-property'
+or DELEGATED_TO property, or in its own text.  It says since when
+in the record of its change to WAITING, as `pos-set-state' writes
+it, or in a date in its own text, a timestamp or YYYY-MM-DD."
   (pos--map-headings
    file
    (lambda ()
@@ -283,7 +287,8 @@ a timestamp or YYYY-MM-DD."
                      (string-trim
                       (buffer-substring-no-properties
                        (min (point) end) end))))
-              (who (or (org-entry-get nil "DELEGATED_TO")
+              (who (or (org-entry-get nil pos-waiting-on-property)
+                       (org-entry-get nil "DELEGATED_TO")
                        (not (string-empty-p own))))
               (since (or (string-match-p "^[ \t]*- State \"WAITING\"" text)
                          (string-match-p
