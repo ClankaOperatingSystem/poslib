@@ -95,11 +95,19 @@ With no note, the record is the change and its time."
 Its state is put back to TODO, no CLOSED is added, LAST_REPEAT is
 written and the record says DONE.  Here the item was due yesterday
 and repeats weekly from the date it was due, so it is next due six
-days from today."
+days from today.  Org's message naming the next date is shown once."
   (pos-state-test-with-tasks
       (format "* TODO Weekly review :review:\nSCHEDULED: <%s ++1w>\n"
               (pos-state-test-day -1))
-    (should (equal "TODO" (nth 2 (pos-set-state root "tasks.org:1" "DONE"))))
+    (let (messages)
+      (cl-letf (((symbol-function 'message)
+                 (lambda (format &rest arguments)
+                   (when format
+                     (push (apply #'format format arguments) messages)))))
+        (should (equal "TODO" (nth 2 (pos-set-state root "tasks.org:1" "DONE")))))
+      (should (= 1 (seq-count (lambda (message)
+                                (string-prefix-p "Entry repeats" message))
+                              messages))))
     (let ((text (pos-state-test-tasks root)))
       (should (string-match-p
                (format "^SCHEDULED: <%s [[:alpha:]]+ \\+\\+1w>$"
