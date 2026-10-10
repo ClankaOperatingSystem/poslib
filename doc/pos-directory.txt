@@ -156,7 +156,8 @@ own, each node naming only what is directly beneath it. A project is a
 leaf: it declares no responsibility or project. Its children are its
 methodologies, each directly beneath its methodologies path, and
 products it works on, anywhere else beneath it. A product is a subject,
-under its own rules, and this document says nothing of what is in it.
+under its own rules, and this document says nothing of what is in it
+but this: its Org files are read as the product's.
 
 A methodology is a repository or a directory that supplies skills and
 commands to the project that declares it (section 6). Its name is the
@@ -175,6 +176,22 @@ methodology, whether it is a directory of the project's repository or
 a repository mounted there: a methodology's own files are not the
 project's canon. What a methodology holds, and the kinds of canon it
 declares, are in doc/pos-methodology.txt.
+
+A tool that walks a tree for its Org files follows the declarations: a
+parent knows its children, and a child knows nothing above it. From a
+node the walk enters the ordinary directories of the node and each
+child the node declares, whatever the child is. A child with a
+configuration is a node and is walked as its configuration says. A
+child with none is a product: its Org files are read as the product's,
+each file in its place, with the default exclusions (section 1)
+whatever the declaring node excludes. A repository within a product is
+not entered, and a configuration within one makes no node. What a child
+is does not decide whether it is read; a methodology alone is not
+entered. A directory with a configuration that no node declares is not
+in the tree: the walk reports it and does not enter it. Reading changes
+nothing about writing: only the files of the repository the tool is
+run in are written. A file that may not be written keeps its own
+#+TODO line.
 
 path is any path that stays beneath the node: relative, with no empty
 part and no part that is . or .., and no backslash. No folder name
@@ -331,8 +348,8 @@ where a session starts up to the root of that repository and no
 further, so a session started anywhere in such a repository finds
 what is installed at its root, and finds the same in each.
 
-Nothing is installed in a product, and nothing in a product is read,
-linked or changed. A product's skills are its own. So are the skills a
+Nothing is installed in a product, and nothing in a product is
+written, linked or changed; its Org files are read (section 2). A product's skills are its own. So are the skills a
 repository keeps besides those installed: the tool links none of them
 into another repository.
 
