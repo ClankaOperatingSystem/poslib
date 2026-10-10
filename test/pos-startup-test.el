@@ -305,15 +305,36 @@ heading instead, so the file has no status and delta is not active."
 
 (ert-deftest pos-startup/the-next-view-labels-each-item-by-its-scope ()
   "The next view lists each open NEXT item, labelled by its scope.
-The label is the file's directory without its projects segments,
-then the file's base name unless that is project; a link is shown as
-its description."
+The label is the file's directory without the directories that
+configurations name for projects, then the file's base name unless
+that is project; a link is shown as its description."
   (pos-startup-test-with-tree
     (should (equal (pos-startup-test-lines (pos-startup-view root "next"))
                    '(("home/roof" . "NEXT Call the roofer")
                      ("alpha/notes" . "NEXT Read the paper")
                      ("alpha" . "NEXT Draft the outline")
                      ("intray" . "NEXT Answer the letter"))))))
+
+(ert-deftest pos-startup/a-label-drops-what-a-configuration-names-for-projects ()
+  "A label leaves out a projects directory by configuration, not by name.
+The root names work/ and home names jobs/todo/, so neither is in a
+label.  A directory named projects that no configuration names is in
+the label, at the root, in a responsibility and in a project."
+  (pos-test-with-files root
+      '((".pos/config.yaml"
+         . "pos: 2\nprojects: work/\nchildren:\n  - path: home\n")
+        ("work/roof.org" . "* NEXT Buy slates\n")
+        ("work/hall/project.org" . "* NEXT Choose the colour\n")
+        ("work/hall/projects/notes.org" . "* NEXT Read the tin\n")
+        ("projects/plain.org" . "* NEXT Sweep the yard\n")
+        ("home/.pos/config.yaml" . "pos: 2\nprojects: jobs/todo/\n")
+        ("home/jobs/todo/fence.org" . "* NEXT Count the posts\n")
+        ("home/projects/other.org" . "* NEXT Oil the gate\n"))
+    (should (equal (sort (mapcar #'car (pos-startup-test-lines
+                                        (pos-startup-view root "next")))
+                         #'string<)
+                   '("hall" "hall/projects/notes" "home/fence"
+                     "home/projects/other" "projects/plain" "roof")))))
 
 (ert-deftest pos-startup/the-roots-own-project-file-is-labelled-as-the-root ()
   "An item of project.org at the root is labelled with a dot.

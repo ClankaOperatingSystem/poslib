@@ -150,15 +150,50 @@ has bound this.")
           (seq-filter (lambda (entry) (eq (pos-scope-kind (cdr entry)) kind))
                       (pos-corpus-entries pos-startup--corpus))))
 
+(defun pos-startup--projects-positions (file)
+  "Return the positions in FILE's path of its scopes' projects directories.
+FILE's path is taken from the root, its first directory at 0.  A
+position is of a directory that the configuration of a scope at or
+above FILE's own names for its projects, where FILE lies beneath
+it.  None for a file `pos-startup--corpus' does not read."
+  (let ((directory (split-string
+                    (or (file-name-directory
+                         (file-relative-name file pos-startup--root))
+                        "")
+                    "/" t))
+        (scope (and pos-startup--corpus
+                    (pos-corpus-owner pos-startup--corpus file)))
+        positions)
+    (while scope
+      (when-let* ((projects (pos-corpus--projects-dir scope))
+                  (path (split-string projects "/" t))
+                  ((<= (length path) (length directory)))
+                  ((equal path (seq-take directory (length path)))))
+        ;; The scope's own path comes first, then what its
+        ;; configuration names.
+        (setq positions
+              (nconc (number-sequence
+                      (if (equal (pos-scope-path scope) ".") 0
+                        (length (split-string (pos-scope-path scope) "/" t)))
+                      (1- (length path)))
+                     positions)))
+      (setq scope (pos-scope-node scope)))
+    positions))
+
 (defun pos-startup--label ()
   "Return a label naming the scope of the current Org file.
-The file's directory relative to the root, without the segments named
-projects.  A file not named project.org adds its own base name.  The
-project.org of the root itself, as in a project that is a repository
-of its own, is labelled \".\", as the root's configuration names it."
+The file's directory relative to the root, without the directories
+that configurations name for projects: a directory's name alone
+drops nothing.  A file not named project.org adds its own base name.
+The project.org of the root itself, as in a project that is a
+repository of its own, is labelled \".\", as the root's
+configuration names it."
   (let* ((file (file-relative-name (or buffer-file-name "") pos-startup--root))
-         (scope (remove "projects"
-                        (split-string (or (file-name-directory file) "") "/" t)))
+         (dropped (pos-startup--projects-positions (or buffer-file-name "")))
+         (scope (let ((index -1))
+                  (seq-remove (lambda (_part) (memq (cl-incf index) dropped))
+                              (split-string (or (file-name-directory file) "")
+                                            "/" t))))
          (base (file-name-base file))
          (parts (append scope (unless (string= base "project") (list base)))))
     (if parts (mapconcat #'identity parts "/") ".")))
