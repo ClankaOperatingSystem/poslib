@@ -21,15 +21,59 @@
 ;;; Commentary:
 
 ;; - `pos-capture': command.
+;; - `pos-capture-like': the open items whose titles are like a title.
 ;; - `pos-capture-batch': shell entry; reads POS_CAPTURE_ROOT,
-;;   POS_CAPTURE_TITLE and POS_CAPTURE_BODY.
+;;   POS_CAPTURE_TITLE, POS_CAPTURE_BODY and POS_CAPTURE_CHECK.
 
 ;;; Code:
 
 (require 'org)
 (require 'org-id)
+(require 'seq)
 (require 'subr-x)
 (require 'pos)
+
+(defcustom pos-capture-like-share 0.6
+  "The share of words two titles have in common that makes them like.
+The words both have, over the words either has; 1.0 is the same words."
+  :type 'float
+  :group 'pos)
+
+(defun pos-capture--words (title)
+  "Return the words of TITLE that tell it from another, lower-cased.
+A word is a run of letters and digits of more than three characters."
+  (seq-uniq
+   (seq-filter (lambda (word) (> (length word) 3))
+               (split-string (downcase title) "[^[:alnum:]]+" t))))
+
+(defun pos-capture-like (root title)
+  "Return (FILE LINE STATE TITLE) for each open item of ROOT like TITLE.
+The items are those of the corpus of ROOT in a state that is not
+done.  Two titles are like when the words they have in common are at
+least `pos-capture-like-share' of the words either has, by
+`pos-capture--words'.  A title with no such word is like none."
+  (let ((words (pos-capture--words title))
+        like)
+    (when words
+      (dolist (file (pos-files root))
+        (with-current-buffer (pos-visit file)
+          (org-map-entries
+           (lambda ()
+             (when (and (org-get-todo-state) (not (org-entry-is-done-p)))
+               (let* ((other (substring-no-properties
+                              (org-get-heading t t t t)))
+                      (theirs (pos-capture--words other))
+                      (both (seq-intersection words theirs)))
+                 (when (and both
+                            (>= (/ (float (length both))
+                                   (length (seq-union words theirs)))
+                                pos-capture-like-share))
+                   (push (list file (line-number-at-pos)
+                               (substring-no-properties (org-get-todo-state))
+                               other)
+                         like)))))
+           nil 'file))))
+    (nreverse like)))
 
 (defun pos-capture (root title &optional body)
   "File TITLE as a TODO under Unsorted in ROOT's intray; return its line.
@@ -93,13 +137,21 @@ locks."
 
 (defun pos-capture-batch ()
   "Capture POS_CAPTURE_TITLE into POS_CAPTURE_ROOT's intray.
-POS_CAPTURE_BODY, if set, is the item's text."
+POS_CAPTURE_BODY, if set, is the item's text.  Print the item's line,
+then \"Like: FILE:LINE: STATE TITLE\" for each of `pos-capture-like'
+found before the item was written.  With POS_CAPTURE_CHECK set and
+not empty, write nothing and print those lines alone."
   (let* ((root (getenv "POS_CAPTURE_ROOT"))
          (title (getenv "POS_CAPTURE_TITLE"))
-         (line (pos-capture root title (getenv "POS_CAPTURE_BODY"))))
-    (princ (format "%s:%d: TODO %s\n"
-                   (expand-file-name "intray.org" root)
-                   line (string-trim title)))))
+         (check (not (member (getenv "POS_CAPTURE_CHECK") '(nil ""))))
+         (like (pos-capture-like root (or title ""))))
+    (unless check
+      (princ (format "%s:%d: TODO %s\n"
+                     (expand-file-name "intray.org" root)
+                     (pos-capture root title (getenv "POS_CAPTURE_BODY"))
+                     (string-trim title))))
+    (pcase-dolist (`(,file ,line ,state ,other) like)
+      (princ (format "Like: %s:%d: %s %s\n" file line state other)))))
 
 (provide 'pos-capture)
 ;;; pos-capture.el ends here

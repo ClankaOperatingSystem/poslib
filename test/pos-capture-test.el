@@ -121,5 +121,44 @@ So is one with a control character.  The intray is unchanged."
       (set-buffer-modified-p nil))
     (should (equal "* Unsorted\n" (pos-capture-test-intray root)))))
 
+(ert-deftest pos-capture/open-items-with-like-titles-are-found ()
+  "An open item is like a title when they share most of their words.
+Words of three letters or fewer are not counted, nor is case or
+punctuation.  Here the first item has the title's four counted words
+and the second three of them; the third shares two and has three of
+its own; the fourth is done; the fifth shares none.  A title with no counted word is like none."
+  (pos-test-with-files root
+      `(("intray.org" . "* Unsorted\n** TODO Call the roofer about the gutter\n")
+        ("tasks.org" . ,(concat "* NEXT Gutter: call roofer!\n"
+                                "* TODO Call the plumber about the boiler leak\n"
+                                "* DONE Call the roofer about the gutter\n"
+                                "* TODO Mow the lawn\n")))
+    (should (equal (list (list (expand-file-name "intray.org" root) 2 "TODO"
+                               "Call the roofer about the gutter")
+                         (list (expand-file-name "tasks.org" root) 1 "NEXT"
+                               "Gutter: call roofer!"))
+                   (pos-capture-like root "call the Roofer, about a gutter")))
+    (should-not (pos-capture-like root "Do it"))))
+
+(ert-deftest pos-capture/the-command-prints-like-items-and-can-check-alone ()
+  "The command prints the captured item, then each like item found before it.
+With POS_CAPTURE_CHECK set it prints the like items and writes
+nothing."
+  (pos-capture-test-with-intray "* Unsorted\n** TODO Call the roofer\n"
+    (let ((intray (expand-file-name "intray.org" root))
+          (process-environment
+           (append (list (concat "POS_CAPTURE_ROOT=" root)
+                         "POS_CAPTURE_TITLE=Call roofer" "POS_CAPTURE_CHECK=1")
+                   process-environment)))
+      (should (equal (format "Like: %s:2: TODO Call the roofer\n" intray)
+                     (with-output-to-string (pos-capture-batch))))
+      (should (equal "* Unsorted\n** TODO Call the roofer\n"
+                     (pos-capture-test-intray root)))
+      (setenv "POS_CAPTURE_CHECK" "")
+      (should (equal (format (concat "%1$s:3: TODO Call roofer\n"
+                                     "Like: %1$s:2: TODO Call the roofer\n")
+                             intray)
+                     (with-output-to-string (pos-capture-batch)))))))
+
 (provide 'pos-capture-test)
 ;;; pos-capture-test.el ends here
