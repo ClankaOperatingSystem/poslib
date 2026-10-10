@@ -345,6 +345,65 @@ A directory that is not there is refused, and nothing is left staged."
       (should (equal staged
                      (directory-files (expand-file-name "_seal" scope) nil "\\`new-"))))))
 
+(ert-deftest pos-seal/an-id-link-in-an-item-is-resolved-as-a-link-to-its-file ()
+  "An id link in an item's Org file is read as a link to the file with the ID.
+To another file of the item it cites that file's CID, with the place
+of the ID as its search option: none for the file's own ID, a
+heading's CUSTOM_ID, else its title.  To a file of the garden outside
+the item it cites a rumour of that file.  To an ID no file holds it
+is kept, annotated as broken.  The sealed file holds the rewritten
+links."
+  (pos-test-with-scope
+    (pos-test-write-bytes (expand-file-name "canon.org" scope)
+                          ":PROPERTIES:\n:ID: canon-id\n:END:\n#+TITLE: Canon\n")
+    (pos-test-write-bytes
+     (expand-file-name "trial/notes.org" scope)
+     (concat ":PROPERTIES:\n:ID: notes-id\n:END:\n"
+             "* Result\n:PROPERTIES:\n:ID: result-id\n:END:\n"
+             "* Other\n:PROPERTIES:\n:ID: other-id\n:CUSTOM_ID: other\n:END:\n"))
+    (pos-test-write-bytes
+     (expand-file-name "trial/index.org" scope)
+     (concat "[[id:notes-id]] [[id:result-id][r]] [[id:other-id]]\n"
+             "[[id:canon-id][canon]] [[id:absent-id][gone]]\n"))
+    (let* ((plan (pos-test-scope-plan scope))
+           (links (seq-filter (lambda (link)
+                                (equal "trial/index.org" (alist-get 'file link)))
+                              (alist-get 'links plan)))
+           (notes (alist-get 'cid (cdr (assoc "trial/notes.org"
+                                              (mapcar (lambda (entry)
+                                                        (cons (pos-ledger--key (car entry))
+                                                              (cdr entry)))
+                                                      (alist-get 'add plan))))))
+           (rumour (alist-get 'cid (aref (alist-get 'rumours plan) 0))))
+      (should (equal (list (list "id:notes-id" "cid" (concat "ipfs://" notes))
+                           (list "id:result-id" "cid" (concat "ipfs://" notes "::*Result"))
+                           (list "id:other-id" "cid" (concat "ipfs://" notes "::#other"))
+                           (list "id:canon-id" "rumour" (concat "ipfs://" rumour))
+                           (list "id:absent-id" "broken" "broken:id:absent-id"))
+                     (mapcar (lambda (link)
+                               (let-alist link (list .from .kind .to)))
+                             links)))
+      (should (string-match-p "Rumour of canon.org"
+                              (alist-get 'text (aref (alist-get 'rumours plan) 0))))
+      (pos-test-approve plan)
+      (should (equal (concat "[[ipfs://" notes "]] [[ipfs://" notes "::*Result][r]]"
+                             " [[ipfs://" notes "::#other]]\n"
+                             "[[ipfs://" rumour "][canon]] [[broken:id:absent-id][gone]]\n")
+                     (decode-coding-string
+                      (pos-ledger-read (expand-file-name "archives/trial/index.org" scope))
+                      'utf-8))))))
+
+(ert-deftest pos-seal/an-id-two-files-hold-is-refused ()
+  "An id link whose ID two files hold is refused (unresolved).
+The files are read only when the item has an id link: with none, an
+ID held twice elsewhere is no matter of the seal's."
+  (pos-test-with-scope
+    (pos-test-write-bytes (expand-file-name "a.org" scope) ":PROPERTIES:\n:ID: twin\n:END:\n")
+    (pos-test-write-bytes (expand-file-name "b.org" scope) ":PROPERTIES:\n:ID: twin\n:END:\n")
+    (should (pos-test-scope-plan scope))
+    (pos-test-write-bytes (expand-file-name "trial/index.org" scope) "[[id:twin]]\n")
+    (pos-test-refused pos-ledger-refused 'unresolved (pos-test-scope-plan scope))))
+
 (ert-deftest pos-seal/two-items-may-rumour-one-target-on-one-day ()
   "Each item's rumour of a target names that item, so is its own record;
 a rumour already sealed word for word is cited, not sealed again."

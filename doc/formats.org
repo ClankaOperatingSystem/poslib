@@ -416,6 +416,17 @@ links of type =file=, in any form, their search options kept; and named
 reference definitions, outside code, their fragments kept, their paths
 URL-decoded. A Markdown URL with a scheme is not a path.
 
+An Org link of type =id= is a link to the file that holds that =ID=
+property, of the file or of a heading, with a search option that names
+the place: none for a file's own ID; for a heading's, =::#= and its
+=CUSTOM_ID= if it has one, else =::*= and its title without state and
+tags. The files read for it are the item's own and the Org files of
+the scope's garden, where archives, attics, =node_modules=, and hidden
+and underscore directories are not looked in; they are read only when
+a file of the item has such a link. An ID that two files hold is
+refused (=unresolved=). An ID that no file holds is a link to nothing.
+From there the link resolves as a =file= link does.
+
 Each link's path is taken from the file where it was written, before the
 move, and resolves:
 
@@ -437,7 +448,7 @@ move, and resolves:
   (=rumour=);
 - to nothing: kept, annotated as broken (=broken=). The annotation
   replaces the whole link: in Org the link's type becomes =broken:=, as
-  =[[broken:PATH][TEXT]]=; in Markdown the link becomes =TEXT [broken
+  =[[broken:PATH][TEXT]]=, and for an =id= link =[[broken:id:ID][TEXT]]=; in Markdown the link becomes =TEXT [broken
   link: PATH]=.
 
 A resolved link's target is replaced whole: in Org the raw link, as

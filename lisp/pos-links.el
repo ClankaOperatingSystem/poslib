@@ -25,12 +25,14 @@
 ;; doc/formats.org specifies.
 ;;
 ;; - `pos-links-in-file': the path links in a file, with byte offsets.
+;; - `pos-links-ids': each Org ID in some files, and where it is held.
 ;; - `pos-links-resolve': where one leads, from where it was written.
 ;; - `pos-links-link': the ipfs:// link to a sealed path in an archive.
 
 ;;; Code:
 
 (require 'cl-lib)
+(require 'org)
 (require 'org-element)
 (require 'markdown-mode)
 (require 'url-util)
@@ -43,24 +45,50 @@
   "Return the byte offset, from 0, of POSITION in the current buffer."
   (1- (position-bytes position)))
 
-(defun pos-links--org ()
+(defconst pos-links-no-file "/no-file-holds-the-id/"
+  "The directory an id link leads into when no file holds its ID.
+Nothing is there, so the link resolves as one to nothing.")
+
+(defun pos-links--id-place (id ids)
+  "Return (PATH . SUFFIX) that a link to ID leads to, by IDS.
+IDS is as `pos-links-ids' gives it.  PATH is the file that holds ID,
+absolute, and SUFFIX the search option of the place in it.  An ID no
+file holds leads into `pos-links-no-file'.  Refuse one that two
+files hold (unresolved)."
+  (let ((places (gethash id ids)))
+    (cond
+     ((null places) (cons (concat pos-links-no-file id) ""))
+     ((cdr places)
+      (pos-ledger--refuse 'unresolved "Two files hold the ID %s: %s" id
+                          (mapconcat #'car (reverse places) ", ")))
+     (t (car places)))))
+
+(defun pos-links--org (&optional ids)
   "Return the file links in the current Org buffer.
 Each is (OFFSET TEXT PATH SUFFIX OFFSET TEXT): TEXT the raw link at byte
 OFFSET, PATH its file, SUFFIX its search option with its :: or empty;
-the raw link is also the whole that an annotation replaces."
+the raw link is also the whole that an annotation replaces.  With
+IDS, as `pos-links-ids' gives it, an id link is one too: PATH and
+SUFFIX are where `pos-links--id-place' says its ID is held."
   (let (links)
     (org-element-map (org-element-parse-buffer) 'link
       (lambda (link)
-        (when (equal (org-element-property :type link) "file")
-          (let ((raw (org-element-property :raw-link link))
-                (search (org-element-property :search-option link)))
+        (let* ((type (org-element-property :type link))
+               (raw (org-element-property :raw-link link))
+               (search (org-element-property :search-option link))
+               (place (cond
+                       ((equal type "file")
+                        (cons (org-element-property :path link)
+                              (if search (concat "::" search) "")))
+                       ((and ids (equal type "id"))
+                        (pos-links--id-place (org-element-property :path link)
+                                             ids)))))
+          (when place
             (save-excursion
               (goto-char (org-element-property :begin link))
               (when (search-forward raw (org-element-property :end link) t)
                 (let ((offset (pos-links--byte (match-beginning 0))))
-                  (push (list offset raw (org-element-property :path link)
-                              (if search (concat "::" search) "")
-                              offset raw)
+                  (push (list offset raw (car place) (cdr place) offset raw)
                         links))))))))
     (nreverse links)))
 
@@ -98,10 +126,12 @@ The whole of an inline link is all of it; of a reference definition, its URL."
                       links)))))))
     (sort links (lambda (a b) (< (car a) (car b))))))
 
-(defun pos-links-in-file (file)
+(defun pos-links-in-file (file &optional ids)
   "Return the path links in FILE, an Org or Markdown file, else nil.
 Each is (OFFSET TEXT PATH SUFFIX WHOLE-OFFSET WHOLE DESCRIPTION), offsets
-in bytes: TEXT the target, WHOLE what an annotation replaces."
+in bytes: TEXT the target, WHOLE what an annotation replaces.  With
+IDS, as `pos-links-ids' gives it, an Org file's id links are among
+them, each leading to the file that holds its ID."
   (let ((org (string-suffix-p ".org" file)) (md (string-suffix-p ".md" file)))
     (when (or org md)
       (with-temp-buffer
@@ -111,7 +141,55 @@ in bytes: TEXT the target, WHOLE what an annotation replaces."
         (cl-letf (((symbol-function 'org-file-contents) (lambda (&rest _) "")))
           (let ((org-mode-hook nil) (markdown-mode-hook nil))
             (if org (org-mode) (markdown-mode))))
-        (if org (pos-links--org) (pos-links--markdown))))))
+        (if org (pos-links--org ids) (pos-links--markdown))))))
+
+;;;; IDs
+
+(defun pos-links--anchor ()
+  "Return the search option that names where point's ID property is held.
+\"\" for a file's own ID, before its first heading.  For a heading's,
+:: and # with its CUSTOM_ID if it has one, else :: and * with its
+title."
+  (if (org-before-first-heading-p)
+      ""
+    (let ((custom (org-entry-get nil "CUSTOM_ID")))
+      (if custom
+          (concat "::#" custom)
+        (concat "::*" (substring-no-properties (org-get-heading t t t t)))))))
+
+(defun pos-links-ids (files)
+  "Return a hash table from each Org ID in FILES to where it is held.
+An ID is the value of an ID property, of a file or of a heading.  Each
+place is (FILE . ANCHOR), ANCHOR as `pos-links--anchor' gives it."
+  (let ((ids (make-hash-table :test #'equal))
+        (property "^[ \t]*:ID:[ \t]+\\(\\S-+\\)[ \t]*$"))
+    (dolist (file files)
+      (let ((text (decode-coding-string (pos-ledger-read file) 'utf-8)))
+        (when (string-match-p property text)
+          (with-temp-buffer
+            (insert text)
+            ;; This file alone: no #+SETUPFILE and no mode hooks.
+            (cl-letf (((symbol-function 'org-file-contents) (lambda (&rest _) "")))
+              (let ((org-mode-hook nil)) (org-mode)))
+            (goto-char (point-min))
+            (while (re-search-forward property nil t)
+              (let ((id (match-string-no-properties 1)))
+                (cl-pushnew (cons file (save-excursion (pos-links--anchor)))
+                            (gethash id ids) :test #'equal)))))))
+    ids))
+
+(defun pos-links-org-files (dir)
+  "Return the Org files beneath DIR that a link by ID may lead to.
+Archives, attics, node_modules, and hidden and underscore directories
+are not looked in, nor is a symbolic link followed.  A hidden file and
+a lock file are not among them."
+  (directory-files-recursively
+   dir "\\`[^.#].*\\.org\\'" nil
+   (lambda (sub)
+     (let ((name (file-name-nondirectory sub)))
+       (not (or (member name '("archives" "attic" "node_modules"))
+                (string-match-p "\\`[._]" name)
+                (file-symlink-p sub)))))))
 
 (defun pos-links-annotate (file link label)
   "Return the annotation replacing LINK's whole in FILE, marked LABEL.
