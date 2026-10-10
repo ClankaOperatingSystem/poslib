@@ -103,7 +103,7 @@ folder beside its archive; other hidden entries are prefixed dot."
                     (concat (or parent "") pos-ledger-integrity "/checkpoints"))
                    (t (concat (or parent "") "dot" name)))))
         (when (file-exists-p (expand-file-name new stage))
-          (pos-ledger--refuse 'destination "Rename would overwrite: %s" new))
+          (pos-ledger-refuse 'destination "Rename would overwrite: %s" new))
         (make-directory (file-name-directory (expand-file-name new stage)) t)
         (rename-file (expand-file-name found stage) (expand-file-name new stage))
         (push (cons found new) renames)))
@@ -285,10 +285,10 @@ dates rumours; LEDGER-ID names a ledger that has none."
                                   scope))
          (history (pos-ledger-history archive)))
     (unless (seq-some (lambda (e) (not (assq 'cid (cdr e)))) (car history))
-      (pos-ledger--refuse 'converted "Nothing to migrate in %s" archive))
+      (pos-ledger-refuse 'converted "Nothing to migrate in %s" archive))
     (let ((changed (nth 1 (pos-ledger--differences (car history) (pos-ledger-inventory archive)))))
       (when changed
-        (pos-ledger--refuse 'differs "Enrolled evidence changed in %s: %S" archive changed)))
+        (pos-ledger-refuse 'differs "Enrolled evidence changed in %s: %S" archive changed)))
     (pcase-let* ((inventory-sha (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory archive))))
                  (`(,discard ,remove ,renames ,collections ,declarations)
                   (pos-migrate--prepare archive stage exclude include))
@@ -348,7 +348,7 @@ dates rumours; LEDGER-ID names a ledger that has none."
                    (cond
                     ((and other (not inside) (pos-links-within-scope-p other scope))
                      (unless (pos-migrate--converted-p other)
-                       (pos-ledger--refuse 'order "Migrate %s first: %s links to it" other rel))
+                       (pos-ledger-refuse 'order "Migrate %s first: %s links to it" other rel))
                      (list rel link "cid" (concat (pos-links--sealed abs) suffix)))
                     (t (let ((r (pos-migrate--rumour abs scope date)))
                          (unless (assoc (car r) rumours) (push r rumours))
@@ -384,7 +384,7 @@ dates rumours; LEDGER-ID names a ledger that has none."
         (let ((there (expand-file-name (car r) stage)))
           (if (file-exists-p there)
               (unless (equal (pos-bytes-read there) (encode-coding-string (cdr r) 'utf-8))
-                (pos-ledger--refuse 'destination "Rumour destination exists: %s" (car r)))
+                (pos-ledger-refuse 'destination "Rumour destination exists: %s" (car r)))
             (make-directory (file-name-directory there) t)
             (pos-migrate--write-over there (encode-coding-string (cdr r) 'utf-8)))))
       (let ((cids (mapcar (lambda (r) (cons (car r) (pos-cid-file (expand-file-name (car r) stage))))
@@ -398,7 +398,7 @@ dates rumours; LEDGER-ID names a ledger that has none."
                                                                          (not (member (cdr d) pending))))
                                                          deps))
                                 pending)))
-            (unless item (pos-ledger--refuse 'loop "Links still loop among %S" pending))
+            (unless item (pos-ledger-refuse 'loop "Links still loop among %S" pending))
             (setq pending (delete item pending))
             (let ((by-file nil))
               (dolist (l links)
@@ -548,7 +548,7 @@ LEDGER-ID names a ledger that has none."
                      (pos-bytes-json
                       `((discard . ,.discard) (remove . ,.remove) (renames . ,.renames)
                         (collections . ,.collections) (declarations . ,.declarations))))
-        (pos-ledger--refuse 'plan "Archive differs from its plan: %s" .archive)))
+        (pos-ledger-refuse 'plan "Archive differs from its plan: %s" .archive)))
     (seq-doseq (r .rumours)
       (let-alist r
         (let ((there (expand-file-name .destination build)))
@@ -565,7 +565,7 @@ LEDGER-ID names a ledger that has none."
           (pos-migrate--write-over file (pos-links-rewrite (pos-bytes-read file) edits)))))
     (unless (equal (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory build)))
                    .final_inventory_sha256)
-      (pos-ledger--refuse 'plan "Rebuilt archive differs from its plan: %s" .archive))))
+      (pos-ledger-refuse 'plan "Rebuilt archive differs from its plan: %s" .archive))))
 
 (defun pos-migrate--protect (dir)
   "Remove the write bits of every file under DIR."
@@ -579,10 +579,10 @@ Rebuild the archive as planned, swap it in, move its ledger beside it,
 close the ledger with the conversion event and repair canon.  Resume if
 interrupted.  Return (EVENT-FILE . ROOT)."
   (unless (equal (pos-bytes-sha (pos-bytes-json plan)) expected)
-    (pos-ledger--refuse 'plan "Reviewed plan hash mismatch"))
+    (pos-ledger-refuse 'plan "Reviewed plan hash mismatch"))
   (let-alist plan
     (unless (and (eql .schema 1) (equal .operation "migrate"))
-      (pos-ledger--refuse 'plan "Not a migration plan"))
+      (pos-ledger-refuse 'plan "Not a migration plan"))
     (let* ((scope (file-name-directory .archive))
            (work (expand-file-name (concat "_migrate/" (file-name-nondirectory .archive)) scope))
            (build (expand-file-name "build" work))
@@ -595,7 +595,7 @@ interrupted.  Return (EVENT-FILE . ROOT)."
       (unless (file-exists-p previous)
         (unless (equal (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory .archive)))
                        .inventory_sha256)
-          (pos-ledger--refuse 'plan "Archive changed since review: %s" .archive))
+          (pos-ledger-refuse 'plan "Archive changed since review: %s" .archive))
         (pos-migrate--rebuild plan build)
         (rename-file .archive previous))
       (when (file-exists-p build)
@@ -630,7 +630,7 @@ interrupted.  Return (EVENT-FILE . ROOT)."
                                               (string-match-p (regexp-quote .to)
                                                               (decode-coding-string now 'utf-8))))
                                 .edits))
-                  (t (pos-ledger--refuse 'plan "Canon changed since review: %s" file)))))))
+                  (t (pos-ledger-refuse 'plan "Canon changed since review: %s" file)))))))
       (pos-seal--checkpoint .archive (pos-bytes-sha bytes))
       (cons event (alist-get 'root (pos-bytes-parse bytes))))))
 

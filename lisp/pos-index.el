@@ -204,7 +204,7 @@ must have the CID its ledger enrols it under, else `entry'.  Refuse
 `absent' if URI is no such link or no scope has such a file; a
 directory is not a file."
   (unless (string-match-p "\\`ipfs://[^/?#:]" uri)
-    (pos-ledger--refuse 'absent "Not an ipfs:// link: %s" uri))
+    (pos-ledger-refuse 'absent "Not an ipfs:// link: %s" uri))
   (let* ((scopes (pos-index--scopes (or directory default-directory)))
          (file (seq-some (lambda (scope)
                            (let ((found (ignore-errors (pos-index-resolve scope uri))))
@@ -216,11 +216,11 @@ directory is not a file."
                     (pcase (pos-index--kept-read scope uri)
                       (`(,bytes ,file-cid ,_)
                        (unless (equal file-cid (pos-cid-bytes bytes))
-                         (pos-ledger--refuse
+                         (pos-ledger-refuse
                           'entry "The keeper's bytes are not those of %s" file-cid))
                        bytes)))
                   scopes)
-        (pos-ledger--refuse 'absent "No archived file for %s" uri))))
+        (pos-ledger-refuse 'absent "No archived file for %s" uri))))
 
 (org-link-set-parameters "ipfs" :follow #'pos-index-follow)
 
