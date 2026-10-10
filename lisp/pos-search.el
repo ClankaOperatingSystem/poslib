@@ -44,6 +44,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'pos-bytes)
+(require 'pos-path)
 (require 'pos-ledger)
 (require 'pos-cid)
 (require 'pos-remote)
@@ -170,7 +171,7 @@ As a sealed item's links name it (doc/formats.org, \"Links\"): the CID
 of the item among ITEMS that holds it, else of the collection among
 COLLECTIONS, else of the file itself, from CIDS, an alist of path and
 CID, then the path beneath that holder where the file is not the whole."
-  (let ((holder (or (seq-find (lambda (h) (pos-ledger--within-p path h))
+  (let ((holder (or (seq-find (lambda (h) (pos-path-within-p path h))
                               (append items collections))
                     path)))
     (concat "ipfs://" (cdr (assoc holder cids))
@@ -184,7 +185,7 @@ Beneath a directory that is.  Refuse `absent' where nothing in CIDS has it."
     (unless bases
       (pos-ledger--refuse 'absent "The ledger enrols nothing under %s" within))
     (lambda (path)
-      (seq-some (lambda (base) (or (equal base ".") (pos-ledger--within-p path base)))
+      (seq-some (lambda (base) (or (equal base ".") (pos-path-within-p path base)))
                 bases))))
 
 ;;;; On disk

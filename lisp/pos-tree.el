@@ -59,6 +59,7 @@
 (require 'cl-lib)
 (require 'pos-bytes)
 (require 'pos-ledger)
+(require 'pos-path)
 (require 'seq)
 (require 'subr-x)
 (require 'yaml)
@@ -76,14 +77,6 @@
           "[0-9a-f]\\{4\\}-[0-9a-f]\\{12\\}\\'")
   "Matches a UUID in canonical form, when letters' case is not folded.")
 
-(defun pos-tree--path-p (path)
-  "Return non-nil if PATH is a path beneath a node: relative and going down.
-It has no empty part, no part that is . or .., and no backslash."
-  (and (not (string-empty-p path))
-       (not (string-match-p "\\\\" path))
-       (not (seq-some (lambda (part) (member part '("" "." "..")))
-                      (split-string path "/")))))
-
 (defun pos-tree--location (value what)
   "Return VALUE, the path of a WHAT, less a final slash; nil for nil.
 Refuse a path that does not stay beneath its node."
@@ -91,13 +84,9 @@ Refuse a path that does not stay beneath its node."
     (let ((path (if (and (> (length value) 1) (string-suffix-p "/" value))
                     (substring value 0 -1)
                   value)))
-      (unless (pos-tree--path-p path)
+      (unless (pos-path-safe-p path)
         (pos-tree--refuse 'bad-path "Not a path for %s: %s" what value))
       path)))
-
-(defun pos-tree--within-p (path container)
-  "Return non-nil if PATH is CONTAINER or beneath it."
-  (or (equal path container) (string-prefix-p (concat container "/") path)))
 
 (defun pos-tree--mapping-p (value)
   "Return non-nil if VALUE, as parsed from YAML, is a mapping."
@@ -167,7 +156,7 @@ default."
                         '(("path" string t) ("remote" string nil)
                           ("branch" string nil))
                         (format "children[%d]" index))
-              (unless (pos-tree--path-p .path)
+              (unless (pos-path-safe-p .path)
                 (pos-tree--refuse 'bad-path "Not a child's path: %s" .path))
               ;; A branch is a repository's: a child with no remote is
               ;; a directory of this one.
@@ -181,7 +170,7 @@ default."
     (dolist (a children)
       (dolist (b children)
         (when (and (not (eq a b))
-                   (pos-tree--within-p (alist-get 'path b) (alist-get 'path a)))
+                   (pos-path-within-p (alist-get 'path b) (alist-get 'path a)))
           (pos-tree--refuse 'bad-path "A child's path is another's or beneath it: %s"
                             (alist-get 'path b)))))
     children))
@@ -192,7 +181,7 @@ A methodology's path is AT and one more part, its name, which is not
 clankos."
   (dolist (child children)
     (let ((path (alist-get 'path child)))
-      (when (pos-tree--within-p path at)
+      (when (pos-path-within-p path at)
         (let ((name (and (> (length path) (length at))
                          (substring path (1+ (length at))))))
           (when (or (not name) (string-match-p "/" name))
@@ -211,7 +200,7 @@ is relative to the node.  None for a node that is no project."
       (sort (delq nil
                   (mapcar (lambda (child)
                             (let ((path (alist-get 'path child)))
-                              (when (pos-tree--within-p path at)
+                              (when (pos-path-within-p path at)
                                 (cons (substring path (1+ (length at))) path))))
                           (append (alist-get 'children config) nil)))
             (lambda (a b) (string< (car a) (car b)))))))
@@ -219,7 +208,7 @@ is relative to the node.  None for a node that is no project."
 (defun pos-tree--own-scope (path children what)
   "Refuse if PATH, a WHAT's scope, is one of CHILDREN or beneath one."
   (dolist (child children)
-    (when (pos-tree--within-p path (alist-get 'path child))
+    (when (pos-path-within-p path (alist-get 'path child))
       (pos-tree--refuse 'bad-path "%s is in a child, which declares its own: %s"
                         what path))))
 
@@ -234,7 +223,7 @@ CHILDREN are the repository's children, already checked."
                         '(("path" string t) ("of" string nil)
                           ("remote" string nil) ("branch" string nil))
                         (format "worktrees[%d]" index))
-              (unless (and (pos-tree--path-p .path)
+              (unless (and (pos-path-safe-p .path)
                            (string-match "\\`\\(?:\\(.+\\)/\\)?_worktrees/[^/]+\\'"
                                          .path))
                 (pos-tree--refuse 'bad-path "Not a worktree's path: %s" .path))
@@ -274,7 +263,7 @@ CHILDREN are the repository's children, already checked."
                           ("sweep" string nil) ("path" string nil))
                         (format "archives[%d]" index))
               (unless (equal .scope ".")
-                (unless (pos-tree--path-p .scope)
+                (unless (pos-path-safe-p .scope)
                   (pos-tree--refuse 'bad-path "Not a scope's path: %s" .scope))
                 (pos-tree--own-scope .scope children "An archive"))
               (unless (member .kept '("committed" "uncommitted" "remote"))
@@ -353,7 +342,7 @@ for another."
         (case-fold-search nil))
     (seq-some (lambda (entry)
                 (if (string-match-p "/" entry)
-                    (pos-tree--within-p path (string-remove-suffix "/" entry))
+                    (pos-path-within-p path (string-remove-suffix "/" entry))
                   (string-match-p
                    (concat "\\`"
                            (mapconcat #'regexp-quote (split-string entry "\\*") ".*")
@@ -450,9 +439,9 @@ with a final slash allowed, which marks a directory of instances; or
 a URL, for a kind kept outside the repository, which is taken as
 written."
   (unless (or (pos-tree-url-p value)
-              (pos-tree--path-p (if (and (> (length value) 1) (string-suffix-p "/" value))
-                                    (substring value 0 -1)
-                                  value)))
+              (pos-path-safe-p (if (and (> (length value) 1) (string-suffix-p "/" value))
+                                   (substring value 0 -1)
+                                 value)))
     (pos-tree--refuse 'bad-path "Not a path or a URL for %s: %s" what value))
   value)
 
