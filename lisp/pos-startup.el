@@ -335,8 +335,9 @@ gather the heading of each line too."
 (defun pos-startup--next ()
   "Return the next view of `pos-startup--corpus'.
 Each NEXT item: those of projects, of responsibilities and of the
-root apart.  An item of a scope yet to be configured, which is of no
-kind, is in a fourth list, printed only when there is such an item."
+root apart.  An item of a product, and one of a scope yet to be
+configured, which is of no kind, are each in a list of their own,
+printed only when there is such an item."
   (mapconcat
    (lambda (pair)
      (let* ((org-agenda-files (pos-startup--files-of-kind (car pair)))
@@ -348,6 +349,9 @@ kind, is in a fourth list, printed only when there is such an item."
           (concat title "\n")))))
    (append '((project . "projects") (responsibility . "responsibilities")
              (root . "the root"))
+           (when (seq-some #'pos-startup--has-next-p
+                           (pos-startup--files-of-kind 'product))
+             '((product . "products")))
            (when (seq-some #'pos-startup--has-next-p
                            (pos-startup--files-of-kind nil))
              '((nil . "scopes yet to be configured"))))

@@ -353,6 +353,20 @@ mend-the-gate is a project of the root."
                       ("orchard/index" . "NEXT Order the saplings"))
                      ("NEXT items of the root"))))))
 
+(ert-deftest pos-startup/a-next-item-of-a-product-is-listed ()
+  "A NEXT item of a product is in a list of its own, after the root's.
+The list is printed only when a product has such an item.  Here kit
+is a declared child with no configuration, so it is a product."
+  (pos-test-with-files root
+      '((".pos/config.yaml" . "pos: 2\nchildren:\n  - path: kit\n")
+        ("kit/todo.org" . "* NEXT Tag the release\n"))
+    (let ((parts (split-string (pos-startup-view root "next") "\n\n" t)))
+      (should (= 4 (length parts)))
+      (should (equal (nth 3 parts)
+                     (concat "NEXT items of products\n  "
+                             (format "%-54s " "kit/todo")
+                             "NEXT Tag the release\n"))))))
+
 (ert-deftest pos-startup/a-next-item-of-a-scope-of-no-kind-is-listed ()
   "A NEXT item of a scope yet to be configured is in a list of its own.
 Such a scope is of no kind, so its item belongs to none of the three
