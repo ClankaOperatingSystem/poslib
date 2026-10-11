@@ -110,23 +110,26 @@ a whole number in digits, returned as a number."
     ('sequence (and (vectorp value) (list value)))
     ('mapping (and (pos-tree--mapping-p value) (list value)))))
 
-(defvar pos-tree--warnings nil
-  "The warnings of the configuration being read, newest first.")
+(cl-defstruct (pos-tree--reading (:constructor pos-tree--reading-make)
+                                 (:copier nil))
+  "The reading of one file.
+WARNINGS are those of the file so far, newest first."
+  warnings)
 
-(defun pos-tree--mapping (value what keys &optional where)
+(defun pos-tree--mapping (reading value what keys &optional where)
   "Return the mapping VALUE as an alist of symbols, checked against KEYS.
 WHAT names the mapping in a refusal.  KEYS is a list of (NAME TYPE
 REQUIRED): a value not of its TYPE and a REQUIRED key that is absent
-are each refused.  A key not among them is a warning, which names it
-after WHERE, the mapping's place in the file, and the key is left
-unread: a file written for a newer reader is read with that key's
-default."
+are each refused.  A key not among them is a warning, added to
+READING, which names it after WHERE, the mapping's place in the file,
+and the key is left unread: a file written for a newer reader is read
+with that key's default."
   (unless (pos-tree--mapping-p value)
     (pos-tree-refuse 'not-a-mapping "%s is not a mapping" what))
   (dolist (pair value)
     (unless (assoc (car pair) keys)
       (push (format "unknown-key: %s%s" (if where (concat where ".") "") (car pair))
-            pos-tree--warnings)))
+            (pos-tree--reading-warnings reading))))
   (mapcan (lambda (key)
             (pcase-let* ((`(,name ,type ,required) key)
                          (pair (assoc name value))
@@ -146,12 +149,13 @@ default."
         (pos-tree-refuse 'bad-path "%s is named twice: %s" what path))
       (push path seen))))
 
-(defun pos-tree--children (entries)
-  "Return the children in ENTRIES, a sequence, checked, defaults filled in."
+(defun pos-tree--children (reading entries)
+  "Return the children in ENTRIES, a sequence, checked, defaults filled in.
+Warnings are added to READING."
   (let ((children
          (seq-map-indexed
           (lambda (entry index)
-            (let-alist (pos-tree--mapping
+            (let-alist (pos-tree--mapping reading
                         entry "A child"
                         '(("path" string t) ("remote" string nil)
                           ("branch" string nil))
@@ -212,13 +216,14 @@ is relative to the node.  None for a node that is no project."
       (pos-tree-refuse 'bad-path "%s is in a child, which declares its own: %s"
                        what path))))
 
-(defun pos-tree--worktrees (entries children)
+(defun pos-tree--worktrees (reading entries children)
   "Return the worktrees in ENTRIES, a sequence, checked, defaults filled in.
-CHILDREN are the repository's children, already checked."
+CHILDREN are the repository's children, already checked.  Warnings are
+added to READING."
   (let ((worktrees
          (seq-map-indexed
           (lambda (entry index)
-            (let-alist (pos-tree--mapping
+            (let-alist (pos-tree--mapping reading
                         entry "A worktree"
                         '(("path" string t) ("of" string nil)
                           ("remote" string nil) ("branch" string nil))
@@ -250,13 +255,14 @@ CHILDREN are the repository's children, already checked."
                         "A worktree")
     worktrees))
 
-(defun pos-tree--archives (entries children)
+(defun pos-tree--archives (reading entries children)
   "Return the archive settings in ENTRIES, a sequence, checked.
-CHILDREN are the repository's children, already checked."
+CHILDREN are the repository's children, already checked.  Warnings are
+added to READING."
   (let ((archives
          (seq-map-indexed
           (lambda (entry index)
-            (let-alist (pos-tree--mapping
+            (let-alist (pos-tree--mapping reading
                         entry "An archive"
                         '(("scope" string t) ("kept" string t)
                           ("ledger" string nil) ("url" string nil)
@@ -363,7 +369,7 @@ for one that says neither, which is yet to be configured.  Every
 scalar is read as the text written, and the keys' types decide what
 it is.  Signal `pos-tree-refused', with the refusal's kind and a
 message, for a file doc/pos-directory.txt does not allow."
-  (let ((pos-tree--warnings nil)
+  (let ((reading (pos-tree--reading-make))
         (parsed (condition-case nil
                     (yaml-parse-string text :object-type 'alist
                                        :object-key-type 'string
@@ -376,7 +382,7 @@ message, for a file doc/pos-directory.txt does not allow."
       (when (and version (/= version 2))
         (pos-tree-refuse 'unknown-version "Not a version this reader knows: %s"
                          version)))
-    (let* ((top (pos-tree--mapping
+    (let* ((top (pos-tree--mapping reading
                  parsed "The file"
                  '(("pos" integer t) ("projects" string nil)
                    ("methodologies" string nil) ("image" string nil)
@@ -388,7 +394,7 @@ message, for a file doc/pos-directory.txt does not allow."
                                               "methodologies"))
            (image (alist-get 'image top))
            (bin (pos-tree--location (alist-get 'bin top) "bin"))
-           (children (pos-tree--children (alist-get 'children top)))
+           (children (pos-tree--children reading (alist-get 'children top)))
            (server (assq 'server top)))
       (when (and projects methodologies)
         (pos-tree-refuse 'bad-value
@@ -412,16 +418,16 @@ message, for a file doc/pos-directory.txt does not allow."
         (bin . ,(or bin :null))
         (exclude . ,(or (pos-tree--exclusions (alist-get 'exclude top)) :null))
         (children . ,(vconcat children))
-        (worktrees . ,(vconcat (pos-tree--worktrees (alist-get 'worktrees top)
+        (worktrees . ,(vconcat (pos-tree--worktrees reading (alist-get 'worktrees top)
                                                     children)))
-        (archives . ,(vconcat (pos-tree--archives (alist-get 'archives top)
+        (archives . ,(vconcat (pos-tree--archives reading (alist-get 'archives top)
                                                   children)))
         (server . ,(if server
-                       (pos-tree--mapping
+                       (pos-tree--mapping reading
                         (cdr (assoc "server" parsed)) "The server"
                         '(("name" string t) ("mcp" string t)) "server")
                      :null))
-        (warnings . ,(vconcat (nreverse pos-tree--warnings)))))))
+        (warnings . ,(vconcat (reverse (pos-tree--reading-warnings reading))))))))
 
 ;;;; The declaration
 
@@ -445,12 +451,13 @@ written."
     (pos-tree-refuse 'bad-path "Not a path or a URL for %s: %s" what value))
   value)
 
-(defun pos-tree--kinds (entries)
-  "Return the kinds of canon in ENTRIES, a sequence, checked, defaults filled in."
+(defun pos-tree--kinds (reading entries)
+  "Return the kinds of canon in ENTRIES, a sequence, checked, defaults filled in.
+Warnings are added to READING."
   (let ((names nil))
     (seq-map-indexed
      (lambda (entry index)
-       (let-alist (pos-tree--mapping
+       (let-alist (pos-tree--mapping reading
                    entry "A kind"
                    '(("kind" string t) ("at" string t) ("format" string nil)
                      ("derived" string nil) ("entrance" string nil))
@@ -489,7 +496,7 @@ an alist of kind, at, format, derived and entrance with defaults
 filled in; checks, a vector of names; and warnings, a vector of
 strings, one for each key this reader does not know.  Signal
 `pos-tree-refused' for a file doc/pos-methodology.txt does not allow."
-  (let ((pos-tree--warnings nil)
+  (let ((reading (pos-tree--reading-make))
         (parsed (condition-case nil
                     (yaml-parse-string text :object-type 'alist
                                        :object-key-type 'string
@@ -502,14 +509,14 @@ strings, one for each key this reader does not know.  Signal
       (when (and version (/= version 1))
         (pos-tree-refuse 'unknown-version "Not a version this reader knows: %s"
                          version)))
-    (let ((top (pos-tree--mapping
+    (let ((top (pos-tree--mapping reading
                 parsed "The declaration"
                 '(("methodology" integer t) ("canon" sequence nil)
                   ("checks" sequence nil)))))
       `((methodology . 1)
-        (canon . ,(vconcat (pos-tree--kinds (alist-get 'canon top))))
+        (canon . ,(vconcat (pos-tree--kinds reading (alist-get 'canon top))))
         (checks . ,(vconcat (pos-tree--checks (alist-get 'checks top))))
-        (warnings . ,(vconcat (nreverse pos-tree--warnings)))))))
+        (warnings . ,(vconcat (reverse (pos-tree--reading-warnings reading))))))))
 
 (defun pos-tree-read-methodology-file (dir)
   "Return the declaration of the methodology at DIR, or nil if it has none.
