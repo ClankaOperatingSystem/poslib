@@ -572,15 +572,25 @@ Signal `pos-tree-refused' if it has two."
   (pos-tree--one-config
    (pos-path-config-files dir)))
 
-(defvar pos-tree--warnings-found nil
-  "The warnings of the configurations read for the plan being made.
-Each names the node, relative to the root, and the warning; newest first.")
+(cl-defstruct (pos-tree--plan (:constructor pos-tree--plan-make) (:copier nil))
+  "The plan being made for a tree.
+ROOT is the tree's root, as a directory name, and SOURCE the directory
+the plan installs from, or nil for none.  ACTIONS and FINDINGS are
+those of the plan, newest first.  WARNINGS are those of the
+configurations read for it, newest first, each naming its node
+relative to ROOT."
+  root source actions findings warnings)
 
-(defun pos-tree--config (dir branch)
+(defun pos-tree--rel (plan path)
+  "Return PATH relative to the root of the tree PLAN is for."
+  (file-relative-name (directory-file-name path) (pos-tree--plan-root plan)))
+
+(defun pos-tree--config (plan dir branch)
   "Return the configuration of the node at DIR, or nil if it has none.
 With BRANCH, DIR is a repository and it is read from that branch as
-committed; with nil, from the working tree.  Signal `pos-tree-refused'
-for a file that is refused, and for two configurations."
+committed; with nil, from the working tree.  Its warnings are added to
+PLAN.  Signal `pos-tree-refused' for a file that is refused, and for
+two configurations."
   (when-let* ((text (if branch
                        (when-let* ((file (pos-tree--one-config
                                           (split-string
@@ -597,46 +607,42 @@ for a file that is refused, and for two configurations."
                          (buffer-string))))))
     (let ((config (pos-tree-read-config text)))
       (seq-doseq (warning (alist-get 'warnings config))
-        (push (format "%s: %s" (pos-tree--rel dir) warning) pos-tree--warnings-found))
+        (push (format "%s: %s" (pos-tree--rel plan dir) warning)
+              (pos-tree--plan-warnings plan)))
       config)))
 
 ;;;; The plan
-
-(defvar pos-tree--root nil
-  "The root of the tree being planned, as a directory name.")
-
-(defvar pos-tree--actions nil
-  "The actions of the plan being made, newest first.")
-
-(defvar pos-tree--findings nil
-  "The findings of the plan being made, newest first.")
 
 (cl-defstruct (pos-tree--node (:constructor pos-tree--node))
   "A repository of the tree that is mounted as declared.
 CHILDREN are its children mounted as declared, each (ENTRY . NODE).
 HELD are the directories of its children that are there and are not
 planned, because of a finding.  LOCALS are the directories of the
-repository that have a configuration of their own, each (DIR . CONFIG)."
-  dir config children held locals)
+repository that have a configuration of their own, each (DIR . CONFIG).
+The rest is what planning the repository has found in it, with paths
+relative to DIR.  MOUNTED are the declared paths of repositories and
+LOCAL those of directories.  LOCAL-EXCLUSIONS is an alist of the path
+of each local node that declares exclusions and the list; a node that
+declares none is absent, and inherits.  ARCHIVE-PATHS are its
+uncommitted archive paths, and ARCHIVE-REFUSED is non-nil if an
+invalid node prevents updating its archive rules."
+  dir config children held locals
+  mounted local local-exclusions archive-paths archive-refused)
 
-(defun pos-tree--rel (path)
-  "Return PATH relative to the root of the tree being planned."
-  (file-relative-name (directory-file-name path) pos-tree--root))
+(defun pos-tree--act (plan do &rest pairs)
+  "Add to PLAN the action DO, with PAIRS, an alist."
+  (push `((do . ,do) ,@pairs) (pos-tree--plan-actions plan)))
 
-(defun pos-tree--act (do &rest pairs)
-  "Add to the plan the action DO, with PAIRS, an alist."
-  (push `((do . ,do) ,@pairs) pos-tree--actions))
-
-(defun pos-tree--find (finding path &optional detail)
-  "Add to the plan the FINDING at PATH, with DETAIL if any."
+(defun pos-tree--find (plan finding path &optional detail)
+  "Add to PLAN the FINDING at PATH, with DETAIL if any."
   (push `((finding . ,finding) (path . ,path)
           ,@(and detail `((detail . ,detail))))
-        pos-tree--findings))
+        (pos-tree--plan-findings plan)))
 
-(defun pos-tree--exclude (dir path)
-  "Plan to exclude PATH in the repository at DIR, unless it is excluded."
+(defun pos-tree--exclude (plan dir path)
+  "Add to PLAN excluding PATH in the repository at DIR, unless it is excluded."
   (unless (pos-tree--excluded-p dir path)
-    (pos-tree--act "exclude" `(repository . ,(pos-tree--rel dir)) `(path . ,path))))
+    (pos-tree--act plan "exclude" `(repository . ,(pos-tree--rel plan dir)) `(path . ,path))))
 
 (defconst pos-tree--archive-begin "# BEGIN ClankOS archive excludes\n"
   "Opening marker of the archive rules this tool maintains.")
@@ -685,12 +691,6 @@ anchored, directory-only Git patterns."
                                      (not (string-suffix-p "\n" old))
                                      (not (string-empty-p block))) "\n" "") block)))))
 
-(defvar pos-tree--archive-paths nil
-  "Uncommitted archive paths in the repository being planned.")
-
-(defvar pos-tree--archive-refused nil
-  "Whether an invalid node prevents updating this repository's archive rules.")
-
 (defun pos-tree--archive-scopes (dir boundaries exclusions &optional prefix)
   "Find archive scopes below DIR, stopping at BOUNDARIES and configurations.
 EXCLUSIONS are the node's, as `pos-tree-exclusions' gives them: a
@@ -713,9 +713,11 @@ or nil at its root."
                                  scopes)))))))
     scopes))
 
-(defun pos-tree--plan-archives (repo base config)
-  "Collect uncommitted archives for CONFIG at BASE in REPO."
-  (let* ((entries (append (alist-get 'archives config) nil))
+(defun pos-tree--collect-archives (plan repo base config)
+  "Collect for PLAN the uncommitted archives of CONFIG at BASE in REPO.
+REPO is the repository's node."
+  (let* ((dir (pos-tree--node-dir repo))
+         (entries (append (alist-get 'archives config) nil))
          (boundaries (mapcar (lambda (e) (alist-get 'path e))
                              (append (alist-get 'children config) (alist-get 'worktrees config) nil)))
          (scopes (sort (delete-dups
@@ -731,26 +733,29 @@ or nil at its root."
                     (setq boundary t)))
                 boundary)
         (let* ((path (expand-file-name "archives" (expand-file-name scope base)))
-               (within (file-relative-name path repo))
+               (within (file-relative-name path dir))
                (entry (seq-find (lambda (e) (equal (alist-get 'scope e) scope)) entries)))
           (cond
-           ((pos-tree--through-link-p repo within)
-            (pos-tree--find "path-taken" (pos-tree--rel path) "a symbolic link")
-            (setq pos-tree--archive-refused t))
+           ((pos-tree--through-link-p dir within)
+            (pos-tree--find plan "path-taken" (pos-tree--rel plan path) "a symbolic link")
+            (setf (pos-tree--node-archive-refused repo) t))
            ((equal (or (alist-get 'kept entry) "uncommitted") "uncommitted")
-            (push within pos-tree--archive-paths))))))))
+            (push within (pos-tree--node-archive-paths repo)))))))))
 
-(defun pos-tree--archive-excludes (repo)
-  "Plan the managed archive exclusions of REPO, unless a node was refused."
-  (unless pos-tree--archive-refused
-    (let ((paths (vconcat (sort (delete-dups pos-tree--archive-paths) #'string<))))
+(defun pos-tree--archive-excludes (plan repo)
+  "Add to PLAN the managed archive exclusions of REPO, a repository's node.
+None if a node of it was refused."
+  (unless (pos-tree--node-archive-refused repo)
+    (let ((dir (pos-tree--node-dir repo))
+          (paths (vconcat (sort (delete-dups (pos-tree--node-archive-paths repo))
+                                #'string<))))
       (condition-case err
-          (let ((texts (pos-tree--archive-text repo paths)))
+          (let ((texts (pos-tree--archive-text dir paths)))
             (unless (equal (car texts) (cdr texts))
-              (pos-tree--act "archive-excludes" `(repository . ,(pos-tree--rel repo))
+              (pos-tree--act plan "archive-excludes" `(repository . ,(pos-tree--rel plan dir))
                              `(paths . ,paths))))
         (pos-tree-refused
-         (pos-tree--find "config-refused" (pos-tree--rel repo)
+         (pos-tree--find plan "config-refused" (pos-tree--rel plan dir)
                          (format "%s: %s" (nth 1 err) (nth 2 err))))))))
 
 (defun pos-tree--through-link-p (dir path)
@@ -766,186 +771,174 @@ or nil at its root."
       (and (file-directory-p path)
            (null (directory-files path nil directory-files-no-dot-files-regexp)))))
 
-(defvar pos-tree--local-exclusions nil
-  "The exclusions each local node of the repository being planned declares.
-An alist of its path relative to the repository and the list; a node
-that declares none is absent, and inherits.")
+(defun pos-tree--undeclared (plan repo exclusions &optional prefix node)
+  "Find for PLAN what is beneath the repository REPO that no entry declares.
+A repository, and a directory holding a configuration.  REPO is the
+repository's node: the declared paths of repositories it has mounted
+are not looked into, and those of its local directories are.
+EXCLUSIONS are those in force, declared by the node at NODE, a prefix
+with its final slash or nil for REPO; a local node that declares its
+own replaces them beneath it.  PREFIX is the directory being looked
+in, with its final slash, or nil for REPO."
+  (let ((dir (pos-tree--node-dir repo)))
+    (dolist (name (directory-files (expand-file-name (or prefix "") dir) nil
+                                   directory-files-no-dot-files-regexp))
+      (let* ((path (concat prefix name))
+             (full (expand-file-name path dir)))
+        (cond
+         ((member path (pos-tree--node-mounted repo)))
+         ((or (file-symlink-p full) (not (file-directory-p full))))
+         ((pos-tree-unwalked-p (string-remove-prefix (or node "") path) exclusions))
+         ((member path (pos-tree--node-local repo))
+          (let ((own (assoc path (pos-tree--node-local-exclusions repo))))
+            (pos-tree--undeclared plan repo (if own (cdr own) exclusions)
+                                  (concat path "/") (if own (concat path "/") node))))
+         ;; A submodule is the repository's own, tracked and declared by git.
+         ((pos-tree--repository-p full)
+          (unless (pos-tree--tracked-p dir path)
+            (pos-tree--find plan "undeclared" (pos-tree--rel plan full))))
+         ((pos-path-config-files full)
+          (pos-tree--find plan "undeclared" (pos-tree--rel plan full) "a configuration"))
+         (t (pos-tree--undeclared plan repo exclusions
+                                  (concat path "/") node)))))))
 
-(defun pos-tree--undeclared (repo mounted local exclusions &optional prefix node)
-  "Find what is beneath the repository at REPO that no entry declares.
-A repository, and a directory holding a configuration.  MOUNTED are the
-declared paths of repositories, which are not looked into, and LOCAL
-those of directories, which are; both relative to REPO.  EXCLUSIONS
-are those in force, declared by the node at NODE, a prefix with its
-final slash or nil for REPO; a local node that declares its own
-replaces them beneath it.  PREFIX is the directory being looked in,
-with its final slash, or nil for REPO."
-  (dolist (name (directory-files (expand-file-name (or prefix "") repo) nil
-                                 directory-files-no-dot-files-regexp))
-    (let* ((path (concat prefix name))
-           (full (expand-file-name path repo)))
-      (cond
-       ((member path mounted))
-       ((or (file-symlink-p full) (not (file-directory-p full))))
-       ((pos-tree-unwalked-p (string-remove-prefix (or node "") path) exclusions))
-       ((member path local)
-        (let ((own (assoc path pos-tree--local-exclusions)))
-          (pos-tree--undeclared repo mounted local (if own (cdr own) exclusions)
-                                (concat path "/") (if own (concat path "/") node))))
-       ;; A submodule is the repository's own, tracked and declared by git.
-       ((pos-tree--repository-p full)
-        (unless (pos-tree--tracked-p repo path)
-          (pos-tree--find "undeclared" (pos-tree--rel full))))
-       ((pos-path-config-files full)
-        (pos-tree--find "undeclared" (pos-tree--rel full) "a configuration"))
-       (t (pos-tree--undeclared repo mounted local exclusions
-                                (concat path "/") node))))))
-
-(defvar pos-tree--mounted nil
-  "The declared paths of repositories in the repository being planned.")
-
-(defvar pos-tree--local-configs nil
-  "The configured directories of the repository being planned, (DIR . CONFIG).")
-
-(defvar pos-tree--local nil
-  "The declared paths of directories in the repository being planned.")
-
-(defun pos-tree--mount-child (repo base child)
-  "Plan CHILD, a declared child with a remote, of the node at BASE in REPO.
-Return (NODE . HELD): NODE is (ENTRY . NODE) for a child mounted as
-declared, else nil; HELD is the child's directory when it is there
-and not planned, because of a finding, else nil."
+(defun pos-tree--mount-child (plan repo base child)
+  "Add to PLAN the declared CHILD, with a remote, of the node at BASE in REPO.
+REPO is the repository's node.  Return (NODE . HELD): NODE is
+\(ENTRY . NODE) for a child mounted as declared, else nil; HELD is the
+child's directory when it is there and not planned, because of a
+finding, else nil."
   (let-alist child
     (let* ((path (expand-file-name .path base))
-           (within (file-relative-name path repo))
-           (shown (pos-tree--rel path)))
-      (push within pos-tree--mounted)
-      (pos-tree--exclude repo within)
+           (dir (pos-tree--node-dir repo))
+           (within (file-relative-name path dir))
+           (shown (pos-tree--rel plan path)))
+      (push within (pos-tree--node-mounted repo))
+      (pos-tree--exclude plan dir within)
       (cond
-       ((pos-tree--through-link-p repo within)
-        (pos-tree--find "path-taken" shown "a symbolic link")
+       ((pos-tree--through-link-p dir within)
+        (pos-tree--find plan "path-taken" shown "a symbolic link")
         nil)
        ((pos-tree--empty-p path)
-        (pos-tree--act "clone" `(path . ,shown) `(remote . ,.remote)
+        (pos-tree--act plan "clone" `(path . ,shown) `(remote . ,.remote)
                        `(branch . ,.branch))
         nil)
        ((not (pos-tree--repository-p path))
-        (pos-tree--find "path-taken" shown "not a repository")
+        (pos-tree--find plan "path-taken" shown "not a repository")
         nil)
        ((not (equal (pos-tree--git-line path "config" "--get" "remote.origin.url")
                     .remote))
-        (pos-tree--find "other-remote" shown)
+        (pos-tree--find plan "other-remote" shown)
         (cons nil path))
        ((not (equal (pos-tree--git-line path "symbolic-ref" "--short" "-q" "HEAD")
                     .branch))
-        (pos-tree--find "off-branch" shown (concat "declared " .branch))
+        (pos-tree--find plan "off-branch" shown (concat "declared " .branch))
         (cons nil path))
        (t (condition-case err
               (cons (cons `((path . ,within) ,@(assq-delete-all 'path (copy-alist child)))
-                          (pos-tree--mounts path (pos-tree--config path .branch)))
+                          (pos-tree--mounts plan path (pos-tree--config plan path .branch)))
                     nil)
             (pos-tree-refused
-             (pos-tree--find "config-refused" shown
+             (pos-tree--find plan "config-refused" shown
                              (format "%s: %s" (nth 1 err) (nth 2 err)))
              (cons nil path))))))))
 
-(defun pos-tree--declare-local (repo base child)
-  "Plan CHILD, a declared directory of the node at BASE in REPO.
-What its own configuration declares is planned as REPO's.  Return
+(defun pos-tree--declare-local (plan repo base child)
+  "Add to PLAN the declared CHILD, a directory of the node at BASE in REPO.
+REPO is the repository's node, and what the directory's own
+configuration declares is planned as the repository's.  Return
 \(NODES . HELD) as `pos-tree--declared' does, for what lies beneath."
   (let-alist child
     (let* ((path (expand-file-name .path base))
-           (within (file-relative-name path repo))
-           (shown (pos-tree--rel path)))
+           (dir (pos-tree--node-dir repo))
+           (within (file-relative-name path dir))
+           (shown (pos-tree--rel plan path)))
       ;; A finding plans nothing beneath: nil.
       (cond
-       ((pos-tree--through-link-p repo within)
-        (pos-tree--find "path-taken" shown "a symbolic link") nil)
+       ((pos-tree--through-link-p dir within)
+        (pos-tree--find plan "path-taken" shown "a symbolic link") nil)
        ((not (file-exists-p path))
-        (pos-tree--find "missing" shown) nil)
+        (pos-tree--find plan "missing" shown) nil)
        ((not (file-directory-p path))
-        (pos-tree--find "path-taken" shown "not a directory") nil)
+        (pos-tree--find plan "path-taken" shown "not a directory") nil)
        ((pos-tree--repository-p path)
-        (push within pos-tree--mounted)
-        (pos-tree--find "path-taken" shown "a repository, declared with no remote") nil)
+        (push within (pos-tree--node-mounted repo))
+        (pos-tree--find plan "path-taken" shown "a repository, declared with no remote") nil)
        (t
-        (push within pos-tree--local)
+        (push within (pos-tree--node-local repo))
         (condition-case err
-            (when-let* ((own (pos-tree--config path nil)))
-              (push (cons path own) pos-tree--local-configs)
+            (when-let* ((own (pos-tree--config plan path nil)))
+              (push (cons path own) (pos-tree--node-locals repo))
               (unless (eq (alist-get 'exclude own) :null)
-                (push (cons within (pos-tree-exclusions own)) pos-tree--local-exclusions))
-              (pos-tree--declared repo path own))
+                (push (cons within (pos-tree-exclusions own))
+                      (pos-tree--node-local-exclusions repo)))
+              (pos-tree--declared plan repo path own))
           (pos-tree-refused
-           (setq pos-tree--archive-refused t)
-           (pos-tree--find "config-refused" shown
+           (setf (pos-tree--node-archive-refused repo) t)
+           (pos-tree--find plan "config-refused" shown
                            (format "%s: %s" (nth 1 err) (nth 2 err)))
            nil)))))))
 
-(defun pos-tree--declare-worktree (repo base worktree)
-  "Plan WORKTREE, a declared working tree of the node at BASE in REPO."
+(defun pos-tree--declare-worktree (plan repo base worktree)
+  "Add to PLAN the declared WORKTREE of the node at BASE in REPO.
+REPO is the repository's node."
   (let-alist worktree
     (let* ((path (expand-file-name .path base))
-           (within (file-relative-name path repo))
-           (shown (pos-tree--rel path)))
-      (push within pos-tree--mounted)
-      (pos-tree--exclude repo within)
+           (dir (pos-tree--node-dir repo))
+           (within (file-relative-name path dir))
+           (shown (pos-tree--rel plan path)))
+      (push within (pos-tree--node-mounted repo))
+      (pos-tree--exclude plan dir within)
       (cond
-       ((pos-tree--through-link-p repo within)
-        (pos-tree--find "path-taken" shown "a symbolic link"))
+       ((pos-tree--through-link-p dir within)
+        (pos-tree--find plan "path-taken" shown "a symbolic link"))
        ((pos-tree--empty-p path)
-        (pos-tree--act "clone" `(path . ,shown)
+        (pos-tree--act plan "clone" `(path . ,shown)
                        (if .of
-                           `(of . ,(pos-tree--rel (expand-file-name .of base)))
+                           `(of . ,(pos-tree--rel plan (expand-file-name .of base)))
                          `(remote . ,.remote))
                        `(branch . ,.branch)))
        ((not (pos-tree--repository-p path))
-        (pos-tree--find "path-taken" shown "not a repository"))))))
+        (pos-tree--find plan "path-taken" shown "not a repository"))))))
 
-(defun pos-tree--declared (repo base config)
-  "Plan what CONFIG declares, the configuration of the node at BASE.
-BASE is the repository at REPO or a directory of it.  Return
-\(NODES . HELD): a node for each repository mounted as declared, as
-\(ENTRY . NODE) with ENTRY's path relative to REPO, and the directories
-of those that are there and are not planned."
+(defun pos-tree--declared (plan repo base config)
+  "Add to PLAN what CONFIG declares, the configuration of the node at BASE.
+BASE is the directory of REPO, a repository's node, or a directory
+within it.  Return (NODES . HELD): a node for each repository mounted
+as declared, as (ENTRY . NODE) with ENTRY's path relative to the
+repository, and the directories of those that are there and are not
+planned."
   (let ((by-path (lambda (a b) (string< (alist-get 'path a) (alist-get 'path b))))
         nodes held)
-    (when config (pos-tree--plan-archives repo base config))
+    (when config (pos-tree--collect-archives plan repo base config))
     (when (eq (alist-get 'kind config) :null)
-      (pos-tree--find "unconfigured" (pos-tree--rel base)))
+      (pos-tree--find plan "unconfigured" (pos-tree--rel plan base)))
     (dolist (child (sort (append (alist-get 'children config) nil) by-path))
       (if (stringp (alist-get 'remote child))
-          (pcase-let ((`(,node . ,taken) (pos-tree--mount-child repo base child)))
+          (pcase-let ((`(,node . ,taken) (pos-tree--mount-child plan repo base child)))
             (when node (push node nodes))
             (when taken (push taken held)))
-        (pcase-let ((`(,below . ,taken) (pos-tree--declare-local repo base child)))
+        (pcase-let ((`(,below . ,taken) (pos-tree--declare-local plan repo base child)))
           (setq nodes (append (reverse below) nodes)
                 held (append taken held)))))
     (dolist (worktree (sort (append (alist-get 'worktrees config) nil) by-path))
-      (pos-tree--declare-worktree repo base worktree))
+      (pos-tree--declare-worktree plan repo base worktree))
     (cons (nreverse nodes) held)))
 
-(defun pos-tree--mounts (dir config)
-  "Plan what is mounted in the repository at DIR, whose configuration is CONFIG.
+(defun pos-tree--mounts (plan dir config)
+  "Add to PLAN what is mounted in the repository at DIR, of CONFIG.
 Return its node, with a node for each repository beneath it that is
 mounted as declared, by this repository or by a directory of it."
-  (let* ((pos-tree--mounted nil)
-         (pos-tree--local nil)
-         (pos-tree--local-configs nil)
-         (pos-tree--local-exclusions nil)
-         (pos-tree--archive-paths nil)
-         (pos-tree--archive-refused nil)
-         (declared (pos-tree--declared dir dir config)))
-    (pos-tree--undeclared dir pos-tree--mounted pos-tree--local
-                          (pos-tree-exclusions config))
-    (when config (pos-tree--archive-excludes dir))
-    (pos-tree--node :dir dir :config config :children (car declared)
-                    :held (cdr declared) :locals (nreverse pos-tree--local-configs))))
+  (let* ((repo (pos-tree--node :dir dir :config config))
+         (declared (pos-tree--declared plan repo dir config)))
+    (pos-tree--undeclared plan repo (pos-tree-exclusions config))
+    (when config (pos-tree--archive-excludes plan repo))
+    (setf (pos-tree--node-children repo) (car declared)
+          (pos-tree--node-held repo) (cdr declared)
+          (pos-tree--node-locals repo) (nreverse (pos-tree--node-locals repo)))
+    repo))
 
 ;;;; What is installed
-
-(defvar pos-tree--source nil
-  "The directory the plan being made installs from, or nil for none.")
 
 (defconst pos-tree--note "README.clankos"
   "The name of the note the tool writes in an ordinary .claude/skills.")
@@ -1018,12 +1011,12 @@ as a path relative to DIR; nil if every part is a directory or absent."
         (setq closed within)))
     closed))
 
-(defun pos-tree--taken (dir path)
-  "Find PATH, in the repository at DIR, held by something not the tool's.
-The detail says whether the repository tracks it and, if so, the
-commit that added it."
-  (pos-tree--find
-   "name-taken" (pos-tree--rel (expand-file-name path dir))
+(defun pos-tree--taken (plan dir path)
+  "Find for PLAN that PATH, in the repository at DIR, is not the tool's.
+Something else holds it.  The detail says whether the repository
+tracks it and, if so, the commit that added it."
+  (pos-tree--find plan
+   "name-taken" (pos-tree--rel plan (expand-file-name path dir))
    (if (pos-tree--tracked-p dir path)
        (let ((added (pos-tree--git-line dir "log" "--diff-filter=A"
                                         "--format=%h" "--" path)))
@@ -1032,44 +1025,45 @@ commit that added it."
            (concat "tracked, added in " (car (last (split-string added "\n"))))))
      "untracked")))
 
-(defun pos-tree--link-in (dir within links owned)
-  "Plan the tool's links in WITHIN, a directory of the repository at DIR.
-LINKS is an alist (NAME . TARGETS): NAME is to be a link to the entry
-of that name in TARGETS, a directory in one of OWNED, the directories
-the tool's links point into.  A name held by something else is found
-and left; a name LINKS gives twice is found for its second; and another
-of the tool's links there is removed."
+(defun pos-tree--link-in (plan dir within links owned)
+  "Add to PLAN the tool's links in WITHIN, of the repository at DIR.
+WITHIN is a directory of the repository.  LINKS is an alist
+\(NAME . TARGETS): NAME is to be a link to the entry of that name in
+TARGETS, a directory in one of OWNED, the directories the tool's links
+point into.  A name held by something else is found and left; a name
+LINKS gives twice is found for its second; and another of the tool's
+links there is removed."
   (let* ((in (expand-file-name within dir))
          (closed (pos-tree--closed dir within))
          (names nil))
     (if closed
-        (when links (pos-tree--taken dir closed))
+        (when links (pos-tree--taken plan dir closed))
       (pcase-dolist (`(,name . ,targets) links)
         (let* ((path (concat within "/" name))
                (link (expand-file-name name in))
-               (shown (pos-tree--rel link))
+               (shown (pos-tree--rel plan link))
                (target (file-relative-name (expand-file-name name targets) in)))
           (cond
            ((member name names)
-            (pos-tree--find "name-taken" shown "named by more than one"))
+            (pos-tree--find plan "name-taken" shown "named by more than one"))
            ((pos-tree--own-link-p link owned)
             (push name names)
-            (pos-tree--exclude dir path)
+            (pos-tree--exclude plan dir path)
             (unless (equal (file-symlink-p link) target)
-              (pos-tree--act "unlink" `(path . ,shown))
-              (pos-tree--act "link" `(path . ,shown) `(target . ,target))))
+              (pos-tree--act plan "unlink" `(path . ,shown))
+              (pos-tree--act plan "link" `(path . ,shown) `(target . ,target))))
            ((or (file-symlink-p link) (file-exists-p link))
             (push name names)
-            (pos-tree--taken dir path))
+            (pos-tree--taken plan dir path))
            (t
             (push name names)
-            (pos-tree--exclude dir path)
-            (pos-tree--act "link" `(path . ,shown) `(target . ,target))))))
+            (pos-tree--exclude plan dir path)
+            (pos-tree--act plan "link" `(path . ,shown) `(target . ,target))))))
       (when (file-directory-p in)
         (dolist (name (directory-files in nil directory-files-no-dot-files-regexp))
           (let ((link (expand-file-name name in)))
             (when (and (not (member name names)) (pos-tree--own-link-p link owned))
-              (pos-tree--act "unlink" `(path . ,(pos-tree--rel link))))))))))
+              (pos-tree--act plan "unlink" `(path . ,(pos-tree--rel plan link))))))))))
 
 (defun pos-tree--not-skills (in)
   "Return the names in IN, a skills directory, that are no skill.
@@ -1095,15 +1089,15 @@ A skill is a directory holding a SKILL.md.  The tool's note is left out."
                   (mapconcat (lambda (name) (concat "  " name "\n")) others "")))
      "\nThe convention is described at\n" pos-tree--convention "\n")))
 
-(defun pos-tree--earlier-link-p (dir name)
+(defun pos-tree--earlier-link-p (plan dir name)
   "Return non-nil if NAME, in the skills at DIR, is a link an earlier tool made.
 That is an untracked symbolic link whose target is a skill's directory
-in another repository of the tree."
+in another repository of the tree PLAN is for."
   (let* ((skills (file-name-as-directory (expand-file-name ".agents/skills" dir)))
          (to (file-symlink-p (expand-file-name name skills)))
          (target (and (stringp to) (expand-file-name to skills))))
     (and target
-         (string-prefix-p pos-tree--root target)
+         (string-prefix-p (pos-tree--plan-root plan) target)
          (string-suffix-p "/.agents/skills/" (file-name-directory target))
          (not (equal (file-name-directory target) skills))
          (not (pos-tree--tracked-p dir (concat ".agents/skills/" name))))))
@@ -1117,14 +1111,15 @@ None where a part of that path is not an ordinary directory."
          (file-directory-p skills)
          (directory-files skills nil directory-files-no-dot-files-regexp))))
 
-(defun pos-tree--claude (dir prefix links owned)
-  "Plan .claude/skills beneath PREFIX in the repository at DIR for LINKS.
-PREFIX is a directory of the repository, relative and ending in a
-slash, or empty for the repository itself.  LINKS and OWNED are as
-`pos-tree--link-in' takes them.  Absent, .claude/skills is to be a
-link to ../.agents/skills when there are skills there.  An ordinary
-directory has the tool's links made in it too, and its note.  A file
-or a symbolic link, there or at .claude, is left."
+(defun pos-tree--claude (plan dir prefix links owned)
+  "Add to PLAN .claude/skills beneath PREFIX in the repository at DIR.
+It is planned for LINKS.  PREFIX is a directory of the repository,
+relative and ending in a slash, or empty for the repository itself.
+LINKS and OWNED are as `pos-tree--link-in' takes them.  Absent,
+.claude/skills is to be a link to ../.agents/skills when there are
+skills there.  An ordinary directory has the tool's links made in it
+too, and its note.  A file or a symbolic link, there or at .claude, is
+left."
   (let* ((skills-path (concat prefix ".claude/skills"))
          (agents-path (concat prefix ".agents/skills"))
          (in (expand-file-name skills-path dir))
@@ -1134,34 +1129,34 @@ or a symbolic link, there or at .claude, is left."
     (cond
      ((pos-tree--closed dir skills-path))
      (ordinary
-      (pos-tree--link-in dir skills-path links owned)
+      (pos-tree--link-in plan dir skills-path links owned)
       (let ((path (concat skills-path "/" pos-tree--note))
             (note (expand-file-name pos-tree--note in)))
         (cond
          ((not links))
-         ((pos-tree--tracked-p dir path) (pos-tree--taken dir path))
-         (t (pos-tree--exclude dir path)
+         ((pos-tree--tracked-p dir path) (pos-tree--taken plan dir path))
+         (t (pos-tree--exclude plan dir path)
             (unless (and (file-regular-p note)
                          (equal (pos-tree--note-text in)
                                 (with-temp-buffer (insert-file-contents note)
                                                   (buffer-string))))
-              (pos-tree--act "note" `(path . ,(pos-tree--rel note))))))))
+              (pos-tree--act plan "note" `(path . ,(pos-tree--rel plan note))))))))
      ((or links (pos-tree--agents-entries dir agents-path))
-      (pos-tree--exclude dir skills-path)
-      (pos-tree--act "link" `(path . ,(pos-tree--rel in))
+      (pos-tree--exclude plan dir skills-path)
+      (pos-tree--act plan "link" `(path . ,(pos-tree--rel plan in))
                      '(target . "../.agents/skills"))))
     ;; The note went with the directory's entries when they were moved.
     (when (and (not ordinary) (file-regular-p stray)
                (not (pos-tree--tracked-p
                      dir (concat agents-path "/" pos-tree--note))))
-      (pos-tree--act "unlink" `(path . ,(pos-tree--rel stray))))))
+      (pos-tree--act plan "unlink" `(path . ,(pos-tree--rel plan stray))))))
 
-(defun pos-tree--methodology-links (base config)
+(defun pos-tree--methodology-links (plan base config)
   "Return what the methodologies CONFIG declares at BASE supply.
 A cons (SKILLS . COMMANDS), each an alist (NAME . DIRECTORY) as
 `pos-tree--link-in' takes, by methodology and then by name.  A
 methodology not there is left for its clone; one with a skill not named
-after it is found (methodology-refused) and supplies nothing."
+after it is found for PLAN (methodology-refused) and supplies nothing."
   (let (skills commands)
     (pcase-dolist (`(,name . ,path) (pos-tree-methodologies config))
       (let* ((dir (expand-file-name path base))
@@ -1171,7 +1166,7 @@ after it is found (methodology-refused) and supplies nothing."
                             held)))
         (cond
          ((not (file-directory-p dir)))
-         (bad (pos-tree--find "methodology-refused" (pos-tree--rel dir)
+         (bad (pos-tree--find plan "methodology-refused" (pos-tree--rel plan dir)
                               (format "a skill not named %s-NAME: %s" name bad)))
          (t (dolist (skill held)
               (push (cons skill (expand-file-name "skills" dir)) skills))
@@ -1179,21 +1174,22 @@ after it is found (methodology-refused) and supplies nothing."
               (push (cons command (expand-file-name "bin" dir)) commands))))))
     (cons (nreverse skills) (nreverse commands))))
 
-(defun pos-tree--in-directory (dir base config)
-  "Plan the links to the methodologies of the project at BASE, in DIR.
-BASE is a directory of the repository at DIR, with CONFIG its own."
+(defun pos-tree--in-directory (plan dir base config)
+  "Add to PLAN the links to the methodologies of the project at BASE.
+They are made in DIR.  BASE is a directory of the repository at DIR,
+with CONFIG its own."
   (when (stringp (alist-get 'methodologies config))
     (let ((prefix (file-name-as-directory (file-relative-name base dir)))
           (owned (list (expand-file-name (alist-get 'methodologies config) base)))
           (bin (alist-get 'bin config)))
-      (pcase-let ((`(,skills . ,commands) (pos-tree--methodology-links base config)))
-        (pos-tree--link-in dir (concat prefix ".agents/skills") skills owned)
+      (pcase-let ((`(,skills . ,commands) (pos-tree--methodology-links plan base config)))
+        (pos-tree--link-in plan dir (concat prefix ".agents/skills") skills owned)
         (when (stringp bin)
-          (pos-tree--link-in dir (concat prefix bin) commands owned))
-        (pos-tree--claude dir prefix skills owned)))))
+          (pos-tree--link-in plan dir (concat prefix bin) commands owned))
+        (pos-tree--claude plan dir prefix skills owned)))))
 
-(defun pos-tree--installs (node)
-  "Plan what is installed in NODE and in the repositories beneath it.
+(defun pos-tree--installs (plan node)
+  "Add to PLAN what is installed in NODE and in the repositories beneath it.
 A repository with a configuration has auto/ in its configuration
 directory, replaced from the source when its version is another, and
 links to what auto/ holds and to what its methodologies supply.  A
@@ -1204,18 +1200,19 @@ the removal of links an earlier tool made."
          (config (pos-tree--node-config node))
          (auto (and config (pos-tree--auto dir))))
     (dolist (name (pos-tree--agents-entries dir))
-      (when (pos-tree--earlier-link-p dir name)
-        (pos-tree--act "unlink"
-                       `(path . ,(pos-tree--rel
+      (when (pos-tree--earlier-link-p plan dir name)
+        (pos-tree--act plan "unlink"
+                       `(path . ,(pos-tree--rel plan
                                   (expand-file-name (concat ".agents/skills/" name)
                                                     dir))))))
     (when auto
-      (let* ((version (and pos-tree--source (pos-tree--version pos-tree--source)))
+      (let* ((source (pos-tree--plan-source plan))
+             (version (and source (pos-tree--version source)))
              (stale (and version (not (equal version (pos-tree--version auto)))))
-             (from (if stale pos-tree--source auto))
+             (from (if stale source auto))
              (at (alist-get 'methodologies config))
              (owned (if (stringp at) (list auto (expand-file-name at dir)) (list auto)))
-             (supplied (pos-tree--methodology-links dir config))
+             (supplied (pos-tree--methodology-links plan dir config))
              (skills (append (mapcar (lambda (name)
                                        (cons name (expand-file-name "skills" auto)))
                                      (pos-tree--held from "skills"))
@@ -1226,18 +1223,18 @@ the removal of links an earlier tool made."
                                (cdr supplied)))
              (bin (alist-get 'bin config)))
         (when (or stale (file-symlink-p auto) (file-exists-p auto))
-          (pos-tree--exclude dir (file-relative-name auto dir)))
+          (pos-tree--exclude plan dir (file-relative-name auto dir)))
         (when stale
-          (pos-tree--act "install" `(path . ,(pos-tree--rel auto))
+          (pos-tree--act plan "install" `(path . ,(pos-tree--rel plan auto))
                          `(version . ,version)))
-        (pos-tree--link-in dir ".agents/skills" skills owned)
+        (pos-tree--link-in plan dir ".agents/skills" skills owned)
         (when (stringp bin)
-          (pos-tree--link-in dir bin commands owned))
-        (pos-tree--claude dir "" skills owned)))
+          (pos-tree--link-in plan dir bin commands owned))
+        (pos-tree--claude plan dir "" skills owned)))
     (pcase-dolist (`(,base . ,own) (pos-tree--node-locals node))
-      (pos-tree--in-directory dir base own))
+      (pos-tree--in-directory plan dir base own))
     (dolist (child (pos-tree--node-children node))
-      (pos-tree--installs (cdr child)))))
+      (pos-tree--installs plan (cdr child)))))
 
 (defun pos-tree-plan (root &optional source)
   "Return the plan for the tree at ROOT, a repository.
@@ -1250,23 +1247,21 @@ string naming the node.  Paths in it are relative to ROOT.
 Nothing is changed and no network is used.  Signal `pos-tree-refused'
 if ROOT is not a repository, or SOURCE not a source."
   (let* ((dir (directory-file-name (expand-file-name root)))
-         (pos-tree--root (file-name-as-directory dir))
-         (pos-tree--source (and source (expand-file-name source)))
-         (pos-tree--actions nil)
-         (pos-tree--findings nil)
-         (pos-tree--warnings-found nil))
+         (source (and source (expand-file-name source)))
+         (plan (pos-tree--plan-make :root (file-name-as-directory dir)
+                                    :source source)))
     (unless (pos-tree--repository-p dir)
       (pos-tree-refuse 'not-a-repository "Not a repository: %s" root))
-    (when pos-tree--source (pos-tree--check-source pos-tree--source))
+    (when source (pos-tree--check-source source))
     (condition-case err
-        (pos-tree--installs (pos-tree--mounts dir (pos-tree--config dir nil)))
+        (pos-tree--installs plan (pos-tree--mounts plan dir (pos-tree--config plan dir nil)))
       (pos-tree-refused
-       (pos-tree--find "config-refused" "."
+       (pos-tree--find plan "config-refused" "."
                        (format "%s: %s" (nth 1 err) (nth 2 err)))))
     `((pos . 2)
-      (actions . ,(vconcat (nreverse pos-tree--actions)))
-      (findings . ,(vconcat (nreverse pos-tree--findings)))
-      (warnings . ,(vconcat (nreverse pos-tree--warnings-found))))))
+      (actions . ,(vconcat (reverse (pos-tree--plan-actions plan))))
+      (findings . ,(vconcat (reverse (pos-tree--plan-findings plan))))
+      (warnings . ,(vconcat (reverse (pos-tree--plan-warnings plan)))))))
 
 ;;;; The second step
 
