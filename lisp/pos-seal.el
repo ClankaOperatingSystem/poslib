@@ -51,7 +51,7 @@
 
 (declare-function pos-index-bytes "pos-index" (uri &optional directory))
 (declare-function pos-search-command "pos-search" (args))
-(declare-function pos-referrers "pos-referrers" (root path))
+(declare-function pos-referrers-print "pos-referrers" (root path))
 (declare-function pos-salvage "pos-salvage" (root source &optional dry-run))
 (declare-function pos-salvage-report "pos-salvage" (root tasks dry-run))
 (declare-function pos-relink-plan "pos-relink" (root seal-plan))
@@ -1471,12 +1471,7 @@ Exit 0 done or clean, 1 findings, 2 refused.
          (send-string-to-terminal (pos-index-bytes link)))
         (`("links-into" ,root ,path)
          (require 'pos-referrers)
-         (let ((root (file-name-as-directory (expand-file-name root))))
-           (pcase-dolist (`(,file ,line ,text ,target)
-                          (pos-referrers root path))
-             (princ (format "%s:%d: %s -> %s\n"
-                            (file-relative-name file root) line text
-                            (file-relative-name target root))))))
+         (pos-referrers-print (file-name-as-directory (expand-file-name root)) path))
         (`("search" ,root ,query . ,options)
          (require 'pos-search)
          (let ((status (pos-search-command (cons root (cons query options)))))
