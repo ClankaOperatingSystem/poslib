@@ -38,7 +38,7 @@
 (require 'pos-links)
 (require 'pos-corpus)
 
-(defun pos-referrers--line (bytes offset)
+(defun pos-referrers-line (bytes offset)
   "Return the line, from 1, that byte OFFSET of BYTES is on."
   (let ((line 1) (start 0))
     (while (and (setq start (string-search "\n" bytes start))
@@ -51,7 +51,7 @@
 As `pos-links-ids' gives it for the corpus's files."
   (pos-links-ids (pos-corpus-files corpus)))
 
-(defun pos-referrers--links (corpus path)
+(defun pos-referrers-links (corpus path)
   "Return the links in CORPUS that lead to PATH, absolute, or into it.
 Each is (FILE OFFSET TEXT TARGET SUFFIX): the file that holds the link,
 the byte offset of the link as written, TEXT, the file it leads to,
@@ -96,12 +96,12 @@ is not one.  Sorted by file, then line, then target, then text."
            (lambda (link)
              (pcase-let ((`(,file ,offset ,text ,target) link))
                (list file
-                     (pos-referrers--line
+                     (pos-referrers-line
                       (or (gethash file bytes)
                           (puthash file (pos-bytes-read file) bytes))
                       offset)
                      text target)))
-           (pos-referrers--links
+           (pos-referrers-links
             (pos-corpus root)
             (directory-file-name (expand-file-name path root))))
           (lambda (a b)
