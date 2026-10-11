@@ -36,6 +36,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   waited for comes. The lint reports an identity that belongs to no
   person, is misnamed or links to anything, and an item that waits on
   what is no identity or on one of another scope.
+- =lisp/pos-bytes.el= :: a file's bytes, their hash, and DAG-JSON.
+- =lisp/pos-path.el= :: the rules for a path written in a ledger or a
+  configuration, and where a node's configuration is.
 - =lisp/pos-cid.el= :: IPFS CIDs of files and trees, computed locally.
 - =lisp/pos-ledger.el= :: archive integrity ledgers, read and checked.
 - =lisp/pos-links.el= :: the links in Org and Markdown files: found,
@@ -53,6 +56,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-index.el= :: the CID index, ephemera, and Org's =ipfs:= links.
 - =lisp/pos-migrate.el= :: a legacy archive brought under a ledger: the
   plan, reviewed, then applied.
+- =lisp/pos-search.el= :: where a query is found in the archives under
+  a root, on disk or at their keepers.
 - =lisp/pos-signin.el= :: signing in to a keeper that takes OAuth 2.0
   tokens, and the token kept, which pyposlib reads too.
 - =lisp/pos-remote.el= :: the client's side of an archive kept away from
