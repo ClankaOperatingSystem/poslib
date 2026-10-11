@@ -185,7 +185,7 @@ PREVIOUS STATUS).  Refuse the status the project has, and what
          (auto-save-default nil)
          (create-lockfiles t)
          (vc-handled-backends nil))
-    (with-current-buffer (pos-place--buffer root corpus file)
+    (with-current-buffer (pos-place-buffer root corpus file)
       (org-with-wide-buffer
        (goto-char (point-min))
        (re-search-forward pos-project--status-line)

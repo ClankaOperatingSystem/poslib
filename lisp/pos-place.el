@@ -43,7 +43,7 @@
 (require 'pos-corpus)
 (require 'pos-state)
 
-(defun pos-place--buffer (root corpus file)
+(defun pos-place-buffer (root corpus file)
   "Return a buffer visiting FILE of CORPUS, the corpus of ROOT, to write it.
 Refuse a file the tree does not read or the root may not write,
 symlinks, unsaved or stale buffers and foreign locks."
@@ -153,8 +153,8 @@ refuses of either file."
          (org-enforce-todo-dependencies nil)
          (org-enforce-todo-checkbox-dependencies nil)
          (kill-ring nil)
-         (from (pos-place--buffer root corpus (car place)))
-         (to (pos-place--buffer root corpus to-file))
+         (from (pos-place-buffer root corpus (car place)))
+         (to (pos-place-buffer root corpus to-file))
          (heading (with-current-buffer to (pos-place--heading under))))
     (unless heading
       (user-error "No heading %s in %s" under file))
