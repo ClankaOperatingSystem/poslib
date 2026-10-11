@@ -164,7 +164,7 @@ its one file, or to its directory."
 As `pos-set-state' does it: the change is recorded in the item's
 LOGBOOK drawer.  NOTE is one line, or empty for none."
   (interactive
-   (list (completing-read "State: " (pos-state--states) nil t)
+   (list (completing-read "State: " (pos-state-states) nil t)
          (read-string "Note (empty for none): ")))
   (let-alist (pos-views--item)
     (unless .file (user-error "This line is of a scope, not an item"))

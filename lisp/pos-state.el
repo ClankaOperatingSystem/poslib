@@ -40,7 +40,7 @@
 (require 'pos)
 (require 'pos-corpus)
 
-(defun pos-state--states ()
+(defun pos-state-states ()
   "Return the states of `pos-todo-keywords', open and done."
   (remove "|" (cdr (car pos-todo-keywords))))
 
@@ -66,7 +66,7 @@ Refuse an ID no heading has, and one that two headings have."
                                   (format "%s:%d" (car place) (cdr place)))
                                 (nreverse places) ", "))))))
 
-(defun pos-state--place (root corpus target)
+(defun pos-state-locate (root corpus target)
   "Return (FILE . LINE) that TARGET names in CORPUS, the corpus of ROOT.
 TARGET is FILE:LINE, with FILE relative to ROOT, or an ID."
   (if (string-match "\\`\\(.+\\):\\([0-9]+\\)\\'" target)
@@ -77,7 +77,7 @@ TARGET is FILE:LINE, with FILE relative to ROOT, or an ID."
         (cons file line))
     (pos-state--find-id corpus target)))
 
-(defun pos-state--log (state previous note)
+(defun pos-state-log (state previous note)
   "Record at point the change from PREVIOUS to STATE, with NOTE if non-nil.
 The record is the one Org writes for a state change, where
 `org-log-into-drawer' says.  Org takes a note in a buffer of its own
@@ -97,7 +97,7 @@ once."
     (insert (or note ""))
     (org-store-log-note)))
 
-(defun pos-state--at-item (root target what function)
+(defun pos-state-at-item (root target what function)
   "Call FUNCTION at the heading of the item TARGET names in the tree at ROOT.
 TARGET is the item's ID, or FILE:LINE, the file relative to ROOT and
 the line of the heading.  FUNCTION is called with the file, in its
@@ -108,7 +108,7 @@ write, symlinks, unsaved or stale buffers, foreign locks, and a line
 that is no item."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (corpus (pos-corpus root))
-         (place (pos-state--place root corpus target))
+         (place (pos-state-locate root corpus target))
          (file (car place))
          (enable-local-variables nil)
          (enable-local-eval nil)
@@ -151,9 +151,9 @@ in the item's LOGBOOK drawer.  Return (FILE LINE STATE TITLE) as the
 item is afterwards; a repeating item set to a done state is open
 again, on its next date.  Refuse a file the root may not write,
 symlinks, unsaved or stale buffers and foreign locks."
-  (unless (member state (pos-state--states))
+  (unless (member state (pos-state-states))
     (user-error "Unknown state: %s (one of %s)"
-                state (string-join (pos-state--states) ", ")))
+                state (string-join (pos-state-states) ", ")))
   (when (and note (or (string-empty-p (string-trim note))
                       (string-match-p "[[:cntrl:]]" note)))
     (user-error "A note is one nonempty line"))
@@ -163,7 +163,7 @@ symlinks, unsaved or stale buffers and foreign locks."
         (org-todo-repeat-to-state nil)
         (org-enforce-todo-dependencies nil)
         (org-enforce-todo-checkbox-dependencies nil))
-    (pos-state--at-item
+    (pos-state-at-item
      root target "setting a state"
      (lambda (file)
        (let ((previous (org-get-todo-state)))
@@ -171,7 +171,7 @@ symlinks, unsaved or stale buffers and foreign locks."
            (user-error "The item is already %s" state))
          (org-todo state)
          (org-back-to-heading t)
-         (pos-state--log state previous (and note (string-trim note)))
+         (pos-state-log state previous (and note (string-trim note)))
          (org-back-to-heading t)
          (list file (line-number-at-pos)
                (substring-no-properties (org-get-todo-state))
@@ -182,7 +182,7 @@ symlinks, unsaved or stale buffers and foreign locks."
 `command-line-args-left' is TARGET STATE [NOTE], as `pos-set-state'
 takes them.  Exit 2 on any other arguments."
   (unless (memq (length command-line-args-left) '(2 3))
-    (message "Usage: TARGET %s [NOTE]" (string-join (pos-state--states) "|"))
+    (message "Usage: TARGET %s [NOTE]" (string-join (pos-state-states) "|"))
     (kill-emacs 2))
   (pcase-let* ((`(,target ,state ,note) command-line-args-left)
                (`(,file ,line ,now ,title)
