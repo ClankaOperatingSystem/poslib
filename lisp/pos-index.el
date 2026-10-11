@@ -166,7 +166,7 @@ On disk, or kept by a keeper and known by their ledgers."
   (let (scopes (dir (file-name-as-directory (expand-file-name directory))))
     (while dir
       (when (and (or (file-directory-p (expand-file-name "archives" dir))
-                     (pos-ledger--kept-here (directory-file-name dir)))
+                     (pos-ledger-kept-here (directory-file-name dir)))
                  (not (equal (file-name-nondirectory (directory-file-name dir))
                              "archives")))
         (push dir scopes))

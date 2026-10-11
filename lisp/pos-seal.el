@@ -70,18 +70,18 @@ PATH is relative to the archive, from REL for SOURCE."
    ((file-directory-p source)
     (mapcan (lambda (name)
               (pos-seal--files (expand-file-name name source) (concat rel "/" name)))
-            (pos-ledger--entries source)))
-   (t (pos-ledger--regular source)
+            (pos-ledger-entry-names source)))
+   (t (pos-ledger-regular source)
       (list (cons rel source)))))
 
 (defun pos-seal--collections (source rel)
   "Return the collections in SOURCE, as paths relative to the archive from REL."
   (when (file-directory-p source)
-    (append (when (pos-ledger--declared-p source) (list rel))
+    (append (when (pos-ledger-declared-p source) (list rel))
             (mapcan (lambda (name)
                       (pos-seal--collections (expand-file-name name source)
                                              (concat rel "/" name)))
-                    (pos-ledger--entries source)))))
+                    (pos-ledger-entry-names source)))))
 
 (defun pos-seal--entry (file)
   "Return FILE's schema 2 ledger entry."
@@ -239,7 +239,7 @@ file is written.  Refuse `loop' if files cite one another in a loop."
                                     (cdr ready)))
                (new (pos-links-rewrite bytes (mapcar #'pos-resolution-rewrite changed)))
                (entry (list (cons 'cid (pos-cid-bytes new))
-                            (cons 'mode (logand (pos-ledger--mode file) (lognot #o222)))
+                            (cons 'mode (logand (pos-ledger-permissions file) (lognot #o222)))
                             (cons 'sha256 (pos-bytes-sha new))
                             (cons 'size (length new)))))
           (when changed
@@ -307,7 +307,7 @@ exist and REL must be a safe path (destination) with no hidden part
 Refuse `identity' unless the ledger of HISTORY is the one named, and
 LEDGER-ID, if given, is the id named."
   (let ((named (pos-ledger-named archive)))
-    (pos-ledger--as-named archive (pos-history-files history))
+    (pos-ledger-as-named archive (pos-history-files history))
     (when (and named ledger-id (not (equal named ledger-id)))
       (pos-ledger-refuse
        'identity "Not the ledger its entry names, %s: %s" named archive))
@@ -318,7 +318,7 @@ LEDGER-ID, if given, is the id named."
 Refuse `kept' a kept archive whose ledger, of HISTORY, is not of schema 3."
   (let ((kept (pos-ledger-kept archive))
         (head (pos-history-head history)))
-    (when (and kept head (not (pos-ledger--event-cid-p head)))
+    (when (and kept head (not (pos-ledger-event-cid-p head)))
       (pos-ledger-refuse
        'kept "A keeper keeps a ledger of schema 3; convert this one first: %s"
        archive))
@@ -330,12 +330,12 @@ Refuse `differs' if an enrolled file is missing or changed.  Nothing
 of an archive KEPT by a keeper is on disk to compare: what it holds is
 what its ledger enrols."
   (if kept
-      (pos-ledger--kept-entries archive known)
+      (pos-ledger-kept-entries archive known)
     (let ((actual (pos-ledger-inventory archive)))
       (pcase-let ((`(,missing ,changed ,_)
-                   (pos-ledger--differences
+                   (pos-ledger-differences
                     known
-                    (pos-ledger--with-cids known actual (pos-ledger--cids archive)))))
+                    (pos-ledger-with-cids known actual (pos-ledger-cids archive)))))
         (when (or missing changed)
           (pos-ledger-refuse 'differs "Existing evidence differs in %s: %S %S"
                              archive missing changed)))
@@ -371,10 +371,10 @@ entry names, else one made at random.  DATE, by default today's, dates
 any rumours the item's links need.  With AS-DESTINATION, a file's links
 are read as written from DESTINATION, not from where it lies; when it
 is a directory, they are read as written from there."
-  (let* ((source (directory-file-name (file-truename (pos-ledger--checked source))))
+  (let* ((source (directory-file-name (file-truename (pos-ledger-checked source))))
          (destination (directory-file-name (expand-file-name destination)))
          (archive (pos-links-archive-of destination)))
-    (pos-ledger--checked (file-name-directory destination))
+    (pos-ledger-checked (file-name-directory destination))
     (unless archive
       (pos-ledger-refuse 'destination "Destination is not in an archive: %s" destination))
     (let* ((rel (file-relative-name destination archive))
@@ -449,7 +449,7 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
 
 (defun pos-seal--protect (file)
   "Remove FILE's write bits."
-  (set-file-modes file (logand (pos-ledger--mode file) (lognot #o222)) 'nofollow))
+  (set-file-modes file (logand (pos-ledger-permissions file) (lognot #o222)) 'nofollow))
 
 (defun pos-seal-write-new (file bytes &optional mode)
   "Publish BYTES at FILE, which must not exist, read-only for all.
@@ -487,7 +487,7 @@ With MODE, a recorded mode that has no write bit, the file has it."
 As paths from REL for TOP; see `pos-seal--empty'."
   (when (and (file-directory-p top) (not (file-symlink-p top)))
     (let ((names (seq-remove (lambda (name) (string-prefix-p "." name))
-                             (pos-ledger--entries top))))
+                             (pos-ledger-entry-names top))))
       (if names
           (mapcan (lambda (name)
                     (pos-seal--empty-under (expand-file-name name top)
@@ -518,7 +518,7 @@ A record staged by write-new leaves it so."
   "Remove each staging directory left empty under TOP, an item.
 Hidden directories and nested archives are not entered, nor links followed."
   (when (and (file-directory-p top) (not (file-symlink-p top)))
-    (dolist (name (pos-ledger--entries top))
+    (dolist (name (pos-ledger-entry-names top))
       (let ((path (expand-file-name name top)))
         (cond ((or (string-prefix-p "." name) (equal name "archives")))
               ((pos-seal--staging-p path) (delete-directory path))
@@ -535,12 +535,12 @@ its hash, until it is converted."
   (let-alist plan
     (pcase-let* (((cl-struct pos-history entries head events (empty empties))
                   (pos-ledger-history .archive))
-                 (blocks (or (null head) (pos-ledger--event-cid-p head)))
+                 (blocks (or (null head) (pos-ledger-event-cid-p head)))
                  (bytes
                   (if blocks
                       (pos-bytes-block
                        `((schema . 3)
-                         (previous . ,(if head (pos-ledger--link head) :null))
+                         (previous . ,(if head (pos-ledger-link head) :null))
                          (ledger_id . ,.ledger_id) (item . ,item) (add . ,add)
                          (root . ,(cdr (assoc "." (pos-ledger-fold
                                                    (append add entries)
@@ -551,7 +551,7 @@ its hash, until it is converted."
                        (item . ,item)
                        (add . ,add) (root . ,(pos-cid-directory .archive))
                        (collections . ,collections)))))
-                 (name (if blocks (pos-ledger--event-cid bytes) (pos-bytes-sha bytes))))
+                 (name (if blocks (pos-ledger-event-cid bytes) (pos-bytes-sha bytes))))
       (list (pos-ledger-event-file-name (1+ events) name) name bytes))))
 
 (defun pos-seal--event (plan destination add collections)
@@ -777,7 +777,7 @@ head.  Return the keeper's description."
             (let* ((number (+ events i 1))
                    (bytes (pos-remote-event keeper number))
                    (file (expand-file-name
-                          (pos-ledger-event-file-name number (pos-ledger--event-cid bytes))
+                          (pos-ledger-event-file-name number (pos-ledger-event-cid bytes))
                           ledger)))
               (pos-seal-write-new file bytes)
               (push file written)))
@@ -791,7 +791,7 @@ head.  Return the keeper's description."
       (pos-ledger-refused
        (mapc #'delete-file written)
        (when (and (zerop events) (file-directory-p ledger)
-                  (null (pos-ledger--entries ledger)))
+                  (null (pos-ledger-entry-names ledger)))
          (delete-directory ledger))
        (signal (car err) (cdr err))))
     described))
@@ -852,7 +852,7 @@ it resumes.  Return (EVENT-FILE . ROOT)."
       (when (and (null sealed)
                  (not (equal (pos-bytes-sha
                               (pos-bytes-json
-                               (pos-ledger--kept-entries
+                               (pos-ledger-kept-entries
                                 .archive (pos-history-entries (pos-ledger-history .archive)))))
                              .inventory_sha256)))
         (pos-ledger-refuse 'plan "Archive changed since review: %s" .archive))
@@ -915,7 +915,7 @@ it resumes.  Return (EVENT-FILE . ROOT)."
 
 (defun pos-seal--anchor-home (root)
   "Return the directory for ROOT's new checkpoints: beside it, else legacy."
-  (let* ((root (file-truename (pos-ledger--checked root)))
+  (let* ((root (file-truename (pos-ledger-checked root)))
          (base (if (equal (file-name-nondirectory root) "archives")
                    (file-name-directory root)
                  root)))
@@ -1014,8 +1014,8 @@ the directories created; and unregistered, the files the ledgers do not know."
       (make-directory directory)
       (setq restored (1+ restored)))
     (let ((protect (lambda (file &optional recorded-mode)
-                     (pos-ledger--regular file)
-                     (let* ((mode (pos-ledger--mode file))
+                     (pos-ledger-regular file)
+                     (let* ((mode (pos-ledger-permissions file))
                             (target (or recorded-mode (logand mode (lognot #o222)))))
                        (unless (= mode target)
                          (set-file-modes file target 'nofollow)
@@ -1029,7 +1029,7 @@ the directories created; and unregistered, the files the ledgers do not know."
                 (funcall protect (expand-file-name (car pair) archive)
                          (alist-get 'mode (cdr pair)))))
             (mapc protect files))))
-      (mapc protect (pos-ledger--checkpoint-files root (pos-ledger-roots root))))
+      (mapc protect (pos-ledger-checkpoint-files root (pos-ledger-roots root))))
     `((repaired . ,count) (restored . ,restored)
       (unregistered . ,(apply #'+ (mapcar (lambda (a) (length (alist-get 'new a))) report))))))
 
@@ -1049,16 +1049,16 @@ with the reason."
                     (pos-ledger-history archive))
                    (reason
                     (cond ((null head) "no ledger")
-                          ((pos-ledger--event-cid-p head) "schema 3")
+                          ((pos-ledger-event-cid-p head) "schema 3")
                           ((seq-some (lambda (e) (not (assq 'cid (cdr e)))) entries)
                            "legacy entries"))))
         (if reason
             (push `((archive . ,archive) (reason . ,reason)) skipped)
           (let* ((cids (pos-cid-tree archive))
-                 (actual (pos-ledger--with-cids
+                 (actual (pos-ledger-with-cids
                           entries (pos-ledger-inventory archive) cids)))
             (pcase-let ((`(,missing ,changed ,new)
-                         (pos-ledger--differences entries actual)))
+                         (pos-ledger-differences entries actual)))
               (when (or missing changed new
                         (not (equal recorded (cdr (assoc "." cids)))))
                 (pos-ledger-refuse
@@ -1072,13 +1072,13 @@ with the reason."
               (let* ((head-file (car (last files)))
                      (bytes (pos-bytes-block
                              `((schema . 3) (kind . "conversion") (from . ,head)
-                               (previous . ,(pos-ledger--link
-                                             (pos-ledger--event-cid
-                                              (pos-ledger--as-block
+                               (previous . ,(pos-ledger-link
+                                             (pos-ledger-event-cid
+                                              (pos-ledger-as-block
                                                (pos-bytes-read head-file)))))
                                (ledger_id . ,(pos-ledger-identity files))
                                (empty . ,(vconcat empty)) (root . ,folded))))
-                     (name (pos-ledger--event-cid bytes))
+                     (name (pos-ledger-event-cid bytes))
                      (file (expand-file-name (pos-ledger-event-file-name (1+ events) name)
                                              (file-name-directory head-file))))
                 (push (list archive file bytes name) pending)))))))
@@ -1127,8 +1127,8 @@ and lies beside it (ledger); the archive is as the ledger says
 \(unclean); and no enrolled path is hidden (hidden)."
   (pcase-let (((cl-struct pos-history entries head files (root recorded) empty)
                history))
-    (pos-ledger--as-named archive files)
-    (unless (pos-ledger--event-cid-p head)
+    (pos-ledger-as-named archive files)
+    (unless (pos-ledger-event-cid-p head)
       (pos-ledger-refuse
        'kept "A keeper keeps a ledger of schema 3; convert this one first: %s"
        archive))
@@ -1136,10 +1136,10 @@ and lies beside it (ledger); the archive is as the ledger says
       (pos-ledger-refuse
        'ledger "A kept archive's ledger lies beside it, not inside: %s" archive))
     (let* ((cids (pos-cid-tree archive))
-           (actual (pos-ledger--with-cids
+           (actual (pos-ledger-with-cids
                     entries (pos-ledger-inventory archive) cids)))
       (pcase-let ((`(,missing ,changed ,new)
-                   (pos-ledger--differences entries actual)))
+                   (pos-ledger-differences entries actual)))
         (when (or missing changed new
                   (not (equal recorded (cdr (assoc "." cids))))
                   (not (equal recorded
@@ -1259,18 +1259,18 @@ is of schema 3 (kept) and folds to its recorded root (root), and what
 is on disk already is enrolled and unchanged (differs)."
   (pcase-let (((cl-struct pos-history entries head files (root recorded) empty)
                history))
-    (pos-ledger--as-named archive files)
-    (unless (pos-ledger--event-cid-p head)
+    (pos-ledger-as-named archive files)
+    (unless (pos-ledger-event-cid-p head)
       (pos-ledger-refuse 'kept "A keeper keeps a ledger of schema 3: %s" archive))
     (unless (equal recorded (cdr (assoc "." (pos-ledger-fold entries empty))))
       (pos-ledger-refuse
        'root "The ledger does not fold to its recorded root: %s" archive))
     (let* ((cids (and (file-directory-p archive)
                       (pos-cid-tree archive)))
-           (actual (pos-ledger--with-cids
+           (actual (pos-ledger-with-cids
                     entries (pos-ledger-inventory archive) cids)))
       (pcase-let ((`(,missing ,changed ,new)
-                   (pos-ledger--differences entries actual)))
+                   (pos-ledger-differences entries actual)))
         (when (or changed new)
           (pos-ledger-refuse
            'differs "What is on disk is not what the ledger enrols: %s" archive))

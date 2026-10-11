@@ -60,7 +60,7 @@
   "Return every file and directory under DIR, relative, parents first."
   (let (out)
     (named-let walk ((d dir) (rel nil))
-      (dolist (name (pos-ledger--entries d))
+      (dolist (name (pos-ledger-entry-names d))
         (let ((path (expand-file-name name d)) (r (if rel (concat rel "/" name) name)))
           (push r out)
           (when (and (file-directory-p path) (not (file-symlink-p path)))
@@ -141,7 +141,7 @@ shape shows them, and the directories INCLUDE names."
          (line (concat pos-ledger-declaration "\n")))
     (if (file-exists-p readme)
         (let ((bytes (pos-bytes-read readme)))
-          (unless (pos-ledger--declared-p dir)
+          (unless (pos-ledger-declared-p dir)
             (let ((at (if (string-match "\\`\\(?:#\\+[^\n]*\n\\)*" bytes) (match-end 0) 0)))
               (pos-migrate--write-over readme (concat (substring bytes 0 at) line
                                                    (substring bytes at)))))
@@ -253,7 +253,7 @@ DECLARATIONS)."
   (pos-migrate--stage archive stage)
   (let* ((known (pos-history-entries (pos-ledger-history archive)))
          (actual (pos-ledger-inventory archive))
-         (missing (car (pos-ledger--differences known actual)))
+         (missing (car (pos-ledger-differences known actual)))
          discard remove)
     (dolist (rel (pos-migrate--walk stage))
       (when (member (file-name-nondirectory rel) pos-migrate-junk)
@@ -468,7 +468,7 @@ dates rumours; LEDGER-ID names a ledger that has none."
          (history (pos-ledger-history archive)))
     (unless (seq-some (lambda (e) (not (assq 'cid (cdr e)))) (pos-history-entries history))
       (pos-ledger-refuse 'converted "Nothing to migrate in %s" archive))
-    (let ((changed (nth 1 (pos-ledger--differences (pos-history-entries history) (pos-ledger-inventory archive)))))
+    (let ((changed (nth 1 (pos-ledger-differences (pos-history-entries history) (pos-ledger-inventory archive)))))
       (when changed
         (pos-ledger-refuse 'differs "Enrolled evidence changed in %s: %S" archive changed)))
     (pcase-let* ((inventory-sha (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory archive))))
