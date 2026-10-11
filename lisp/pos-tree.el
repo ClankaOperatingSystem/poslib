@@ -1410,7 +1410,7 @@ Exit 0 nothing to do, 1 something to do or to report, 2 refused.
 
 (defun pos-tree--print (plan)
   "Print PLAN as JSON and exit, with 0 for an empty plan and 1 otherwise."
-  (princ (decode-coding-string (pos-bytes-json plan) 'utf-8))
+  (pos-bytes-print plan)
   (kill-emacs (if (and (seq-empty-p (alist-get 'actions plan))
                        (seq-empty-p (alist-get 'findings plan)))
                   0

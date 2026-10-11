@@ -461,8 +461,7 @@ any other option or a second name, so that no word is passed over."
              (princ (concat (pos-sweep-report week (pos-sweep-apply root file dry-run) dry-run)
                             "\n"))))
           (`("close")
-           (princ (decode-coding-string
-                   (pos-bytes-json (vconcat (pos-sweep-close root))) 'utf-8))
+           (pos-bytes-print (vconcat (pos-sweep-close root)))
            (princ "\n"))
           (`("close" "--apply")
            (dolist (event (pos-sweep-close-apply (pos-sweep-close root)))
