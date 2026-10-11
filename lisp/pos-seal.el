@@ -561,7 +561,7 @@ COLLECTIONS are the item's."
          (event (pos-seal--event-of plan item add collections
                                     (pos-seal--empty destination item))))
     (pos-seal-write-new (expand-file-name (nth 0 event) (alist-get 'ledger plan))
-                         (nth 2 event))
+                        (nth 2 event))
     (nth 1 event)))
 
 (defun pos-seal--sealed (plan)
@@ -1303,7 +1303,7 @@ recalled."
               (pos-ledger-refuse 'entry "The keeper's bytes are not those of %s" cid))
             (push (cons cid bytes) read)))
         (pos-seal-write-new (expand-file-name path archive)
-                             (cdr (assoc cid read)) (alist-get 'mode entry))))
+                            (cdr (assoc cid read)) (alist-get 'mode entry))))
     (dolist (path empty)
       (make-directory (expand-file-name path archive) t))
     (make-directory archive t)
