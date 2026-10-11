@@ -76,7 +76,7 @@ if the path is absent."
          (setq level (1+ level))
          (if (re-search-forward
               (concat "^" (make-string level ?*) " +\\(?:"
-                      (regexp-opt (pos-state--states)) " +\\)?"
+                      (regexp-opt (pos-state-states)) " +\\)?"
                       (regexp-quote name) "\\(?:[ \t]+:[[:alnum:]_@#%:]+:\\)?[ \t]*$")
               bound t)
              (progn (beginning-of-line)
@@ -133,12 +133,12 @@ LOGBOOK drawer with the place it came from.  Return (FILE LINE STATE
 TITLE) as the item is afterwards.  Refuse a heading that is the item
 or within it, a path FILE does not have, and what `pos-set-state'
 refuses of either file."
-  (when (and state (not (member state (pos-state--states))))
+  (when (and state (not (member state (pos-state-states))))
     (user-error "Unknown state: %s (one of %s)"
-                state (string-join (pos-state--states) ", ")))
+                state (string-join (pos-state-states) ", ")))
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (corpus (pos-corpus root))
-         (place (pos-state--place root corpus target))
+         (place (pos-state-locate root corpus target))
          (to-file (expand-file-name file root))
          (enable-local-variables nil)
          (enable-local-eval nil)
@@ -188,7 +188,7 @@ refuses of either file."
                        (when state
                          (org-todo state)
                          (org-back-to-heading t)
-                         (pos-state--log state previous nil)
+                         (pos-state-log state previous nil)
                          (org-back-to-heading t))
                        (pos-place--log came-from)
                        (org-back-to-heading t)
@@ -228,11 +228,11 @@ FILE:LINE\", one for each of `pos-place-stale-links', where the link
 is after the move.  Exit 2 on any other arguments."
   (unless (memq (length command-line-args-left) '(3 4))
     (message "Usage: TARGET FILE UNDER [%s]"
-             (string-join (pos-state--states) "|"))
+             (string-join (pos-state-states) "|"))
     (kill-emacs 2))
   (pcase-let* ((`(,target ,to ,under ,state) command-line-args-left)
                (root (file-name-as-directory (expand-file-name pos-directory)))
-               (old (pos-state--place root (pos-corpus root) target))
+               (old (pos-state-locate root (pos-corpus root) target))
                (title (with-current-buffer (pos-visit (car old))
                         (org-with-wide-buffer
                          (goto-char (point-min))

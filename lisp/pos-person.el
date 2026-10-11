@@ -475,7 +475,7 @@ or a foreign lock, before anything is written."
 CORPUS is the corpus of ROOT and TARGET is as `pos-set-state' takes
 it.  Refuse a file this root may not write, symlinks, unsaved or
 stale buffers, foreign locks and a line that is not an item's."
-  (let* ((place (pos-state--place root corpus target))
+  (let* ((place (pos-state-locate root corpus target))
          (file (car place)))
     (unless (pos-corpus-writable-p corpus file)
       (user-error "Not a file this root may write: %s"
@@ -550,7 +550,7 @@ TARGET is as `pos-set-state' takes it.  The item's
 nil.  Return (FILE LINE STATE TITLE) as the item is afterwards.
 Refuse an item that is not WAITING and the STATE WAITING."
   (let ((state (or state "NEXT")))
-    (unless (and (member state (pos-state--states))
+    (unless (and (member state (pos-state-states))
                  (not (equal state "WAITING")))
       (user-error "Not a state for what has arrived: %s" state))
     (unless (pos-person--note-p note)

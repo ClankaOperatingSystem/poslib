@@ -92,7 +92,7 @@ when it has no such date.  Refuse what `pos-set-state' refuses."
          (parsed (and (not (equal date "none")) (pos-item--date date)))
          (org-log-reschedule nil)
          (org-log-redeadline nil))
-    (pos-state--at-item
+    (pos-state-at-item
      root target "setting a date"
      (lambda (file)
        (cond
@@ -127,7 +127,7 @@ own tags afterwards.  Refuse what `pos-set-state' refuses."
   (dolist (change specs)
     (unless (string-match-p "\\`[-+][[:alnum:]_@#%]+\\'" change)
       (user-error "Not +TAG or -TAG: %s" change)))
-  (pos-state--at-item
+  (pos-state-at-item
    root target "setting tags"
    (lambda (file)
      (let ((tags (mapcar #'substring-no-properties (org-get-tags nil t))))
