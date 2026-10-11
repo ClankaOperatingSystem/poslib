@@ -105,7 +105,7 @@ keeper keeps.  A directory is not a file: the protocol reads none."
                       (pos-ledger-roots scope)))
             (url (and archive (pos-ledger-kept archive)))
             (entry (and url (assoc (file-relative-name file archive)
-                                   (car (pos-ledger-history archive))))))
+                                   (pos-history-entries (pos-ledger-history archive))))))
        (and entry
             (list url (alist-get 'cid (cdr entry)) (file-name-nondirectory file)))))
    (cdr (assoc cid index))))

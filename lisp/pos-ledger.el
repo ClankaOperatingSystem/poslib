@@ -25,7 +25,7 @@
 ;; writes them to the ledger.
 ;;
 ;; - `pos-ledger-inventory': what an archive holds.
-;; - `pos-ledger-history': what its ledger enrolled.
+;; - `pos-ledger-history': what its ledger enrolled, a `pos-history'.
 ;; - `pos-ledger-fold-cids': the archive's CIDs from the ledger alone.
 ;; - `pos-ledger-event': a new event's name and bytes.
 ;; - `pos-ledger-event-file-name', `pos-ledger-event-file-id': an event
@@ -41,6 +41,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'subr-x)
 (require 'pos-bytes)
 (require 'pos-cid)
@@ -290,22 +291,25 @@ from its fingerprint, and adds only new paths."
   "Return the hash or CID in the name of the event file FILE."
   (substring (file-name-nondirectory file) 9 -5))
 
-(defun pos-ledger-history (archive)
-  "Return ARCHIVE's ledger as a list of what it enrolled and recorded.
-\(ENTRIES HEAD EVENTS FILES ROOT COLLECTIONS ITEMS EMPTY): ENTRIES is
-an alist of path and entry; HEAD the last event's hash or, in
-schema 3, its CID; EVENTS their number; FILES the event files; ROOT the
-archive CID the last event recorded, if it records one; COLLECTIONS
+(cl-defstruct (pos-history (:constructor pos-history--make) (:copier nil))
+  "What an archive's ledger enrolled and recorded.
+ENTRIES is an alist of path and entry; HEAD the last event's hash or,
+in schema 3, its CID; EVENTS their number; FILES the event files; ROOT
+the archive CID the last event recorded, if it records one; COLLECTIONS
 every path sealed as a collection, sorted; ITEMS the path of each item
 a schema 2 or 3 event sealed, sorted; EMPTY the empty directories the
-schema 3 events enrolled, sorted.  No ledger is (nil nil 0 nil nil nil
-nil nil)."
+schema 3 events enrolled, sorted."
+  entries head events files root collections items empty)
+
+(defun pos-ledger-history (archive)
+  "Return ARCHIVE's ledger as a `pos-history': what it enrolled and recorded.
+No ledger is a history of no events, with every other field nil."
   (let ((folder (pos-ledger-folder archive))
         entries previous previous-cid files ledger-id (number 0) schema root
         collections items converted empty)
     (cond
      ((not (or (file-exists-p folder) (file-symlink-p folder)))
-      (list nil nil 0 nil nil nil nil nil))
+      (pos-history--make :events 0))
      ((or (file-symlink-p folder) (not (file-directory-p folder)))
       (pos-ledger-refuse 'ledger "Invalid ledger: %s" folder))
      (t
@@ -422,11 +426,15 @@ nil nil)."
           (push path files)))
       (unless files
         (pos-ledger-refuse 'empty "Empty ledger needs investigation: %s" folder))
-      (list (seq-sort-by #'car #'string< entries)
-            previous number (nreverse files) root
-            (seq-uniq (sort collections #'string<))
-            (sort items #'string<)
-            (seq-uniq (sort empty #'string<)))))))
+      (pos-history--make
+       :entries (seq-sort-by #'car #'string< entries)
+       :head previous
+       :events number
+       :files (nreverse files)
+       :root root
+       :collections (seq-uniq (sort collections #'string<))
+       :items (sort items #'string<)
+       :empty (seq-uniq (sort empty #'string<)))))))
 
 (defun pos-ledger-event (add previous number &optional ledger-id)
   "Return (NAME . BYTES), event NUMBER enrolling ADD after PREVIOUS.
@@ -642,7 +650,7 @@ within are known by the names their events are enrolled under."
                                                       pos-ledger-integrity))))
                                (guard (string-match pos-ledger--event-name name)))
                           (match-string 2 name))))
-                     (car (pos-ledger-history archive))))))))
+                     (pos-history-entries (pos-ledger-history archive))))))))
 
 (defun pos-ledger--check-anchors (root archives)
   "Refuse unless every head a checkpoint for ROOT names is in ARCHIVES."
@@ -708,7 +716,7 @@ them, the empty ones as recorded, the root as \".\"; nothing is read from
 the archive itself.  Refuses `entry' when an enrolled entry records no
 CID, as a legacy ledger's do."
   (let ((history (pos-ledger-history archive)))
-    (pos-ledger-fold (nth 0 history) (nth 7 history))))
+    (pos-ledger-fold (pos-history-entries history) (pos-history-empty history))))
 
 (defun pos-ledger--with-cids (known actual cids)
   "Return ACTUAL with a CID from CIDS in each entry KNOWN records one for."
@@ -782,7 +790,8 @@ clone does not keep the bit."
          (_ (pos-ledger--check-anchors root archives))
          reports)
     (dolist (archive archives)
-      (pcase-let* ((`(,known ,head ,events ,files ,recorded ,collections ,_ ,empty)
+      (pcase-let* (((cl-struct pos-history (entries known) head events files (root recorded)
+                               collections empty)
                     (pos-ledger-history archive))
                    (_ (pos-ledger--as-named archive files))
                    (kept (pos-ledger-kept archive))

@@ -200,7 +200,8 @@ the CID WITHIN where it is given.
 The CIDs a reference names come from the ledger's fold, as a kept
 archive's do, with no file hashed; a ledger whose entries record no
 CID, one of schema 1, is hashed from disk as link hashes it."
-  (pcase-let* ((`(,entries ,_ ,_ ,_ ,_ ,collections ,items ,empty) (pos-ledger-history archive))
+  (pcase-let* (((cl-struct pos-history entries collections items empty)
+                (pos-ledger-history archive))
                (cids (condition-case nil
                          (pos-ledger-fold entries empty)
                        (pos-ledger-refused (pos-cid-tree archive))))

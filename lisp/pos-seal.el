@@ -274,7 +274,7 @@ is a directory, they are read as written from there."
         (pos-ledger-refuse 'destination "Unsafe destination: %s" rel))
       (when (seq-some (lambda (part) (string-prefix-p "." part)) (split-string rel "/"))
         (pos-ledger-refuse 'hidden "Hidden files are not sealed: %s" rel))
-      (pcase-let* ((`(,known ,head ,events ,files ,_ ,collections ,items)
+      (pcase-let* (((cl-struct pos-history (entries known) head events files collections items)
                     (pos-ledger-history archive))
                    (_ (let ((within (seq-find (lambda (i) (pos-path-within-p rel i))
                                               (append items collections))))
@@ -470,7 +470,7 @@ event: a DAG-JSON block named by its CID, its root the fold of what the
 ledger enrols.  A schema 1 or 2 ledger takes a schema 2 event, named by
 its hash, until it is converted."
   (let-alist plan
-    (pcase-let* ((`(,entries ,head ,events ,_ ,_ ,_ ,_ ,empties)
+    (pcase-let* (((cl-struct pos-history entries head events (empty empties))
                   (pos-ledger-history .archive))
                  (blocks (or (null head) (pos-ledger--event-cid-p head)))
                  (bytes
@@ -506,7 +506,7 @@ COLLECTIONS are the item's."
 Events since PLAN's previous head must seal PLAN's rumours, then its item,
 in order."
   (let-alist plan
-    (let* ((files (nth 3 (pos-ledger-history .archive)))
+    (let* ((files (pos-history-files (pos-ledger-history .archive)))
            (hashes (mapcar #'pos-ledger-event-file-id files))
            (since (if (eq .previous :null) files
                     (let ((at (seq-position hashes .previous)))
@@ -612,8 +612,8 @@ Return (EVENT-FILE . ROOT)."
         (pos-seal--protect (expand-file-name (pos-bytes-key (car pair)) .archive)))
       (seq-doseq (rumour .rumours)
         (pos-seal--protect (expand-file-name (alist-get 'destination rumour) .archive)))
-      (let ((files (nth 3 (pos-ledger-history .archive))))
-        (pos-seal--checkpoint .archive (nth 1 (pos-ledger-history .archive)))
+      (let ((files (pos-history-files (pos-ledger-history .archive))))
+        (pos-seal--checkpoint .archive (pos-history-head (pos-ledger-history .archive)))
         (cons (car (last files))
               (alist-get 'root (pos-bytes-parse (pos-bytes-read (car (last files))))))))))
 
@@ -706,7 +706,7 @@ head.  Return the keeper's description."
   (let* ((described (pos-remote-describe keeper))
          (theirs (alist-get 'events described))
          (head (let ((h (alist-get 'head described))) (unless (eq h :null) h)))
-         (events (nth 2 (pos-ledger-history archive)))
+         (events (pos-history-events (pos-ledger-history archive)))
          written)
     (condition-case err
         (progn
@@ -721,7 +721,8 @@ head.  Return the keeper's description."
           (let ((caught (condition-case nil
                             (pos-ledger-history archive)
                           (pos-ledger-refused nil))))
-            (unless (and caught (equal head (nth 1 caught)) (equal theirs (nth 2 caught)))
+            (unless (and caught (equal head (pos-history-head caught))
+                         (equal theirs (pos-history-events caught)))
               (pos-ledger-refuse 'chain "The keeper holds another ledger than this one: %s"
                                  archive))))
       (pos-ledger-refused
@@ -789,7 +790,7 @@ it resumes.  Return (EVENT-FILE . ROOT)."
                  (not (equal (pos-bytes-sha
                               (pos-bytes-json
                                (pos-ledger--kept-entries
-                                .archive (car (pos-ledger-history .archive)))))
+                                .archive (pos-history-entries (pos-ledger-history .archive)))))
                              .inventory_sha256)))
         (pos-ledger-refuse 'plan "Archive changed since review: %s" .archive))
       ;; Rumours first: each an item of its own, of the one file its text is.
@@ -827,7 +828,7 @@ it resumes.  Return (EVENT-FILE . ROOT)."
             (delete-directory .source t)
           (delete-file .source)))
       (pos-seal--leave-stage .source)
-      (pcase-let ((`(,_ ,head ,_ ,files) (pos-ledger-history .archive)))
+      (pcase-let (((cl-struct pos-history head files) (pos-ledger-history .archive)))
         (pos-seal--checkpoint .archive head)
         (cons (car (last files))
               (alist-get 'root (pos-bytes-parse (pos-bytes-read (car (last files))))))))))
@@ -939,12 +940,13 @@ the directories created; and unregistered, the files the ledgers do not know."
                (history (pos-ledger-history archive)))
           (seq-doseq (name (alist-get 'changed a))
             (unless (pos-seal--read-bits-only-p
-                     (expand-file-name name archive) (cdr (assoc name (nth 0 history))))
+                     (expand-file-name name archive) (cdr (assoc name (pos-history-entries history))))
               (pos-ledger-refuse 'differs "Evidence changed; repair refused: %s" archive)))
           (setq directories
                 (append directories
                         (pos-seal--missing-directories
-                         archive (nth 0 history) (nth 4 history) (nth 7 history)))))))
+                         archive (pos-history-entries history)
+                         (pos-history-root history) (pos-history-empty history)))))))
     (dolist (directory directories)
       (make-directory directory)
       (setq restored (1+ restored)))
@@ -957,7 +959,7 @@ the directories created; and unregistered, the files the ledgers do not know."
                          (setq count (1+ count)))))))
       (dolist (a report)
         (let ((archive (alist-get 'archive a)))
-          (pcase-let ((`(,known ,_ ,_ ,files) (pos-ledger-history archive)))
+          (pcase-let (((cl-struct pos-history (entries known) files) (pos-ledger-history archive)))
             ;; A keeper holds a kept archive's files; only its ledger is here.
             (when (eq (alist-get 'kept a) :null)
               (dolist (pair known)
@@ -980,7 +982,7 @@ archive with its event file and new head; and skipped, each an archive
 with the reason."
   (let (converted skipped pending)
     (dolist (archive (pos-ledger-roots root))
-      (pcase-let* ((`(,entries ,head ,events ,files ,recorded)
+      (pcase-let* (((cl-struct pos-history entries head events files (root recorded))
                     (pos-ledger-history archive))
                    (reason
                     (cond ((null head) "no ledger")
@@ -1079,7 +1081,7 @@ reason."
   (let (kept skipped pending)
     (dolist (archive (pos-ledger-roots root))
       (pcase-let* ((url (pos-ledger-kept archive))
-                   (`(,entries ,head ,_ ,files ,recorded ,_ ,_ ,empty)
+                   ((cl-struct pos-history entries head files (root recorded) empty)
                     (pos-ledger-history archive))
                    (reason (cond ((null url) "on disk")
                                  ((null head) "no ledger")
@@ -1187,7 +1189,7 @@ and skipped, each an archive with the reason."
   (let (recalled skipped pending)
     (dolist (archive (pos-ledger-roots root))
       (pcase-let* ((url (pos-ledger-kept archive))
-                   (`(,entries ,head ,_ ,files ,recorded ,_ ,_ ,empty)
+                   ((cl-struct pos-history entries head files (root recorded) empty)
                     (pos-ledger-history archive))
                    (reason (cond ((null url) "on disk")
                                  ((null head) "no ledger"))))
