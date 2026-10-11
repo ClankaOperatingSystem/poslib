@@ -179,7 +179,7 @@ An archive not yet made holds nothing."
             (pos-ledger-refuse 'link "Symlink in archive: %s" path))
            ((file-directory-p path) (walk path child))
            (t (push (cons child (pos-ledger-record path)) result))))))
-    (sort result (lambda (a b) (string< (car a) (car b))))))
+    (seq-sort-by #'car #'string< result)))
 
 ;;;; History
 
@@ -422,7 +422,7 @@ nil nil)."
           (push path files)))
       (unless files
         (pos-ledger-refuse 'empty "Empty ledger needs investigation: %s" folder))
-      (list (sort entries (lambda (a b) (string< (car a) (car b))))
+      (list (seq-sort-by #'car #'string< entries)
             previous number (nreverse files) root
             (seq-uniq (sort collections #'string<))
             (sort items #'string<)
@@ -761,10 +761,8 @@ Its README.org has the declaration line, or it is a capsule."
     (dolist (pair known)
       (let ((now (assoc (car pair) actual)))
         (cond ((null now) (push (car pair) missing))
-              ((not (equal (sort (copy-sequence (cdr pair))
-                                 (lambda (a b) (string< (car a) (car b))))
-                           (sort (copy-sequence (cdr now))
-                                 (lambda (a b) (string< (car a) (car b))))))
+              ((not (equal (seq-sort-by #'car #'string< (cdr pair))
+                           (seq-sort-by #'car #'string< (cdr now))))
                (push (car pair) changed)))))
     (dolist (pair actual)
       (unless (assoc (car pair) known) (push (car pair) new)))

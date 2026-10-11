@@ -322,8 +322,7 @@ files; under version 2 FILES is nil and nothing follows the later events."
                              (cons "event" event)
                              (cons "claims" (pos-bytes-json claims)))
                        following
-                       (sort (copy-sequence files)
-                             (lambda (a b) (string< (car a) (car b))))))))
+                       (seq-sort-by #'car #'string< files)))))
     (pos-bytes-parse
      (pos-remote--call archive "POST" "/events" (car sent) (cdr sent)))))
 

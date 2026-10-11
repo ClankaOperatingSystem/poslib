@@ -244,7 +244,7 @@ two-configurations, and :names, the names in it, sorted."
         (pos-corpus--make
          :root (file-name-as-directory root)
          :scopes (nreverse scopes)
-         :entries (sort files (lambda (a b) (string< (car a) (car b))))
+         :entries (seq-sort-by #'car #'string< files)
          :findings (nreverse findings)
          :unwritable (nreverse unwritable))))))
 
