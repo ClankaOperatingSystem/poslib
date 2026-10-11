@@ -28,6 +28,7 @@
 ;; - `pos-links-ids': each Org ID in some files, and where it is held.
 ;; - `pos-links-resolve': where one leads, from where it was written.
 ;; - `pos-links-link': the ipfs:// link to a sealed path in an archive.
+;; - `pos-links-archive-of': the outermost archive above a path.
 
 ;;; Code:
 
@@ -222,7 +223,7 @@ FROM must be at OFFSET."
 
 ;;;; Resolving
 
-(defun pos-links--archive-of (file)
+(defun pos-links-archive-of (file)
   "Return the outermost archive above FILE, or nil."
   (let (found (dir (file-name-directory (directory-file-name file))))
     (while (and dir (not (equal dir (file-name-directory (directory-file-name dir)))))
@@ -233,7 +234,7 @@ FROM must be at OFFSET."
 
 (defun pos-links--sealed (target)
   "Return the ipfs:// link to archived TARGET, as sealed, or refuse."
-  (let* ((archive (pos-links--archive-of target))
+  (let* ((archive (pos-links-archive-of target))
          (rel (file-relative-name target archive)))
     (pcase-let ((`(,entries ,_ ,_ ,_ ,_ ,collections ,items) (pos-ledger-history archive)))
       (let ((item (or (seq-find (lambda (i) (pos-path-within-p rel i)) items)
@@ -252,7 +253,7 @@ FROM must be at OFFSET."
 (defun pos-links--kept-p (target)
   "Return non-nil if TARGET is enrolled in an archive kept by a keeper.
 Nothing is on disk there, and TARGET is a path its ledger folds to."
-  (let ((archive (pos-links--archive-of target)))
+  (let ((archive (pos-links-archive-of target)))
     (and archive (pos-ledger-kept archive)
          (assoc (file-relative-name target archive) (pos-ledger-fold-cids archive))
          t)))
@@ -308,7 +309,7 @@ Nothing outside the garden is read: only that it lies there is said."
 \(rumour . TARGET) for anything else that exists, a container's archive
 included, and (broken . TARGET) for nothing.  Without SCOPE, any archive
 is cited."
-  (let ((archive (pos-links--archive-of target)))
+  (let ((archive (pos-links-archive-of target)))
     (cond
      ((not (or (file-exists-p target) (file-symlink-p target)
                (pos-links--kept-p target)))
@@ -321,7 +322,7 @@ is cited."
   "Return the ipfs:// link to PATH, a sealed path in an archive, or refuse.
 The link is the one a sealed item's link to PATH is rewritten to."
   (let ((target (directory-file-name (expand-file-name path))))
-    (unless (pos-links--archive-of target)
+    (unless (pos-links-archive-of target)
       (pos-ledger-refuse 'unsealed "Not a path in an archive: %s" target))
     (pos-links--sealed target)))
 

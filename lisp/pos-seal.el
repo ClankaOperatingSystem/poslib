@@ -59,15 +59,6 @@
 
 ;;;; Items
 
-(defun pos-seal--outermost-archive (path)
-  "Return the outermost directory named archives above PATH, or nil."
-  (let (found (dir (file-name-directory (directory-file-name path))))
-    (while (and dir (not (equal dir (file-name-directory (directory-file-name dir)))))
-      (when (equal (file-name-nondirectory (directory-file-name dir)) "archives")
-        (setq found (directory-file-name dir)))
-      (setq dir (file-name-directory (directory-file-name dir))))
-    found))
-
 (defun pos-seal--files (source rel)
   "Return SOURCE's files as (PATH . FILE), refusing hidden and special ones.
 PATH is relative to the archive, from REL for SOURCE."
@@ -111,15 +102,7 @@ PATH is relative to the archive, from REL for SOURCE."
       (expand-file-name (concat pos-ledger-integrity "/ledger")
                         (file-name-directory archive)))))
 
-(defun pos-seal--last-id (files)
-  "Return the ledger_id of the last of the event FILES that has one."
-  (pos-ledger-identity files))
-
 ;;;; Links
-
-(defun pos-seal--title (file)
-  "Return FILE's title, as `pos-links--title'."
-  (pos-links--title file))
 
 (defun pos-seal-rumour (date text)
   "Return (DESTINATION . TEXT), the rumour of TEXT dated DATE.
@@ -273,14 +256,14 @@ are read as written from DESTINATION, not from where it lies; when it
 is a directory, they are read as written from there."
   (let* ((source (directory-file-name (file-truename (pos-ledger--checked source))))
          (destination (directory-file-name (expand-file-name destination)))
-         (archive (pos-seal--outermost-archive destination)))
+         (archive (pos-links-archive-of destination)))
     (pos-ledger--checked (file-name-directory destination))
     (unless archive
       (pos-ledger-refuse 'destination "Destination is not in an archive: %s" destination))
     (let ((rel (file-relative-name destination archive)))
       (setq archive (file-truename archive)
             destination (expand-file-name rel archive)))
-    (when (pos-seal--outermost-archive (concat source "/"))
+    (when (pos-links-archive-of (concat source "/"))
       (pos-ledger-refuse 'source "Source is already archived: %s" source))
     (unless (or (file-exists-p source) (file-symlink-p source))
       (pos-ledger-refuse 'source "No such item: %s" source))
@@ -355,7 +338,7 @@ is a directory, they are read as written from there."
               (source . ,source) (destination . ,destination) (archive . ,archive)
               (ledger . ,(pos-seal--ledger-folder archive))
               (number . ,(1+ events)) (previous . ,(or head :null))
-              (ledger_id . ,(or (pos-seal--last-id files) named ledger-id (pos-seal--uuid)))
+              (ledger_id . ,(or (pos-ledger-identity files) named ledger-id (pos-seal--uuid)))
               (add . ,add) (collections . ,(vconcat collections))
               (links . ,links) (originals . ,originals) (rumours . ,rumours)
               (inventory_sha256 . ,(pos-bytes-sha (pos-bytes-json actual)))
@@ -370,7 +353,7 @@ where a program composed the record somewhere else.  The staged file is
 named for DESTINATION, so staging for it again replaces what was staged
 before.  If planning fails, nothing is left staged.
 LEDGER-ID names a new ledger, as for `pos-seal-plan'."
-  (let* ((archive (or (pos-seal--outermost-archive (expand-file-name destination))
+  (let* ((archive (or (pos-links-archive-of (expand-file-name destination))
                       (pos-ledger-refuse 'destination "Destination is not in an archive: %s"
                                          destination)))
          (stage (expand-file-name "_seal" (file-name-directory archive)))
@@ -1028,7 +1011,7 @@ with the reason."
                                              (pos-ledger--event-cid
                                               (pos-ledger--as-block
                                                (pos-bytes-read head-file)))))
-                               (ledger_id . ,(pos-seal--last-id files))
+                               (ledger_id . ,(pos-ledger-identity files))
                                (empty . ,(vconcat empty)) (root . ,folded))))
                      (name (pos-ledger--event-cid bytes))
                      (file (expand-file-name (pos-ledger-event-file-name (1+ events) name)
