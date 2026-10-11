@@ -87,7 +87,7 @@ PATH is relative to the archive, from REL for SOURCE."
   "Return FILE's schema 2 ledger entry."
   (cons (cons 'cid (pos-cid-file file)) (pos-ledger-record file)))
 
-(defun pos-seal--uuid ()
+(defun pos-seal-uuid ()
   "Return a random UUID, version 4, in canonical form."
   (let* ((hex (secure-hash 'sha256 (format "%S%S%S" (random t) (current-time) (emacs-pid))))
          (variant (aref "89ab" (% (string-to-number (substring hex 16 17) 16) 4))))
@@ -401,7 +401,7 @@ is a directory, they are read as written from there."
             (source . ,source) (destination . ,destination) (archive . ,archive)
             (ledger . ,(pos-seal--ledger-folder archive))
             (number . ,(1+ events)) (previous . ,(or head :null))
-            (ledger_id . ,(or (pos-ledger-identity files) named ledger-id (pos-seal--uuid)))
+            (ledger_id . ,(or (pos-ledger-identity files) named ledger-id (pos-seal-uuid)))
             (add . ,add) (collections . ,(vconcat collections))
             (links . ,links) (originals . ,originals) (rumours . ,rumours)
             (inventory_sha256 . ,(pos-bytes-sha (pos-bytes-json actual)))
@@ -451,7 +451,7 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
   "Remove FILE's write bits."
   (set-file-modes file (logand (pos-ledger--mode file) (lognot #o222)) 'nofollow))
 
-(defun pos-seal--write-new (file bytes &optional mode)
+(defun pos-seal-write-new (file bytes &optional mode)
   "Publish BYTES at FILE, which must not exist, read-only for all.
 With MODE, a recorded mode that has no write bit, the file has it."
   (make-directory (file-name-directory file) t)
@@ -471,7 +471,7 @@ With MODE, a recorded mode that has no write bit, the file has it."
                 (cons path (pos-seal--entry (expand-file-name path .archive)))))
             .add)))
 
-(defun pos-seal--checkpoint (archive head)
+(defun pos-seal-checkpoint-head (archive head)
   "Record HEAD for ARCHIVE in a checkpoint beside it."
   (let* ((bytes (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "archive"))))
          (base (file-name-directory archive))
@@ -480,7 +480,7 @@ With MODE, a recorded mode that has no write bit, the file has it."
                    (expand-file-name pos-ledger-anchors base)))
          (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") folder)))
     (unless (file-exists-p file)
-      (pos-seal--write-new file bytes))))
+      (pos-seal-write-new file bytes))))
 
 (defun pos-seal--empty-under (top rel)
   "Return the directories at or under TOP holding nothing IPFS would add.
@@ -560,7 +560,7 @@ COLLECTIONS are the item's."
   (let* ((item (file-relative-name destination (alist-get 'archive plan)))
          (event (pos-seal--event-of plan item add collections
                                     (pos-seal--empty destination item))))
-    (pos-seal--write-new (expand-file-name (nth 0 event) (alist-get 'ledger plan))
+    (pos-seal-write-new (expand-file-name (nth 0 event) (alist-get 'ledger plan))
                          (nth 2 event))
     (nth 1 event)))
 
@@ -645,7 +645,7 @@ Return (EVENT-FILE . ROOT)."
           (let ((there (expand-file-name .destination (alist-get 'archive plan))))
             (unless (member .destination sealed)
               (unless (file-exists-p there)
-                (pos-seal--write-new there (encode-coding-string .text 'utf-8)))
+                (pos-seal-write-new there (encode-coding-string .text 'utf-8)))
               (unless (equal (pos-bytes-read there) (encode-coding-string .text 'utf-8))
                 (pos-ledger-refuse 'plan "Rumour differs from its plan: %s" there))
               (pos-seal--event plan there (funcall add-of (list .destination)) [])))))
@@ -676,7 +676,7 @@ Return (EVENT-FILE . ROOT)."
       (seq-doseq (rumour .rumours)
         (pos-seal--protect (expand-file-name (alist-get 'destination rumour) .archive)))
       (let ((files (pos-history-files (pos-ledger-history .archive))))
-        (pos-seal--checkpoint .archive (pos-history-head (pos-ledger-history .archive)))
+        (pos-seal-checkpoint-head .archive (pos-history-head (pos-ledger-history .archive)))
         (cons (car (last files))
               (alist-get 'root (pos-bytes-parse (pos-bytes-read (car (last files))))))))))
 
@@ -779,7 +779,7 @@ head.  Return the keeper's description."
                    (file (expand-file-name
                           (pos-ledger-event-file-name number (pos-ledger--event-cid bytes))
                           ledger)))
-              (pos-seal--write-new file bytes)
+              (pos-seal-write-new file bytes)
               (push file written)))
           (let ((caught (condition-case nil
                             (pos-ledger-history archive)
@@ -848,7 +848,7 @@ it resumes.  Return (EVENT-FILE . ROOT)."
               (pcase-let ((`(,file ,_ ,bytes)
                            (pos-seal--event-of plan item add collections empty)))
                 (pos-seal--send-event keeper version file bytes files claims)
-                (pos-seal--write-new (expand-file-name file .ledger) bytes)))))
+                (pos-seal-write-new (expand-file-name file .ledger) bytes)))))
       (when (and (null sealed)
                  (not (equal (pos-bytes-sha
                               (pos-bytes-json
@@ -892,7 +892,7 @@ it resumes.  Return (EVENT-FILE . ROOT)."
           (delete-file .source)))
       (pos-seal--leave-stage .source)
       (pcase-let (((cl-struct pos-history head files) (pos-ledger-history .archive)))
-        (pos-seal--checkpoint .archive head)
+        (pos-seal-checkpoint-head .archive head)
         (cons (car (last files))
               (alist-get 'root (pos-bytes-parse (pos-bytes-read (car (last files))))))))))
 
@@ -949,7 +949,7 @@ before checkpointing: %s" root))
                (bytes (pos-bytes-json `((schema . 1) (heads . ,(vconcat heads))
                                         (coverage . ,coverage))))
                (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") home)))
-          (cond ((not (file-exists-p file)) (pos-seal--write-new file bytes))
+          (cond ((not (file-exists-p file)) (pos-seal-write-new file bytes))
                 ((not (equal (pos-bytes-read file) bytes))
                  (pos-ledger-refuse 'checkpoint "Checkpoint conflict: %s" file)))))
       home)))
@@ -1083,8 +1083,8 @@ with the reason."
                                              (file-name-directory head-file))))
                 (push (list archive file bytes name) pending)))))))
     (pcase-dolist (`(,archive ,file ,bytes ,name) (nreverse pending))
-      (pos-seal--write-new file bytes)
-      (pos-seal--checkpoint archive name)
+      (pos-seal-write-new file bytes)
+      (pos-seal-checkpoint-head archive name)
       (push `((archive . ,archive) (event . ,file) (head . ,name)) converted))
     `((converted . ,(vconcat (nreverse converted)))
       (skipped . ,(vconcat (nreverse skipped))))))
@@ -1302,7 +1302,7 @@ recalled."
             (unless (equal cid (pos-cid-bytes bytes))
               (pos-ledger-refuse 'entry "The keeper's bytes are not those of %s" cid))
             (push (cons cid bytes) read)))
-        (pos-seal--write-new (expand-file-name path archive)
+        (pos-seal-write-new (expand-file-name path archive)
                              (cdr (assoc cid read)) (alist-get 'mode entry))))
     (dolist (path empty)
       (make-directory (expand-file-name path archive) t))

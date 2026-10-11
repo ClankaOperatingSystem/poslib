@@ -285,7 +285,7 @@ An annotation, broken or later, does; any other replaces the target."
       (setq dir (file-name-directory (directory-file-name dir))))
     found))
 
-(defun pos-links--sealed (target)
+(defun pos-links-sealed (target)
   "Return the ipfs:// link to archived TARGET, as sealed, or refuse."
   (let* ((archive (pos-links-archive-of target))
          (rel (file-relative-name target archive)))
@@ -369,7 +369,7 @@ is cited."
                (pos-links--kept-p target)))
       (cons 'broken target))
      ((and archive (or (null scope) (pos-links-within-scope-p archive scope)))
-      (cons 'cid (pos-links--sealed target)))
+      (cons 'cid (pos-links-sealed target)))
      (t (cons 'rumour target)))))
 
 (defun pos-links-link (path)
@@ -378,7 +378,7 @@ The link is the one a sealed item's link to PATH is rewritten to."
   (let ((target (directory-file-name (expand-file-name path))))
     (unless (pos-links-archive-of target)
       (pos-ledger-refuse 'unsealed "Not a path in an archive: %s" target))
-    (pos-links--sealed target)))
+    (pos-links-sealed target)))
 
 (provide 'pos-links)
 ;;; pos-links.el ends here
