@@ -566,23 +566,29 @@ Refuse an item that is not WAITING and the STATE WAITING."
 
 ;;;; Lint
 
+(cl-defstruct (pos-identity (:constructor pos-identity--make) (:copier nil))
+  "A person-identity of a tree.
+ID is its Org ID, or nil for a file that has none.  It is at LINE of
+FILE, 1 for an identity that is a file.  NAME is its title or its
+heading, SCOPE the scope it is an identity in, and TEXT what it says:
+a file's text, or a heading's entry."
+  id file line name scope text)
+
 (defun pos-person--identities (corpus)
-  "Return the person-identities of CORPUS, each (ID FILE LINE NAME SCOPE TEXT).
-An identity is a file in the
-person-identities directory of a scope that has a configuration, or
-a heading with an ID under `pos-person-heading' in a file of a
-project that has none.  LINE is 1 for a file.  ID is nil for a file
-that has none.  SCOPE is the identity's scope and TEXT what it
-says: a file's text, or a heading's entry."
+  "Return the person-identities of CORPUS, each a `pos-identity'.
+An identity is a file in the person-identities directory of a scope
+that has a configuration, or a heading with an ID under
+`pos-person-heading' in a file of a project that has none."
   (let (identities)
     (dolist (scope (pos-corpus-scopes corpus))
       (when-let* (((pos-scope-config scope))
                   (config (pos-person--config-directory (pos-scope-dir scope))))
         (dolist (file (pos-person--org-files
                        (expand-file-name pos-person-identities-directory config)))
-          (push (list (pos-person--file-id file) file 1
-                      (pos-person--file-title file) scope
-                      (pos-person--file-text file))
+          (push (pos-identity--make
+                 :id (pos-person--file-id file) :file file :line 1
+                 :name (pos-person--file-title file) :scope scope
+                 :text (pos-person--file-text file))
                 identities))))
     (pcase-dolist (`(,file . ,scope) (pos-corpus-entries corpus))
       (when (and (eq 'project (pos-scope-kind scope))
@@ -597,17 +603,23 @@ says: a file's text, or a heading's entry."
                (let ((end (save-excursion (org-end-of-subtree t t) (point))))
                  (while (re-search-forward "^\\*\\* " end t)
                    (when-let* ((id (org-entry-get (point) "ID")))
-                     (push (list id file (line-number-at-pos)
-                                 (substring-no-properties
-                                  (org-get-heading t t t t))
-                                 scope
-                                 (buffer-substring-no-properties
-                                  (line-end-position)
-                                  (save-excursion
-                                    (or (outline-next-heading) (goto-char end))
-                                    (point))))
+                     (push (pos-identity--make
+                            :id id :file file :line (line-number-at-pos)
+                            :name (substring-no-properties
+                                   (org-get-heading t t t t))
+                            :scope scope
+                            :text (buffer-substring-no-properties
+                                   (line-end-position)
+                                   (save-excursion
+                                     (or (outline-next-heading) (goto-char end))
+                                     (point))))
                            identities))))))))))
     (nreverse identities)))
+
+(defun pos-person--identity-of (id identities)
+  "Return the first of IDENTITIES whose ID is ID, or nil."
+  (seq-find (lambda (identity) (equal id (pos-identity-id identity)))
+            identities))
 
 (defun pos-person--within-p (scope other)
   "Return non-nil if the scope OTHER is SCOPE or lies beneath it."
@@ -629,7 +641,7 @@ a scope that is neither the item's nor beneath it."
          (people (pos-person-entities root))
          (identities (pos-person--identities corpus))
          findings)
-    (pcase-dolist (`(,id ,file ,line ,name ,scope ,text) identities)
+    (pcase-dolist ((cl-struct pos-identity id file line name scope text) identities)
       (let ((person (and id (seq-find (lambda (person) (member id (cddr person)))
                                       people))))
         (cond
@@ -652,7 +664,7 @@ a scope that is neither the item's nor beneath it."
       (with-temp-buffer
         (insert-file-contents file)
         (while (re-search-forward "\\[\\[id:\\([^]]+\\)\\]" nil t)
-          (unless (assoc (match-string 1) identities)
+          (unless (pos-person--identity-of (match-string 1) identities)
             (push (list file (line-number-at-pos)
                         (format "link to no person-identity: %s" (match-string 1)))
                   findings)))))
@@ -668,7 +680,7 @@ a scope that is neither the item's nor beneath it."
                     (id (and value
                              (string-match "\\[\\[id:\\([^]]+\\)\\]" value)
                              (match-string 1 value)))
-                    (identity (and id (assoc id identities)))
+                    (identity (and id (pos-person--identity-of id identities)))
                     (line (save-excursion (org-back-to-heading t)
                                           (line-number-at-pos))))
                (cond
@@ -677,11 +689,11 @@ a scope that is neither the item's nor beneath it."
                              (format "%s does not link to a person-identity"
                                      pos-waiting-on-property))
                        findings))
-                ((not (pos-person--within-p scope (nth 4 identity)))
+                ((not (pos-person--within-p scope (pos-identity-scope identity)))
                  (push (list file line
                              (format "%s links to an identity of another scope: %s"
                                      pos-waiting-on-property
-                                     (pos-scope-path (nth 4 identity))))
+                                     (pos-scope-path (pos-identity-scope identity))))
                        findings)))))))))
     (nreverse findings)))
 
