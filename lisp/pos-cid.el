@@ -451,6 +451,22 @@ receives a relative path and a CID as text, files as given."
 With `pos-cid-dag-json', how a DAG-JSON ledger event is named."
   (pos-cid--text (pos-cid--cid codec block)))
 
+(defun pos-cid--inventory-parent (tree path)
+  "Return the directory of TREE for PATH's last part, made if absent.
+Refuse a part IPFS would leave out, and a file where a directory is."
+  (let ((parts (split-string path "/"))
+        (node tree))
+    (dolist (part parts)
+      (when (or (string-empty-p part) (string-prefix-p "." part))
+        (error "Not a path IPFS would add: %s" path)))
+    (dolist (part (butlast parts))
+      (let ((child (gethash part node)))
+        (unless (or (null child) (hash-table-p child))
+          (error "A file and a directory share a path: %s" path))
+        (setq node (or child
+                       (puthash part (make-hash-table :test #'equal) node)))))
+    node))
+
 (defun pos-cid-inventory (entries &optional empty)
   "Return the CID of every file and directory over ENTRIES, root included.
 ENTRIES lists a tree's files as (PATH CID SIZE): the relative path, the
@@ -462,39 +478,21 @@ relative path and CID, files as given, the root \".\"."
   (let ((tree (make-hash-table :test #'equal)) cids)
     (dolist (entry entries)
       (let* ((path (nth 0 entry))
-             (parts (split-string path "/"))
-             (node tree))
-        (dolist (part parts)
-          (when (or (string-empty-p part) (string-prefix-p "." part))
-            (error "Not a path IPFS would add: %s" path)))
-        (dolist (part (butlast parts))
-          (let ((child (gethash part node)))
-            (unless (or (null child) (hash-table-p child))
-              (error "A file and a directory share a path: %s" path))
-            (setq node (or child
-                           (puthash part (make-hash-table :test #'equal) node)))))
-        (when (gethash (car (last parts)) node)
+             (name (car (last (split-string path "/"))))
+             (node (pos-cid--inventory-parent tree path)))
+        (when (gethash name node)
           (error "A file and a directory share a path: %s" path))
-        (puthash (car (last parts))
+        (puthash name
                  (list (pos-cid-decode (nth 1 entry))
                        (pos-cid--file-tsize (nth 2 entry))
                        (nth 1 entry))
                  node)))
     (dolist (path empty)
-      (let ((parts (split-string path "/"))
-            (node tree))
-        (dolist (part parts)
-          (when (or (string-empty-p part) (string-prefix-p "." part))
-            (error "Not a path IPFS would add: %s" path)))
-        (dolist (part (butlast parts))
-          (let ((child (gethash part node)))
-            (unless (or (null child) (hash-table-p child))
-              (error "A file and a directory share a path: %s" path))
-            (setq node (or child
-                           (puthash part (make-hash-table :test #'equal) node)))))
-        (when (gethash (car (last parts)) node)
+      (let ((name (car (last (split-string path "/"))))
+            (node (pos-cid--inventory-parent tree path)))
+        (when (gethash name node)
           (error "Not an empty directory: %s" path))
-        (puthash (car (last parts)) (make-hash-table :test #'equal) node)))
+        (puthash name (make-hash-table :test #'equal) node)))
     (pos-cid--inventory-directory
      tree "" (lambda (rel cid) (push (cons rel cid) cids)))
     (nreverse cids)))
