@@ -163,7 +163,8 @@ Org files of the scope's garden."
                                                   (concat base (substring c (1+ (length rel))))))))
                                         collections)
                         (pos-links-in-file file ids)))
-          (pcase-let* ((`(,offset ,text ,path ,suffix ,whole-offset ,whole) link)
+          (pcase-let* (((cl-struct pos-link offset text path suffix whole-offset whole)
+                        link)
                        (abs (expand-file-name path (if (and written-at (equal file source))
                                                        written-at
                                                      (file-name-directory file)))))

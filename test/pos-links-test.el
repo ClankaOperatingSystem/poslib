@@ -77,12 +77,15 @@ replaces.  A link of another type, web or id, is not a path link, and a
 file that is neither Org nor Markdown has no links."
   (pos-test-with-files dir `(("a.org" . ,pos-links-test-org)
                              ("a.txt" . "[[file:x.org]]\n"))
-    (should (equal '((18 "file:notes/b.org::*Heading" "notes/b.org" "::*Heading"
-                         18 "file:notes/b.org::*Heading")
-                     (61 "file:c.md" "c.md" "" 61 "file:c.md")
-                     (76 "./d.txt" "./d.txt" "" 76 "./d.txt"))
-                   (mapcar (lambda (link) (seq-take link 6))
-                           (pos-links-in-file (expand-file-name "a.org" dir)))))
+    (should (equal (list (pos-link-create
+                          :offset 18 :text "file:notes/b.org::*Heading"
+                          :path "notes/b.org" :suffix "::*Heading"
+                          :whole-offset 18 :whole "file:notes/b.org::*Heading")
+                         (pos-link-create :offset 61 :text "file:c.md" :path "c.md" :suffix ""
+                                          :whole-offset 61 :whole "file:c.md")
+                         (pos-link-create :offset 76 :text "./d.txt" :path "./d.txt" :suffix ""
+                                          :whole-offset 76 :whole "./d.txt"))
+                   (pos-links-in-file (expand-file-name "a.org" dir))))
     (should-not (pos-links-in-file (expand-file-name "a.txt" dir)))))
 
 (ert-deftest pos-links/markdown-links-are-found-with-their-fragments ()
@@ -92,22 +95,32 @@ of it with its text, a definition's is its URL.  A URL with a scheme, a
 bare fragment, and links in inline or fenced code are not path links."
   (pos-test-with-files dir `(("a.md" . ,pos-links-test-markdown)
                              ("b.md" . "[n](notes/b%20c.org#frag)\n"))
-    (should (equal '((21 "notes/b.md#frag" "notes/b.md" "#frag"
-                         9 "[the notes](notes/b.md#frag)" "the notes")
-                     (52 "pic.png" "pic.png" "" 39 "![a picture](pic.png)" "a picture")
-                     (154 "refs/z.md" "refs/z.md" "" 154 "refs/z.md" nil))
+    (should (equal (list (pos-link-create
+                          :offset 21 :text "notes/b.md#frag" :path "notes/b.md" :suffix "#frag"
+                          :whole-offset 9 :whole "[the notes](notes/b.md#frag)"
+                          :description "the notes")
+                         (pos-link-create
+                          :offset 52 :text "pic.png" :path "pic.png" :suffix ""
+                          :whole-offset 39 :whole "![a picture](pic.png)"
+                          :description "a picture")
+                         (pos-link-create :offset 154 :text "refs/z.md" :path "refs/z.md"
+                                          :suffix "" :whole-offset 154 :whole "refs/z.md"))
                    (pos-links-in-file (expand-file-name "a.md" dir))))
     ;; The decoded path is the file on disk; the text is what a rewrite
     ;; replaces; the whole and description are read after decoding, which
     ;; searches strings of its own.
-    (should (equal '((4 "notes/b%20c.org#frag" "notes/b c.org" "#frag"
-                        0 "[n](notes/b%20c.org#frag)" "n"))
+    (should (equal (list (pos-link-create
+                          :offset 4 :text "notes/b%20c.org#frag" :path "notes/b c.org"
+                          :suffix "#frag" :whole-offset 0 :whole "[n](notes/b%20c.org#frag)"
+                          :description "n"))
                    (pos-links-in-file (expand-file-name "b.md" dir))))))
 
 (ert-deftest pos-links/a-markdown-url-in-angle-brackets-is-a-link ()
   "A URL written <with spaces> is found whole, with its description."
   (pos-test-with-files dir '(("a.md" . "![img](<pic one.png>)\n"))
-    (should (equal '((7 "<pic one.png>" "pic one.png" "" 0 "![img](<pic one.png>)" "img"))
+    (should (equal (list (pos-link-create
+                          :offset 7 :text "<pic one.png>" :path "pic one.png" :suffix ""
+                          :whole-offset 0 :whole "![img](<pic one.png>)" :description "img"))
                    (pos-links-in-file (expand-file-name "a.md" dir))))))
 
 (ert-deftest pos-links/offsets-count-bytes-not-characters ()
@@ -115,11 +128,13 @@ bare fragment, and links in inline or fenced code are not path links."
 That is one more than its character position, in Org and Markdown alike."
   (pos-test-with-files dir '(("a.md" . "Café [tail](t.md)\n")
                              ("a.org" . "Café [[file:t.org]]\n"))
-    (should (equal '((13 "t.md" "t.md" "" 6 "[tail](t.md)" "tail"))
+    (should (equal (list (pos-link-create :offset 13 :text "t.md" :path "t.md" :suffix ""
+                                          :whole-offset 6 :whole "[tail](t.md)"
+                                          :description "tail"))
                    (pos-links-in-file (expand-file-name "a.md" dir))))
-    (should (equal '((8 "file:t.org" "t.org" "" 8 "file:t.org"))
-                   (mapcar (lambda (link) (seq-take link 6))
-                           (pos-links-in-file (expand-file-name "a.org" dir)))))))
+    (should (equal (list (pos-link-create :offset 8 :text "file:t.org" :path "t.org"
+                                          :suffix "" :whole-offset 8 :whole "file:t.org"))
+                   (pos-links-in-file (expand-file-name "a.org" dir))))))
 
 ;;;; Rewriting and annotating
 
@@ -153,11 +168,16 @@ It replaces file: or no type, keeping the path and its search option;
 the description outside the raw link is not the annotation's to touch."
   (should (equal "broken:notes/b.org::*Heading"
                  (pos-links-annotate "a.org"
-                                     '(18 "file:notes/b.org::*Heading" "notes/b.org"
-                                          "::*Heading" 18 "file:notes/b.org::*Heading")
+                                     (pos-link-create
+                                      :offset 18 :text "file:notes/b.org::*Heading"
+                                      :path "notes/b.org" :suffix "::*Heading"
+                                      :whole-offset 18 :whole "file:notes/b.org::*Heading")
                                      "broken")))
   (should (equal "later:./d.txt"
-                 (pos-links-annotate "a.org" '(76 "./d.txt" "./d.txt" "" 76 "./d.txt")
+                 (pos-links-annotate "a.org"
+                                     (pos-link-create :offset 76 :text "./d.txt"
+                                                      :path "./d.txt" :suffix ""
+                                                      :whole-offset 76 :whole "./d.txt")
                                      "later"))))
 
 (ert-deftest pos-links/a-markdown-annotation-keeps-the-text-and-notes-the-link ()
@@ -165,19 +185,26 @@ the description outside the raw link is not the annotation's to touch."
 The note gives the link as written, fragment and all; an image's text is
 kept the same way; a reference definition, which has no text, takes the
 label as a prefix."
-  (let ((link '(21 "notes/b.md#frag" "notes/b.md" "#frag"
-                   9 "[the notes](notes/b.md#frag)" "the notes")))
+  (let ((link (pos-link-create
+               :offset 21 :text "notes/b.md#frag" :path "notes/b.md" :suffix "#frag"
+               :whole-offset 9 :whole "[the notes](notes/b.md#frag)"
+               :description "the notes")))
     (should (equal "the notes [broken link: notes/b.md#frag]"
                    (pos-links-annotate "a.md" link "broken")))
     (should (equal "the notes [later record: notes/b.md#frag]"
                    (pos-links-annotate "a.md" link "later"))))
   (should (equal "a picture [broken link: pic.png]"
-                 (pos-links-annotate "a.md" '(52 "pic.png" "pic.png" ""
-                                                 39 "![a picture](pic.png)" "a picture")
+                 (pos-links-annotate "a.md"
+                                     (pos-link-create
+                                      :offset 52 :text "pic.png" :path "pic.png" :suffix ""
+                                      :whole-offset 39 :whole "![a picture](pic.png)"
+                                      :description "a picture")
                                      "broken")))
   (should (equal "broken:refs/z.md"
-                 (pos-links-annotate "a.md" '(154 "refs/z.md" "refs/z.md" ""
-                                                  154 "refs/z.md" nil)
+                 (pos-links-annotate "a.md"
+                                     (pos-link-create :offset 154 :text "refs/z.md"
+                                                      :path "refs/z.md" :suffix ""
+                                                      :whole-offset 154 :whole "refs/z.md")
                                      "broken"))))
 
 ;;;; The garden
