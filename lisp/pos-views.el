@@ -71,13 +71,11 @@ A line that names an item or a scope has the text property pos-item:
 the item or the scope's row, as `pos-startup-view-items' gives them.
 The lines and the items are made in one reading of the files, and
 are in the same order."
-  (let* ((pos-startup--gathering t)
-         (pos-startup--items nil)
-         ;; Making a view visits files and shows agendas: it does not
-         ;; leave the current buffer as it found it.
-         (text (save-current-buffer (pos-startup-view root view)))
-         (items (nreverse pos-startup--items))
-         (start (point)))
+  (pcase-let* ((`(,text . ,items)
+                ;; Making a view visits files and shows agendas: it does
+                ;; not leave the current buffer as it found it.
+                (save-current-buffer (pos-startup-view-with-items root view)))
+               (start (point)))
     (insert text)
     (save-excursion
       (goto-char start)

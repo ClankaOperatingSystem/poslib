@@ -35,6 +35,7 @@
 ;; - `pos-startup-report': the prompts and the views, as text.
 ;; - `pos-startup-view': one view, as text.
 ;; - `pos-startup-view-items': one view, as data: what each line is of.
+;; - `pos-startup-view-with-items': one view, as both, from one reading.
 ;; - `pos-startup-data': the report as data, for `json-serialize'.
 ;; - `pos-startup-batch': shell entry; --view NAME, repeated, picks views;
 ;;   --weekly picks `pos-startup-weekly-views'; --json prints the data.
@@ -779,10 +780,17 @@ stuck and projects, which list scopes, each has scope, scope_kind
 and status; in projects, review, next and outcome too.  A line of
 reviews-to-schedule for a path that is no scope's has the scope of
 the review's file, and covers, file, line and title."
-  (let ((pos-startup--gathering t)
-        (pos-startup--items nil))
-    (pos-startup-view root view)
-    (nreverse pos-startup--items)))
+  (cdr (pos-startup-view-with-items root view)))
+
+(defun pos-startup-view-with-items (root view)
+  "Return (TEXT . ITEMS) for VIEW of the Org files under ROOT.
+TEXT is as `pos-startup-view' returns it and ITEMS as
+`pos-startup-view-items' does, from one reading of the files, so the
+lines of TEXT and ITEMS are in the same order."
+  (let* ((pos-startup--gathering t)
+         (pos-startup--items nil)
+         (text (pos-startup-view root view)))
+    (cons text (nreverse pos-startup--items))))
 
 (defun pos-startup--table (rows)
   "Return ROWS, lists of strings, as lines with their columns aligned."
