@@ -269,6 +269,191 @@ DECLARATIONS)."
       (list (sort discard #'string<) (sort (append missing remove) #'string<)
             renames collections declarations))))
 
+(defun pos-migrate--meant (path written archive stage renames)
+  "Return the absolute path meant by a link to PATH from directory WRITTEN.
+A path gone from ARCHIVE and from STAGE, whose counterpart at the same
+relative path beside ARCHIVE exists, as a withdrawn record's does in
+canon, or a record's archived since its link was written: the
+counterpart is meant.  RENAMES are those the stage made."
+  (let* ((scope (file-name-directory archive))
+         (written-abs (expand-file-name path written))
+         (counterpart
+          (and (string-prefix-p (file-name-as-directory archive) written-abs)
+               (not (file-exists-p written-abs))
+               (not (file-exists-p
+                     (expand-file-name
+                      (pos-migrate--through
+                       (pos-migrate--rel written-abs archive) renames)
+                      stage)))
+               (expand-file-name (pos-migrate--rel written-abs archive) scope))))
+    (if (and counterpart (file-exists-p counterpart))
+        counterpart written-abs)))
+
+(defun pos-migrate--classify (archive stage date files renames collections)
+  "Return (LINKS . RUMOURS) for the links in FILES of STAGE, built from ARCHIVE.
+LINKS holds a `pos-resolution' for every link, each resolved from where
+it was written, in the archive as it is; one to another item of the
+archive has a target and no text yet.  RUMOURS holds (DESTINATION .
+TEXT) for each rumour the links need, dated DATE.  RENAMES and
+COLLECTIONS are as `pos-migrate--prepare' returns them."
+  (let ((scope (file-name-directory archive))
+        links rumours)
+    (dolist (rel (seq-remove (lambda (rel) (pos-migrate--in-capsule-p rel collections stage))
+                             files))
+      (let* ((original (pos-migrate--back rel renames))
+             (written (file-name-directory (expand-file-name original archive))))
+        (dolist (link (pos-links-in-file (expand-file-name rel stage)))
+          (pcase-let* (((cl-struct pos-link text path suffix) link)
+                       (abs (pos-migrate--meant path written archive stage renames))
+                       (inside (string-prefix-p (file-name-as-directory archive) abs)))
+            (push
+             (cond
+              ((and inside (let ((t-rel (pos-migrate--through (pos-migrate--rel abs archive)
+                                                              renames)))
+                             (file-exists-p (expand-file-name t-rel stage))))
+               (let ((target (pos-migrate--through (pos-migrate--rel abs archive) renames)))
+                 (cond ((equal target rel)
+                        (pos-resolution-create :file rel :link link
+                                               :kind "internal" :to text))
+                       ((seq-some (lambda (c) (and (pos-path-within-p rel c)
+                                                   (pos-path-within-p target c)))
+                                  collections)
+                        (pos-resolution-create :file rel :link link
+                                               :kind "internal" :to text))
+                       ((and (file-directory-p (expand-file-name target stage))
+                             (not (member target collections)))
+                        (let ((r (pos-migrate--rumour abs scope date)))
+                          (unless (assoc (car r) rumours) (push r rumours))
+                          (pos-resolution-create :file rel :link link :kind "rumour"
+                                                 :rumour (car r) :suffix suffix)))
+                       (t (pos-resolution-create :file rel :link link :kind "cid"
+                                                 :target target :suffix suffix)))))
+              ((or (file-exists-p abs) (file-symlink-p abs))
+               (let ((other (pos-links-archive-of abs)))
+                 (cond
+                  ((and other (not inside) (pos-links-within-scope-p other scope))
+                   (unless (pos-migrate--converted-p other)
+                     (pos-ledger-refuse 'order "Migrate %s first: %s links to it" other rel))
+                   (pos-resolution-create
+                    :file rel :link link
+                    :kind "cid" :to (concat (pos-links--sealed abs) suffix)))
+                  (t (let ((r (pos-migrate--rumour abs scope date)))
+                       (unless (assoc (car r) rumours) (push r rumours))
+                       (pos-resolution-create :file rel :link link :kind "rumour"
+                                              :rumour (car r) :suffix suffix))))))
+              (t (pos-resolution-create
+                  :file rel :link link
+                  :kind "broken" :to (pos-links-annotate rel link "broken"))))
+             links)))))
+    (cons links rumours)))
+
+(defun pos-migrate--deps (links collections)
+  "Return (ITEM . CITED) for each of LINKS that awaits another item's CID.
+ITEM is the item of COLLECTIONS that holds the link, CITED the one it
+leads into."
+  (delq nil
+        (mapcar (lambda (r)
+                  (and (pos-resolution-target r)
+                       (cons (pos-migrate--item-of (pos-resolution-file r) collections)
+                             (pos-migrate--item-of (pos-resolution-target r) collections))))
+                links)))
+
+(defun pos-migrate--break-loops (links archive collections)
+  "Return LINKS with each loop among the items of COLLECTIONS broken.
+Where items cite one another in a loop, a link from an earlier record
+to a later one, by `pos-migrate--date' in ARCHIVE, becomes an
+annotation."
+  (let* ((deps (pos-migrate--deps links collections))
+         (items (seq-uniq (append (mapcar #'car deps) (mapcar #'cdr deps))))
+         (edges (mapcar (lambda (i) (cons i (seq-uniq (mapcar #'cdr (seq-filter (lambda (d) (and (equal (car d) i) (not (equal (cdr d) i)))) deps)))))
+                        items))
+         (later (make-hash-table :test #'equal)))
+    (dolist (component (pos-migrate--sccs items edges))
+      (when (cdr component)
+        (dolist (a component)
+          (dolist (b (cdr (assoc a edges)))
+            (when (and (member b component)
+                       (let ((da (pos-migrate--date a archive)) (db (pos-migrate--date b archive)))
+                         (or (string< da db) (and (equal da db) (string< a b)))))
+              (puthash (cons a b) t later))))))
+    (mapcar (lambda (r)
+              (pcase-let (((cl-struct pos-resolution (file rel) link target) r))
+                (if (and target
+                         (gethash (cons (pos-migrate--item-of rel collections)
+                                        (pos-migrate--item-of target collections))
+                                  later))
+                    (pos-resolution-create
+                     :file rel :link link
+                     :kind "later" :to (pos-links-annotate rel link "later"))
+                  r)))
+            links)))
+
+(defun pos-migrate--rewrite (links rumours stage collections)
+  "Rewrite in STAGE the files that hold LINKS, and return LINKS resolved.
+RUMOURS are written first.  Then the items of COLLECTIONS are taken
+leaves first: the links in each are given the CIDs they await, its
+files are rewritten, and its own CID is taken for the items that cite
+it.  Refuse `destination' if another text is where a rumour goes, and
+`loop' if items still cite one another in a loop."
+  (dolist (r rumours)
+    (let ((there (expand-file-name (car r) stage)))
+      (if (file-exists-p there)
+          (unless (equal (pos-bytes-read there) (encode-coding-string (cdr r) 'utf-8))
+            (pos-ledger-refuse 'destination "Rumour destination exists: %s" (car r)))
+        (make-directory (file-name-directory there) t)
+        (pos-migrate--write-over there (encode-coding-string (cdr r) 'utf-8)))))
+  (let ((deps (pos-migrate--deps links collections))
+        (cids (mapcar (lambda (r) (cons (car r) (pos-cid-file (expand-file-name (car r) stage))))
+                      rumours))
+        (pending (seq-uniq (mapcar (lambda (r)
+                                     (pos-migrate--item-of (pos-resolution-file r)
+                                                           collections))
+                                   links)))
+        (done nil) (resolved nil))
+    (while pending
+      (let ((item (seq-find (lambda (i) (seq-every-p (lambda (d) (or (not (equal (car d) i))
+                                                                     (equal (cdr d) i)
+                                                                     (member (cdr d) done)
+                                                                     (not (member (cdr d) pending))))
+                                                     deps))
+                            pending)))
+        (unless item (pos-ledger-refuse 'loop "Links still loop among %S" pending))
+        (setq pending (delete item pending))
+        (let ((by-file nil))
+          (dolist (r links)
+            (when (equal (pos-migrate--item-of (pos-resolution-file r) collections) item)
+              (pcase-let (((cl-struct pos-resolution to target rumour suffix) r))
+                (cond
+                 (to)
+                 (rumour
+                  (setf (pos-resolution-to r)
+                        (concat "ipfs://" (cdr (assoc rumour cids)) suffix)))
+                 (t
+                  (let* ((titem (pos-migrate--item-of target collections))
+                         (cid (or (cdr (assoc titem cids))
+                                  (pos-migrate--cid stage titem))))
+                    (setf (pos-resolution-to r)
+                          (concat "ipfs://" cid
+                                  (unless (equal target titem)
+                                    (concat "/" (substring target (1+ (length titem)))))
+                                  suffix))))))
+              (push r by-file)))
+          (dolist (rel (seq-uniq (mapcar #'pos-resolution-file by-file)))
+            (let* ((file (expand-file-name rel stage))
+                   (all (seq-filter (lambda (r) (equal (pos-resolution-file r) rel))
+                                    by-file))
+                   (edits (mapcar #'pos-resolution-rewrite
+                                  (seq-remove (lambda (r) (equal (pos-resolution-from r)
+                                                                 (pos-resolution-to r)))
+                                              all))))
+              (dolist (r all)
+                (push r resolved))
+              (when edits
+                (pos-migrate--write-over file (pos-links-rewrite (pos-bytes-read file) edits)))))
+          (push item done)
+          (push (cons item (pos-migrate--cid stage item)) cids))))
+    resolved))
+
 (defun pos-migrate-plan (archive &optional root exclude date ledger-id include)
   "Return the plan migrating ARCHIVE, its canon links repaired under ROOT.
 EXCLUDE names candidate collections that are not, INCLUDE directories
@@ -293,194 +478,46 @@ dates rumours; LEDGER-ID names a ledger that has none."
                                       (and (string-match-p "\\.\\(org\\|md\\)\\'" rel)
                                            (file-regular-p (expand-file-name rel stage))))
                                     (pos-migrate--walk stage)))
-                 (links nil) (deps nil) (rumours nil))
-      ;; Resolve every link from where it was written, in the archive as it is.
-      (dolist (rel (seq-remove (lambda (rel) (pos-migrate--in-capsule-p rel collections stage))
-                               files))
-        (let* ((original (pos-migrate--back rel renames))
-               (written (file-name-directory (expand-file-name original archive))))
-          (dolist (link (pos-links-in-file (expand-file-name rel stage)))
-            (pcase-let* (((cl-struct pos-link text path suffix) link)
-                         (written-abs (expand-file-name path written))
-                         ;; A path gone from the archive, whose counterpart at the
-                         ;; same relative path exists, as a withdrawn record's does
-                         ;; in canon, or a record's archived since its link was
-                         ;; written: the counterpart is meant.
-                         (abs (let ((counterpart
-                                     (and (string-prefix-p (file-name-as-directory archive)
-                                                           written-abs)
-                                          (not (file-exists-p written-abs))
-                                          (not (file-exists-p
-                                                (expand-file-name
-                                                 (pos-migrate--through
-                                                  (pos-migrate--rel written-abs archive) renames)
-                                                 stage)))
-                                          (expand-file-name (pos-migrate--rel written-abs archive)
-                                                            scope))))
-                                (if (and counterpart (file-exists-p counterpart))
-                                    counterpart written-abs)))
-                         (inside (string-prefix-p (file-name-as-directory archive) abs)))
-              (push
-               (cond
-                ((and inside (let ((t-rel (pos-migrate--through (pos-migrate--rel abs archive)
-                                                                renames)))
-                               (file-exists-p (expand-file-name t-rel stage))))
-                 (let* ((target (pos-migrate--through (pos-migrate--rel abs archive) renames))
-                        (item (pos-migrate--item-of rel collections))
-                        (titem (pos-migrate--item-of target collections)))
-                   (cond ((equal target rel)
-                          (pos-resolution-create :file rel :link link
-                                                 :kind "internal" :to text))
-                         ((seq-some (lambda (c) (and (pos-path-within-p rel c)
-                                                     (pos-path-within-p target c)))
-                                    collections)
-                          (pos-resolution-create :file rel :link link
-                                                 :kind "internal" :to text))
-                         ((and (file-directory-p (expand-file-name target stage))
-                               (not (member target collections)))
-                          (let ((r (pos-migrate--rumour abs scope date)))
-                            (unless (assoc (car r) rumours) (push r rumours))
-                            (pos-resolution-create :file rel :link link :kind "rumour"
-                                                   :rumour (car r) :suffix suffix)))
-                         (t (push (cons item titem) deps)
-                            (pos-resolution-create :file rel :link link :kind "cid"
-                                                   :target target :suffix suffix)))))
-                ((or (file-exists-p abs) (file-symlink-p abs))
-                 (let ((other (pos-links-archive-of abs)))
-                   (cond
-                    ((and other (not inside) (pos-links-within-scope-p other scope))
-                     (unless (pos-migrate--converted-p other)
-                       (pos-ledger-refuse 'order "Migrate %s first: %s links to it" other rel))
-                     (pos-resolution-create
-                      :file rel :link link
-                      :kind "cid" :to (concat (pos-links--sealed abs) suffix)))
-                    (t (let ((r (pos-migrate--rumour abs scope date)))
-                         (unless (assoc (car r) rumours) (push r rumours))
-                         (pos-resolution-create :file rel :link link :kind "rumour"
-                                                :rumour (car r) :suffix suffix))))))
-                (t (pos-resolution-create
-                    :file rel :link link
-                    :kind "broken" :to (pos-links-annotate rel link "broken"))))
-               links)))))
-      ;; Loops among items: a link from an earlier record to a later one
-      ;; becomes an annotation.
-      (let* ((items (seq-uniq (append (mapcar #'car deps) (mapcar #'cdr deps))))
-             (edges (mapcar (lambda (i) (cons i (seq-uniq (mapcar #'cdr (seq-filter (lambda (d) (and (equal (car d) i) (not (equal (cdr d) i)))) deps)))))
-                            items))
-             (later (make-hash-table :test #'equal)))
-        (dolist (component (pos-migrate--sccs items edges))
-          (when (cdr component)
-            (dolist (a component)
-              (dolist (b (cdr (assoc a edges)))
-                (when (and (member b component)
-                           (let ((da (pos-migrate--date a archive)) (db (pos-migrate--date b archive)))
-                             (or (string< da db) (and (equal da db) (string< a b)))))
-                  (puthash (cons a b) t later))))))
-        (setq links
-              (mapcar (lambda (r)
-                        (pcase-let (((cl-struct pos-resolution (file rel) link target) r))
-                          (if (and target
-                                   (gethash (cons (pos-migrate--item-of rel collections)
-                                                  (pos-migrate--item-of target collections))
-                                            later))
-                              (pos-resolution-create
-                               :file rel :link link
-                               :kind "later" :to (pos-links-annotate rel link "later"))
-                            r)))
-                      links))
-        (setq deps (seq-remove (lambda (d) (gethash d later)) deps)))
-      ;; Rumours, then items leaves-first: rewrite each, then take its CID.
-      (dolist (r rumours)
-        (let ((there (expand-file-name (car r) stage)))
-          (if (file-exists-p there)
-              (unless (equal (pos-bytes-read there) (encode-coding-string (cdr r) 'utf-8))
-                (pos-ledger-refuse 'destination "Rumour destination exists: %s" (car r)))
-            (make-directory (file-name-directory there) t)
-            (pos-migrate--write-over there (encode-coding-string (cdr r) 'utf-8)))))
-      (let ((cids (mapcar (lambda (r) (cons (car r) (pos-cid-file (expand-file-name (car r) stage))))
-                          rumours))
-            (pending (seq-uniq (mapcar (lambda (r)
-                                         (pos-migrate--item-of (pos-resolution-file r)
-                                                               collections))
-                                       links)))
-            (done nil) (resolved nil))
-        (while pending
-          (let ((item (seq-find (lambda (i) (seq-every-p (lambda (d) (or (not (equal (car d) i))
-                                                                         (equal (cdr d) i)
-                                                                         (member (cdr d) done)
-                                                                         (not (member (cdr d) pending))))
-                                                         deps))
-                                pending)))
-            (unless item (pos-ledger-refuse 'loop "Links still loop among %S" pending))
-            (setq pending (delete item pending))
-            (let ((by-file nil))
-              (dolist (r links)
-                (when (equal (pos-migrate--item-of (pos-resolution-file r) collections) item)
-                  (pcase-let (((cl-struct pos-resolution to target rumour suffix) r))
-                    (cond
-                     (to)
-                     (rumour
-                      (setf (pos-resolution-to r)
-                            (concat "ipfs://" (cdr (assoc rumour cids)) suffix)))
-                     (t
-                      (let* ((titem (pos-migrate--item-of target collections))
-                             (cid (or (cdr (assoc titem cids))
-                                      (pos-migrate--cid stage titem))))
-                        (setf (pos-resolution-to r)
-                              (concat "ipfs://" cid
-                                      (unless (equal target titem)
-                                        (concat "/" (substring target (1+ (length titem)))))
-                                      suffix))))))
-                  (push r by-file)))
-              (dolist (rel (seq-uniq (mapcar #'pos-resolution-file by-file)))
-                (let* ((file (expand-file-name rel stage))
-                       (all (seq-filter (lambda (r) (equal (pos-resolution-file r) rel))
-                                        by-file))
-                       (edits (mapcar #'pos-resolution-rewrite
-                                      (seq-remove (lambda (r) (equal (pos-resolution-from r)
-                                                                     (pos-resolution-to r)))
-                                                  all))))
-                  (dolist (r all)
-                    (push r resolved))
-                  (when edits
-                    (pos-migrate--write-over file (pos-links-rewrite (pos-bytes-read file) edits)))))
-              (push item done)
-              (push (cons item (pos-migrate--cid stage item)) cids))))
-        ;; The canon links that name paths the migration moves.
-        (let* ((moves (append (list (cons (concat (pos-migrate--rel archive root) "/" pos-ledger-directory)
-                                          (concat (pos-migrate--rel scope root) "/"
-                                                  pos-ledger-integrity "/ledger")))
-                              (mapcar (lambda (r) (cons (concat (pos-migrate--rel archive root) "/" (car r))
-                                                        (concat (pos-migrate--rel archive root) "/" (cdr r))))
-                                      renames)))
-               (canon (pos-migrate--canon root moves))
-               (event (pos-migrate--event stage history remove renames
-                                          collections ledger-id)))
-          `((schema . 1) (operation . "migrate")
-            (archive . ,archive) (stage . ,stage) (root . ,root) (date . ,date)
-            (exclude . ,(vconcat exclude)) (include . ,(vconcat include))
-            (inventory_sha256 . ,inventory-sha)
-            (discard . ,(vconcat discard)) (remove . ,(vconcat remove))
-            (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r)))) renames)))
-            (collections . ,(vconcat collections))
-            (declarations . ,(vconcat (mapcar (lambda (d) `((readme . ,(car d)) (kind . ,(cdr d))))
-                                              declarations)))
-            (rumours . ,(vconcat (mapcar (lambda (r) `((destination . ,(car r)) (text . ,(cdr r))))
-                                         (seq-sort-by #'car #'string< rumours))))
-            (links . ,(vconcat
-                       (mapcar #'pos-resolution-alist
-                               (sort resolved
-                                     (lambda (a b)
-                                       (let ((fa (pos-resolution-file a))
-                                             (fb (pos-resolution-file b)))
-                                         (if (equal fa fb)
-                                             (< (pos-resolution-offset a)
-                                                (pos-resolution-offset b))
-                                           (string< fa fb))))))))
-            (canon . ,(vconcat canon))
-            (final_inventory_sha256
-             . ,(pos-bytes-sha (pos-bytes-json (pos-ledger-inventory stage))))
-            (event . ,event)))))))
+                 (`(,links . ,rumours)
+                  (pos-migrate--classify archive stage date files renames collections))
+                 (resolved
+                  (pos-migrate--rewrite (pos-migrate--break-loops links archive collections)
+                                        rumours stage collections))
+                 ;; The canon links that name paths the migration moves.
+                 (moves (append (list (cons (concat (pos-migrate--rel archive root) "/" pos-ledger-directory)
+                                            (concat (pos-migrate--rel scope root) "/"
+                                                    pos-ledger-integrity "/ledger")))
+                                (mapcar (lambda (r) (cons (concat (pos-migrate--rel archive root) "/" (car r))
+                                                          (concat (pos-migrate--rel archive root) "/" (cdr r))))
+                                        renames)))
+                 (canon (pos-migrate--canon root moves))
+                 (event (pos-migrate--event stage history remove renames
+                                            collections ledger-id)))
+      `((schema . 1) (operation . "migrate")
+        (archive . ,archive) (stage . ,stage) (root . ,root) (date . ,date)
+        (exclude . ,(vconcat exclude)) (include . ,(vconcat include))
+        (inventory_sha256 . ,inventory-sha)
+        (discard . ,(vconcat discard)) (remove . ,(vconcat remove))
+        (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r)))) renames)))
+        (collections . ,(vconcat collections))
+        (declarations . ,(vconcat (mapcar (lambda (d) `((readme . ,(car d)) (kind . ,(cdr d))))
+                                          declarations)))
+        (rumours . ,(vconcat (mapcar (lambda (r) `((destination . ,(car r)) (text . ,(cdr r))))
+                                     (seq-sort-by #'car #'string< rumours))))
+        (links . ,(vconcat
+                   (mapcar #'pos-resolution-alist
+                           (sort resolved
+                                 (lambda (a b)
+                                   (let ((fa (pos-resolution-file a))
+                                         (fb (pos-resolution-file b)))
+                                     (if (equal fa fb)
+                                         (< (pos-resolution-offset a)
+                                            (pos-resolution-offset b))
+                                       (string< fa fb))))))))
+        (canon . ,(vconcat canon))
+        (final_inventory_sha256
+         . ,(pos-bytes-sha (pos-bytes-json (pos-ledger-inventory stage))))
+        (event . ,event)))))
 
 (defun pos-migrate--cid (stage item)
   "Return the CID of ITEM in STAGE, a file or a directory."
