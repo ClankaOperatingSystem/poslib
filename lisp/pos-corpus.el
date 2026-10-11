@@ -50,9 +50,11 @@
 ;; function for what is at each path, so the tests give it a listing
 ;; and the commands give it `pos-corpus--list', which looks.
 ;;
-;; - `pos-corpus': walk a root once and return its corpus.
+;; - `pos-corpus': walk a root once and return its corpus, a
+;;   `pos-corpus'.
 ;; - `pos-corpus-files', `pos-corpus-owner', `pos-corpus-scopes':
-;;   the files, the scope each belongs to, and the scopes.
+;;   the files, the scope each belongs to, and the scopes, each a
+;;   `pos-scope'.
 ;; - `pos-corpus-methodologies': the methodologies the projects declare.
 ;; - `pos-corpus-writable-p': whether a command may write a file.
 
