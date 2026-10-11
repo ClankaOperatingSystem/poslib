@@ -127,7 +127,7 @@ taken, as a file or a directory."
         (user-error "There is already a project named %s in %s" name within))
       (make-directory directory t)
       (write-region (pos-project--text
-                     (org-id-new) (string-trim title) (string-trim outcome)
+                     (pos-new-id) (string-trim title) (string-trim outcome)
                      (date-to-time (concat review " 00:00:00"))
                      (and next (string-trim next)) (current-time))
                     nil file nil 'silent nil 'excl)

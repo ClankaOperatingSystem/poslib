@@ -145,7 +145,7 @@ file alone is cited."
   "Salvage the open task at point in FILE into the buffer INTRAY.
 ROOT is the directory of the intray."
   (let* ((title (substring-no-properties (org-get-heading t t t t)))
-         (id (or (org-entry-get nil "ID") (org-id-new)))
+         (id (or (org-entry-get nil "ID") (pos-new-id)))
          (from (file-relative-name file root))
          (search (pos-salvage--search title))
          (subtree (buffer-substring-no-properties
