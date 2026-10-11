@@ -2,8 +2,13 @@
 
 Emacs library for a personal OS in Org files. Package: =pos=.
 
-- =lisp/pos.el= :: lint, refile, dedupe, over the corpus; the root and
-  its settings.
+- =lisp/pos.el= :: what the commands share: the root and its settings,
+  the TODO sequence and the files of the corpus.
+- =lisp/pos-lint.el= :: the lint of the corpus.
+- =lisp/pos-dedupe.el= :: tasks held in more than one place, resolved by
+  a plan, reviewed, then applied.
+- =lisp/pos-refile.el= :: the intray's entries, moved to their files by
+  a plan, reviewed, then applied.
 - =lisp/pos-sweep.el= :: the weekly sweep of done items into the archive
   each scope's configuration names: a plan, reviewed, then applied;
   and the sealing of a closed week.

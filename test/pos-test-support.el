@@ -38,6 +38,7 @@
 (require 'pos-remote)
 (require 'pos-seal)
 (require 'pos-cid)
+(require 'pos-refile)
 
 ;;;; Where the tests are
 
@@ -269,6 +270,34 @@ signals nothing, or another kind, fails with both kinds shown."
                   (format "%s" (condition-case refused
                                    (progn ,@body :nothing-refused)
                                  (,error (car (cdr refused))))))))
+
+;;;; A tree of Org files
+
+(defmacro pos-test-configured (&rest body)
+  "Evaluate BODY with the configuration of test/pos-config.el in force.
+A refile rule each into a work and a body projects file."
+  (declare (indent 0))
+  `(let ((pos-refile-rules '(("invoice\\|client" . "work/work-projects.org")
+                             ("dentist\\|checkup" . "body/body-projects.org"))))
+     ,@body))
+
+(defconst pos-test-git-head "ref: refs/heads/master\n"
+  "The HEAD of a repository; a directory holding one in .git is a repository.")
+
+(defconst pos-test-child-config "pos: 2\nprojects: projects/\n"
+  "The configuration of a child repository: a node of the root's tree.")
+
+(defconst pos-test-root-config
+  "pos: 2\nchildren:\n  - path: child\n    remote: git@example.org:child.git\n"
+  "The configuration of a root that declares the child repository.")
+
+(defun pos-test-lines (&rest lines)
+  "Return LINES as the text of a file: each ended by a newline."
+  (mapconcat (lambda (line) (concat line "\n")) lines ""))
+
+(defun pos-test-text (root file)
+  "Return the text of FILE, named relative to ROOT."
+  (pos-test-file-string (expand-file-name file root)))
 
 (provide 'pos-test-support)
 ;;; pos-test-support.el ends here

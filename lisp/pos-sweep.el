@@ -56,6 +56,11 @@
 (require 'pos-corpus)
 (require 'pos-seal)
 
+(defconst pos-sweep-default-path "archive/orgmode"
+  "Where a sweep writes beneath a scope that names no path.
+One directory per week, one archive file per source, as
+doc/pos-directory.txt has it.")
+
 ;;;; Weeks
 
 (defun pos-week-name (time)
@@ -125,7 +130,7 @@ of done entries with an open entry beneath them, which stay."
       (org-map-entries
        (lambda ()
          (when (org-entry-is-done-p)
-           (if (pos--open-descendant-p)
+           (if (pos-open-descendant-p)
                (push (org-get-heading t t t t) skipped)
              (setq org-map-continue-from
                    (save-excursion (org-end-of-subtree t) (point)))
@@ -143,7 +148,7 @@ when none would be archived."
     (with-current-buffer (pos-visit file)
       (org-map-entries
        (lambda ()
-         (when (and (org-entry-is-done-p) (not (pos--open-descendant-p)))
+         (when (and (org-entry-is-done-p) (not (pos-open-descendant-p)))
            (let ((end (save-excursion (org-end-of-subtree t) (point))))
              (push (buffer-substring-no-properties (point) end) texts)
              (setq org-map-continue-from end))))
@@ -168,7 +173,7 @@ it stays.  Return (:archived COUNT :skipped HEADINGS)."
       (org-map-entries
        (lambda ()
          (when (org-entry-is-done-p)
-           (if (pos--open-descendant-p)
+           (if (pos-open-descendant-p)
                (push (org-get-heading t t t t) skipped)
              ;; Subtree gone; resume here.
              (setq org-map-continue-from (point))
