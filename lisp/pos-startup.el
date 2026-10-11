@@ -165,7 +165,7 @@ it.  None for a file `pos-startup--corpus' does not read."
                     (pos-corpus-owner pos-startup--corpus file)))
         positions)
     (while scope
-      (when-let* ((projects (pos-corpus--projects-dir scope))
+      (when-let* ((projects (pos-corpus-projects-dir scope))
                   (path (split-string projects "/" t))
                   ((<= (length path) (length directory)))
                   ((equal path (seq-take directory (length path)))))

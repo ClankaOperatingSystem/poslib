@@ -61,11 +61,11 @@ a symbolic link, nor a file in a hidden directory."
       (sort (seq-remove
              #'file-symlink-p
              (directory-files-recursively
-              source pos-corpus--org-regexp nil
+              source pos-corpus-org-regexp nil
               (lambda (dir)
                 (not (string-prefix-p "." (file-name-nondirectory dir))))))
             #'string<)
-    (and (pos-corpus--org-file-p (file-name-nondirectory source))
+    (and (pos-corpus-org-file-p (file-name-nondirectory source))
          (not (file-symlink-p source))
          (list source))))
 

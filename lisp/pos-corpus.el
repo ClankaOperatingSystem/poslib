@@ -93,13 +93,13 @@ command may not write."
 
 ;;;; The rules
 
-(defconst pos-corpus--org-regexp "\\`[^.#].*\\.org\\'"
+(defconst pos-corpus-org-regexp "\\`[^.#].*\\.org\\'"
   "Matches the name of an Org file that is read.
 Not a hidden file, nor a lock file, which begins with .#.")
 
-(defun pos-corpus--org-file-p (name)
+(defun pos-corpus-org-file-p (name)
   "Return non-nil if NAME names an Org file read into the corpus."
-  (string-match-p pos-corpus--org-regexp name))
+  (string-match-p pos-corpus-org-regexp name))
 
 (defun pos-corpus--kind (config)
   "Return the kind of scope a node with CONFIG is: responsibility, project or nil."
@@ -107,7 +107,7 @@ Not a hidden file, nor a lock file, which begins with .#.")
     ("responsibility" 'responsibility)
     ("project" 'project)))
 
-(defun pos-corpus--projects-dir (scope)
+(defun pos-corpus-projects-dir (scope)
   "Return the path, relative to the root, of SCOPE's projects directory, or nil.
 Nil for a scope whose configuration names none."
   (let ((projects (alist-get 'projects (pos-scope-config scope))))
@@ -180,7 +180,7 @@ two-configurations, and :names, the names in it, sorted."
                     (info (funcall lister path)))
                (pcase (plist-get info :kind)
                  ('file
-                  (when (pos-corpus--org-file-p name)
+                  (when (pos-corpus-org-file-p name)
                     (push (cons (expand-file-name path root)
                                 (if projects-of
                                     (make-scope 'project (file-name-sans-extension path)
@@ -233,7 +233,7 @@ two-configurations, and :names, the names in it, sorted."
                                exclusions exclusions-node nil declared))
                      (t
                       (descend path scope exclusions exclusions-node
-                               (and (equal path (pos-corpus--projects-dir scope))
+                               (and (equal path (pos-corpus-projects-dir scope))
                                     scope)
                                declared))))))))))
       (let* ((info (funcall lister ""))
