@@ -34,7 +34,7 @@
   (let* ((inventory (pos-ledger-inventory archive))
          (event (pos-ledger-event inventory nil 1 "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1")))
     (pos-seal-write-new (expand-file-name (concat pos-ledger-directory "/" (car event)) archive)
-                         (cdr event))
+                        (cdr event))
     (pos-migrate--protect archive)
     (pos-bytes-sha (cdr event))))
 
