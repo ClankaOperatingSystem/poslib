@@ -1100,5 +1100,12 @@ intray and the row counts as unwritable."
       (should (equal "* Unsorted\n** TODO a\n"
                      (pos-test-text root "intray.org"))))))
 
+(ert-deftest pos/a-new-id-is-lower-case-where-uuidgen-prints-upper-case ()
+  "A new ID is lower case where the system's uuidgen prints upper case."
+  (let ((org-id-method 'uuid)
+        (org-id-prefix nil)
+        (org-id-uuid-program "echo 0A1B2C3D-4E5F-4A6B-8C7D-9E0F1A2B3C4D"))
+    (should (equal "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d" (pos-new-id)))))
+
 (provide 'pos-test)
 ;;; pos-test.el ends here

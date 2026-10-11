@@ -123,7 +123,7 @@ locks."
                     (forward-line -1)
                     ;; Not `org-id-get-create', which also writes the
                     ;; ID to `org-id-locations-file'.
-                    (org-entry-put (point) "ID" (org-id-new))
+                    (org-entry-put (point) "ID" (pos-new-id))
                     (org-entry-put (point) "CREATED"
                                    (format-time-string
                                     (org-time-stamp-format t t)))
