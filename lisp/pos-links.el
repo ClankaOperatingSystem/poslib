@@ -236,7 +236,8 @@ FROM must be at OFFSET."
   "Return the ipfs:// link to archived TARGET, as sealed, or refuse."
   (let* ((archive (pos-links-archive-of target))
          (rel (file-relative-name target archive)))
-    (pcase-let ((`(,entries ,_ ,_ ,_ ,_ ,collections ,items) (pos-ledger-history archive)))
+    (pcase-let (((cl-struct pos-history entries collections items)
+                 (pos-ledger-history archive)))
       (let ((item (or (seq-find (lambda (i) (pos-path-within-p rel i)) items)
                       (seq-find (lambda (c) (pos-path-within-p rel c)) collections)
                       (and (assoc rel entries) rel))))

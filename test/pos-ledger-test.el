@@ -89,7 +89,7 @@ archive-integrity/ledger/, or in the legacy folder inside it, not both."
             (let ((archive (expand-file-name .archive dir)))
               (if .error
                   (pos-test-refused pos-ledger-refused .error (pos-ledger-history archive))
-                (pcase-let ((`(,entries ,head ,events ,_ ,root ,collections ,items ,empty)
+                (pcase-let (((cl-struct pos-history entries head events root collections items empty)
                              (pos-ledger-history archive)))
                   (should (equal (or .empty []) (vconcat empty)))
                   (should (equal .items (vconcat items)))

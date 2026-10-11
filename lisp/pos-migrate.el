@@ -211,7 +211,7 @@ TARGET's path is given from ROOT, the archive's scope."
 
 (defun pos-migrate--converted-p (archive)
   "Return non-nil if ARCHIVE's ledger records CIDs for every entry."
-  (let ((entries (car (pos-ledger-history archive))))
+  (let ((entries (pos-history-entries (pos-ledger-history archive))))
     (and entries (seq-every-p (lambda (e) (assq 'cid (cdr e))) entries))))
 
 (defun pos-migrate--in-capsule-p (rel collections stage)
@@ -251,7 +251,7 @@ Junk is removed, hidden entries renamed and collections, less EXCLUDE
 and with INCLUDE, declared.  Return (DISCARD REMOVE RENAMES COLLECTIONS
 DECLARATIONS)."
   (pos-migrate--stage archive stage)
-  (let* ((known (car (pos-ledger-history archive)))
+  (let* ((known (pos-history-entries (pos-ledger-history archive)))
          (actual (pos-ledger-inventory archive))
          (missing (car (pos-ledger--differences known actual)))
          discard remove)
@@ -281,9 +281,9 @@ dates rumours; LEDGER-ID names a ledger that has none."
          (stage (expand-file-name (concat "_migrate/" (file-name-nondirectory archive) "/stage")
                                   scope))
          (history (pos-ledger-history archive)))
-    (unless (seq-some (lambda (e) (not (assq 'cid (cdr e)))) (car history))
+    (unless (seq-some (lambda (e) (not (assq 'cid (cdr e)))) (pos-history-entries history))
       (pos-ledger-refuse 'converted "Nothing to migrate in %s" archive))
-    (let ((changed (nth 1 (pos-ledger--differences (car history) (pos-ledger-inventory archive)))))
+    (let ((changed (nth 1 (pos-ledger--differences (pos-history-entries history) (pos-ledger-inventory archive)))))
       (when changed
         (pos-ledger-refuse 'differs "Enrolled evidence changed in %s: %S" archive changed)))
     (pcase-let* ((inventory-sha (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory archive))))
@@ -498,7 +498,7 @@ Each of MOVES is (OLD . NEW), paths from ROOT."
 STAGE is the archive as it will be; HISTORY its ledger now; REMOVE and
 RENAMES what becomes of its entries; COLLECTIONS those declared;
 LEDGER-ID names a ledger that has none."
-  (pcase-let* ((`(,known ,head ,events ,files) history)
+  (pcase-let* (((cl-struct pos-history (entries known) head events files) history)
                (legacy (seq-filter (lambda (e) (not (assq 'cid (cdr e)))) known))
                (cids (pos-cid-tree stage))
                (entry (lambda (rel) (cons (cons 'cid (cdr (assoc rel cids)))

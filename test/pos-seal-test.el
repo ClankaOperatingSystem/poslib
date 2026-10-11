@@ -260,7 +260,7 @@ applied twice, it adds nothing."
       (rename-file (expand-file-name "trial" scope) (expand-file-name "archives/trial" scope))
       (let ((first (pos-seal-apply plan hash)))
         (should (equal first (pos-seal-apply plan hash))))
-      (should (equal 1 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
+      (should (equal 1 (pos-history-events (pos-ledger-history (expand-file-name "archives" scope))))))))
 
 (ert-deftest pos-seal/a-new-record-is-staged-then-sealed ()
   "New bytes are staged beside the archive, then sealed like any item."
@@ -418,7 +418,7 @@ a rumour already sealed word for word is cited, not sealed again."
                     (pos-test-approve plan)
                     (alist-get 'destination (aref (alist-get 'rumours plan) 0))))))
       (should-not (equal (funcall seal "first") (funcall seal "second")))
-      (should (equal 4 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
+      (should (equal 4 (pos-history-events (pos-ledger-history (expand-file-name "archives" scope))))))))
 
 (ert-deftest pos-seal/a-program-applies-its-own-plan-explicitly ()
   "The write-new command with --apply seals at once; without it, a plan."
@@ -460,7 +460,7 @@ a rumour already sealed word for word is cited, not sealed again."
       (should-not (file-exists-p target))
       (should (equal 0 (funcall run "--apply")))
       (should (file-exists-p (expand-file-name "result.md" target)))
-      (should (equal 1 (nth 2 (pos-ledger-history (expand-file-name "archives" scope))))))))
+      (should (equal 1 (pos-history-events (pos-ledger-history (expand-file-name "archives" scope))))))))
 
 (ert-deftest pos-seal/a-staging-directory-left-empty-is-not-sealed ()
   "An empty _seal in an item is removed and no event records it.
@@ -472,7 +472,7 @@ empty directory is recorded.  The check after the seal is clean."
     (pos-test-write-bytes (expand-file-name "trial/kept/_seal/plan.json" scope) "{}")
     (let* ((archive (pos-test-scope-sealed scope))
            (event (pos-bytes-parse
-                   (pos-bytes-read (car (last (nth 3 (pos-ledger-history archive))))))))
+                   (pos-bytes-read (car (last (pos-history-files (pos-ledger-history archive))))))))
       (should (equal ["trial/child" "trial/hollow"] (alist-get 'empty event)))
       (should-not (file-exists-p (expand-file-name "trial/_seal" archive)))
       (should-not (file-exists-p (expand-file-name "trial/child/_seal" archive)))
@@ -578,7 +578,7 @@ Beside the scope; and recording them again is no conflict."
       (should-error (pos-seal-checkpoint scope) :type 'pos-ledger-refused)
       (delete-file (expand-file-name "stray.txt" archive))
       (let* ((home (pos-seal-checkpoint scope))
-             (head (nth 1 (pos-ledger-history archive)))
+             (head (pos-history-head (pos-ledger-history archive)))
              (bytes (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "tree"))))
              (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") home)))
         (should (equal home (expand-file-name "archive-integrity/checkpoints"
@@ -631,7 +631,7 @@ bytes have changed, repair refuses."
     (make-directory (expand-file-name "trial/empty/leaf" scope) t)
     (let* ((archive (pos-test-scope-sealed scope))
            (history (pos-ledger-history archive))
-           (events (mapcar #'pos-bytes-read (nth 3 history)))
+           (events (mapcar #'pos-bytes-read (pos-history-files history)))
            (folder (expand-file-name "trial/empty" archive)))
       (delete-directory folder t)
       (should (pos-seal-findings-p (pos-ledger-check scope)))
@@ -639,7 +639,7 @@ bytes have changed, repair refuses."
                      (pos-seal-repair scope)))
       (should-not (pos-seal-findings-p (pos-ledger-check scope)))
       (should (equal history (pos-ledger-history archive)))
-      (should (equal events (mapcar #'pos-bytes-read (nth 3 history))))
+      (should (equal events (mapcar #'pos-bytes-read (pos-history-files history))))
       (should (equal '((repaired . 0) (restored . 0) (unregistered . 0))
                      (pos-seal-repair scope))))))
 
@@ -688,7 +688,7 @@ Its files are with its keeper: a checkpoint records its head, and
 repair protects its ledger's events and looks for nothing else."
   (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
     (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
-           (event (car (nth 3 (pos-ledger-history (expand-file-name "archives" scope))))))
+           (event (car (pos-history-files (pos-ledger-history (expand-file-name "archives" scope))))))
       (should (equal (expand-file-name "archive-integrity/checkpoints" scope)
                      (pos-seal-checkpoint scope)))
       (set-file-modes event #o644)
@@ -742,10 +742,10 @@ nothing is sent."
 (ert-deftest pos-seal/a-keeper-that-refuses-leaves-the-item-and-the-ledger ()
   "Refused by its keeper, a seal writes no event and the item stays."
   (pos-seal-test-with-kept "seal-kept-not-allowed"
-    (let ((events (nth 2 (pos-ledger-history (alist-get 'archive plan)))))
+    (let ((events (pos-history-events (pos-ledger-history (alist-get 'archive plan)))))
       (pos-test-refused pos-ledger-refused "access"
         (pos-test-approve plan))
-      (should (equal events (nth 2 (pos-ledger-history (alist-get 'archive plan)))))
+      (should (equal events (pos-history-events (pos-ledger-history (alist-get 'archive plan)))))
       (should (file-exists-p source)))))
 
 (ert-deftest pos-seal/a-keeper-with-another-head-is-a-finding ()
