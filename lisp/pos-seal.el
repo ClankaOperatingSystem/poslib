@@ -506,7 +506,7 @@ its hash, until it is converted."
                        (add . ,add) (root . ,(pos-cid-directory .archive))
                        (collections . ,collections)))))
                  (name (if blocks (pos-ledger--event-cid bytes) (pos-bytes-sha bytes))))
-      (list (format "%08d-%s.json" (1+ events) name) name bytes))))
+      (list (pos-ledger-event-file-name (1+ events) name) name bytes))))
 
 (defun pos-seal--event (plan destination add collections)
   "Write the event of PLAN sealing ADD at DESTINATION; return what names it.
@@ -524,7 +524,7 @@ Events since PLAN's previous head must seal PLAN's rumours, then its item,
 in order."
   (let-alist plan
     (let* ((files (nth 3 (pos-ledger-history .archive)))
-           (hashes (mapcar (lambda (f) (substring (file-name-nondirectory f) 9 -5)) files))
+           (hashes (mapcar #'pos-ledger-event-file-id files))
            (since (if (eq .previous :null) files
                     (let ((at (seq-position hashes .previous)))
                       (unless at
@@ -731,7 +731,7 @@ head.  Return the keeper's description."
             (let* ((number (+ events i 1))
                    (bytes (pos-remote-event keeper number))
                    (file (expand-file-name
-                          (format "%08d-%s.json" number (pos-ledger--event-cid bytes))
+                          (pos-ledger-event-file-name number (pos-ledger--event-cid bytes))
                           ledger)))
               (pos-seal--write-new file bytes)
               (push file written)))
@@ -1031,7 +1031,7 @@ with the reason."
                                (ledger_id . ,(pos-seal--last-id files))
                                (empty . ,(vconcat empty)) (root . ,folded))))
                      (name (pos-ledger--event-cid bytes))
-                     (file (expand-file-name (format "%08d-%s.json" (1+ events) name)
+                     (file (expand-file-name (pos-ledger-event-file-name (1+ events) name)
                                              (file-name-directory head-file))))
                 (push (list archive file bytes name) pending)))))))
     (pcase-dolist (`(,archive ,file ,bytes ,name) (nreverse pending))
@@ -1144,7 +1144,7 @@ reason."
         (when (or (> held (length files))
                   (and (> held 0)
                        (not (equal (alist-get 'head described)
-                                   (substring (nth (1- held) names) 9 -5)))))
+                                   (pos-ledger-event-file-id (nth (1- held) names))))))
           (pos-ledger-refuse 'chain "The keeper holds another ledger than this one: %s"
                              archive))
         (pcase-let* ((`(,added . ,first) (pos-seal--added-paths files entries))
