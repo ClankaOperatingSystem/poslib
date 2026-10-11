@@ -542,29 +542,52 @@ Its state is one of `pos-startup-next-action-states'."
        nil 'file)
       nil)))
 
+(cl-defstruct (pos-startup--project (:constructor pos-startup--project-make)
+                                    (:copier nil))
+  "What the files of one project say of it.
+PATH is the project's, and OWNER its scope.  STATUS is that of its
+files; HAS-NEXT is non-nil if one of them has an item in one of
+`pos-startup-next-action-states', and NEXT is the title of the first
+such item.  OUTCOME is as `pos-startup--outcome' gives it.  REVIEW is
+the earliest date, as YYYY-MM-DD, an open heading tagged
+`pos-startup-review-tag' is scheduled on.  Each of these is nil if
+no file of the project has it."
+  path owner status has-next outcome next review)
+
+(defun pos-startup--project-of (file projects)
+  "Return the one of PROJECTS that FILE belongs to, or a new one.
+A new one has its path and owner alone."
+  (let* ((owner (pos-corpus-owner pos-startup--corpus file))
+         (path (pos-scope-path owner)))
+    (or (seq-find (lambda (project) (equal path (pos-startup--project-path project)))
+                  projects)
+        (pos-startup--project-make :path path :owner owner))))
+
 (defun pos-startup--stuck ()
   "Return the view of the projects of `pos-startup--corpus' with no next action.
 Begun projects, by `pos-startup-stuck-statuses', none of whose files
 has an item in one of `pos-startup-next-action-states'."
   (let (projects)
     (dolist (file (pos-startup--files-of-kind 'project))
-      (let* ((owner (pos-corpus-owner pos-startup--corpus file))
-             (path (pos-scope-path owner))
-             (project (or (assoc path projects)
-                          (car (push (list path nil nil owner) projects)))))
-        (setf (nth 1 project) (or (nth 1 project) (pos-startup--file-status file)))
-        (setf (nth 2 project) (or (nth 2 project)
-                                  (pos-startup--has-next-action-p file)))))
+      (let ((project (pos-startup--project-of file projects)))
+        (cl-pushnew project projects)
+        (setf (pos-startup--project-status project)
+              (or (pos-startup--project-status project)
+                  (pos-startup--file-status file))
+              (pos-startup--project-has-next project)
+              (or (pos-startup--project-has-next project)
+                  (pos-startup--has-next-action-p file)))))
     (pos-startup--list
      "Projects with no next action"
-     (mapcar (lambda (project)
-               (pos-startup--scope-row (nth 3 project) (nth 1 project))
-               (format "%-54s %s" (nth 0 project) (nth 1 project)))
-             (seq-sort-by #'car #'string<
-                          (seq-filter (lambda (project)
-                                        (and (member (nth 1 project) pos-startup-stuck-statuses)
-                                             (not (nth 2 project))))
-                                      projects))))))
+     (mapcar (pcase-lambda ((cl-struct pos-startup--project path owner status))
+               (pos-startup--scope-row owner status)
+               (format "%-54s %s" path status))
+             (seq-sort-by #'pos-startup--project-path #'string<
+                          (seq-filter
+                           (pcase-lambda ((cl-struct pos-startup--project status has-next))
+                             (and (member status pos-startup-stuck-statuses)
+                                  (not has-next)))
+                           projects))))))
 
 (defun pos-startup--outcome ()
   "Return the OUTCOME property the current buffer has before its first heading.
@@ -580,13 +603,10 @@ one."
           (org-link-display-format
            (string-join (split-string outcome "[ \t\n]+" t) " "))))))
 
-(defun pos-startup--project-facts (file)
-  "Return (STATUS OUTCOME NEXT REVIEW) as FILE, a project's file, has them.
-STATUS is the file's; OUTCOME is `pos-startup--outcome'; NEXT is the
-title of its first item in one of `pos-startup-next-action-states';
-REVIEW is the earliest date, as YYYY-MM-DD, an open heading tagged
-`pos-startup-review-tag' is scheduled on.  Each is nil if FILE has
-none."
+(defun pos-startup--read-project (project file)
+  "Add to PROJECT what is said of it in FILE, one of its files.
+Its status, outcome and next action are the first that a file of the
+project has; its review is the earliest of its files'."
   (let ((status (pos-startup--file-status file))
         next review)
     (with-current-buffer (pos-visit file)
@@ -604,7 +624,18 @@ none."
                  (when (or (not review) (string< date review))
                    (setq review date)))))))
        nil 'file)
-      (list status (pos-startup--outcome) next review))))
+      (let ((outcome (pos-startup--outcome))
+            (had (pos-startup--project-review project)))
+        (setf (pos-startup--project-status project)
+              (or (pos-startup--project-status project) status)
+              (pos-startup--project-outcome project)
+              (or (pos-startup--project-outcome project) outcome)
+              (pos-startup--project-next project)
+              (or (pos-startup--project-next project) next)
+              (pos-startup--project-review project)
+              (if (and review had)
+                  (if (string< review had) review had)
+                (or had review)))))))
 
 (defun pos-startup--projects ()
   "Return the projects view of `pos-startup--corpus'.
@@ -617,23 +648,16 @@ as a dash."
   (let ((covered (car (pos-startup--reviews-of-scopes)))
         projects)
     (dolist (file (pos-startup--files-of-kind 'project))
-      (let* ((owner (pos-corpus-owner pos-startup--corpus file))
-             (path (pos-scope-path owner))
-             (project (or (assoc path projects)
-                          (car (push (list path owner nil nil nil nil) projects))))
-             (facts (pos-startup--project-facts file)))
-        (dotimes (i 4)
-          (let ((fact (nth i facts)) (had (nth (+ 2 i) project)))
-            (setf (nth (+ 2 i) project)
-                  ;; The earliest review of the project's files.
-                  (if (and (= i 3) fact had)
-                      (if (string< fact had) fact had)
-                    (or had fact)))))))
+      (let ((project (pos-startup--project-of file projects)))
+        (cl-pushnew project projects)
+        (pos-startup--read-project project file)))
     (pos-startup--list
      "Projects"
      (mapcan
       (lambda (project)
-        (pcase-let* ((`(,path ,owner ,status ,outcome ,next ,own) project)
+        (pcase-let* (((cl-struct pos-startup--project path owner status outcome next
+                                 (review own))
+                      project)
                      (named (cdr (assoc path covered)))
                      (review (if (and own named (string< own named)) own
                                (or named own))))
@@ -644,9 +668,10 @@ as a dash."
           (list (format "%-54s %-9s review %-10s" path status (or review "-"))
                 (format "  next: %s" (or next "-"))
                 (format "  outcome: %s" (or outcome "-")))))
-      (seq-sort-by #'car #'string<
+      (seq-sort-by #'pos-startup--project-path #'string<
                    (seq-filter (lambda (project)
-                                 (member (nth 2 project) pos-startup-active-statuses))
+                                 (member (pos-startup--project-status project)
+                                         pos-startup-active-statuses))
                                projects))))))
 
 (defun pos-startup--intray ()
