@@ -328,29 +328,39 @@ dates rumours; LEDGER-ID names a ledger that has none."
                  (let* ((target (pos-migrate--through (pos-migrate--rel abs archive) renames))
                         (item (pos-migrate--item-of rel collections))
                         (titem (pos-migrate--item-of target collections)))
-                   (cond ((equal target rel) (list rel link "internal" text))
+                   (cond ((equal target rel)
+                          (pos-resolution-create :file rel :link link
+                                                 :kind "internal" :to text))
                          ((seq-some (lambda (c) (and (pos-path-within-p rel c)
                                                      (pos-path-within-p target c)))
                                     collections)
-                          (list rel link "internal" text))
+                          (pos-resolution-create :file rel :link link
+                                                 :kind "internal" :to text))
                          ((and (file-directory-p (expand-file-name target stage))
                                (not (member target collections)))
                           (let ((r (pos-migrate--rumour abs scope date)))
                             (unless (assoc (car r) rumours) (push r rumours))
-                            (list rel link "rumour" :rumour (car r) suffix)))
+                            (pos-resolution-create :file rel :link link :kind "rumour"
+                                                   :rumour (car r) :suffix suffix)))
                          (t (push (cons item titem) deps)
-                            (list rel link "cid" :item titem target suffix)))))
+                            (pos-resolution-create :file rel :link link :kind "cid"
+                                                   :target target :suffix suffix)))))
                 ((or (file-exists-p abs) (file-symlink-p abs))
                  (let ((other (pos-links-archive-of abs)))
                    (cond
                     ((and other (not inside) (pos-links-within-scope-p other scope))
                      (unless (pos-migrate--converted-p other)
                        (pos-ledger-refuse 'order "Migrate %s first: %s links to it" other rel))
-                     (list rel link "cid" (concat (pos-links--sealed abs) suffix)))
+                     (pos-resolution-create
+                      :file rel :link link
+                      :kind "cid" :to (concat (pos-links--sealed abs) suffix)))
                     (t (let ((r (pos-migrate--rumour abs scope date)))
                          (unless (assoc (car r) rumours) (push r rumours))
-                         (list rel link "rumour" :rumour (car r) suffix))))))
-                (t (list rel link "broken" (pos-links-annotate rel link "broken"))))
+                         (pos-resolution-create :file rel :link link :kind "rumour"
+                                                :rumour (car r) :suffix suffix))))))
+                (t (pos-resolution-create
+                    :file rel :link link
+                    :kind "broken" :to (pos-links-annotate rel link "broken"))))
                links)))))
       ;; Loops among items: a link from an earlier record to a later one
       ;; becomes an annotation.
@@ -367,13 +377,16 @@ dates rumours; LEDGER-ID names a ledger that has none."
                              (or (string< da db) (and (equal da db) (string< a b)))))
                   (puthash (cons a b) t later))))))
         (setq links
-              (mapcar (lambda (l)
-                        (pcase l
-                          (`(,rel ,link "cid" :item ,titem ,_ ,_)
-                           (if (gethash (cons (pos-migrate--item-of rel collections) titem) later)
-                               (list rel link "later" (pos-links-annotate rel link "later"))
-                             l))
-                          (_ l)))
+              (mapcar (lambda (r)
+                        (pcase-let (((cl-struct pos-resolution (file rel) link target) r))
+                          (if (and target
+                                   (gethash (cons (pos-migrate--item-of rel collections)
+                                                  (pos-migrate--item-of target collections))
+                                            later))
+                              (pos-resolution-create
+                               :file rel :link link
+                               :kind "later" :to (pos-links-annotate rel link "later"))
+                            r)))
                       links))
         (setq deps (seq-remove (lambda (d) (gethash d later)) deps)))
       ;; Rumours, then items leaves-first: rewrite each, then take its CID.
@@ -386,7 +399,10 @@ dates rumours; LEDGER-ID names a ledger that has none."
             (pos-migrate--write-over there (encode-coding-string (cdr r) 'utf-8)))))
       (let ((cids (mapcar (lambda (r) (cons (car r) (pos-cid-file (expand-file-name (car r) stage))))
                           rumours))
-            (pending (seq-uniq (mapcar (lambda (l) (pos-migrate--item-of (car l) collections)) links)))
+            (pending (seq-uniq (mapcar (lambda (r)
+                                         (pos-migrate--item-of (pos-resolution-file r)
+                                                               collections))
+                                       links)))
             (done nil) (resolved nil))
         (while pending
           (let ((item (seq-find (lambda (i) (seq-every-p (lambda (d) (or (not (equal (car d) i))
@@ -398,37 +414,34 @@ dates rumours; LEDGER-ID names a ledger that has none."
             (unless item (pos-ledger-refuse 'loop "Links still loop among %S" pending))
             (setq pending (delete item pending))
             (let ((by-file nil))
-              (dolist (l links)
-                (when (equal (pos-migrate--item-of (car l) collections) item)
-                  (let ((to (pcase l
-                              (`(,_ ,_ ,_ :item ,titem ,target ,suffix)
-                               (let ((cid (or (cdr (assoc titem cids))
-                                              (pos-migrate--cid stage titem))))
-                                 (concat "ipfs://" cid
-                                         (unless (equal target titem)
-                                           (concat "/" (substring target (1+ (length titem)))))
-                                         suffix)))
-                              (`(,_ ,_ ,_ :rumour ,dest ,suffix)
-                               (concat "ipfs://" (cdr (assoc dest cids)) suffix))
-                              (`(,_ ,_ ,_ ,to) to))))
-                    (push (list (car l) (nth 1 l) (nth 2 l) to) by-file))))
-              (dolist (rel (seq-uniq (mapcar #'car by-file)))
+              (dolist (r links)
+                (when (equal (pos-migrate--item-of (pos-resolution-file r) collections) item)
+                  (pcase-let (((cl-struct pos-resolution to target rumour suffix) r))
+                    (cond
+                     (to)
+                     (rumour
+                      (setf (pos-resolution-to r)
+                            (concat "ipfs://" (cdr (assoc rumour cids)) suffix)))
+                     (t
+                      (let* ((titem (pos-migrate--item-of target collections))
+                             (cid (or (cdr (assoc titem cids))
+                                      (pos-migrate--cid stage titem))))
+                        (setf (pos-resolution-to r)
+                              (concat "ipfs://" cid
+                                      (unless (equal target titem)
+                                        (concat "/" (substring target (1+ (length titem)))))
+                                      suffix))))))
+                  (push r by-file)))
+              (dolist (rel (seq-uniq (mapcar #'pos-resolution-file by-file)))
                 (let* ((file (expand-file-name rel stage))
-                       ;; Each as (OFFSET FROM TO KIND): an annotation replaces
-                       ;; the whole link, a resolution only its target.
-                       (all (mapcar (lambda (l)
-                                      (let ((link (nth 1 l))
-                                            (whole (member (nth 2 l) '("broken" "later"))))
-                                        (list (if whole (pos-link-whole-offset link)
-                                                (pos-link-offset link))
-                                              (if whole (pos-link-whole link)
-                                                (pos-link-text link))
-                                              (nth 3 l) (nth 2 l))))
-                                    (seq-filter (lambda (l) (equal (car l) rel)) by-file)))
-                       (edits (mapcar (lambda (e) (seq-take e 3))
-                                      (seq-remove (lambda (e) (equal (nth 1 e) (nth 2 e))) all))))
-                  (dolist (e all)
-                    (push (list rel (nth 0 e) (nth 1 e) (nth 3 e) (nth 2 e)) resolved))
+                       (all (seq-filter (lambda (r) (equal (pos-resolution-file r) rel))
+                                        by-file))
+                       (edits (mapcar #'pos-resolution-rewrite
+                                      (seq-remove (lambda (r) (equal (pos-resolution-from r)
+                                                                     (pos-resolution-to r)))
+                                                  all))))
+                  (dolist (r all)
+                    (push r resolved))
                   (when edits
                     (pos-migrate--write-over file (pos-links-rewrite (pos-bytes-read file) edits)))))
               (push item done)
@@ -455,12 +468,15 @@ dates rumours; LEDGER-ID names a ledger that has none."
             (rumours . ,(vconcat (mapcar (lambda (r) `((destination . ,(car r)) (text . ,(cdr r))))
                                          (seq-sort-by #'car #'string< rumours))))
             (links . ,(vconcat
-                       (mapcar (lambda (l) `((file . ,(nth 0 l)) (offset . ,(nth 1 l))
-                                             (from . ,(nth 2 l)) (kind . ,(nth 3 l))
-                                             (to . ,(nth 4 l))))
-                               (sort resolved (lambda (a b) (if (equal (car a) (car b))
-                                                                (< (nth 1 a) (nth 1 b))
-                                                              (string< (car a) (car b))))))))
+                       (mapcar #'pos-resolution-alist
+                               (sort resolved
+                                     (lambda (a b)
+                                       (let ((fa (pos-resolution-file a))
+                                             (fb (pos-resolution-file b)))
+                                         (if (equal fa fb)
+                                             (< (pos-resolution-offset a)
+                                                (pos-resolution-offset b))
+                                           (string< fa fb))))))))
             (canon . ,(vconcat canon))
             (final_inventory_sha256
              . ,(pos-bytes-sha (pos-bytes-json (pos-ledger-inventory stage))))
