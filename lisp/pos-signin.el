@@ -105,12 +105,9 @@ Each an alist by string: TOKENS by \"ISSUER CLIENT\", KEEPERS by origin."
     (unless (file-directory-p dir)
       (make-directory dir t)
       (set-file-modes dir #o700))
-    (let ((temp (make-temp-file (expand-file-name "tokens-" dir)))
-          (coding-system-for-write 'binary))
+    (let ((temp (make-temp-file (expand-file-name "tokens-" dir))))
       (set-file-modes temp #o600)
-      (with-temp-file temp
-        (set-buffer-multibyte nil)
-        (insert (pos-bytes-json `((tokens . ,(car kept)) (keepers . ,(cdr kept))))))
+      (pos-bytes-write temp (pos-bytes-json `((tokens . ,(car kept)) (keepers . ,(cdr kept)))))
       (set-file-modes temp #o600)
       (rename-file temp file t))))
 

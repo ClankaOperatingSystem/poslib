@@ -24,6 +24,7 @@
 ;; it, in lockstep with pyposlib.
 ;;
 ;; - `pos-bytes-read': a file's bytes.
+;; - `pos-bytes-write': bytes to a file.
 ;; - `pos-bytes-sha': the SHA-256 of bytes.
 ;; - `pos-bytes-json': DAG-JSON bytes of a value, and a newline.
 ;; - `pos-bytes-block': the same without the newline, a block.
@@ -44,6 +45,13 @@
     (set-buffer-multibyte nil)
     (insert-file-contents-literally file)
     (buffer-string)))
+
+(defun pos-bytes-write (file bytes)
+  "Write BYTES to FILE, replacing its contents."
+  (let ((coding-system-for-write 'binary))
+    (with-temp-file file
+      (set-buffer-multibyte nil)
+      (insert bytes))))
 
 (defun pos-bytes-sha (bytes)
   "Return the lower-case hex SHA-256 of BYTES."
