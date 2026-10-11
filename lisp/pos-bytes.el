@@ -27,6 +27,7 @@
 ;; - `pos-bytes-write': bytes to a file.
 ;; - `pos-bytes-sha': the SHA-256 of bytes.
 ;; - `pos-bytes-json': DAG-JSON bytes of a value, and a newline.
+;; - `pos-bytes-print': the same, printed.
 ;; - `pos-bytes-block': the same without the newline, a block.
 ;; - `pos-bytes-parse': the value in JSON bytes.
 ;; - `pos-bytes-key': an object's key as a string.
@@ -105,6 +106,10 @@
 (defun pos-bytes-json (value)
   "Return the canonical JSON bytes of VALUE, with its final newline."
   (encode-coding-string (concat (pos-bytes--encode value) "\n") 'utf-8))
+
+(defun pos-bytes-print (value)
+  "Print VALUE as canonical JSON, with its final newline."
+  (princ (decode-coding-string (pos-bytes-json value) 'utf-8)))
 
 (defun pos-bytes-block (value)
   "Return VALUE as a DAG-JSON block: its canonical bytes, with no newline."

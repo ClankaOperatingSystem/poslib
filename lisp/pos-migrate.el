@@ -643,19 +643,14 @@ applies it.  Exit 0 done, 2 refused."
         (`("plan" ,archive . ,rest)
          ;; After ROOT, +DIR includes a collection and DIR excludes one.
          (let ((names (cdr rest)))
-           (princ (decode-coding-string
-                   (pos-bytes-json
-                    (pos-migrate-plan
-                     archive (car rest)
-                     (seq-remove (lambda (n) (string-prefix-p "+" n)) names) nil nil
-                     (mapcar (lambda (n) (substring n 1))
-                             (seq-filter (lambda (n) (string-prefix-p "+" n)) names))))
-                   'utf-8))))
+           (pos-bytes-print (pos-migrate-plan
+                             archive (car rest)
+                             (seq-remove (lambda (n) (string-prefix-p "+" n)) names) nil nil
+                             (mapcar (lambda (n) (substring n 1))
+                                     (seq-filter (lambda (n) (string-prefix-p "+" n)) names))))))
         (`("apply" ,plan-file ,hash)
          (let ((result (pos-migrate-apply (pos-bytes-parse (pos-bytes-read plan-file)) hash)))
-           (princ (decode-coding-string
-                   (pos-bytes-json `((event . ,(car result)) (root . ,(cdr result))))
-                   'utf-8))))
+           (pos-bytes-print `((event . ,(car result)) (root . ,(cdr result))))))
         (_ (message "Usage: plan ARCHIVE [ROOT [DIR... +DIR...]] | apply PLAN HASH")
            (kill-emacs 2)))
     (pos-ledger-refused
