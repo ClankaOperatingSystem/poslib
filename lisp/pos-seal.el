@@ -125,35 +125,39 @@ As (DESTINATION . TEXT), DESTINATION within the archive, dated DATE."
            (pos-links-description target scope)
            ".\n"))))
 
-(defun pos-seal--resolve (source rel archive files collections date &optional written-at)
-  "Resolve the links in FILES, the item at SOURCE sealed at REL in ARCHIVE.
-Return (ADD LINKS ORIGINALS RUMOURS): the entries of the rewritten files,
-every path link with its resolution, the SHA-256 of each file rewritten,
-and the rumours to seal first.  COLLECTIONS are the item's; DATE dates
-the rumours.  A file's links are read from its directory, or for a file
-item, from WRITTEN-AT if given.  An id link in an Org file is read as a
-link to the file that holds its ID, among the item's files and the
-Org files of the scope's garden."
+(defun pos-seal--ids (scope files)
+  "Return where each Org ID is held, for the id links in FILES, or nil.
+As `pos-links-ids' gives it, over the Org files among FILES and those
+of the garden of SCOPE.  Nothing is read, and nil returned, unless an
+Org file of FILES has an id link.  FILES is an alist of sealed path
+and file."
+  (when (seq-some
+         (lambda (pair)
+           (and (string-suffix-p ".org" (cdr pair))
+                (string-search "[[id:" (pos-bytes-read (cdr pair)))))
+         files)
+    (pos-links-ids
+     (seq-uniq
+      (append (pos-links-org-files (pos-links-garden scope))
+              (seq-filter (lambda (file) (string-suffix-p ".org" file))
+                          (mapcar #'cdr files)))))))
+
+(defun pos-seal--classify (source rel archive files collections date written-at)
+  "Return (PLANS . RUMOURS) for the links in FILES of the item at SOURCE.
+The item is to be sealed at REL in ARCHIVE.  PLANS holds, for each
+file, its sealed path and a `pos-resolution' for each of its links; a
+link to another file of the item has a target and no text yet, and a
+capsule's links are left as written.  RUMOURS holds (DESTINATION .
+TEXT) for each rumour the links need, dated DATE.  COLLECTIONS and
+WRITTEN-AT are as `pos-seal--resolve' takes them.  Refuse `unresolved'
+a link within the item to a file it does not hold."
   (let* ((scope (file-name-directory archive))
          (base (file-name-as-directory source))
          (inside (lambda (abs) (or (equal abs source) (string-prefix-p base abs))))
          (in-archive (lambda (abs) (if (equal abs source) rel
                                      (concat rel "/" (substring abs (length base))))))
-         ;; Where each ID is held, read only when a file of the item
-         ;; has an id link.
-         (ids (when (seq-some
-                     (lambda (pair)
-                       (and (string-suffix-p ".org" (cdr pair))
-                            (string-search "[[id:" (pos-bytes-read (cdr pair)))))
-                     files)
-                (pos-links-ids
-                 (seq-uniq
-                  (append (pos-links-org-files (pos-links-garden scope))
-                          (seq-filter (lambda (file) (string-suffix-p ".org" file))
-                                      (mapcar #'cdr files)))))))
+         (ids (pos-seal--ids scope files))
          rumours plans)
-    ;; Each file: its links, each as a `pos-resolution'.  A capsule's are
-    ;; left as written.
     (dolist (pair files)
       (let ((file (cdr pair)) resolved)
         (dolist (link (unless (seq-some (lambda (c)
@@ -198,55 +202,79 @@ Org files of the scope's garden."
                                            :suffix suffix)))))
              resolved)))
         (push (cons (car pair) (nreverse resolved)) plans)))
-    (setq rumours (seq-sort-by #'car #'string< rumours))
-    (let ((rumour-cids (mapcar (lambda (r) (cons (car r) (pos-cid-bytes
-                                                          (encode-coding-string (cdr r) 'utf-8))))
-                               rumours))
-          done links originals add)
-      ;; Rewrite files after the files they cite, whose CIDs change with them.
-      (while plans
-        (let ((ready (seq-find (lambda (plan)
-                                 (seq-every-p (lambda (r)
-                                                (or (not (pos-resolution-target r))
-                                                    (assoc (pos-resolution-target r) done)))
-                                              (cdr plan)))
-                               plans)))
-          (unless ready
-            (pos-ledger-refuse 'loop "Links loop within the item: %s"
-                               (mapconcat #'car plans ", ")))
-          (setq plans (delq ready plans))
+    (cons plans rumours)))
+
+(defun pos-seal--rewrite (plans files rumour-cids)
+  "Return (ADD LINKS ORIGINALS) for PLANS, the links of FILES resolved.
+PLANS is as `pos-seal--classify' returns it.  A file is rewritten after
+the files it cites, whose CIDs change with them: each link is given
+the CID it awaits, a file's from those rewritten before it and a
+rumour's from RUMOUR-CIDS, an alist of destination and CID.  ADD holds
+the entry of each file as rewritten, LINKS every link as a plan
+records it, and ORIGINALS the SHA-256 each rewritten file had.  No
+file is written.  Refuse `loop' if files cite one another in a loop."
+  (let (done links originals add)
+    (while plans
+      (let ((ready (seq-find (lambda (plan)
+                               (seq-every-p (lambda (r)
+                                              (or (not (pos-resolution-target r))
+                                                  (assoc (pos-resolution-target r) done)))
+                                            (cdr plan)))
+                             plans)))
+        (unless ready
+          (pos-ledger-refuse 'loop "Links loop within the item: %s"
+                             (mapconcat #'car plans ", ")))
+        (setq plans (delq ready plans))
+        (dolist (r (cdr ready))
+          (pcase-let (((cl-struct pos-resolution to target rumour suffix) r))
+            (unless to
+              (setf (pos-resolution-to r)
+                    (concat "ipfs://"
+                            (cdr (if target (assoc target done) (assoc rumour rumour-cids)))
+                            suffix)))))
+        (let* ((file (cdr (assoc (car ready) files)))
+               (bytes (pos-bytes-read file))
+               (changed (seq-remove (lambda (r) (equal (pos-resolution-from r)
+                                                       (pos-resolution-to r)))
+                                    (cdr ready)))
+               (new (pos-links-rewrite bytes (mapcar #'pos-resolution-rewrite changed)))
+               (entry (list (cons 'cid (pos-cid-bytes new))
+                            (cons 'mode (logand (pos-ledger--mode file) (lognot #o222)))
+                            (cons 'sha256 (pos-bytes-sha new))
+                            (cons 'size (length new)))))
+          (when changed
+            (push (cons (car ready) (pos-bytes-sha bytes)) originals))
           (dolist (r (cdr ready))
-            (pcase-let (((cl-struct pos-resolution to target rumour suffix) r))
-              (unless to
-                (setf (pos-resolution-to r)
-                      (concat "ipfs://"
-                              (cdr (if target (assoc target done) (assoc rumour rumour-cids)))
-                              suffix)))))
-          (let* ((file (cdr (assoc (car ready) files)))
-                 (bytes (pos-bytes-read file))
-                 (changed (seq-remove (lambda (r) (equal (pos-resolution-from r)
-                                                         (pos-resolution-to r)))
-                                      (cdr ready)))
-                 (new (pos-links-rewrite bytes (mapcar #'pos-resolution-rewrite changed)))
-                 (entry (list (cons 'cid (pos-cid-bytes new))
-                              (cons 'mode (logand (pos-ledger--mode file) (lognot #o222)))
-                              (cons 'sha256 (pos-bytes-sha new))
-                              (cons 'size (length new)))))
-            (when changed
-              (push (cons (car ready) (pos-bytes-sha bytes)) originals))
-            (dolist (r (cdr ready))
-              (push (pos-resolution-alist r) links))
-            (push (cons (car ready) (alist-get 'cid entry)) done)
-            (push (cons (car ready) entry) add))))
-      (list (seq-sort-by #'car #'string< add)
-            (vconcat (sort links (lambda (a b)
-                                   (let ((fa (alist-get 'file a)) (fb (alist-get 'file b)))
-                                     (if (equal fa fb) (< (alist-get 'offset a) (alist-get 'offset b))
-                                       (string< fa fb))))))
-            (seq-sort-by #'car #'string< originals)
-            (vconcat (mapcar (lambda (r) `((destination . ,(car r)) (text . ,(cdr r))
-                                           (cid . ,(cdr (assoc (car r) rumour-cids)))))
-                             rumours))))))
+            (push (pos-resolution-alist r) links))
+          (push (cons (car ready) (alist-get 'cid entry)) done)
+          (push (cons (car ready) entry) add))))
+    (list add links originals)))
+
+(defun pos-seal--resolve (source rel archive files collections date &optional written-at)
+  "Resolve the links in FILES, the item at SOURCE sealed at REL in ARCHIVE.
+Return (ADD LINKS ORIGINALS RUMOURS): the entries of the rewritten files,
+every path link with its resolution, the SHA-256 of each file rewritten,
+and the rumours to seal first.  COLLECTIONS are the item's; DATE dates
+the rumours.  A file's links are read from its directory, or for a file
+item, from WRITTEN-AT if given.  An id link in an Org file is read as a
+link to the file that holds its ID, among the item's files and the
+Org files of the scope's garden."
+  (pcase-let* ((`(,plans . ,rumours)
+                (pos-seal--classify source rel archive files collections date written-at))
+               (rumours (seq-sort-by #'car #'string< rumours))
+               (rumour-cids (mapcar (lambda (r) (cons (car r) (pos-cid-bytes
+                                                               (encode-coding-string (cdr r) 'utf-8))))
+                                    rumours))
+               (`(,add ,links ,originals) (pos-seal--rewrite plans files rumour-cids)))
+    (list (seq-sort-by #'car #'string< add)
+          (vconcat (sort links (lambda (a b)
+                                 (let ((fa (alist-get 'file a)) (fb (alist-get 'file b)))
+                                   (if (equal fa fb) (< (alist-get 'offset a) (alist-get 'offset b))
+                                     (string< fa fb))))))
+          (seq-sort-by #'car #'string< originals)
+          (vconcat (mapcar (lambda (r) `((destination . ,(car r)) (text . ,(cdr r))
+                                         (cid . ,(cdr (assoc (car r) rumour-cids)))))
+                           rumours)))))
 
 ;;;; Plans
 
