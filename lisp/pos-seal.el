@@ -152,8 +152,8 @@ Org files of the scope's garden."
                           (seq-filter (lambda (file) (string-suffix-p ".org" file))
                                       (mapcar #'cdr files)))))))
          rumours plans)
-    ;; Each file: its links, as (OFFSET TEXT KIND . TO-OR-TARGET).  A
-    ;; capsule's are left as written.
+    ;; Each file: its links, each as a `pos-resolution'.  A capsule's are
+    ;; left as written.
     (dolist (pair files)
       (let ((file (cdr pair)) resolved)
         (dolist (link (unless (seq-some (lambda (c)
@@ -163,8 +163,7 @@ Org files of the scope's garden."
                                                   (concat base (substring c (1+ (length rel))))))))
                                         collections)
                         (pos-links-in-file file ids)))
-          (pcase-let* (((cl-struct pos-link offset text path suffix whole-offset whole)
-                        link)
+          (pcase-let* (((cl-struct pos-link text path suffix) link)
                        (abs (expand-file-name path (if (and written-at (equal file source))
                                                        written-at
                                                      (file-name-directory file)))))
@@ -175,20 +174,28 @@ Org files of the scope's garden."
                     ((seq-some (lambda (c) (and (pos-path-within-p (car pair) c)
                                                 (pos-path-within-p target c)))
                                collections)
-                     (list offset text "internal" text))
-                    ((assoc target files) (list offset text "cid" :file target suffix))
+                     (pos-resolution-create :file (car pair) :link link
+                                            :kind "internal" :to text))
+                    ((assoc target files)
+                     (pos-resolution-create :file (car pair) :link link
+                                            :kind "cid" :target target :suffix suffix))
                     (t (pos-ledger-refuse 'unresolved "Link within the item to %s" abs))))
                (pcase (pos-links-resolve abs scope)
-                 (`(cid . ,to) (list offset text "cid" (concat to suffix)))
+                 (`(cid . ,to)
+                  (pos-resolution-create :file (car pair) :link link
+                                         :kind "cid" :to (concat to suffix)))
                  ;; A link to nothing is kept, annotated as broken: the
                  ;; annotation replaces the whole link.
                  (`(broken . ,_)
-                  (list whole-offset whole "broken"
-                        (pos-links-annotate file link "broken")))
+                  (pos-resolution-create
+                   :file (car pair) :link link
+                   :kind "broken" :to (pos-links-annotate file link "broken")))
                  (`(rumour . ,target)
                   (let ((rumour (pos-seal--rumour target scope rel date)))
                     (unless (assoc (car rumour) rumours) (push rumour rumours))
-                    (list offset text "rumour" :rumour (car rumour) suffix)))))
+                    (pos-resolution-create :file (car pair) :link link
+                                           :kind "rumour" :rumour (car rumour)
+                                           :suffix suffix)))))
              resolved)))
         (push (cons (car pair) (nreverse resolved)) plans)))
     (setq rumours (seq-sort-by #'car #'string< rumours))
@@ -199,41 +206,36 @@ Org files of the scope's garden."
       ;; Rewrite files after the files they cite, whose CIDs change with them.
       (while plans
         (let ((ready (seq-find (lambda (plan)
-                                 (seq-every-p (lambda (l) (or (not (eq (nth 3 l) :file))
-                                                              (assoc (nth 4 l) done)))
+                                 (seq-every-p (lambda (r)
+                                                (or (not (pos-resolution-target r))
+                                                    (assoc (pos-resolution-target r) done)))
                                               (cdr plan)))
                                plans)))
           (unless ready
             (pos-ledger-refuse 'loop "Links loop within the item: %s"
                                (mapconcat #'car plans ", ")))
           (setq plans (delq ready plans))
+          (dolist (r (cdr ready))
+            (pcase-let (((cl-struct pos-resolution to target rumour suffix) r))
+              (unless to
+                (setf (pos-resolution-to r)
+                      (concat "ipfs://"
+                              (cdr (if target (assoc target done) (assoc rumour rumour-cids)))
+                              suffix)))))
           (let* ((file (cdr (assoc (car ready) files)))
-                 (rewrites
-                  (mapcar (lambda (l)
-                            (pcase l
-                              (`(,offset ,text ,kind :file ,target ,suffix)
-                               (list offset text kind
-                                     (concat "ipfs://" (cdr (assoc target done)) suffix)))
-                              (`(,offset ,text ,kind :rumour ,dest ,suffix)
-                               (list offset text kind
-                                     (concat "ipfs://" (cdr (assoc dest rumour-cids)) suffix)))
-                              (_ l)))
-                          (cdr ready)))
                  (bytes (pos-bytes-read file))
-                 (changed (seq-filter (lambda (w) (not (equal (nth 1 w) (nth 3 w)))) rewrites))
-                 (new (pos-links-rewrite bytes (mapcar (lambda (w) (list (nth 0 w) (nth 1 w)
-                                                                         (nth 3 w)))
-                                                       changed)))
+                 (changed (seq-remove (lambda (r) (equal (pos-resolution-from r)
+                                                         (pos-resolution-to r)))
+                                      (cdr ready)))
+                 (new (pos-links-rewrite bytes (mapcar #'pos-resolution-rewrite changed)))
                  (entry (list (cons 'cid (pos-cid-bytes new))
                               (cons 'mode (logand (pos-ledger--mode file) (lognot #o222)))
                               (cons 'sha256 (pos-bytes-sha new))
                               (cons 'size (length new)))))
             (when changed
               (push (cons (car ready) (pos-bytes-sha bytes)) originals))
-            (dolist (w rewrites)
-              (push `((file . ,(car ready)) (offset . ,(nth 0 w)) (from . ,(nth 1 w))
-                      (kind . ,(nth 2 w)) (to . ,(nth 3 w)))
-                    links))
+            (dolist (r (cdr ready))
+              (push (pos-resolution-alist r) links))
             (push (cons (car ready) (alist-get 'cid entry)) done)
             (push (cons (car ready) entry) add))))
       (list (seq-sort-by #'car #'string< add)

@@ -27,6 +27,7 @@
 ;; - `pos-links-in-file': the path links in a file, each a `pos-link'.
 ;; - `pos-links-ids': each Org ID in some files, and where it is held.
 ;; - `pos-links-resolve': where one leads, from where it was written.
+;; - `pos-resolution': what becomes of one when its item is sealed.
 ;; - `pos-links-link': the ipfs:// link to a sealed path in an archive.
 ;; - `pos-links-archive-of': the outermost archive above a path.
 
@@ -233,6 +234,47 @@ FROM must be at OFFSET."
     out))
 
 ;;;; Resolving
+
+(cl-defstruct (pos-resolution (:constructor pos-resolution-create) (:copier nil))
+  "What becomes of LINK, a `pos-link' in FILE, when its item is sealed.
+KIND is internal, cid, rumour, broken or later, and TO the text written
+in the link's place.  TO is nil while the CID it cites is not known:
+then TARGET is the sealed path the link leads to, or RUMOUR the
+destination of the rumour that stands for it, and SUFFIX what follows
+the CID."
+  file link kind to target rumour suffix)
+
+(defun pos-resolution--whole-p (resolution)
+  "Return non-nil if the whole of RESOLUTION's link is replaced.
+An annotation, broken or later, does; any other replaces the target."
+  (member (pos-resolution-kind resolution) '("broken" "later")))
+
+(defun pos-resolution-offset (resolution)
+  "Return the byte offset of the text replaced by RESOLUTION."
+  (let ((link (pos-resolution-link resolution)))
+    (if (pos-resolution--whole-p resolution)
+        (pos-link-whole-offset link)
+      (pos-link-offset link))))
+
+(defun pos-resolution-from (resolution)
+  "Return the text replaced by RESOLUTION."
+  (let ((link (pos-resolution-link resolution)))
+    (if (pos-resolution--whole-p resolution)
+        (pos-link-whole link)
+      (pos-link-text link))))
+
+(defun pos-resolution-rewrite (resolution)
+  "Return RESOLUTION as (OFFSET FROM TO), for `pos-links-rewrite'."
+  (list (pos-resolution-offset resolution) (pos-resolution-from resolution)
+        (pos-resolution-to resolution)))
+
+(defun pos-resolution-alist (resolution)
+  "Return RESOLUTION as a plan records it, an alist."
+  `((file . ,(pos-resolution-file resolution))
+    (offset . ,(pos-resolution-offset resolution))
+    (from . ,(pos-resolution-from resolution))
+    (kind . ,(pos-resolution-kind resolution))
+    (to . ,(pos-resolution-to resolution))))
 
 (defun pos-links-archive-of (file)
   "Return the outermost archive above FILE, or nil."
