@@ -149,11 +149,8 @@ and a file changed since the plan was made."
                 writes)))
       (dolist (write (nreverse writes))
         (pcase-let ((`(,file ,bytes) write))
-          (let ((modes (file-modes file))
-                (coding-system-for-write 'binary))
-            (with-temp-file file
-              (set-buffer-multibyte nil)
-              (insert bytes))
+          (let ((modes (file-modes file)))
+            (pos-bytes-write file bytes)
             (set-file-modes file modes))))
       (mapcar (lambda (entry) (alist-get 'file entry)) .files))))
 

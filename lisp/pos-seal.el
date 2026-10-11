@@ -390,10 +390,7 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
                                     0 16)
                          (file-name-extension destination t))
                  stage)))
-      (let ((coding-system-for-write 'binary))
-        (with-temp-file file
-          (set-buffer-multibyte nil)
-          (insert bytes)))
+      (pos-bytes-write file bytes)
       (set-file-modes file #o644)
       (condition-case err
           (pos-seal-plan file destination ledger-id nil (or links-from t))
@@ -415,10 +412,7 @@ With MODE, a recorded mode that has no write bit, the file has it."
   (let ((temp (make-temp-file (expand-file-name "_integrity-" (file-name-directory file)))))
     (unwind-protect
         (progn
-          (let ((coding-system-for-write 'binary))
-            (with-temp-file temp
-              (set-buffer-multibyte nil)
-              (insert bytes)))
+          (pos-bytes-write temp bytes)
           (set-file-modes temp (or mode #o444))
           (add-name-to-file temp file))
       (delete-file temp))))
@@ -563,10 +557,7 @@ in order."
                                                            (not (equal .from .to)))))
                                                   .links))))
                   (modes (file-modes file)))
-              (let ((coding-system-for-write 'binary))
-                (with-temp-file file
-                  (set-buffer-multibyte nil)
-                  (insert new)))
+              (pos-bytes-write file new)
               (set-file-modes file modes)))
            ((equal (pos-bytes-sha bytes)
                    (alist-get 'sha256 (cdr (assoc path (mapcar (lambda (a) (cons (pos-bytes-key (car a)) (cdr a))) .add))))))

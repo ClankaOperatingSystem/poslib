@@ -64,10 +64,7 @@ An alist of CID and the paths, relative to SCOPE, that have it."
       (setq index (sort index (lambda (a b) (string< (car a) (car b)))))
       (let ((file (expand-file-name pos-index-file scope)))
         (make-directory (file-name-directory file) t)
-        (let ((coding-system-for-write 'binary))
-          (with-temp-file file
-            (set-buffer-multibyte nil)
-            (insert (pos-bytes-json `((schema . 1) (cids . ,index)))))))
+        (pos-bytes-write file (pos-bytes-json `((schema . 1) (cids . ,index)))))
       index)))
 
 (defun pos-index--load (scope)

@@ -48,11 +48,8 @@
 
 (defun pos-migrate--write-over (file bytes)
   "Write BYTES to FILE, replacing it, keeping its mode if it has one."
-  (let ((modes (and (file-exists-p file) (file-modes file)))
-        (coding-system-for-write 'binary))
-    (with-temp-file file
-      (set-buffer-multibyte nil)
-      (insert bytes))
+  (let ((modes (and (file-exists-p file) (file-modes file))))
+    (pos-bytes-write file bytes)
     (set-file-modes file (or modes #o644))))
 
 (defun pos-migrate--rel (file root)
