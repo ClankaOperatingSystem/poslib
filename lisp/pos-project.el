@@ -112,7 +112,7 @@ taken, as a file or a directory."
                             (and (memq (pos-scope-kind scope) '(root responsibility))
                                  (equal within (pos-scope-path scope))))
                           (pos-corpus-scopes corpus)))
-         (projects (and scope (pos-corpus--projects-dir scope))))
+         (projects (and scope (pos-corpus-projects-dir scope))))
     (unless scope
       (user-error "Not the root or a responsibility of the tree: %s" within))
     (unless projects
