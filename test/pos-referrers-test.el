@@ -30,6 +30,13 @@
 (require 'pos-referrers)
 (require 'pos-test-support)
 
+(defun pos-referrers-test-rows (root path)
+  "Return (FILE LINE TEXT TARGET) for each of `pos-referrers' of PATH in ROOT."
+  (mapcar (lambda (link)
+            (list (pos-referrer-file link) (pos-referrer-line link)
+                  (pos-referrer-text link) (pos-referrer-target link)))
+          (pos-referrers root path)))
+
 (ert-deftest pos-referrers/links-into-a-path-are-found-by-file-and-by-id ()
   "A link into a path is found whether it names a file or an ID.
 Here the path is projects/paint.  The intray links to a file in it,
@@ -66,12 +73,12 @@ lead to."
                            (list intray 3 "id:colour" notes)
                            (list life 1 "id:paint" project)
                            (list life 1 "id:paint" project))
-                     (pos-referrers root "projects/paint")))
+                     (pos-referrers-test-rows root "projects/paint")))
       (should (equal (list (list intray 2 "file:projects/paint/project.org::*Outcome"
                                  project)
                            (list life 1 "id:paint" project)
                            (list life 1 "id:paint" project))
-                     (pos-referrers root "projects/paint/project.org")))
+                     (pos-referrers-test-rows root "projects/paint/project.org")))
       (should-not (pos-referrers root "life")))))
 
 (ert-deftest pos-referrers/links-on-one-line-to-one-file-are-in-a-fixed-order ()
@@ -80,7 +87,7 @@ lead to."
       '(("intray.org" . "[[id:note]] [[file:old/a.org]] [[file:./old/a.org]]\n")
         ("old/a.org" . ":PROPERTIES:\n:ID: note\n:END:\n"))
     (should (equal '("file:./old/a.org" "file:old/a.org" "id:note")
-                   (mapcar (lambda (link) (nth 2 link))
+                   (mapcar #'pos-referrer-text
                            (pos-referrers root "old"))))))
 
 (ert-deftest pos-referrers/an-id-two-files-hold-leads-to-both ()
@@ -93,7 +100,7 @@ once for each."
         ("old/b.org" . "* H\n:PROPERTIES:\n:ID: twin\n:END:\n"))
     (should (equal (list (expand-file-name "old/a.org" root)
                          (expand-file-name "old/b.org" root))
-                   (mapcar (lambda (link) (nth 3 link))
+                   (mapcar #'pos-referrer-target
                            (pos-referrers root "old"))))))
 
 (provide 'pos-referrers-test)

@@ -27,7 +27,9 @@
 ;; no index is asked.  A path that is to be moved or sealed is asked
 ;; for first, so that what links to it is known.
 ;;
-;; - `pos-referrers': the links that lead to a path or into it.
+;; - `pos-referrers': the links that lead to a path or into it, each a
+;;   `pos-referrer'.
+;; - `pos-referrers-print': the same, printed, a line for each.
 ;; - `pos-referrers-ids': each Org ID of a tree and where it is held.
 
 ;;; Code:
@@ -37,6 +39,14 @@
 (require 'pos-ledger)
 (require 'pos-links)
 (require 'pos-corpus)
+
+(cl-defstruct (pos-referrer (:constructor pos-referrer--make) (:copier nil))
+  "A link in a tree's Org files that leads to a path or into it.
+FILE is the Org file that holds the link, and TEXT the link as
+written, at byte OFFSET, on LINE.  TARGET is the file it leads to,
+absolute.  SUFFIX is the search option that goes with it: a file
+link's own, or for an id link the anchor of the ID."
+  file offset line text target suffix)
 
 (defun pos-referrers-line (bytes offset)
   "Return the line, from 1, that byte OFFSET of BYTES is on."
@@ -53,10 +63,7 @@ As `pos-links-ids' gives it for the corpus's files."
 
 (defun pos-referrers-links (corpus path)
   "Return the links in CORPUS that lead to PATH, absolute, or into it.
-Each is (FILE OFFSET TEXT TARGET SUFFIX): the file that holds the link,
-the byte offset of the link as written, TEXT, the file it leads to,
-and the search option that goes with it.  For a file link SUFFIX is
-the link's own; for an id link it is the anchor of the ID.  Unsorted."
+Each is a `pos-referrer'.  Unsorted."
   (let* ((base (file-name-as-directory path))
          (inside (lambda (file) (or (equal file path) (string-prefix-p base file))))
          (ids (pos-referrers-ids corpus))
@@ -69,7 +76,11 @@ the link's own; for an id link it is the anchor of the ID.  Unsorted."
                          (pos-links-in-file file))
             (let ((target (directory-file-name (expand-file-name target here))))
               (when (funcall inside target)
-                (push (list file offset text target suffix) links))))
+                (push (pos-referrer--make
+                       :file file :offset offset
+                       :line (pos-referrers-line bytes offset)
+                       :text text :target target :suffix suffix)
+                      links))))
           (let ((start 0))
             (while (string-match "\\[\\[\\(id:\\([^]\n]+\\)\\)\\]" bytes start)
               (setq start (match-end 0))
@@ -80,38 +91,47 @@ the link's own; for an id link it is the anchor of the ID.  Unsorted."
                                          (match-string 2 bytes) 'utf-8)
                                         ids))
                   (when (funcall inside target)
-                    (push (list file offset text target anchor) links)))))))))
+                    (push (pos-referrer--make
+                           :file file :offset offset
+                           :line (pos-referrers-line bytes offset)
+                           :text text :target target :suffix anchor)
+                          links)))))))))
     links))
 
 (defun pos-referrers (root path)
   "Return the links in the tree at ROOT that lead to PATH or into it.
-Each is (FILE LINE TEXT TARGET): the Org file of the corpus that holds
-the link, the line it is on, the link as written and the file it
-leads to, absolute.  A file link leads where its path does, read from
-its file's directory.  An id link leads to each file of the corpus
-that holds the ID.  A link in a file that is itself PATH or within it
-is not one.  Sorted by file, then line, then target, then text."
-  (let ((bytes (make-hash-table :test #'equal)))
-    (sort (mapcar
-           (lambda (link)
-             (pcase-let ((`(,file ,offset ,text ,target) link))
-               (list file
-                     (pos-referrers-line
-                      (or (gethash file bytes)
-                          (puthash file (pos-bytes-read file) bytes))
-                      offset)
-                     text target)))
-           (pos-referrers-links
-            (pos-corpus root)
-            (directory-file-name (expand-file-name path root))))
-          (lambda (a b)
-            (or (string< (car a) (car b))
-                (and (equal (car a) (car b))
-                     (or (< (nth 1 a) (nth 1 b))
-                         (and (= (nth 1 a) (nth 1 b))
-                              (or (string< (nth 3 a) (nth 3 b))
-                                  (and (equal (nth 3 a) (nth 3 b))
-                                       (string< (nth 2 a) (nth 2 b))))))))))))
+Each is a `pos-referrer'.  A file link leads where its path does, read
+from its file's directory.  An id link leads to each file of the
+corpus that holds the ID.  A link in a file that is itself PATH or
+within it is not one.  Sorted by file, then line, then target, then
+text."
+  (sort (pos-referrers-links
+         (pos-corpus root)
+         (directory-file-name (expand-file-name path root)))
+        (lambda (a b)
+          (pcase-let (((cl-struct pos-referrer (file file-a) (line line-a)
+                                  (target target-a) (text text-a))
+                       a)
+                      ((cl-struct pos-referrer (file file-b) (line line-b)
+                                  (target target-b) (text text-b))
+                       b))
+            (or (string< file-a file-b)
+                (and (equal file-a file-b)
+                     (or (< line-a line-b)
+                         (and (= line-a line-b)
+                              (or (string< target-a target-b)
+                                  (and (equal target-a target-b)
+                                       (string< text-a text-b)))))))))))
+
+(defun pos-referrers-print (root path)
+  "Print each of `pos-referrers' of PATH in ROOT, a directory name.
+A line for each, as FILE:LINE: LINK -> FILE, the files relative to
+ROOT."
+  (pcase-dolist ((cl-struct pos-referrer file line text target)
+                 (pos-referrers root path))
+    (princ (format "%s:%d: %s -> %s\n"
+                   (file-relative-name file root) line text
+                   (file-relative-name target root)))))
 
 (provide 'pos-referrers)
 ;;; pos-referrers.el ends here
