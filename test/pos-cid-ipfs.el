@@ -106,7 +106,7 @@ fixture holds or expects."
             (push (cons (alist-get 'name event) (alist-get 'encoded event)) events))
           (dolist (event (nreverse events))
             (let ((id (substring (car event) 9 -5)))
-              (when (pos-ledger--event-cid-p id)
+              (when (pos-ledger-event-cid-p id)
                 (unless (pos-cid-ipfs-block-agrees
                          repo (format "ledger %s %s" (car named) (substring (car event) 0 8))
                          (cdr event) id)

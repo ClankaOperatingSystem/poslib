@@ -491,7 +491,7 @@ a _seal that holds something else stays."
       (should-not (file-exists-p (expand-file-name "_seal" scope)))
       (pos-test-write-bytes (expand-file-name "_seal/other.json" scope) "{}")
       (funcall seal "second.txt")
-      (should (equal '("other.json") (pos-ledger--entries (expand-file-name "_seal" scope)))))))
+      (should (equal '("other.json") (pos-ledger-entry-names (expand-file-name "_seal" scope)))))))
 
 (ert-deftest pos-seal/a-sealed-path-has-a-link ()
   "A sealed item's link is ipfs:// and its CID; a path within adds it.
@@ -652,7 +652,7 @@ bytes have changed, repair refuses."
       (set-file-modes file #o644)
       (should (equal '((repaired . 1) (restored . 0) (unregistered . 0))
                      (pos-seal-repair scope)))
-      (should (= #o400 (pos-ledger--mode file)))
+      (should (= #o400 (pos-ledger-permissions file)))
       (should-not (pos-seal-findings-p (pos-ledger-check scope))))))
 
 (ert-deftest pos-seal/repair-validates-directories-before-writing ()

@@ -52,7 +52,7 @@ their value, refused."
               (pos-ledger--strict (encode-coding-string .bytes 'utf-8 t) (car named)))
           (let ((block (encode-coding-string .encoded 'utf-8 t)))
             (should (equal block (pos-bytes-block .value)))
-            (should (equal .cid (pos-ledger--event-cid block)))
+            (should (equal .cid (pos-ledger-event-cid block)))
             (pos-test-same-json .value (pos-ledger--strict block (car named)))))))))
 
 ;;;; Inventories and events
