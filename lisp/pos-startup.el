@@ -316,10 +316,10 @@ item lacks is :null."
        (properties . ,(mapcar (lambda (property)
                                 (cons (intern (car property))
                                       (substring-no-properties (cdr property))))
-                              (sort (assoc-delete-all
-                                     "CATEGORY"
-                                     (org-entry-properties nil 'standard))
-                                    (lambda (a b) (string< (car a) (car b))))))
+                              (seq-sort-by #'car #'string<
+                                           (assoc-delete-all
+                                            "CATEGORY"
+                                            (org-entry-properties nil 'standard)))))
        (body . ,(save-excursion
                   (org-end-of-meta-data t)
                   (string-trim (buffer-substring-no-properties
@@ -559,11 +559,11 @@ has an item in one of `pos-startup-next-action-states'."
      (mapcar (lambda (project)
                (pos-startup--scope-row (nth 3 project) (nth 1 project))
                (format "%-54s %s" (nth 0 project) (nth 1 project)))
-             (sort (seq-filter (lambda (project)
-                                 (and (member (nth 1 project) pos-startup-stuck-statuses)
-                                      (not (nth 2 project))))
-                               projects)
-                   (lambda (a b) (string< (car a) (car b))))))))
+             (seq-sort-by #'car #'string<
+                          (seq-filter (lambda (project)
+                                        (and (member (nth 1 project) pos-startup-stuck-statuses)
+                                             (not (nth 2 project))))
+                                      projects))))))
 
 (defun pos-startup--outcome ()
   "Return the OUTCOME property the current buffer has before its first heading.
@@ -643,10 +643,10 @@ as a dash."
           (list (format "%-54s %-9s review %-10s" path status (or review "-"))
                 (format "  next: %s" (or next "-"))
                 (format "  outcome: %s" (or outcome "-")))))
-      (sort (seq-filter (lambda (project)
-                          (member (nth 2 project) pos-startup-active-statuses))
-                        projects)
-            (lambda (a b) (string< (car a) (car b))))))))
+      (seq-sort-by #'car #'string<
+                   (seq-filter (lambda (project)
+                                 (member (nth 2 project) pos-startup-active-statuses))
+                               projects))))))
 
 (defun pos-startup--intray ()
   "Return the intray view of `pos-startup--corpus'.

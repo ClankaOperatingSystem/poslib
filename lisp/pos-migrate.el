@@ -451,7 +451,7 @@ dates rumours; LEDGER-ID names a ledger that has none."
             (declarations . ,(vconcat (mapcar (lambda (d) `((readme . ,(car d)) (kind . ,(cdr d))))
                                               declarations)))
             (rumours . ,(vconcat (mapcar (lambda (r) `((destination . ,(car r)) (text . ,(cdr r))))
-                                         (sort rumours (lambda (a b) (string< (car a) (car b)))))))
+                                         (seq-sort-by #'car #'string< rumours))))
             (links . ,(vconcat
                        (mapcar (lambda (l) `((file . ,(nth 0 l)) (offset . ,(nth 1 l))
                                              (from . ,(nth 2 l)) (kind . ,(nth 3 l))
@@ -518,9 +518,9 @@ LEDGER-ID names a ledger that has none."
     (let ((bytes (pos-bytes-json
                   `((schema . 2) (kind . "conversion") (previous . ,(or head :null))
                     (ledger_id . ,(or (pos-seal--last-id files) ledger-id (pos-seal--uuid)))
-                    (remove . ,(vconcat remove)) (rename . ,(sort rename (lambda (a b) (string< (car a) (car b)))))
-                    (convert . ,(sort convert (lambda (a b) (string< (car a) (car b)))))
-                    (add . ,(sort add (lambda (a b) (string< (car a) (car b)))))
+                    (remove . ,(vconcat remove)) (rename . ,(seq-sort-by #'car #'string< rename))
+                    (convert . ,(seq-sort-by #'car #'string< convert))
+                    (add . ,(seq-sort-by #'car #'string< add))
                     (collections . ,(vconcat collections))
                     (root . ,(cdr (assoc "." cids)))))))
       `((name . ,(pos-ledger-event-file-name (1+ events) (pos-bytes-sha bytes)))

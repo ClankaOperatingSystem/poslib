@@ -197,13 +197,13 @@ methodologies belong at; its NAME is the last part of its PATH, which
 is relative to the node.  None for a node that is no project."
   (let ((at (alist-get 'methodologies config)))
     (when (stringp at)
-      (sort (delq nil
-                  (mapcar (lambda (child)
-                            (let ((path (alist-get 'path child)))
-                              (when (pos-path-within-p path at)
-                                (cons (substring path (1+ (length at))) path))))
-                          (append (alist-get 'children config) nil)))
-            (lambda (a b) (string< (car a) (car b)))))))
+      (seq-sort-by #'car #'string<
+                   (delq nil
+                         (mapcar (lambda (child)
+                                   (let ((path (alist-get 'path child)))
+                                     (when (pos-path-within-p path at)
+                                       (cons (substring path (1+ (length at))) path))))
+                                 (append (alist-get 'children config) nil)))))))
 
 (defun pos-tree--own-scope (path children what)
   "Refuse if PATH, a WHAT's scope, is one of CHILDREN or beneath one."

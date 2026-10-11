@@ -105,7 +105,7 @@ link whose ID two files hold."
                                          (lambda (a b)
                                            (< (alist-get 'offset a)
                                               (alist-get 'offset b))))))))
-                    (sort files (lambda (a b) (string< (car a) (car b)))))))
+                    (seq-sort-by #'car #'string< files))))
         (unwritable . ,(vconcat
                         (sort unwritable
                               (lambda (a b)

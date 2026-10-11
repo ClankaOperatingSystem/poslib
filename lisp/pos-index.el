@@ -61,7 +61,7 @@ An alist of CID and the paths, relative to SCOPE, that have it."
                                                 #'string<)))
                        index))
                table)
-      (setq index (sort index (lambda (a b) (string< (car a) (car b)))))
+      (setq index (seq-sort-by #'car #'string< index))
       (let ((file (expand-file-name pos-index-file scope)))
         (make-directory (file-name-directory file) t)
         (pos-bytes-write file (pos-bytes-json `((schema . 1) (cids . ,index)))))

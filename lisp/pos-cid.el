@@ -360,11 +360,11 @@ their Unicode normalisation."
   (let ((coding (or file-name-coding-system default-file-name-coding-system))
         (names (let ((file-name-coding-system 'binary))
                  (directory-files dir nil "\\`[^.]"))))
-    (sort (mapcar (lambda (raw)
-                    (cons raw (expand-file-name (decode-coding-string raw coding)
-                                                dir)))
-                  names)
-          (lambda (a b) (string< (car a) (car b))))))
+    (seq-sort-by #'car #'string<
+                 (mapcar (lambda (raw)
+                           (cons raw (expand-file-name (decode-coding-string raw coding)
+                                                       dir)))
+                         names))))
 
 (defun pos-cid--directory (dir rel visit)
   "Return the node of DIR, at REL in its tree, calling VISIT on each node.
