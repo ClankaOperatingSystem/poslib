@@ -254,7 +254,7 @@ digit, and a person recorded already."
     (pos-person--write-new
      file
      (pos-person--record-text
-      (org-id-new) name
+      (pos-new-id) name
       (concat "A person-entity.  Each item of the list below is one of this"
               " person's\nperson-identities: the person in one scope.")))
     file))
@@ -311,7 +311,7 @@ there, and MADE is non-nil."
                  (setq found id)))))))
       (if found
           (cons found nil)
-        (let ((id (org-id-new)))
+        (let ((id (pos-new-id)))
           (pos-person--writing buffer
             (goto-char (point-min))
             (if (re-search-forward people nil t)
@@ -368,7 +368,7 @@ is not a scope's, and a scope another repository holds."
                                     (file-relative-name file root)))
                     nil))
              (t
-              (let ((id (org-id-new)))
+              (let ((id (pos-new-id)))
                 (pos-person--write-new
                  file
                  (pos-person--record-text

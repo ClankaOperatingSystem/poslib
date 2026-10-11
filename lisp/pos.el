@@ -34,6 +34,7 @@
 
 (require 'org)
 (require 'org-archive)
+(require 'org-id)
 (require 'seq)
 (require 'cl-lib)
 (require 'pos-roam)
@@ -50,6 +51,12 @@
   "Where a sweep writes beneath a scope that names no path.
 One directory per week, one archive file per source, as
 doc/pos-directory.txt has it.")
+
+(defun pos-new-id ()
+  "Return a new ID for an item or a file, in lower case.
+Org takes a UUID from the system's uuidgen, which prints upper case on
+some systems and lower case on others."
+  (downcase (org-id-new)))
 
 (defun pos-files (root &optional writable)
   "Return the Org files of the tree at ROOT: its corpus, sorted.
