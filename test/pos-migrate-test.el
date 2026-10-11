@@ -33,7 +33,7 @@
   "Enrol everything in ARCHIVE in a legacy, schema 1 ledger, write-protected."
   (let* ((inventory (pos-ledger-inventory archive))
          (event (pos-ledger-event inventory nil 1 "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1")))
-    (pos-seal--write-new (expand-file-name (concat pos-ledger-directory "/" (car event)) archive)
+    (pos-seal-write-new (expand-file-name (concat pos-ledger-directory "/" (car event)) archive)
                          (cdr event))
     (pos-migrate--protect archive)
     (pos-bytes-sha (cdr event))))
@@ -148,7 +148,7 @@ so its own verification holds."
                               (pos-ledger-inventory archive)))
              (event (pos-ledger-event add (pos-bytes-sha (pos-bytes-read previous)) 2
                                       "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1")))
-        (pos-seal--write-new (expand-file-name (car event) ledger) (cdr event)))
+        (pos-seal-write-new (expand-file-name (car event) ledger) (cdr event)))
       (pos-migrate--protect archive)
       (let ((plan (pos-migrate-test-run scope)))
         (should (member "capsules/snap" (append (alist-get 'collections plan) nil)))

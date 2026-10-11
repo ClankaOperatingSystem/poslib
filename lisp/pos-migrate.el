@@ -336,7 +336,7 @@ COLLECTIONS are as `pos-migrate--prepare' returns them."
                      (pos-ledger-refuse 'order "Migrate %s first: %s links to it" other rel))
                    (pos-resolution-create
                     :file rel :link link
-                    :kind "cid" :to (concat (pos-links--sealed abs) suffix)))
+                    :kind "cid" :to (concat (pos-links-sealed abs) suffix)))
                   (t (let ((r (pos-migrate--rumour abs scope date)))
                        (unless (assoc (car r) rumours) (push r rumours))
                        (pos-resolution-create :file rel :link link :kind "rumour"
@@ -572,7 +572,7 @@ LEDGER-ID names a ledger that has none."
         (push (cons rel (funcall entry rel)) add)))
     (let ((bytes (pos-bytes-json
                   `((schema . 2) (kind . "conversion") (previous . ,(or head :null))
-                    (ledger_id . ,(or (pos-ledger-identity files) ledger-id (pos-seal--uuid)))
+                    (ledger_id . ,(or (pos-ledger-identity files) ledger-id (pos-seal-uuid)))
                     (remove . ,(vconcat remove)) (rename . ,(seq-sort-by #'car #'string< rename))
                     (convert . ,(seq-sort-by #'car #'string< convert))
                     (add . ,(seq-sort-by #'car #'string< add))
@@ -667,7 +667,7 @@ interrupted.  Return (EVENT-FILE . ROOT)."
           (when (file-exists-p anchors) (delete-directory anchors))))
       ;; 3. The conversion event.
       (unless (file-exists-p event)
-        (pos-seal--write-new event bytes))
+        (pos-seal-write-new event bytes))
       ;; 4. Write bits, canon, checkpoint.
       (pos-migrate--protect .archive)
       (seq-doseq (c .canon)
@@ -683,7 +683,7 @@ interrupted.  Return (EVENT-FILE . ROOT)."
                                                               (decode-coding-string now 'utf-8))))
                                 .edits))
                   (t (pos-ledger-refuse 'plan "Canon changed since review: %s" file)))))))
-      (pos-seal--checkpoint .archive (pos-bytes-sha bytes))
+      (pos-seal-checkpoint-head .archive (pos-bytes-sha bytes))
       (cons event (alist-get 'root (pos-bytes-parse bytes))))))
 
 ;;;; Command line
