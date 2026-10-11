@@ -24,7 +24,7 @@
 ;; them, and their resolution when an item is sealed, as
 ;; doc/formats.org specifies.
 ;;
-;; - `pos-links-in-file': the path links in a file, with byte offsets.
+;; - `pos-links-in-file': the path links in a file, each a `pos-link'.
 ;; - `pos-links-ids': each Org ID in some files, and where it is held.
 ;; - `pos-links-resolve': where one leads, from where it was written.
 ;; - `pos-links-link': the ipfs:// link to a sealed path in an archive.
@@ -43,6 +43,15 @@
 (require 'pos-ledger)
 
 ;;;; Finding
+
+(cl-defstruct (pos-link (:constructor pos-link-create) (:copier nil))
+  "A path link found in an Org or Markdown file.
+TEXT is the target as written, at byte OFFSET; PATH its file and SUFFIX
+its search option or fragment, with its :: or #, or empty.  WHOLE, at
+byte WHOLE-OFFSET, is what an annotation replaces: in Org the raw
+link, in Markdown all of an inline link, or a reference definition's
+URL.  DESCRIPTION is a Markdown inline link's text, else nil."
+  offset text path suffix whole-offset whole description)
 
 (defun pos-links--byte (position)
   "Return the byte offset, from 0, of POSITION in the current buffer."
@@ -67,12 +76,11 @@ files hold (unresolved)."
      (t (car places)))))
 
 (defun pos-links--org (&optional ids)
-  "Return the file links in the current Org buffer.
-Each is (OFFSET TEXT PATH SUFFIX OFFSET TEXT): TEXT the raw link at byte
-OFFSET, PATH its file, SUFFIX its search option with its :: or empty;
-the raw link is also the whole that an annotation replaces.  With
-IDS, as `pos-links-ids' gives it, an id link is one too: PATH and
-SUFFIX are where `pos-links--id-place' says its ID is held."
+  "Return the file links in the current Org buffer, each a `pos-link'.
+The raw link is both the text and the whole that an annotation
+replaces.  With IDS, as `pos-links-ids' gives it, an id link is one
+too: its path and suffix are where `pos-links--id-place' says its ID is
+held."
   (let (links)
     (org-element-map (org-element-parse-buffer) 'link
       (lambda (link)
@@ -91,7 +99,9 @@ SUFFIX are where `pos-links--id-place' says its ID is held."
               (goto-char (org-element-property :begin link))
               (when (search-forward raw (org-element-property :end link) t)
                 (let ((offset (pos-links--byte (match-beginning 0))))
-                  (push (list offset raw (car place) (cdr place) offset raw)
+                  (push (pos-link-create :offset offset :text raw
+                                         :path (car place) :suffix (cdr place)
+                                         :whole-offset offset :whole raw)
                         links))))))))
     (nreverse links)))
 
@@ -122,19 +132,20 @@ The whole of an inline link is all of it; of a reference definition, its URL."
             (let ((path (save-match-data (pos-links--markdown-path url)))
                   (inline (eq (car spec) markdown-regex-link-inline)))
               (when path
-                (push (list (pos-links--byte beg) url (car path) (cdr path)
-                            (pos-links--byte (if inline (match-beginning 0) beg))
-                            (if inline (match-string-no-properties 0) url)
-                            (and inline (match-string-no-properties 3)))
+                (push (pos-link-create
+                       :offset (pos-links--byte beg) :text url
+                       :path (car path) :suffix (cdr path)
+                       :whole-offset (pos-links--byte (if inline (match-beginning 0) beg))
+                       :whole (if inline (match-string-no-properties 0) url)
+                       :description (and inline (match-string-no-properties 3)))
                       links)))))))
-    (sort links (lambda (a b) (< (car a) (car b))))))
+    (seq-sort-by #'pos-link-offset #'< links)))
 
 (defun pos-links-in-file (file &optional ids)
   "Return the path links in FILE, an Org or Markdown file, else nil.
-Each is (OFFSET TEXT PATH SUFFIX WHOLE-OFFSET WHOLE DESCRIPTION), offsets
-in bytes: TEXT the target, WHOLE what an annotation replaces.  With
-IDS, as `pos-links-ids' gives it, an Org file's id links are among
-them, each leading to the file that holds its ID."
+Each is a `pos-link'.  With IDS, as `pos-links-ids' gives it, an Org
+file's id links are among them, each leading to the file that holds
+its ID."
   (let ((org (string-suffix-p ".org" file)) (md (string-suffix-p ".md" file)))
     (when (or org md)
       (with-temp-buffer
@@ -198,7 +209,7 @@ a lock file are not among them."
   "Return the annotation replacing LINK's whole in FILE, marked LABEL.
 LABEL is broken or later.  In Org, the link's type becomes LABEL; in
 Markdown, the link becomes its text and a bracketed note."
-  (pcase-let ((`(,_ ,text ,_ ,_ ,_ ,whole ,description) link))
+  (pcase-let (((cl-struct pos-link text whole description) link))
     (cond
      ((string-suffix-p ".org" file)
       (concat label ":" (if (string-prefix-p "file:" text) (substring text 5) text)))

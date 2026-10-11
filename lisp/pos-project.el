@@ -221,7 +221,7 @@ and returns the path to write in its place, or nil to leave it.
 BYTES is the file's bytes afterwards and COUNT the links changed."
   (let (rewrites)
     (dolist (link (pos-links-in-file file))
-      (pcase-let ((`(,offset ,text ,path) link))
+      (pcase-let (((cl-struct pos-link offset text path) link))
         (unless (or (file-name-absolute-p path) (string-prefix-p "~" path))
           (let ((new (funcall rewrite path))
                 (at (string-search path text)))
