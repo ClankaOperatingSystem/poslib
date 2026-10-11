@@ -28,6 +28,8 @@
 ;; - `pos-ledger-history': what its ledger enrolled.
 ;; - `pos-ledger-fold-cids': the archive's CIDs from the ledger alone.
 ;; - `pos-ledger-event': a new event's name and bytes.
+;; - `pos-ledger-event-file-name', `pos-ledger-event-file-id': an event
+;;   file's name from its number and id, and the id in a name.
 ;; - `pos-ledger-kept': the keeper an archive is kept by, if it has one.
 ;; - `pos-ledger-named': the id an archive's ledger is to have, if named.
 ;; - `pos-ledger-check': the report on every archive under a root.
@@ -280,6 +282,14 @@ from its fingerprint, and adds only new paths."
   "\\`\\([0-9]\\{8\\}\\)-\\([0-9a-f]\\{64\\}\\|baguqeera[a-z2-7]\\{52\\}\\)\\.json\\'"
   "An event file's name: its number, and its hash or, in schema 3, its CID.")
 
+(defun pos-ledger-event-file-name (number id)
+  "Return the name of the event file numbered NUMBER, of the hash or CID ID."
+  (format "%08d-%s.json" number id))
+
+(defun pos-ledger-event-file-id (file)
+  "Return the hash or CID in the name of the event file FILE."
+  (substring (file-name-nondirectory file) 9 -5))
+
 (defun pos-ledger-history (archive)
   "Return ARCHIVE's ledger as a list of what it enrolled and recorded.
 \(ENTRIES HEAD EVENTS FILES ROOT COLLECTIONS ITEMS EMPTY): ENTRIES is
@@ -424,7 +434,7 @@ ADD is an alist of path and entry; PREVIOUS a hash or nil."
   (let ((bytes (pos-bytes-json
                 `((schema . 1) (previous . ,(or previous :null)) (add . ,add)
                   ,@(when ledger-id `((ledger_id . ,ledger-id)))))))
-    (cons (format "%08d-%s.json" number (pos-bytes-sha bytes)) bytes)))
+    (cons (pos-ledger-event-file-name number (pos-bytes-sha bytes)) bytes)))
 
 ;;;; Kept archives
 

@@ -523,7 +523,7 @@ LEDGER-ID names a ledger that has none."
                     (add . ,(sort add (lambda (a b) (string< (car a) (car b)))))
                     (collections . ,(vconcat collections))
                     (root . ,(cdr (assoc "." cids)))))))
-      `((name . ,(format "%08d-%s.json" (1+ events) (pos-bytes-sha bytes)))
+      `((name . ,(pos-ledger-event-file-name (1+ events) (pos-bytes-sha bytes)))
         (text . ,(decode-coding-string bytes 'utf-8))))))
 
 ;;;; Application
