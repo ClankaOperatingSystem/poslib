@@ -459,6 +459,23 @@ Nothing is installed in a methodology and nothing in it is changed:
 the tool reads its skills and commands and writes only links in the
 node that declares it.
 
+A coding agent shows a session the skills of the directory it is
+opened in and of each directory above it, as far as the root of the
+repository. So the skills of a node's methodologies are shown in every
+directory beneath that node in the same repository, a project that is
+such a directory among them, and in no repository mounted there. A
+project that is a repository of its own is shown none of its
+responsibility's.
+
+Where a directory's .agents/skills holds a skill with the name of
+another skill in a directory above it in the same repository, an agent
+shows one and not the other, or two under one name. The tool reports
+the lower (name-repeated) with the path of the upper. Two whose
+SKILL.md are the same text are one skill, as when one methodology is
+declared at two nodes of a line, and are not reported. The directories
+the exclusions in force name are not looked in, and nothing is
+reported in a product.
+
 
 7. The two steps
 
@@ -510,6 +527,9 @@ and findings, which the tool reports and does not act on:
     name-taken      a path where the tool would make a link, held by
                     something that is not the tool's, or named by
                     more than one skill or command
+    name-repeated   a skill with the name of another skill in a
+                    directory above it in the same repository; detail
+                    is the other's path
     methodology-refused  a methodology with a skill whose name does
                     not begin with the methodology's name and a
                     hyphen: nothing of it is linked
@@ -604,5 +624,7 @@ section 5 describes them.
 The tests of the tool in real repositories include a project that
 declares a mounted methodology and a local one, each holding a skill
 and a command; a methodology with a skill named without its prefix; a
-methodology whose entry is removed; and one repository mounted as a
-product in one place and a methodology in another.
+methodology whose entry is removed; one repository mounted as a
+product in one place and a methodology in another; a responsibility
+that declares methodologies; and a skill with the name of another in a
+directory above it.

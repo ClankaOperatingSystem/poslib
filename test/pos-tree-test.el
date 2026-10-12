@@ -1212,6 +1212,33 @@ of the repository; each has its links made where it is."
                       (expand-file-name "work/.agents/skills/trade-greet" root))
                      "../../methodologies/trade/skills/trade-greet")))))
 
+(ert-deftest pos-tree/a-skill-named-as-another-above-it-is-found ()
+  "Two skills of one name along a line of directories are found.
+A coding agent shows a session the skills of each directory above it
+in the repository.  Here work/desk has a skill tidy that is not the
+root's, and one greet that is the root's text exactly; work/shelf has
+none of either name, and a mounted child is another repository."
+  (pos-tree-test-with dir
+    (let* ((skill (lambda (prefix name text)
+                    (list (format "%s.agents/skills/%s/SKILL.md" prefix name) text)))
+           (child (apply #'pos-tree-test-repository (expand-file-name "origins/child" dir)
+                         ".clanka/config.yml" "pos: 2\n"
+                         (funcall skill "" "tidy" "The child's.\n")))
+           (root (apply #'pos-tree-test-repository
+                        (expand-file-name "root" dir)
+                        ".clanka/config.yml"
+                        (pos-tree-test-config (pos-tree-test-child "mounted" child))
+                        (append (funcall skill "" "tidy" "The root's.\n")
+                                (funcall skill "" "greet" "Hello.\n")
+                                (funcall skill "work/desk/" "tidy" "The desk's.\n")
+                                (funcall skill "work/desk/" "greet" "Hello.\n")
+                                (funcall skill "work/shelf/" "sort" "The shelf's.\n"))))
+           (plan (pos-tree-test-settle root)))
+      (should (equal (pos-tree-test-summary plan)
+                     '("name-repeated work/desk/.agents/skills/tidy")))
+      (should (equal (alist-get 'detail (aref (alist-get 'findings plan) 0))
+                     ".agents/skills/tidy")))))
+
 (ert-deftest pos-tree/two-methodologies-supplying-one-name-are-found ()
   "Where two methodologies supply one command, the first is linked.
 The second is found as a name taken, named by more than one."
