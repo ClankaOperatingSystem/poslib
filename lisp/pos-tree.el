@@ -777,7 +777,30 @@ None if a node of it was refused."
       (and (file-directory-p path)
            (null (directory-files path nil directory-files-no-dot-files-regexp)))))
 
-(defun pos-tree--undeclared (plan repo exclusions &optional prefix node)
+(defun pos-tree--skills-in (dir)
+  "Return the skills of the directory DIR, each (NAME . FILE).
+A skill is an entry of its .agents/skills that holds a SKILL.md, a
+link to one among them, and FILE is that SKILL.md."
+  (let ((in (expand-file-name ".agents/skills" dir)))
+    (and (file-directory-p in)
+         (delq nil
+               (mapcar (lambda (name)
+                         (let ((file (expand-file-name (concat name "/SKILL.md") in)))
+                           (and (file-regular-p file) (cons name file))))
+                       (directory-files in nil directory-files-no-dot-files-regexp))))))
+
+(defun pos-tree--repeated (plan here above)
+  "Find for PLAN each skill of HERE with the name of another in ABOVE.
+Each is an alist as `pos-tree--skills-in' gives it.  Two with one
+name and one text are the same skill, and are not found."
+  (pcase-dolist (`(,name . ,file) here)
+    (when-let* ((other (cdr (assoc name above))))
+      (unless (equal (pos-bytes-read file) (pos-bytes-read other))
+        (pos-tree--find plan "name-repeated"
+                        (pos-tree--rel plan (file-name-directory file))
+                        (pos-tree--rel plan (file-name-directory other)))))))
+
+(defun pos-tree--undeclared (plan repo exclusions &optional prefix node above)
   "Find for PLAN what is beneath the repository REPO that no entry declares.
 A repository, and a directory holding a configuration.  REPO is the
 repository's node: the declared paths of repositories it has mounted
@@ -785,8 +808,17 @@ are not looked into, and those of its local directories are.
 EXCLUSIONS are those in force, declared by the node at NODE, a prefix
 with its final slash or nil for REPO; a local node that declares its
 own replaces them beneath it.  PREFIX is the directory being looked
-in, with its final slash, or nil for REPO."
-  (let ((dir (pos-tree--node-dir repo)))
+in, with its final slash, or nil for REPO.
+
+Where REPO has a configuration, find as well each skill of a
+directory that has the name of another skill in a directory above it
+\(name-repeated).  ABOVE are the skills of the directories above
+PREFIX in the repository, the nearest first."
+  (let* ((dir (pos-tree--node-dir repo))
+         (here (and (pos-tree--node-config repo)
+                    (pos-tree--skills-in (expand-file-name (or prefix "") dir))))
+         (above (progn (pos-tree--repeated plan here above)
+                       (append here above))))
     (dolist (name (directory-files (expand-file-name (or prefix "") dir) nil
                                    directory-files-no-dot-files-regexp))
       (let* ((path (concat prefix name))
@@ -798,7 +830,8 @@ in, with its final slash, or nil for REPO."
          ((member path (pos-tree--node-local repo))
           (let ((own (assoc path (pos-tree--node-local-exclusions repo))))
             (pos-tree--undeclared plan repo (if own (cdr own) exclusions)
-                                  (concat path "/") (if own (concat path "/") node))))
+                                  (concat path "/") (if own (concat path "/") node)
+                                  above)))
          ;; A submodule is the repository's own, tracked and declared by git.
          ((pos-tree--repository-p full)
           (unless (pos-tree--tracked-p dir path)
@@ -806,7 +839,7 @@ in, with its final slash, or nil for REPO."
          ((pos-path-config-files full)
           (pos-tree--find plan "undeclared" (pos-tree--rel plan full) "a configuration"))
          (t (pos-tree--undeclared plan repo exclusions
-                                  (concat path "/") node)))))))
+                                  (concat path "/") node above)))))))
 
 (defun pos-tree--mount-child (plan repo base child)
   "Add to PLAN the declared CHILD, with a remote, of the node at BASE in REPO.
