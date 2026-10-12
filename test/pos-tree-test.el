@@ -282,7 +282,7 @@ in that repository or beneath it."
   (pos-tree-test-with dir
     (let* ((child (apply #'pos-tree-test-repository
                          (expand-file-name "origins/child" dir)
-                         ".pos/config.yaml" "pos: 2\nprojects: p/\nmethodologies: m/\n"
+                         ".pos/config.yaml" "pos: 2\nprojects: m/p/\nmethodologies: m/\n"
                          (pos-tree-test-skill "c")))
            (root (apply #'pos-tree-test-repository (expand-file-name "root" dir)
                         (pos-tree-test-skill "r"))))
@@ -292,7 +292,7 @@ in that repository or beneath it."
       (should (equal (seq-filter (lambda (line) (string-match-p "child" line))
                                  (pos-tree-test-summary (pos-tree-test-settle root)))
                      '("config-refused projects/child")))
-      (pos-tree-test-write root ".pos/config.yaml" "pos: 2\nprojects: p/\nmethodologies: m/\n")
+      (pos-tree-test-write root ".pos/config.yaml" "pos: 2\nprojects: m/p/\nmethodologies: m/\n")
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
                      '("config-refused ."))))))
 
@@ -367,8 +367,8 @@ the key."
       (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
       (should (file-exists-p (expand-file-name "child/deeper/README" root))))))
 
-(ert-deftest pos-tree/a-node-that-names-neither-location-is-unconfigured ()
-  "It is found, and what it declares is planned all the same."
+(ert-deftest pos-tree/a-node-that-names-neither-location-is-planned ()
+  "What it declares is planned, and nothing is found."
   (pos-tree-test-with dir
     (let* ((child (pos-tree-test-repository (expand-file-name "origins/child" dir)
                                             "README" "child\n"))
@@ -378,7 +378,7 @@ the key."
                            (concat "pos: 2\nchildren:\n"
                                    (pos-tree-test-child "work" child)))
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("exclude . work" "clone work" "archive-excludes ." "unconfigured ."))))))
+                     '("exclude . work" "clone work" "archive-excludes ."))))))
 
 (ert-deftest pos-tree/a-child-with-no-remote-is-a-directory ()
   "The directory itself is not excluded or cloned; a missing one is found."
@@ -1186,6 +1186,31 @@ the methodology mount is read; nothing is written in a product."
                                        "git@example.org:clankos.git")))))
       (should (equal (pos-tree-test-summary (pos-tree-plan root))
                      '("config-refused ."))))))
+
+(ert-deftest pos-tree/a-responsibility-links-its-methodologies ()
+  "A node that says where its projects belong may have methodologies too.
+The root has one and so has work, a responsibility that is a directory
+of the repository; each has its links made where it is."
+  (pos-tree-test-with dir
+    (let* ((files (lambda (prefix name)
+                    (cl-loop for (path text) on (pos-tree-test-method name) by #'cddr
+                             append (list (concat prefix "methodologies/" name "/" path)
+                                          text))))
+           (config (lambda (name &rest more)
+                     (concat "pos: 2\nprojects: projects/\nmethodologies: methodologies/\n"
+                             "children:\n  - path: methodologies/" name "\n"
+                             (apply #'concat more))))
+           (root (apply #'pos-tree-test-repository
+                        (expand-file-name "root" dir)
+                        ".clanka/config.yml" (funcall config "tidy" "  - path: work\n")
+                        "work/.clanka/config.yml" (funcall config "trade")
+                        (append (funcall files "" "tidy")
+                                (funcall files "work/" "trade")))))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
+      (should (equal (pos-tree-test-names root ".agents/skills") '("tidy-greet")))
+      (should (equal (file-symlink-p
+                      (expand-file-name "work/.agents/skills/trade-greet" root))
+                     "../../methodologies/trade/skills/trade-greet")))))
 
 (ert-deftest pos-tree/two-methodologies-supplying-one-name-are-found ()
   "Where two methodologies supply one command, the first is linked.

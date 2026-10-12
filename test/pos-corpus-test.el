@@ -199,7 +199,7 @@ it declares within it is a scope of its own."
 (ert-deftest pos-corpus/what-lies-in-a-projects-directory-is-a-project ()
   "What lies directly in a node's projects directory is a project.
 A directory or a single Org file, named by its path; a project's files
-are its own, and a project may hold a configuration of its own kind."
+are its own, and a project may hold a configuration of its own."
   (let ((corpus (pos-corpus-test-walk
                  `(("" dir :config ,(pos-corpus-test-declaring "projects/beta" "health"))
                    ("projects/alpha/project.org" file) ("projects/alpha/notes/n.org" file)
@@ -232,16 +232,38 @@ Its files belong to the scope above, and nothing in it is a scope."
                    (pos-corpus-test-files corpus)))
     (should-not (pos-corpus-test-scopes corpus))))
 
-(ert-deftest pos-corpus/an-unconfigured-node-is-entered-and-has-no-kind ()
-  "A node yet to be configured is read and is a scope of no kind.
-Its configuration says neither where its projects belong nor its
-methodologies."
+(ert-deftest pos-corpus/a-nodes-place-says-what-it-is ()
+  "A node in a projects directory is a project.
+One anywhere else is a responsibility.  What its configuration holds
+does not say: craft says where its methodologies belong and new says
+nothing, and each is a responsibility; projects/plain says nothing and
+is a project."
   (let ((corpus (pos-corpus-test-walk
-                 `(("" dir :config ,(pos-corpus-test-declaring "new"))
+                 `(("" dir :config ,(pos-corpus-test-declaring "new" "craft"
+                                                               "projects/plain"))
                    ("new" dir :config "pos: 2\n")
-                   ("new/a.org" file)))))
-    (should (equal '(("new/a.org" . "new")) (pos-corpus-test-files corpus)))
-    (should (equal '((nil . "new")) (pos-corpus-test-scopes corpus)))))
+                   ("new/a.org" file)
+                   ("craft" dir :config "pos: 2\nprojects: projects/\nmethodologies: methods/\n")
+                   ("craft/projects/chair.org" file)
+                   ("projects/plain" dir :config "pos: 2\n")
+                   ("projects/plain/project.org" file)))))
+    (should (equal '((responsibility . "craft") (project . "craft/projects/chair")
+                     (responsibility . "new") (project . "projects/plain"))
+                   (pos-corpus-test-scopes corpus)))
+    (should-not (pos-corpus-findings corpus))))
+
+(ert-deftest pos-corpus/a-project-is-a-leaf ()
+  "A project's configuration that says where projects belong is a finding.
+What lies there is the project's own, and no project of its own."
+  (let ((corpus (pos-corpus-test-walk
+                 `(("" dir :config ,(pos-corpus-test-declaring "projects/big"))
+                   ("projects/big" dir :config "pos: 2\nprojects: projects/\n")
+                   ("projects/big/projects/part.org" file)))))
+    (should (equal '(("projects/big/projects/part.org" . "projects/big"))
+                   (pos-corpus-test-files corpus)))
+    (should (equal '((project . "projects/big")) (pos-corpus-test-scopes corpus)))
+    (should (equal '(("projects/big" . "project-holds-projects: a project is a leaf"))
+                   (pos-corpus-findings corpus)))))
 
 ;;;; Repositories and writing
 
@@ -327,12 +349,12 @@ It is reported and not entered; the rest of the tree is read."
   (let ((corpus (pos-corpus-test-walk
                  `(("" dir :config ,(pos-corpus-test-declaring "bad" "twice"))
                    ("a.org" file)
-                   ("bad" dir :config "pos: 2\nprojects: p/\nmethodologies: m/\n")
+                   ("bad" dir :config "pos: 2\nprojects: m/p/\nmethodologies: m/\n")
                    ("bad/b.org" file)
                    ("twice" dir :config two-configurations)
                    ("twice/t.org" file)))))
     (should (equal '(("a.org" . ".")) (pos-corpus-test-files corpus)))
-    (should (equal '(("bad" . "config-refused: bad-value: A node says where its projects belong or its methodologies, not both")
+    (should (equal '(("bad" . "config-refused: bad-path: Projects and methodologies belong at separate paths: m")
                      ("twice" . "config-refused: two-configurations: The node has two configurations"))
                    (pos-corpus-findings corpus)))))
 

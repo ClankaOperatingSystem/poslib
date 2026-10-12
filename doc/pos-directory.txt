@@ -48,12 +48,12 @@ The top level is a mapping:
 
     pos             2, the version of this document; required
     projects        where this node's projects belong: a path beneath
-                    it, usually projects/. It makes the node a
-                    responsibility
+                    it, usually projects/. What lies directly there is
+                    a project (section 2)
     methodologies   where this node's methodologies belong: a path
-                    beneath it, usually methodologies/. It makes the
-                    node a project. Each methodology is a child
-                    declared directly beneath this path (section 2)
+                    beneath it, usually methodologies/. Each
+                    methodology is a child declared directly beneath
+                    this path (section 2)
     image           the container image this node's commands run in
     bin             where links to this node's commands are made
                     (section 6): a path beneath it, usually bin
@@ -64,12 +64,11 @@ The top level is a mapping:
     archives    where archives are kept (section 4)
     server      the server this repository is bound to (section 5)
 
-A node is a responsibility or a project, and says which by the one of
-projects and methodologies it has. A responsibility holds projects and
-has no methodologies; a project has methodologies and holds no
-projects. A file with both is refused (bad-value). A file with neither
-is not refused: its node is unconfigured, which a tool reports, and a
-person is asked which it is before the node is used.
+A node is a responsibility or a project. The file does not say which:
+where the node lies does (section 2). A file may have projects,
+methodologies, both or neither, so a responsibility may have
+methodologies as a project may. The two are separate paths: where one
+is the other, or beneath it, the file is refused (bad-path).
 
 A final slash on any of these paths is dropped.
 
@@ -146,24 +145,35 @@ An entry is a boundary. Its path and everything beneath it is the
 child's and not this node's. The entry does not say what the child is;
 where it is, and what is at the path, do:
 
-    directly beneath a project's methodologies path    a methodology
-    a configuration that says where its methodologies belong   a project
-    any other configuration                             a responsibility
-    no configuration                                           a product
+    directly beneath the node's methodologies path       a methodology
+    no configuration                                     a product
+    a configuration, directly beneath the node's
+    projects path                                        a project
+    any other configuration                              a responsibility
+
+A directory or an Org file directly beneath a responsibility's
+projects path that no entry declares is a project too: one with no
+configuration, which declares nothing. So a project is known by its
+place, and what its configuration holds, if it has one, does not say
+that it is one.
 
 A responsibility is a branch of the tree: it declares children of its
 own, each node naming only what is directly beneath it. A project is a
-leaf: it declares no responsibility or project. Its children are its
+leaf: it holds no responsibility or project. Its children are its
 methodologies, each directly beneath its methodologies path, and
-products it works on, anywhere else beneath it. A product is a subject,
-under its own rules, and this document says nothing of what is in it
-but this: its Org files are read as the product's.
+products it works on, anywhere else beneath it. A project's
+configuration that says where projects belong is reported
+(project-holds-projects), and what lies there is the project's own. A
+product is a subject, under its own rules, and this document says
+nothing of what is in it but this: its Org files are read as the
+product's.
 
 A methodology is a repository or a directory that supplies skills and
-commands to the project that declares it (section 6). Its name is the
-last part of its path: methodologies/hello is the methodology hello.
-Nothing at the path says it is one; the entry's place does, so the
-same repository is a methodology where a project declares it beneath
+commands to the node that declares it, a project or a responsibility
+(section 6). Its name is the last part of its path:
+methodologies/hello is the methodology hello. Nothing at the path
+says it is one; the entry's place does, so the same repository is a
+methodology where a node declares it beneath
 its methodologies path and a product wherever else it is declared,
 mounted as often as there are entries for it, each on its own branch.
 A methodology's path has exactly one part after the methodologies
@@ -171,10 +181,10 @@ path: an entry at that path itself, or deeper beneath it, is refused
 (bad-path). The name clankos is reserved: an entry whose methodology
 is named clankos is refused (bad-value).
 
-A tool that walks a project for its files does not enter a
-methodology, whether it is a directory of the project's repository or
+A tool that walks a node for its files does not enter a
+methodology, whether it is a directory of the node's repository or
 a repository mounted there: a methodology's own files are not the
-project's canon. What a methodology holds, and the kinds of canon it
+node's canon. What a methodology holds, and the kinds of canon it
 declares, are in doc/pos-methodology.txt.
 
 A tool that walks a tree for its Org files follows the declarations: a
@@ -379,7 +389,7 @@ Links make what is installed found:
     in .git/info/exclude.
   - A link is the tool's if it is a symbolic link whose target is in
     auto/ of the repository it is made in, or beneath the methodologies
-    path of the project it is made in. The tool's link to something no
+    path of the node it is made in. The tool's link to something no
     longer there, or into a methodology no longer declared, is removed.
     So a skill or a command a newer source leaves out goes, and its
     link with it.
@@ -418,7 +428,7 @@ untracked symbolic link in .agents/skills/ whose target is a skill's
 directory in another repository of the tree, is removed: in a product
 too, since the tool made it.
 
-A project's methodologies supply skills and commands in the same way,
+A node's methodologies supply skills and commands in the same way,
 from where they lie. A methodology is a directory holding
 
     skills/NAME/   a skill: a directory holding a SKILL.md, whose NAME
@@ -427,18 +437,18 @@ from where they lie. A methodology is a directory holding
 
 either of which may be absent. Nothing is copied: for each skill,
 .agents/skills/NAME is a link to it in the methodology's directory,
-and for each command, where the project says bin, NAME there is a link
+and for each command, where the node says bin, NAME there is a link
 to it. The links are made as the links above are, relative, untracked
 and excluded, and .claude/skills is served the same way. They are made
-in the project: at the root of its repository, beside the source's
-links, when the project is a repository; in its directory, when it is
+in the node: at the root of its repository, beside the source's
+links, when the node is a repository; in its directory, when it is
 a directory of a repository. The methodology is whatever is at its
 path: a change to it is seen on the next plan, and nothing is
 versioned.
 
 A methodology that holds a skill whose NAME does not begin with the
 methodology's name and a hyphen is reported (methodology-refused) and
-nothing of it is linked; the project's other methodologies and the
+nothing of it is linked; the node's other methodologies and the
 source's skills are. Where a methodology's skill or command has the
 name of one of the source's, or of another methodology's, the path is
 held by the tool's own link to the first, and the second is reported
@@ -447,7 +457,7 @@ as any child is, and its links are planned on the plan that follows.
 
 Nothing is installed in a methodology and nothing in it is changed:
 the tool reads its skills and commands and writes only links in the
-project that declares it.
+node that declares it.
 
 
 7. The two steps
@@ -497,9 +507,6 @@ and findings, which the tool reports and does not act on:
                     exclusions in force name (section 1) are not looked
                     in
     missing         a child with no remote whose directory is not there
-    unconfigured    a node whose configuration says neither where its
-                    projects belong nor its methodologies. What it
-                    declares is planned all the same
     name-taken      a path where the tool would make a link, held by
                     something that is not the tool's, or named by
                     more than one skill or command
@@ -565,7 +572,7 @@ this operation after writing configuration.
 
 The install ROOT SOURCE command applies only the exclude, install,
 link, unlink and note actions from a fresh plan made with SOURCE, the
-links to each project's methodologies among them, and prints the
+links to each node's methodologies among them, and prints the
 remaining plan. It clones nothing and changes no archive
 rule, so it uses no network. A command run in a tree uses this
 operation first, so that what is installed there is the source's.
@@ -583,8 +590,8 @@ configures them, and tests the tool's behaviour in them.
 fixtures/pos-directory/ holds configuration files for both libraries.
 Each fixture is a JSON object: about, what it shows; yaml, the file's
 text; and either config, what a reader makes of it, or refused, the
-kind of refusal. config has kind, which is responsibility, project or null;
-projects, methodologies, image and bin, each a string or null; exclude,
+kind of refusal. config has projects, methodologies, image and bin,
+each a string or null; exclude,
 an array of strings or null; children, worktrees and archives, each an
 array with every default filled in, a child with no remote having null
 for its remote and branch, and an archive carrying sweep and path only

@@ -27,15 +27,19 @@
 ;; configurations alone, as doc/pos-directory.txt has it.
 ;;
 ;; A scope is the root, a responsibility, a project or a product.  A
-;; responsibility is a directory whose configuration says where its
-;; projects belong; a project is what lies there, a directory or a
-;; single Org file.  A directory's name carries no meaning by itself.
+;; project is what lies where a responsibility's configuration says
+;; its projects belong: a directory, with a configuration of its own
+;; or with none, or a single Org file.  A node anywhere else is a
+;; responsibility.  A directory's name carries no meaning by itself,
+;; and neither does what a configuration holds.
 ;;
 ;; Membership of the tree follows declarations: a parent knows its
 ;; children and a child knows nothing above it.  The walk enters the
 ;; ordinary directories of a node and each child the node declares
 ;; under children, whatever the child is.  A declared child with a
-;; configuration is a node, read as its configuration says.  One with
+;; configuration is a node, read as its configuration says.  A
+;; project is a leaf: where its configuration says projects belong is
+;; a finding, and what lies there is the project's own.  One with
 ;; none is a product: its Org files are read as the product's, with
 ;; the default exclusions, and nothing in it is written.  A directory
 ;; with a configuration that no node declares is not in the tree; it
@@ -55,7 +59,7 @@
 ;; - `pos-corpus-files', `pos-corpus-owner', `pos-corpus-scopes':
 ;;   the files, the scope each belongs to, and the scopes, each a
 ;;   `pos-scope'.
-;; - `pos-corpus-methodologies': the methodologies the projects declare.
+;; - `pos-corpus-methodologies': the methodologies the nodes declare.
 ;; - `pos-corpus-writable-p': whether a command may write a file.
 
 ;;; Code:
@@ -67,15 +71,13 @@
 
 (cl-defstruct (pos-scope (:constructor pos-scope--make) (:copier nil))
   "A scope of the tree: the root, a responsibility, a project or a product.
-KIND is the symbol root, responsibility, project or product, or nil
-for a node whose configuration says neither where its projects belong
-nor its methodologies, which is yet to be configured.  PATH is relative
-to the root, \".\" for the root itself; for a one-file project it is
-the file's path without its extension.  DIR is the directory the scope
-is, absolute, as a directory name; for a one-file project, the
-directory holding the file.  CONFIG is the scope's configuration as
-`pos-tree-read-config' gives it, or nil for a project known by where
-it lies.  NODE is the nearest scope at or above this one that has a
+KIND is the symbol root, responsibility, project or product.  PATH is
+relative to the root, \".\" for the root itself; for a one-file
+project it is the file's path without its extension.  DIR is the
+directory the scope is, absolute, as a directory name; for a one-file
+project, the directory holding the file.  CONFIG is the scope's
+configuration as `pos-tree-read-config' gives it, or nil for one that
+has none.  NODE is the nearest scope at or above this one that has a
 configuration, or nil for the root."
   kind path dir config node)
 
@@ -101,17 +103,12 @@ Not a hidden file, nor a lock file, which begins with .#.")
   "Return non-nil if NAME names an Org file read into the corpus."
   (string-match-p pos-corpus-org-regexp name))
 
-(defun pos-corpus--kind (config)
-  "Return the kind of scope a node with CONFIG is: responsibility, project or nil."
-  (pcase (alist-get 'kind config)
-    ("responsibility" 'responsibility)
-    ("project" 'project)))
-
 (defun pos-corpus-projects-dir (scope)
   "Return the path, relative to the root, of SCOPE's projects directory, or nil.
-Nil for a scope whose configuration names none."
+Nil for a scope whose configuration names none, and for a project,
+which holds none."
   (let ((projects (alist-get 'projects (pos-scope-config scope))))
-    (when (stringp projects)
+    (when (and (stringp projects) (not (eq 'project (pos-scope-kind scope))))
       (if (equal (pos-scope-path scope) ".")
           projects
         (concat (pos-scope-path scope) "/" projects)))))
@@ -205,10 +202,14 @@ two-configurations, and :names, the names in it, sorted."
                      ((and text (member path declared))
                       (when (plist-get info :repository) (push path unwritable))
                       (when-let* ((config (read-config path text)))
-                        (let* ((node (make-scope (pos-corpus--kind config) path config
-                                                 (nearest-node scope)))
+                        (let* ((node (make-scope (if projects-of 'project 'responsibility)
+                                                 path config (nearest-node scope)))
                                (own (alist-get 'exclude config))
                                (declares (not (eq own :null))))
+                          (when (and projects-of
+                                     (stringp (alist-get 'projects config)))
+                            (push (cons path "project-holds-projects: a project is a leaf")
+                                  findings))
                           (descend path node
                                    (if declares (pos-tree-exclusions config) exclusions)
                                    (if declares (concat path "/") exclusions-node)
@@ -298,7 +299,7 @@ KIND is root, responsibility, project or product."
               (pos-corpus-scopes corpus)))
 
 (defun pos-corpus-methodologies (corpus)
-  "Return the methodologies CORPUS's projects declare, each (SCOPE NAME . DIR).
+  "Return the methodologies CORPUS's nodes declare, each (SCOPE NAME . DIR).
 DIR is the methodology's directory, absolute, as a directory name,
 whether or not it is there."
   (mapcan (lambda (scope)

@@ -2,7 +2,6 @@
  "about": "A file that declares nothing.",
  "yaml": "pos: 2\n",
  "config": {
-  "kind": null,
   "projects": null,
   "methodologies": null,
   "image": null,

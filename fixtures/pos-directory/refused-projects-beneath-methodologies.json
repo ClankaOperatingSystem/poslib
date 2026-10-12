@@ -1,0 +1,5 @@
+{
+ "about": "Projects and methodologies belong at separate paths, neither beneath the other.",
+ "yaml": "pos: 2\nprojects: methods/projects\nmethodologies: methods\n",
+ "refused": "bad-path"
+}

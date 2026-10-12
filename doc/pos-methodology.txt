@@ -1,13 +1,15 @@
 The methodology directory
 Version 1
 
-A project uses methodologies: each a repository or a directory declared
-directly beneath the project's methodologies path (doc/pos-directory.txt,
-section 2). A methodology supplies skills and commands, which section 6
-of that document says how the tree tool links into the project. This
-document says what else a methodology holds: a declaration of the kinds
-of canon its commands create and maintain in the project, and of the
-checks it supplies for them; and what a tool does with the declaration.
+A node, a project or a responsibility, uses methodologies: each a
+repository or a directory declared directly beneath the node's
+methodologies path (doc/pos-directory.txt, section 2). A methodology
+supplies skills and commands, which section 6 of that document says
+how the tree tool links into the node. This document says what else a
+methodology holds: a declaration of the kinds of canon its commands
+create and maintain in the node, and of the checks it supplies for
+them; and what a tool does with the declaration. Below, "the project"
+is the node that declares the methodology, whichever of the two it is.
 
 A methodology has no configuration. It declares no children and names
 no locations; it is what its declaring entry says it is. What it holds:

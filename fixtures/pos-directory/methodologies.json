@@ -1,8 +1,7 @@
 {
- "about": "A node that says where its methodologies belong is a project.",
+ "about": "A node says where its methodologies belong. The file does not say whether the node is a project or a responsibility: its place does.",
  "yaml": "pos: 2\nmethodologies: methodologies\n",
  "config": {
-  "kind": "project",
   "projects": null,
   "methodologies": "methodologies",
   "image": null,
