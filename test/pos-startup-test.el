@@ -1001,11 +1001,36 @@ is :null, and an item with no tags has an empty vector."
                        (scheduled . :null) (deadline . :null) (closed . :null)
                        (properties . nil) (body . "")))))))
 
+(ert-deftest pos-startup/an-active-project-with-no-outcome-is-named ()
+  "The no-outcome view names each active project with no outcome.
+Active is a STATUS among `pos-startup-active-statuses'.  A directory
+project with a configuration of its own is a project as any other.
+Here roof has an outcome, paint and floor have none, and shelf is not
+begun."
+  (pos-test-with-files root
+      '((".pos/config.yaml"
+         . "pos: 2\nprojects: projects/\nchildren:\n  - path: projects/floor\n")
+        ("projects/roof.org"
+         . ":PROPERTIES:\n:STATUS: WIP\n:OUTCOME: The roof keeps the rain out.\n:END:\n")
+        ("projects/paint.org" . ":PROPERTIES:\n:STATUS: COMMITTED\n:END:\n")
+        ("projects/floor/.pos/config.yaml" . "pos: 2\nmethodologies: methodologies/\n")
+        ("projects/floor/project.org" . ":PROPERTIES:\n:STATUS: WIP\n:END:\n")
+        ("projects/shelf.org" . ":PROPERTIES:\n:STATUS: IDEA\n:END:\n"))
+    (let ((text (pos-startup-view root "no-outcome")))
+      (should (string-prefix-p "Projects with no outcome: " text))
+      (should (equal (mapcar #'car (pos-startup-test-lines text))
+                     '("projects/floor" "projects/paint"))))
+    (should (equal (pos-startup-view-items root "no-outcome")
+                   '(((scope . "projects/floor") (scope_kind . "project")
+                      (status . "WIP"))
+                     ((scope . "projects/paint") (scope_kind . "project")
+                      (status . "COMMITTED")))))))
+
 (ert-deftest pos-startup/a-view-of-scopes-as-data-names-each-scope ()
   "A view of scopes gives each scope, its kind and its status.
 The views are reviews-to-schedule and stuck.  In the tree, the scopes
 with no review are those the text names: three projects with their
-STATUS, then two responsibilities, which have none.  beta is begun with
+STATUS, then three responsibilities, which have none.  beta is begun with
 no next action."
   (pos-startup-test-with-tree
     (should (equal (pos-startup-view-items root "reviews-to-schedule")

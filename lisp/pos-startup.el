@@ -110,17 +110,18 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
 
 (defconst pos-startup-views
   '("next" "waiting" "someday" "scheduled" "deadlines" "reviews"
-    "reviews-to-schedule" "stuck" "projects" "intray" "finished" "all")
+    "reviews-to-schedule" "stuck" "no-outcome" "projects" "intray" "finished"
+    "all")
   "The names of the views, in the order they are printed.")
 
 (defconst pos-startup-default-views
   '("next" "waiting" "scheduled" "deadlines" "reviews" "reviews-to-schedule"
-    "stuck" "intray")
+    "stuck" "no-outcome" "intray")
   "The views `pos-startup-report' prints when none is named.")
 
 (defconst pos-startup-weekly-views
   '("intray" "next" "waiting" "scheduled" "deadlines" "reviews" "stuck"
-    "reviews-to-schedule" "someday" "finished")
+    "no-outcome" "reviews-to-schedule" "someday" "finished")
   "The views of a weekly review, in the order the review reads them.
 What is to be placed; what is next, waited for, dated and to be
 reviewed; what is set aside; and what was finished in the week.")
@@ -585,6 +586,36 @@ has an item in one of `pos-startup-next-action-states'."
                                   (not has-next)))
                            projects))))))
 
+(defun pos-startup--no-outcome ()
+  "Return the view of the active projects with no outcome.
+The projects of `pos-startup--corpus' that are active by
+`pos-startup-active-statuses', with no file that has an outcome as
+`pos-startup--outcome' gives it.  A project is what lies
+where a responsibility's projects belong, and its outcome says why it
+is done and how it is known to be finished."
+  (let (projects)
+    (dolist (file (pos-startup--files-of-kind 'project))
+      (let ((project (pos-startup--project-of file projects)))
+        (cl-pushnew project projects)
+        (setf (pos-startup--project-status project)
+              (or (pos-startup--project-status project)
+                  (pos-startup--file-status file))
+              (pos-startup--project-outcome project)
+              (or (pos-startup--project-outcome project)
+                  (with-current-buffer (pos-visit file) (pos-startup--outcome))))))
+    (pos-startup--list
+     (concat "Projects with no outcome: why is each done, "
+             "and how is it known to be finished?")
+     (mapcar (pcase-lambda ((cl-struct pos-startup--project path owner status))
+               (pos-startup--scope-row owner status)
+               (format "%-54s %s" path status))
+             (seq-sort-by #'pos-startup--project-path #'string<
+                          (seq-filter
+                           (pcase-lambda ((cl-struct pos-startup--project status outcome))
+                             (and (member status pos-startup-active-statuses)
+                                  (not outcome)))
+                           projects))))))
+
 (defun pos-startup--outcome ()
   "Return the OUTCOME property the current buffer has before its first heading.
 One line, with OUTCOME+ lines joined to it as Org joins them and each
@@ -782,6 +813,7 @@ A view of more than one list has a title for each."
       ("reviews" (pos-startup--reviews))
       ("reviews-to-schedule" (pos-startup--reviews-to-schedule))
       ("stuck" (pos-startup--stuck))
+      ("no-outcome" (pos-startup--no-outcome))
       ("projects" (pos-startup--projects))
       ("intray" (pos-startup--intray))
       ("finished" (pos-startup--finished))
@@ -797,7 +829,7 @@ A list with an element for each line `pos-startup-view' prints, in
 its order.  In a view of items each is an alist as
 `pos-startup--item-at-point' gives it; in waiting, each has
 waiting_on too, the person's name or :null.  In reviews-to-schedule,
-stuck and projects, which list scopes, each has scope, scope_kind
+stuck, no-outcome and projects, which list scopes, each has scope, scope_kind
 and status; in projects, review, next and outcome too.  A line of
 reviews-to-schedule for a path that is no scope's has the scope of
 the review's file, and covers, file, line and title."
