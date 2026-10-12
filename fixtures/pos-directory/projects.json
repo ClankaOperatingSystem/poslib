@@ -1,8 +1,7 @@
 {
- "about": "A node that says where its projects belong is a responsibility; a final slash is dropped.",
+ "about": "A node says where its projects belong; a final slash is dropped.",
  "yaml": "pos: 2\nprojects: portfolio/\n",
  "config": {
-  "kind": "responsibility",
   "projects": "portfolio",
   "methodologies": null,
   "image": null,

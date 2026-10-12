@@ -125,8 +125,8 @@ and each responsibility has one of its own."
           . ":PROPERTIES:\n:STATUS: COMMITTED\n:END:\n* TODO Find the card\n")
          ("health/teeth/.pos/config.yaml" . ,pos-startup-test-responsibility)
          ("health/teeth/intray.org" . "* Unsorted\n")
-         ;; A project by configuration: widget's says where its
-         ;; methodologies belong; its file has no STATUS.
+         ;; A responsibility with methodologies: widget lies in no
+         ;; projects directory.
          ("tools/widget/.clanka/config.yml" . "pos: 2\nmethodologies: methodologies/\n")
          ("tools/widget/notes.org" . "* TODO Oil the widget\n")
          ;; A directory with two configurations, and a file beneath it.
@@ -207,9 +207,9 @@ A directory's name means nothing by itself.  In the tree, health,
 health/teeth, home, garden, kitchen and cellar each hold a
 configuration that says where their projects belong, so each is a
 responsibility; shed holds none, so it is a plain directory of the
-root.  What lies directly in a projects directory is
-a project, as is tools/widget, whose configuration says where its
-methodologies belong."
+root.  What lies directly in a projects directory is a project.
+tools/widget lies in none, so it is a responsibility too, though its
+configuration says only where its methodologies belong."
   (pos-startup-test-with-tree
     (let ((corpus (pos-corpus root)))
       (should (eq 'root (pos-scope-kind (car (pos-corpus-scopes corpus)))))
@@ -226,7 +226,7 @@ methodologies belong."
                        (project . "projects/beta")
                        (project . "projects/delta")
                        (project . "projects/gamma")
-                       (project . "tools/widget")))))))
+                       (responsibility . "tools/widget")))))))
 
 (ert-deftest pos-startup/a-refused-configuration-is-a-finding-and-a-leaf ()
   "A directory whose configuration is refused is a finding, and is not entered.
@@ -278,7 +278,7 @@ read has no owner."
                        ("shed/index.org" root ".")
                        ("projects/alpha/notes.org" project "projects/alpha")
                        ("health/projects/checkup.org" project "health/projects/checkup")
-                       ("tools/widget/notes.org" project "tools/widget")
+                       ("tools/widget/notes.org" responsibility "tools/widget")
                        ("home/index.org"
                         responsibility "home")
                        ("home/projects/roof/project.org"
@@ -395,29 +395,6 @@ is a declared child with no configuration, so it is a product."
                      (concat "NEXT items of products\n  "
                              (format "%-54s " "kit/todo")
                              "NEXT Tag the release\n"))))))
-
-(ert-deftest pos-startup/a-next-item-of-a-scope-of-no-kind-is-listed ()
-  "A NEXT item of a scope yet to be configured is in a list of its own.
-Such a scope is of no kind, so its item belongs to none of the three
-lists.  The fourth list is printed only when it has an item.  Here
-new's configuration says neither where its projects belong nor its
-methodologies; with its item not NEXT, three lists are printed."
-  (pos-test-with-files root
-      '((".pos/config.yaml" . "pos: 2\nchildren:\n  - path: new\n")
-        ("new/.pos/config.yaml" . "pos: 2\n")
-        ("new/notes.org" . "* NEXT Decide what new is\n"))
-    (let ((parts (split-string (pos-startup-view root "next") "\n\n" t)))
-      (should (= 4 (length parts)))
-      (should (equal (nth 3 parts)
-                     (concat "NEXT items of scopes yet to be configured\n  "
-                             (format "%-54s " "new/notes")
-                             "NEXT Decide what new is\n")))))
-  (pos-test-with-files root
-      '((".pos/config.yaml" . "pos: 2\nchildren:\n  - path: new\n")
-        ("new/.pos/config.yaml" . "pos: 2\n")
-        ("new/notes.org" . "* TODO Decide what new is\n"))
-    (should (= 3 (length (split-string (pos-startup-view root "next")
-                                       "\n\n" t))))))
 
 (ert-deftest pos-startup/the-waiting-view-lists-each-waiting-item ()
   "The waiting view lists each WAITING item, labelled by its scope.
@@ -584,10 +561,10 @@ A project is active when its file's STATUS is one of
 `pos-startup-active-statuses'; every responsibility counts, and so
 does the root, named \".\".  A review scheduled on any date, in the
 window or beyond it, is a review.  In the tree, beta, checkup and
-roof are active without one; gamma is complete, delta has no status
-and tools/widget's file has none.  Of the responsibilities,
-health/teeth and garden have none; home, health and kitchen have one
-in the window, and cellar one beyond it.  shed is no responsibility,
+roof are active without one; gamma is complete and delta has no
+status.  Of the responsibilities, health/teeth, garden and
+tools/widget have none; home, health and kitchen have one in the
+window, and cellar one beyond it.  shed is no responsibility,
 so it is not named, and its review is the root's, so the root is not
 named either."
   (pos-startup-test-with-tree
@@ -598,7 +575,7 @@ named either."
                        "projects/beta")))
       (should (equal (split-string (nth 1 parts) "\n" t " +")
                      '("Responsibilities with a review to be scheduled"
-                       "garden" "health/teeth")))
+                       "garden" "health/teeth" "tools/widget")))
       (should (equal (nth 2 parts)
                      "Root with a review to be scheduled\n  (none)\n")))))
 
@@ -1041,6 +1018,8 @@ no next action."
                      ((scope . "garden") (scope_kind . "responsibility")
                       (status . :null))
                      ((scope . "health/teeth") (scope_kind . "responsibility")
+                      (status . :null))
+                     ((scope . "tools/widget") (scope_kind . "responsibility")
                       (status . :null)))))
     (should (equal (pos-startup-view-items root "stuck")
                    '(((scope . "projects/beta") (scope_kind . "project")

@@ -1,0 +1,16 @@
+{
+ "about": "A node may say where its projects belong and where its methodologies do: a responsibility may have methodologies.",
+ "yaml": "pos: 2\nprojects: projects/\nmethodologies: methodologies/\n",
+ "config": {
+  "projects": "projects",
+  "methodologies": "methodologies",
+  "image": null,
+  "bin": null,
+  "exclude": null,
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null,
+  "warnings": []
+ }
+}

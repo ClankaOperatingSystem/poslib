@@ -198,7 +198,7 @@ clankos."
   "Return the methodologies CONFIG declares, each (NAME . PATH), by name.
 A methodology is a child directly beneath the path CONFIG says its
 methodologies belong at; its NAME is the last part of its PATH, which
-is relative to the node.  None for a node that is no project."
+is relative to the node.  None for a node that says no such path."
   (let ((at (alist-get 'methodologies config)))
     (when (stringp at)
       (seq-sort-by #'car #'string<
@@ -358,14 +358,12 @@ for another."
 
 (defun pos-tree-read-config (text)
   "Return the configuration in TEXT, a config.yaml's, checked.
-An alist of kind, projects, methodologies, image, bin, exclude,
-children, worktrees, archives, server and warnings, with defaults
-filled in: sequences are vectors and an absent value is :null.
-warnings is a vector of strings, one for each key this reader does
-not know, which it leaves unread.  kind is
-\"responsibility\" for a node that says where its projects belong,
-\"project\" for one that says where its methodologies belong, and :null
-for one that says neither, which is yet to be configured.  Every
+An alist of projects, methodologies, image, bin, exclude, children,
+worktrees, archives, server and warnings, with defaults filled in:
+sequences are vectors and an absent value is :null.  warnings is a
+vector of strings, one for each key this reader does not know, which
+it leaves unread.  The file does not say what its node is: where the
+node lies does, as doc/pos-directory.txt section 2 has it.  Every
 scalar is read as the text written, and the keys' types decide what
 it is.  Signal `pos-tree-refused', with the refusal's kind and a
 message, for a file doc/pos-directory.txt does not allow."
@@ -396,9 +394,12 @@ message, for a file doc/pos-directory.txt does not allow."
            (bin (pos-tree--location (alist-get 'bin top) "bin"))
            (children (pos-tree--children reading (alist-get 'children top)))
            (server (assq 'server top)))
-      (when (and projects methodologies)
-        (pos-tree-refuse 'bad-value
-                         "A node says where its projects belong or its methodologies, not both"))
+      (when (and projects methodologies
+                 (or (pos-path-within-p projects methodologies)
+                     (pos-path-within-p methodologies projects)))
+        (pos-tree-refuse 'bad-path
+                         "Projects and methodologies belong at separate paths: %s"
+                         methodologies))
       (when methodologies
         (pos-tree--check-methodologies methodologies children))
       ;; A tool with no YAML reader finds the image by its line.
@@ -410,9 +411,7 @@ message, for a file doc/pos-directory.txt does not allow."
                               text)))))
         (pos-tree-refuse 'bad-value
                          "The image is not on one line, as image: NAME, unquoted"))
-      `((kind . ,(cond (projects "responsibility") (methodologies "project")
-                       (t :null)))
-        (projects . ,(or projects :null))
+      `((projects . ,(or projects :null))
         (methodologies . ,(or methodologies :null))
         (image . ,(or image :null))
         (bin . ,(or bin :null))
@@ -918,8 +917,6 @@ planned."
   (let ((by-path (lambda (a b) (string< (alist-get 'path a) (alist-get 'path b))))
         nodes held)
     (when config (pos-tree--collect-archives plan repo base config))
-    (when (eq (alist-get 'kind config) :null)
-      (pos-tree--find plan "unconfigured" (pos-tree--rel plan base)))
     (dolist (child (sort (append (alist-get 'children config) nil) by-path))
       (if (stringp (alist-get 'remote child))
           (pcase-let ((`(,node . ,taken) (pos-tree--mount-child plan repo base child)))
@@ -998,7 +995,7 @@ working tree has no configuration lacks."
 (defun pos-tree--own-link-p (link owned)
   "Return non-nil if LINK is a symbolic link whose target is in one of OWNED.
 OWNED are directories the tool's links point into: auto/, and the
-methodologies of a project."
+methodologies of a node."
   (when-let* ((to (file-symlink-p link)))
     (let ((target (expand-file-name to (file-name-directory link))))
       (seq-some (lambda (dir) (string-prefix-p (file-name-as-directory dir) target))
@@ -1182,7 +1179,7 @@ after it is found for PLAN (methodology-refused) and supplies nothing."
     (cons (nreverse skills) (nreverse commands))))
 
 (defun pos-tree--in-directory (plan dir base config)
-  "Add to PLAN the links to the methodologies of the project at BASE.
+  "Add to PLAN the links to the methodologies of the node at BASE.
 They are made in DIR.  BASE is a directory of the repository at DIR,
 with CONFIG its own."
   (when (stringp (alist-get 'methodologies config))
@@ -1200,7 +1197,7 @@ with CONFIG its own."
 A repository with a configuration has auto/ in its configuration
 directory, replaced from the source when its version is another, and
 links to what auto/ holds and to what its methodologies supply.  A
-project that is a directory of it has links to its own methodologies.
+node that is a directory of it has links to its own methodologies.
 One with no configuration, a product, has nothing planned in it but
 the removal of links an earlier tool made."
   (let* ((dir (pos-tree--node-dir node))

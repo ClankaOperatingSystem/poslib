@@ -2,7 +2,6 @@
  "about": "bin says where links to a node's commands are made: a path beneath it, less a final slash.",
  "yaml": "pos: 2\nprojects: projects/\nbin: tools/bin/\n",
  "config": {
-  "kind": "responsibility",
   "projects": "projects",
   "methodologies": null,
   "image": null,
