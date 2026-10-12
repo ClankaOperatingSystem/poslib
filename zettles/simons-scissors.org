@@ -1,0 +1,33 @@
+:PROPERTIES:
+:ID:       90e31bba-2d13-4d33-ac82-8044743eb34e
+:END:
+#+TITLE: Simon's scissors
+
+Simon's scissors is Herbert Simon's picture of behaviour as the cut made
+by two blades.[fn:1]
+
+The first blade is the structure of the place where work is done, and the
+second is the ability of whoever does the work. Simon held that behaviour
+cannot be understood from one blade alone.[fn:2] In an AI system the
+second blade is the model: its intelligence and instincts push against the
+information environment it works in, and what the agent does is decided
+where the two meet. poslib works on the first blade: a
+[[id:4942c91a-4024-44d5-b549-41a105415fdd][garden]] is an information
+environment designed around the physics of personal productivity: Emacs,
+[[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]], tasks, schedules
+and continuous learning.
+[[id:86911fc3-3341-49dc-8908-8cb05a92ba23][Grassé's stigmergy]] describes
+the two blades in a colony of termites.
+
+[fn:1] Herbert A. Simon, 1916–2001, studied how people and organisations
+decide, and won the Nobel prize in economics in 1978:
+[[https://en.wikipedia.org/wiki/Herbert_A._Simon][Herbert A. Simon]] on
+Wikipedia. The picture is from his "Invariants of Human Behavior",
+/Annual Review of Psychology/, 1990, where rational behaviour "is shaped
+by a scissors whose two blades are the structure of task environments and
+the computational capabilities of the actor".
+
+[fn:2] He first argued it in "Rational Choice and the Structure of the
+Environment", /Psychological Review/, 1956. See
+[[https://en.wikipedia.org/wiki/Bounded_rationality][Bounded rationality]]
+on Wikipedia.

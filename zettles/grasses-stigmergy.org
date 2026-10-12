@@ -1,0 +1,33 @@
+:PROPERTIES:
+:ID:       86911fc3-3341-49dc-8908-8cb05a92ba23
+:END:
+#+TITLE: Grassé's stigmergy
+
+Grassé's stigmergy is Pierre-Paul Grassé's name for the way termites
+coordinate their building through the nest itself.[fn:1]
+
+A termite alone is stupid. Together termites build solar-powered cities
+with gardens, garrisons, granaries, nurseries and air conditioning,
+entirely out of mud and spit. Grassé found that no termite holds the plan
+or directs another: each one acts on the state of the work where it
+stands, and what it adds changes that state for the next.[fn:2] Agents are
+like termites, and like people too: they can be stupid, unpredictable and
+occasionally perverse. What many of them build together depends on the
+place they work in, which is the first blade of
+[[id:90e31bba-2d13-4d33-ac82-8044743eb34e][Simon's scissors]]. In poslib
+that place is the [[id:4942c91a-4024-44d5-b549-41a105415fdd][garden]]: an
+agent acts on the [[id:f4e86452-48ad-4ffb-8218-d2491c92a3ca][canon]] and
+the tasks it finds there, and what it leaves is what the next one finds.
+
+[fn:1] Pierre-Paul Grassé, 1895–1985, was a French zoologist who studied
+termites:
+[[https://en.wikipedia.org/wiki/Pierre-Paul_Grass%C3%A9][Pierre-Paul
+Grassé]] on Wikipedia. He made the name in 1959 from the Greek words for
+mark and work, in "La reconstruction du nid et les coordinations
+interindividuelles chez /Bellicositermes natalensis/ et /Cubitermes/
+sp.", /Insectes Sociaux/.
+
+[fn:2] Grassé saw it in termites rebuilding a nest: a termite adds mud
+where it finds mud already placed, so the growing nest directs the
+builders. See [[https://en.wikipedia.org/wiki/Stigmergy][Stigmergy]] on
+Wikipedia.
