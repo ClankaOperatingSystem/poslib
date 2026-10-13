@@ -52,11 +52,24 @@
 (require 'pos-corpus)
 (require 'pos-links)
 
-(defcustom pos-project-statuses '("COMMITTED" "WIP" "DONE")
-  "The values a project file's STATUS property takes.
-COMMITTED is a project not begun, WIP one begun, DONE one closed."
-  :type '(repeat string)
+(defcustom pos-project-statuses
+  '(("COMMITTED" . planned) ("WIP" . begun) ("DONE" . closed))
+  "The values a project file's STATUS property takes, each with what it says.
+A status says the project is planned and not yet begun, begun, or
+closed.  A project not closed is active, and is expected to have a
+review scheduled; one begun is expected to have a next action."
+  :type '(alist :key-type string
+                :value-type (choice (const planned) (const begun) (const closed)))
   :group 'pos)
+
+(defun pos-project-active-p (status)
+  "Return non-nil if a project whose file has STATUS is not closed."
+  (let ((says (cdr (assoc status pos-project-statuses))))
+    (and says (not (eq says 'closed)))))
+
+(defun pos-project-begun-p (status)
+  "Return non-nil if a project whose file has STATUS is begun."
+  (eq (cdr (assoc status pos-project-statuses)) 'begun))
 
 (defun pos-project--text (id title outcome review next created)
   "Return the text of a project file.
@@ -126,7 +139,7 @@ taken, as a file or a directory."
                     nil file nil 'silent nil 'excl)
       file)))
 
-(defconst pos-project--status-line "^:STATUS:[ \t]+\\(\\S-+\\)[ \t]*$"
+(defconst pos-project-status-line "^:STATUS:[ \t]+\\(\\S-+\\)[ \t]*$"
   "A regexp matching a STATUS property's line, its value in group 1.")
 
 (defun pos-project--status-file (corpus project)
@@ -148,7 +161,7 @@ with no such file."
              (org-with-wide-buffer
               (goto-char (point-min))
               (re-search-forward
-               pos-project--status-line
+               pos-project-status-line
                (save-excursion
                  (or (re-search-forward "^\\*+ " nil t) (point-max)))
                t))))
@@ -163,9 +176,9 @@ is one line, or nil.  The change is recorded, with its time, at the
 head of a LOGBOOK drawer beneath the file's properties.  Return (FILE
 PREVIOUS STATUS).  Refuse the status the project has, and what
 `pos-set-state' refuses of the file."
-  (unless (member status pos-project-statuses)
+  (unless (assoc status pos-project-statuses)
     (user-error "Unknown status: %s (one of %s)"
-                status (string-join pos-project-statuses ", ")))
+                status (string-join (mapcar #'car pos-project-statuses) ", ")))
   (when (and note (not (pos-one-line-p note)))
     (user-error "A note is one nonempty line"))
   (let* ((root (file-name-as-directory (expand-file-name root)))
@@ -173,7 +186,7 @@ PREVIOUS STATUS).  Refuse the status the project has, and what
          (file (pos-project--status-file corpus project)))
     (pos-writing (pos-buffer-to-write root file corpus)
       (goto-char (point-min))
-      (re-search-forward pos-project--status-line)
+      (re-search-forward pos-project-status-line)
       (let ((previous (match-string-no-properties 1)))
         (when (equal previous status)
           (user-error "The project is already %s" status))
@@ -309,7 +322,7 @@ Exit 2 on any other arguments."
       (_ (message "%s\n%s\n%s"
                   "Usage: create WITHIN NAME TITLE OUTCOME REVIEW [NEXT]"
                   (format "       status PROJECT %s [NOTE]"
-                          (string-join pos-project-statuses "|"))
+                          (string-join (mapcar #'car pos-project-statuses) "|"))
                   "       promote PROJECT")
          (kill-emacs 2)))))
 
