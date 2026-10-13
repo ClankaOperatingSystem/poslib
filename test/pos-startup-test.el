@@ -39,15 +39,6 @@
   "Return the Org date DAYS from today, as <YYYY-MM-DD>."
   (format-time-string "<%Y-%m-%d>" (time-add nil (days-to-time days))))
 
-(defconst pos-startup-test-responsibility "pos: 2\nprojects: projects/\n"
-  "The configuration of a responsibility whose projects lie in projects/.")
-
-(defun pos-startup-test-declaring (&rest paths)
-  "Return the configuration of a responsibility that declares PATHS.
-Each is a child with no remote.  Its projects lie in projects/."
-  (concat pos-startup-test-responsibility "children:\n"
-          (mapconcat (lambda (path) (format "  - path: %s\n" path)) paths "")))
-
 (defmacro pos-startup-test-with-tree (&rest body)
   "Evaluate BODY with `root' holding the shared tree of cases.
 Each entry is there for a rule, which the docstring of the test that
@@ -60,7 +51,7 @@ and each responsibility has one of its own."
          ;; directory; its own files: an intray, and names that are not
          ;; read.
          (".pos/config.yaml"
-          . ,(pos-startup-test-declaring "home" "garden" "kitchen" "cellar"
+          . ,(pos-test-declaring "home" "garden" "kitchen" "cellar"
                                          "health" "tools/widget" "twice"))
          ("intray.org" . "* Unsorted\n** NEXT Answer the letter\n** TODO Sort the shelf\n")
          ("notes.txt" . "Not an Org file.\n")
@@ -95,19 +86,19 @@ and each responsibility has one of its own."
          ;; of its own; garden has none; kitchen's and cellar's reviews
          ;; fall at the edges of the reviews window.  shed has no
          ;; configuration, so it is a plain directory of the root.
-         ("home/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("home/.clanka/config.yml" . ,pos-test-child-config)
          ("home/index.org"
           . ,(concat "* TODO Review the home :review:\nSCHEDULED: "
                      (pos-startup-test-day 3) "\n"))
          ("home/projects/roof/project.org"
           . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Call the roofer\n")
-         ("garden/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("garden/.clanka/config.yml" . ,pos-test-child-config)
          ("garden/index.org" . "* TODO Prune the hedge\n")
-         ("kitchen/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("kitchen/.clanka/config.yml" . ,pos-test-child-config)
          ("kitchen/index.org"
           . ,(concat "* TODO Review the kitchen :review:\nSCHEDULED: "
                      (pos-startup-test-day 6) "\n"))
-         ("cellar/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("cellar/.clanka/config.yml" . ,pos-test-child-config)
          ("cellar/index.org"
           . ,(concat "* TODO Review the cellar :review:\nSCHEDULED: "
                      (pos-startup-test-day 7) "\n"))
@@ -115,7 +106,7 @@ and each responsibility has one of its own."
           . ,(concat "* TODO Review the shed :review:\nSCHEDULED: "
                      (pos-startup-test-day 0) "\n"))
          ;; Responsibilities elsewhere: health, and teeth within it.
-         ("health/.clanka/config.yml" . ,(pos-startup-test-declaring "teeth"))
+         ("health/.clanka/config.yml" . ,(pos-test-declaring "teeth"))
          ("health/intray.org"
           . ,(concat "* Unsorted\n** TODO Book [[https://example.org][the dentist]]\n"
                      "** DONE Buy floss\n"
@@ -123,24 +114,24 @@ and each responsibility has one of its own."
                      (pos-startup-test-day 2) "\n"))
          ("health/projects/checkup.org"
           . ":PROPERTIES:\n:STATUS: COMMITTED\n:END:\n* TODO Find the card\n")
-         ("health/teeth/.pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("health/teeth/.pos/config.yaml" . ,pos-test-child-config)
          ("health/teeth/intray.org" . "* Unsorted\n")
          ;; A responsibility with methodologies: widget lies in no
          ;; projects directory.
          ("tools/widget/.clanka/config.yml" . "pos: 2\nmethodologies: methodologies/\n")
          ("tools/widget/notes.org" . "* TODO Oil the widget\n")
          ;; A directory with two configurations, and a file beneath it.
-         ("twice/.pos/config.yaml" . ,pos-startup-test-responsibility)
-         ("twice/.clanka/config.yml" . ,pos-startup-test-responsibility)
+         ("twice/.pos/config.yaml" . ,pos-test-child-config)
+         ("twice/.clanka/config.yml" . ,pos-test-child-config)
          ("twice/notes.org" . "* NEXT Twice over\n")
          ;; Directories that are not read, with Org files and
          ;; configurations inside them.
          ("archives/old.org" . "* NEXT Archived\n")
-         ("archives/kept/.pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("archives/kept/.pos/config.yaml" . ,pos-test-child-config)
          ("projects/alpha/attic/draft.org" . "* NEXT In the attic\n")
          ("_tmp/scratch.org" . "* NEXT Generated\n")
          (".hidden/secret.org" . "* NEXT Hidden\n")
-         (".hidden/.pos/config.yaml" . ,pos-startup-test-responsibility))
+         (".hidden/.pos/config.yaml" . ,pos-test-child-config))
      ,@body))
 
 (defun pos-startup-test-lines (text)
@@ -364,9 +355,9 @@ mend-the-gate is a project of the root."
       (should (equal (mapcar #'car (pos-startup-test-lines (nth 2 parts)))
                      '("intray")))))
   (pos-test-with-files root
-      `((".pos/config.yaml" . ,(pos-startup-test-declaring "orchard"))
+      `((".pos/config.yaml" . ,(pos-test-declaring "orchard"))
         ("projects/mend-the-gate.org" . "* NEXT Buy a hinge\n")
-        ("orchard/.pos/config.yaml" . ,pos-startup-test-responsibility)
+        ("orchard/.pos/config.yaml" . ,pos-test-child-config)
         ("orchard/index.org" . "* NEXT Order the saplings\n")
         ("orchard/projects/prune-the-trees/project.org"
          . "* NEXT Sharpen the saw\n"))
@@ -589,18 +580,18 @@ work/index.org, scheduled on 2030-03-04; work's own review is
 scheduled on 2030-03-11."
   (declare (indent 1))
   `(pos-test-with-files root
-       `((".pos/config.yaml" . ,(pos-startup-test-declaring "work"))
+       `((".pos/config.yaml" . ,(pos-test-declaring "work"))
          ("intray.org" . "* Unsorted\n")
-         ("work/.pos/config.yaml" . ,(pos-startup-test-declaring "shop" "yard"))
+         ("work/.pos/config.yaml" . ,(pos-test-declaring "shop" "yard"))
          ("work/index.org"
           . ,(concat "* TODO Review work :review:\nSCHEDULED: <2030-03-11 Mon>\n"
                      "* TODO Review the shop :review:\nSCHEDULED: <2030-03-04 Mon>\n"
                      ":PROPERTIES:\n:COVERS:   " ,covers "\n:END:\n"))
          ("work/projects/ledger.org"
           . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* NEXT Add the column\n")
-         ("work/shop/.pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("work/shop/.pos/config.yaml" . ,pos-test-child-config)
          ("work/shop/index.org" . "* TODO Sweep the floor\n")
-         ("work/yard/.pos/config.yaml" . ,pos-startup-test-responsibility)
+         ("work/yard/.pos/config.yaml" . ,pos-test-child-config)
          ("work/yard/index.org" . "* TODO Stack the timber\n"))
      ,@body))
 
@@ -633,9 +624,9 @@ tag; each time shop is listed as having no review."
                      "* TODO Review the shop :review:\n"
                      "* TODO Review the shop\nSCHEDULED: <2030-03-04 Mon>\n"))
     (pos-test-with-files root
-        `((".pos/config.yaml" . ,(pos-startup-test-declaring "shop"))
+        `((".pos/config.yaml" . ,(pos-test-declaring "shop"))
           ("index.org" . ,(concat heading ":PROPERTIES:\n:COVERS:   shop\n:END:\n"))
-          ("shop/.pos/config.yaml" . ,pos-startup-test-responsibility)
+          ("shop/.pos/config.yaml" . ,pos-test-child-config)
           ("shop/index.org" . "* TODO Sweep the floor\n"))
       (should (member "shop"
                       (mapcar (lambda (row) (alist-get 'scope row))
@@ -652,11 +643,11 @@ no scope from there."
       (should-not (member "." scopes))
       (should (member "work/shop" scopes))))
   (pos-test-with-files root
-      `((".pos/config.yaml" . ,(pos-startup-test-declaring "home office"))
+      `((".pos/config.yaml" . ,(pos-test-declaring "home office"))
         ("index.org"
          . ,(concat "* TODO Review the office :review:\nSCHEDULED: <2030-03-04 Mon>\n"
                     ":PROPERTIES:\n:COVERS:   home%20office/\n:END:\n"))
-        ("home office/.pos/config.yaml" . ,pos-startup-test-responsibility)
+        ("home office/.pos/config.yaml" . ,pos-test-child-config)
         ("home office/index.org" . "* TODO Clear the desk\n"))
     (should-not (pos-startup-view-items root "reviews-to-schedule"))))
 
@@ -695,7 +686,7 @@ the weekly is listed and the four-weekly is beyond the window; the
 root has a review, so it is not named.  A root with an intray alone
 is named, as \".\"."
   (pos-test-with-files root
-      `((".clanka/config.yml" . ,pos-startup-test-responsibility)
+      `((".clanka/config.yml" . ,pos-test-child-config)
         ("intray.org" . "* Unsorted\n")
         ("life.org"
          . ,(concat "#+TITLE: Life\n\n* Purpose and principles\n\n* Vision\n\n"
@@ -723,7 +714,7 @@ single file; fence has a NEXT item; gate waits on someone; path has
 its NEXT item in a second file; pond is committed and not begun; well
 is complete.  A NEXT item in the root's intray is no project's."
   (pos-test-with-files root
-      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+      `((".pos/config.yaml" . ,pos-test-child-config)
         ("intray.org" . "* Unsorted\n** NEXT Answer the letter\n")
         ("projects/paint/project.org"
          . ":PROPERTIES:\n:STATUS:   WIP\n:END:\n* TODO Choose the colour\n* DONE Buy brushes\n")
@@ -752,7 +743,7 @@ a second file and its later review not shown; floor, a single file,
 has a status alone and an Outcome heading, which is not read, and
 shows dashes; well is complete and is not listed."
   (pos-test-with-files root
-      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+      `((".pos/config.yaml" . ,pos-test-child-config)
         ("projects/paint/project.org"
          . ,(concat ":PROPERTIES:\n:STATUS:   WIP\n"
                     ":OUTCOME:  The hall is painted\n"
@@ -974,7 +965,7 @@ CATEGORY Org works out.  The body is the entry's own text: not
 its planning line, its drawers or its children.  What an item lacks
 is :null, and an item with no tags has an empty vector."
   (pos-test-with-files root
-      `((".pos/config.yaml" . ,pos-startup-test-responsibility)
+      `((".pos/config.yaml" . ,pos-test-child-config)
         ("projects/paint/project.org"
          . ,(concat "#+TITLE: Paint\n\n* Tasks\n"
                     "** NEXT Choose the colour :home:shop:\n"

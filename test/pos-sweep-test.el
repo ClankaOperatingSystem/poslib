@@ -49,12 +49,6 @@
 (defconst pos-sweep-test-week "2026-W36"
   "The week `pos-test-sunday' closes.")
 
-(defconst pos-sweep-test-git-head "ref: refs/heads/master\n"
-  "The HEAD of a repository; a directory holding one in .git is a repository.")
-
-(defconst pos-sweep-test-child-config "pos: 2\nprojects: projects/\n"
-  "The configuration of a child repository: a node of the root's tree.")
-
 (defconst pos-sweep-test-intray
   "#+TODO: TODO | DONE CANCELLED
 * TODO open task
@@ -67,14 +61,6 @@
 ** TODO nested open
 "
   "An intray with every shape the sweep must handle.")
-
-(defun pos-sweep-test-lines (&rest lines)
-  "Return LINES as the text of a file: each ended by a newline."
-  (mapconcat (lambda (line) (concat line "\n")) lines ""))
-
-(defun pos-sweep-test-text (root file)
-  "Return the text of FILE, named relative to ROOT."
-  (pos-test-file-string (expand-file-name file root)))
 
 (defun pos-sweep-test-config (&rest entries)
   "Return a node's configuration with projects in projects/ and ENTRIES.
@@ -215,13 +201,13 @@ entry with an open entry beneath it is named as skipped instead; and
 the file is not changed by the count."
   (pos-test-with-files root
       `(("intray.org" . ,pos-sweep-test-intray)
-        ("nest.org" . ,(pos-sweep-test-lines "* DONE parent"
+        ("nest.org" . ,(pos-test-lines "* DONE parent"
                                              "** DONE child one"
                                              "** DONE child two")))
     (should (equal '(3 "parent with open child")
                    (pos-sweep-done-entries (expand-file-name "intray.org" root))))
     (should (equal '(1) (pos-sweep-done-entries (expand-file-name "nest.org" root))))
-    (should (equal pos-sweep-test-intray (pos-sweep-test-text root "intray.org")))))
+    (should (equal pos-sweep-test-intray (pos-test-text root "intray.org")))))
 
 (ert-deftest pos-sweep/done-entries-move-to-the-archive-and-open-ones-stay ()
   "Archiving a file moves its DONE and CANCELLED entries, however nested.
@@ -236,7 +222,7 @@ nested one records the outline path it came from."
            (archived (pos-test-file-string archive)))
       (should (equal 3 (plist-get result :archived)))
       (should (equal '("parent with open child") (plist-get result :skipped)))
-      (should (equal (pos-sweep-test-lines "#+TODO: TODO | DONE CANCELLED"
+      (should (equal (pos-test-lines "#+TODO: TODO | DONE CANCELLED"
                                            "* TODO open task"
                                            "* DONE parent with open child"
                                            "** TODO still open"
@@ -285,7 +271,7 @@ Org leaves point at the end of the pasted subtree, in its last child;
 the stamp climbs back to the entry itself, so a parent with done
 children is stamped once, on the parent."
   (pos-test-with-files root
-      `(("intray.org" . ,(pos-sweep-test-lines "* DONE parent"
+      `(("intray.org" . ,(pos-test-lines "* DONE parent"
                                                "** DONE child one"
                                                "** DONE child two")))
     (let* ((file (expand-file-name "intray.org" root))
@@ -426,10 +412,10 @@ the week and the rows back."
         ("life/notes.org" . "* DONE parent with open child\n** TODO open\n")
         ("todo.org" . "* TODO only open\n")
         ("archives/old.org" . "* DONE kept\n")
-        ("vendor/lib/.git/HEAD" . ,pos-sweep-test-git-head)
+        ("vendor/lib/.git/HEAD" . ,pos-test-git-head)
         ("vendor/lib/README.org" . "* DONE released\n")
-        ("child/.git/HEAD" . ,pos-sweep-test-git-head)
-        ("child/.clanka/config.yml" . ,pos-sweep-test-child-config)
+        ("child/.git/HEAD" . ,pos-test-git-head)
+        ("child/.clanka/config.yml" . ,pos-test-child-config)
         ("child/intray.org" . "* DONE theirs\n"))
     (let ((text (pos-sweep-plan root pos-sweep-test-week)))
       (should (string-prefix-p "#+TITLE: Sweep 2026-W36\n" text))
@@ -499,7 +485,7 @@ and nothing is left or stale."
                       (expand-file-name
                        "archive/orgmode/2026-W36/life/notes.org_archive" root)
                       "DONE shipped")))
-      (should (equal "* TODO next\n" (pos-sweep-test-text root "life/notes.org"))))))
+      (should (equal "* TODO next\n" (pos-test-text root "life/notes.org"))))))
 
 (ert-deftest pos-sweep/a-row-edited-to-skip-is-left ()
   "A row a reviewer marks skip, or anything but sweep, is left as it is.
@@ -512,7 +498,7 @@ the row is counted as left."
       (pos-sweep-test-edit-plan plan "| sweep | intray.org" "| skip | intray.org")
       (should (equal '(:archived 1 :skipped nil :left 1 :stale 0)
                      (pos-sweep-apply root plan)))
-      (should (equal "* DONE finished\n" (pos-sweep-test-text root "intray.org")))
+      (should (equal "* DONE finished\n" (pos-test-text root "intray.org")))
       (should-not (file-exists-p
                    (expand-file-name "archive/orgmode/2026-W36/intray.org_archive" root)))
       (should (file-exists-p
@@ -528,15 +514,15 @@ archived and nothing is written there."
   (pos-test-with-files root
       `(("intray.org" . "* DONE finished\n")
         ("life/notes.org" . "* DONE shipped\n")
-        ("vendor/lib/.git/HEAD" . ,pos-sweep-test-git-head)
+        ("vendor/lib/.git/HEAD" . ,pos-test-git-head)
         ("vendor/lib/README.org" . "* TODO theirs\n"))
     (dolist (elsewhere '("vendor/lib/notes.org_archive" "../notes.org_archive"))
       (pos-sweep-test-with-plan plan root pos-sweep-test-week
         (pos-sweep-test-edit-plan plan "archive/orgmode/2026-W36/life/notes.org_archive"
                                   elsewhere)
         (should-error (pos-sweep-apply root plan) :type 'user-error)
-        (should (equal "* DONE finished\n" (pos-sweep-test-text root "intray.org")))
-        (should (equal "* DONE shipped\n" (pos-sweep-test-text root "life/notes.org")))
+        (should (equal "* DONE finished\n" (pos-test-text root "intray.org")))
+        (should (equal "* DONE shipped\n" (pos-test-text root "life/notes.org")))
         (should-not (file-exists-p (expand-file-name elsewhere root)))
         (should-not (file-exists-p
                      (expand-file-name "archive/orgmode/2026-W36/intray.org_archive" root)))))))
@@ -561,8 +547,8 @@ so a reviewer never approves what was not shown."
       (should (equal '(:archived 0 :skipped nil :left 0 :stale 2)
                      (pos-sweep-apply root plan)))
       (should (equal "* DONE first\n* DONE second\n"
-                     (pos-sweep-test-text root "gained.org")))
-      (should (equal "* DONE first\n" (pos-sweep-test-text root "lost.org")))
+                     (pos-test-text root "gained.org")))
+      (should (equal "* DONE first\n" (pos-test-text root "lost.org")))
       (should-not (file-exists-p (expand-file-name "archive" root))))))
 
 (ert-deftest pos-sweep/a-file-with-other-done-entries-than-the-plan-s-is-stale ()
@@ -601,7 +587,7 @@ The files keep their entries and no archive directory is made."
     (pos-sweep-test-with-plan plan root pos-sweep-test-week
       (should (equal '(:archived 3 :skipped ("parent with open child") :left 0 :stale 0)
                      (pos-sweep-apply root plan t)))
-      (should (equal pos-sweep-test-intray (pos-sweep-test-text root "intray.org")))
+      (should (equal pos-sweep-test-intray (pos-test-text root "intray.org")))
       (should-not (file-exists-p (expand-file-name "archive" root))))))
 
 ;;;; The command line
@@ -630,7 +616,7 @@ entry with open children is the one thing the sweep leaves for a
 person to resolve, so the report says which."
   (let ((result '(:archived 194 :skipped ("call the plumber" "renew licence")
                   :left 1 :stale 2)))
-    (should (equal (pos-sweep-test-lines
+    (should (equal (pos-test-lines
                     "Sweep 2026-W36: archived 194, skipped 2, 1 files left, 2 stale"
                     "  skipped (done, but has open children):"
                     "    call the plumber"
@@ -660,7 +646,7 @@ product repository, is left where it is.  The counts and skipped headings are to
         ("life/life-projects.org" . "* DONE shipped\n* TODO next\n")
         ("life/resources/book.org" . "* DONE read\n")
         ("archives/old.org" . "* DONE kept\n")
-        ("vendor/lib/.git/HEAD" . ,pos-sweep-test-git-head)
+        ("vendor/lib/.git/HEAD" . ,pos-test-git-head)
         ("vendor/lib/README.org" . "* DONE released\n"))
     (let* ((pos-directory root)
            (result (pos-sweep pos-sweep-test-week)))
@@ -671,9 +657,9 @@ product repository, is left where it is.  The counts and skipped headings are to
         (should (file-exists-p
                  (expand-file-name
                   (concat "archive/orgmode/2026-W36/" file "_archive") root))))
-      (should (equal "* DONE kept\n" (pos-sweep-test-text root "archives/old.org")))
+      (should (equal "* DONE kept\n" (pos-test-text root "archives/old.org")))
       (should (equal "* DONE released\n"
-                     (pos-sweep-test-text root "vendor/lib/README.org"))))))
+                     (pos-test-text root "vendor/lib/README.org"))))))
 
 (ert-deftest pos-sweep/a-sweep-without-arguments-finds-its-own-week ()
   "Called with no arguments, a sweep uses the latest boundary at or before now.
@@ -689,7 +675,7 @@ stamped with the boundary too."
       (should (string-search
                (concat "ARCHIVE_TIME: "
                        (format-time-string "%F %a %H:%M" boundary))
-               (pos-sweep-test-text root archive))))))
+               (pos-test-text root archive))))))
 
 ;;;; Closing weeks
 
@@ -746,7 +732,7 @@ plan for it, so nothing is renamed and no ledger event is written
 inside the child; closing from the child gives the one plan."
   (pos-test-with-files root
       `((".clanka/config.yml" . ,(pos-sweep-test-config))
-        ("child/.git/HEAD" . ,pos-sweep-test-git-head)
+        ("child/.git/HEAD" . ,pos-test-git-head)
         ("child/.clanka/config.yml"
          . ,(pos-sweep-test-config (pos-sweep-test-entry "." "sweep: sealed")))
         ("child/_sweep/2026-W35/intray.org_archive" . "* DONE finished\n"))

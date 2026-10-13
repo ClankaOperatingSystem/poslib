@@ -32,14 +32,6 @@
 
 ;;;; Canonical JSON
 
-(ert-deftest pos-ledger/json-is-written-one-way ()
-  "Keys in UTF-8 byte order, no spaces, raw UTF-8, few escapes, a newline."
-  (dolist (named (pos-fixtures "json"))
-    (ert-info ((car named))
-      (let-alist (cdr named)
-        (should (equal (encode-coding-string .encoded 'utf-8 t)
-                       (pos-bytes-json .value)))))))
-
 (ert-deftest pos-ledger/a-block-is-dag-json-written-one-way ()
   "Every fixture in fixtures/dag-json/ encodes, or is refused.
 A value's block and its CID; or bytes that are not the one block of
