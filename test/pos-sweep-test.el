@@ -40,6 +40,7 @@
 
 (require 'ert)
 (require 'cl-lib)
+(require 'pos-checkpoint)
 (require 'pos-sweep)
 (require 'pos-node)
 (require 'pos-test-support)
@@ -709,7 +710,7 @@ ledger check of the root has no finding."
       (should (file-exists-p sealed))
       (should (zerop (logand (file-modes sealed) #o222)))
       (should (string-search "* DONE finished" (pos-test-file-string sealed)))
-      (should-not (pos-seal-findings-p (pos-ledger-check root))))))
+      (should-not (pos-checkpoint-findings-p (pos-ledger-check root))))))
 
 (ert-deftest pos-sweep/a-weekly-scope-has-nothing-to-close ()
   "A scope swept weekly has no weeks to close.
