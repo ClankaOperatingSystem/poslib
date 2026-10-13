@@ -133,10 +133,10 @@ its own; the fourth is done; the fifth shares none.  A title with no counted wor
                                 "* TODO Call the plumber about the boiler leak\n"
                                 "* DONE Call the roofer about the gutter\n"
                                 "* TODO Mow the lawn\n")))
-    (should (equal (list (list (expand-file-name "intray.org" root) 2 "TODO"
-                               "Call the roofer about the gutter")
-                         (list (expand-file-name "tasks.org" root) 1 "NEXT"
-                               "Gutter: call roofer!"))
+    (should (equal (list (pos-item-make :file (expand-file-name "intray.org" root) :line 2
+                                        :state "TODO" :title "Call the roofer about the gutter")
+                         (pos-item-make :file (expand-file-name "tasks.org" root) :line 1
+                                        :state "NEXT" :title "Gutter: call roofer!"))
                    (pos-capture-like root "call the Roofer, about a gutter")))
     (should-not (pos-capture-like root "Do it"))))
 
