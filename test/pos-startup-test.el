@@ -548,10 +548,10 @@ scheduled on day 6 and cellar's on day 7."
 
 (ert-deftest pos-startup/scopes-with-no-review-scheduled-are-named ()
   "Active projects, responsibilities and the root with no open review are named.
-A project is active when its file's STATUS is one of
-`pos-startup-active-statuses'; every responsibility counts, and so
-does the root, named \".\".  A review scheduled on any date, in the
-window or beyond it, is a review.  In the tree, beta, checkup and
+A project is active when its file's STATUS says, by
+`pos-project-statuses', that it is not closed; every responsibility
+counts, and so does the root, named \".\".  A review scheduled on any
+date, in the window or beyond it, is a review.  In the tree, beta, checkup and
 roof are active without one; gamma is complete and delta has no
 status.  Of the responsibilities, health/teeth, garden and
 tools/widget have none; home, health and kitchen have one in the
@@ -706,8 +706,8 @@ is named, as \".\"."
 
 (ert-deftest pos-startup/a-begun-project-with-no-next-action-is-stuck ()
   "The stuck view names each begun project with no next action.
-A project is begun when its file's STATUS is one of
-`pos-startup-stuck-statuses'; a next action is an item in one of
+A project is begun when its file's STATUS says so, by
+`pos-project-statuses'; a next action is an item in one of
 `pos-startup-next-action-states', in any file of the project.  Here
 paint and floor are begun with TODO items alone, and floor is a
 single file; fence has a NEXT item; gate waits on someone; path has
@@ -994,7 +994,7 @@ is :null, and an item with no tags has an empty vector."
 
 (ert-deftest pos-startup/an-active-project-with-no-outcome-is-named ()
   "The no-outcome view names each active project with no outcome.
-Active is a STATUS among `pos-startup-active-statuses'.  A directory
+Active is a STATUS that is not closed, by `pos-project-statuses'.  A directory
 project with a configuration of its own is a project as any other.
 Here roof has an outcome, paint and floor have none, and shelf is not
 begun."
