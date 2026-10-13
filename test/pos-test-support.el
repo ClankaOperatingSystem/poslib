@@ -289,7 +289,14 @@ A refile rule each into a work and a body projects file."
   "The HEAD of a repository; a directory holding one in .git is a repository.")
 
 (defconst pos-test-child-config "pos: 2\nprojects: projects/\n"
-  "The configuration of a child repository: a node of the root's tree.")
+  "The configuration of a responsibility whose projects lie in projects/.
+A child repository with it is a node of the root's tree.")
+
+(defun pos-test-declaring (&rest paths)
+  "Return the configuration of a responsibility that declares PATHS.
+Each is a child with no remote.  Its projects lie in projects/."
+  (concat pos-test-child-config "children:\n"
+          (mapconcat (lambda (path) (format "  - path: %s\n" path)) paths "")))
 
 (defconst pos-test-root-config
   "pos: 2\nchildren:\n  - path: child\n    remote: git@example.org:child.git\n"

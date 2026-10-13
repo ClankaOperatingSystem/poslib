@@ -1,18 +1,37 @@
-;;; pos-roam-test.el --- Tests for pos-roam -*- lexical-binding: t; -*-
+;;; pos-roam-test.el --- Tests for pos-roam.el  -*- lexical-binding: t -*-
+
+;; Copyright (C) 2026 Chris Gough
+
+;; Author: Chris Gough
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
-;; The index of a tree: what it covers, what it records, and whose
-;; database it is.
+
+;; Run: make test.
+;;
+;; Each test is named for the rule it pins.  The index of a tree: what
+;; it covers, what it records, and whose database it is.  The index of
+;; each temporary repository goes to the cache test/pos-test-support.el
+;; names, never to a database of the user's.
 
 ;;; Code:
 
 (require 'ert)
 (require 'pos-roam)
 (require 'pos-test-support)
-
-;; The index of each temporary repository goes to a cache of the tests'
-;; own, never to a database of the user's.
-(setq pos-roam-cache-directory (make-temp-file "pos-roam-test-" t))
 
 (ert-deftest pos-roam/the-index-covers-the-corpus-and-no-more ()
   "The files indexed are the corpus: what the configuration allows.
@@ -30,7 +49,7 @@ configuration, and a lock file by its name."
                    (mapcar (lambda (file) (file-relative-name file root))
                            (pos-roam-files root))))))
 
-(ert-deftest pos-roam-referrers/are-the-id-links-the-index-records ()
+(ert-deftest pos-roam/the-referrers-are-the-id-links-the-index-records ()
   "A link is recorded where a node holds it.
 In a file with an ID, or under a heading with one.  A link in a file
 with neither is not."
@@ -46,7 +65,7 @@ with neither is not."
                                      (cdr referrer)))
                              (pos-roam-referrers "target")))))))
 
-(ert-deftest pos-roam-with-index/follows-what-changed-on-disk ()
+(ert-deftest pos-roam/the-index-follows-what-changed-on-disk ()
   "The index is brought up to date each time it is used."
   (pos-test-with-files root '(("a.org" . "* Target\n:PROPERTIES:\n:ID: target\n:END:\n")
                               ("b.org" . ":PROPERTIES:\n:ID: file-b\n:END:\n"))
@@ -57,7 +76,7 @@ with neither is not."
     (pos-roam-with-index root
       (should (equal 1 (length (pos-roam-referrers "target")))))))
 
-(ert-deftest pos-roam-rewrite-link/rewrites-the-link-there-and-no-other ()
+(ert-deftest pos-roam/a-link-is-rewritten-there-and-no-other ()
   "The link at the recorded place is pointed elsewhere.
 One that has moved is left, and reported; a dry run reports without
 writing."
@@ -72,7 +91,7 @@ writing."
       (should (equal "Lead [[id:new][x]] and [[id:old]].\n"
                      (pos-test-file-string file))))))
 
-(ert-deftest pos-roam-db-location/is-the-users-only-around-the-root ()
+(ert-deftest pos-roam/the-database-is-the-users-only-around-the-root ()
   "A root within `org-roam-directory' is served by that index.
 Any other root has one of its own, named by its path, in the cache."
   (pos-test-with-files root '(("a.org" . ""))
@@ -86,7 +105,7 @@ Any other root has one of its own, named by its path, in the cache."
                                        pos-roam-cache-directory)
                      (pos-roam-db-location root))))))
 
-(ert-deftest pos-roam-with-index/writes-no-database-of-the-users-elsewhere ()
+(ert-deftest pos-roam/indexing-writes-no-database-of-the-users-elsewhere ()
   "Indexing a tree outside `org-roam-directory' leaves its database alone.
 Whatever org-roam's variables are rebound to meanwhile."
   (pos-test-with-files root '(("a.org" . "* Target\n:PROPERTIES:\n:ID: target\n:END:\n"))

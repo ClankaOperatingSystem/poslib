@@ -46,7 +46,7 @@
 
 ;;;; Dedupe
 
-(defun pos-test-copy (file line &optional body parent)
+(defun pos-dedupe-test-copy (file line &optional body parent)
   "Return the `pos--task-entries' entry for a copy of \"Fix the gate\".
 The copy is in FILE under /repo/, at LINE, with BODY, default empty,
 under PARENT, default none, and has no ID."
@@ -59,8 +59,8 @@ under PARENT, default none, and has no ID."
 The intray is where a task waits to be filed; a copy already in its
 pillar is the task filed.  The suggestion pairs an action with each
 entry, in the group's order, whichever way round the group comes."
-  (let ((intray (pos-test-copy "intray.org" 1))
-        (pillar (pos-test-copy "life/life-areas.org" 2
+  (let ((intray (pos-dedupe-test-copy "intray.org" 1))
+        (pillar (pos-dedupe-test-copy "life/life-areas.org" 2
                                "hinge is bent" "Household")))
     (should (equal (list (cons "drop" intray) (cons "keep" pillar))
                    (pos-dedupe-suggest (list intray pillar) "/repo/")))
@@ -72,9 +72,9 @@ entry, in the group's order, whichever way round the group comes."
   "Copies in two pillar files are both marked ?, for a person to decide.
 Neither pillar outranks the other.  An intray copy in the same group
 does not settle it, and is a question too."
-  (let ((life (pos-test-copy "life/life-areas.org" 2))
-        (people (pos-test-copy "people/people-areas.org" 5))
-        (intray (pos-test-copy "intray.org" 1)))
+  (let ((life (pos-dedupe-test-copy "life/life-areas.org" 2))
+        (people (pos-dedupe-test-copy "people/people-areas.org" 5))
+        (intray (pos-dedupe-test-copy "intray.org" 1)))
     (should (equal '("?" "?")
                    (mapcar #'car (pos-dedupe-suggest (list life people)
                                                      "/repo/"))))
@@ -87,9 +87,9 @@ does not settle it, and is a question too."
 More said is more to lose; the other is dropped and, if its body
 differs, merged under the kept one when the plan is applied.  Bodies
 of equal length keep the first."
-  (let ((bare (pos-test-copy "intray.org" 1))
-        (said (pos-test-copy "intray.org" 2 "hinge is bent"))
-        (later (pos-test-copy "intray.org" 3)))
+  (let ((bare (pos-dedupe-test-copy "intray.org" 1))
+        (said (pos-dedupe-test-copy "intray.org" 2 "hinge is bent"))
+        (later (pos-dedupe-test-copy "intray.org" 3)))
     (should (equal '("drop" "keep")
                    (mapcar #'car (pos-dedupe-suggest (list bare said)
                                                      "/repo/"))))
