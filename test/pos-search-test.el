@@ -1,6 +1,7 @@
 ;;; pos-search-test.el --- Tests for pos-search -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 Chris Gough
+
 ;; Author: Chris Gough
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 

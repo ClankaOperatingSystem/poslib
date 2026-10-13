@@ -44,6 +44,8 @@
 (require 'pos-ledger)
 (require 'pos-remote)
 
+;;;; The index
+
 (defconst pos-index-file "_index/cids.json"
   "Where a scope keeps its index, relative to the scope.")
 
@@ -78,6 +80,8 @@ An alist of CID and the paths, relative to SCOPE, that have it."
     (when (file-exists-p file)
       (mapcar (lambda (pair) (cons (pos-bytes-key (car pair)) (cdr pair)))
               (alist-get 'cids (pos-bytes-parse (pos-bytes-read file)))))))
+
+;;;; Where a link leads
 
 (defun pos-index--parse (uri)
   "Return (CID . PATH) from URI, ipfs://CID or ipfs://CID/PATH.
@@ -171,6 +175,8 @@ file's name and bytes give, as visiting the file would."
          (set-buffer-modified-p nil)
          (setq buffer-read-only t))
        buffer))))
+
+;;;; Org's ipfs: links
 
 (defun pos-index--scopes (directory)
   "Return the scopes above DIRECTORY that have archives, nearest first.

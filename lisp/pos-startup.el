@@ -70,7 +70,6 @@
 (require 'pos-corpus)
 (require 'pos-person)
 (require 'pos-project)
-(require 'pos-roam)
 (require 'pos-node)
 
 (defcustom pos-startup-scheduled-days 14
@@ -891,7 +890,8 @@ VIEWS defaults to `pos-startup-default-views'."
   "Return VIEWS of ROOT's Org files as data, for `json-serialize'.
 VIEWS defaults to `pos-startup-default-views'.  An alist: files_read,
 the count of files; not_read, a vector with path and reason for each
-configuration refused; views, each view's name with the vector of
+path not read, a configuration refused, one no node declares or a
+project that holds projects; views, each view's name with the vector of
 what `pos-startup-view-items' gives for it.  A view named twice is
 given once."
   (let ((views (or views pos-startup-default-views)))
@@ -931,9 +931,6 @@ argument."
               (t (message "Usage: [--json] [--weekly] [--view %s] ..."
                           (string-join pos-startup-views "|"))
                  (kill-emacs 2)))))
-    ;; Each session opens here: the index is kept current as a matter
-    ;; of course, so that a later command finds it ready.
-    (pos-roam-sync pos-directory)
     (if json
         (princ (concat (json-serialize
                         (pos-startup-data pos-directory (nreverse views)))

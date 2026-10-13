@@ -1062,11 +1062,9 @@ given once."
   "The output is the report of the views named, however many.
 Two, three and four --view arguments each print the report
 `pos-startup-report' gives for those views in that order, a view
-named twice being printed twice.  The index goes to a cache of the
-test's own."
+named twice being printed twice."
   (pos-startup-test-with-tree
-    (let ((pos-directory root)
-          (pos-roam-cache-directory (make-temp-file "pos-startup-test-" t)))
+    (let ((pos-directory root))
       (dolist (views '(("next" "reviews")
                        ("next" "scheduled" "reviews")
                        ("reviews" "reviews" "next" "scheduled")))
@@ -1079,10 +1077,9 @@ test's own."
 
 (ert-deftest pos-startup/the-command-prints-the-data-as-json ()
   "With --json the output is `pos-startup-data' of the views named, as JSON.
-One line.  The index goes to a cache of the test's own."
+One line."
   (pos-startup-test-with-tree
     (let ((pos-directory root)
-          (pos-roam-cache-directory (make-temp-file "pos-startup-test-" t))
           (command-line-args-left (list "--view" "next" "--json" "--view" "stuck")))
       (should (equal (concat (json-serialize
                               (pos-startup-data root '("next" "stuck")))
@@ -1097,7 +1094,6 @@ the weekly ones is a view."
   (should-not (seq-difference pos-startup-weekly-views pos-startup-views))
   (pos-startup-test-with-tree
     (let ((pos-directory root)
-          (pos-roam-cache-directory (make-temp-file "pos-startup-test-" t))
           (command-line-args-left (list "--weekly" "--view" "all")))
       (should (equal (pos-startup-report
                       root (append pos-startup-weekly-views '("all")))
