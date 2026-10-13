@@ -219,6 +219,27 @@ Markdown, the link becomes its text and a bracketed note."
               (if (equal label "broken") "broken link" "later record") text))
      (t (concat label ":" whole)))))
 
+(defun pos-links-edits (links &optional file)
+  "Return the edits among LINKS, as `pos-links-rewrite' takes them.
+Each link is an alist with offset, from, to and file, as a plan
+writes it; an edit is (OFFSET FROM TO) for each link whose to differs
+from its from, of FILE where given, in LINKS' order."
+  (delq nil (mapcar (lambda (link)
+                      (let-alist link
+                        (and (or (null file) (equal .file file))
+                             (not (equal .from .to))
+                             (list .offset .from .to))))
+                    links)))
+
+(defun pos-links-in-order (links)
+  "Return LINKS, alists with file and offset, sorted by file then offset."
+  (sort (copy-sequence links)
+        (lambda (a b)
+          (let ((fa (alist-get 'file a)) (fb (alist-get 'file b)))
+            (if (equal fa fb)
+                (< (alist-get 'offset a) (alist-get 'offset b))
+              (string< fa fb))))))
+
 (defun pos-links-rewrite (bytes rewrites)
   "Return BYTES with each (OFFSET FROM TO) of REWRITES applied.
 FROM must be at OFFSET."

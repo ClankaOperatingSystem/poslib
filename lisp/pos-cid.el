@@ -285,35 +285,31 @@ file's own CID among them; CID is text.  Equal blocks appear once."
                (push node nodes))
              (setq start (+ start pos-cid-chunk-size))
              (< start size)))
-    (setq nodes (nreverse nodes))
-    (while (cdr nodes)
-      (let (level)
-        (while nodes
-          (let (group)
-            (dotimes (_ pos-cid-file-max-links)
-              (when nodes (push (pop nodes) group)))
-            (let* ((children (nreverse group))
-                   (parts (pos-cid--file-links children))
-                   (node (pos-cid--file-node children)))
-              (unless (assoc (pos-cid--text (car node)) held)
-                (push (cons (pos-cid--text (car node))
-                            (pos-cid--pb-node (car parts) (cdr parts)))
-                      held))
-              (push node level))))
-        (setq nodes (nreverse level))))
+    (pos-cid--balance
+     (nreverse nodes)
+     (lambda (node children)
+       (unless (assoc (pos-cid--text (car node)) held)
+         (let ((parts (pos-cid--file-links children)))
+           (push (cons (pos-cid--text (car node))
+                       (pos-cid--pb-node (car parts) (cdr parts)))
+                 held)))))
     (nreverse held)))
 
-(defun pos-cid--balance (nodes)
+(defun pos-cid--balance (nodes &optional made)
   "Return the root of a balanced file DAG over leaf NODES.
 One leaf is its own root; otherwise each level groups the one below
-into file nodes of at most `pos-cid-file-max-links' links."
+into file nodes of at most `pos-cid-file-max-links' links.  MADE, if
+given, is called with each file node made and its children."
   (while (cdr nodes)
     (let (level)
       (while nodes
         (let (group)
           (dotimes (_ pos-cid-file-max-links)
             (when nodes (push (pop nodes) group)))
-          (push (pos-cid--file-node (nreverse group)) level)))
+          (let* ((children (nreverse group))
+                 (node (pos-cid--file-node children)))
+            (when made (funcall made node children))
+            (push node level))))
       (setq nodes (nreverse level))))
   (car nodes))
 
