@@ -245,7 +245,7 @@ With 256-byte chunks and 4 links a node, every shape of DAG is tried."
       (dolist (size '(0 1 255 256 257 1024 1025 3000 5000))
         (let ((file (expand-file-name "f" dir)))
           (pos-test-write-bytes file (pos-fixture-bytes `((pattern . ,size))))
-          (should (equal (nth 1 (pos-cid--file file))
+          (should (equal (pos-cid--node-tsize (pos-cid--file file))
                          (pos-cid--file-tsize size))))))))
 
 (ert-deftest pos-cid/an-inventory-refuses-what-ipfs-would-leave-out ()
