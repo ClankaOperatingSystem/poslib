@@ -684,7 +684,7 @@ the fixture's seal, planned."
      (pos-fixture-with fixture dir
        (let-alist fixture
          (let* ((tape (pos-test-tape .keeper))
-                (pos-remote-send-function tape)
+                (pos-http-send-function tape)
                 (pos-remote-keeper-function
                  (lambda (url)
                    (pos-remote-http-create :url url :token (alist-get 'token .keeper))))
@@ -744,7 +744,7 @@ Nothing is sent."
   (pos-fixture-with (pos-fixture "ledger" "report-kept-asked") dir
     (let ((process-environment (cons "POS_ARCHIVE_OFFLINE=1" process-environment))
           (pos-ledger-offline nil)
-          (pos-remote-send-function (lambda (&rest _) (error "A keeper was asked"))))
+          (pos-http-send-function (lambda (&rest _) (error "A keeper was asked"))))
       (let ((report (car (pos-ledger-check dir))))
         (should (stringp (alist-get 'kept report)))
         (should (eq :null (alist-get 'keeper report)))))))

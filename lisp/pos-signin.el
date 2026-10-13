@@ -41,9 +41,8 @@
 (require 'url-parse)
 (require 'url-util)
 (require 'pos-bytes)
+(require 'pos-http)
 (require 'pos-ledger)
-
-(defvar pos-remote-send-function)
 
 (defconst pos-signin-well-known "/.well-known/oauth-protected-resource"
   "The path, at a keeper's origin, of how to sign in to it (RFC 9728).")
@@ -62,8 +61,7 @@ back (STATUS . BYTES).")
 
 (defun pos-signin--fetch (url &optional form)
   "Return (STATUS . BYTES) for URL: a GET, or with FORM a POST of it."
-  (require 'pos-remote)
-  (funcall pos-remote-send-function (if form "POST" "GET") url
+  (funcall pos-http-send-function (if form "POST" "GET") url
            (append '(("Accept" . "application/json"))
                    (when form
                      '(("Content-Type" . "application/x-www-form-urlencoded"))))

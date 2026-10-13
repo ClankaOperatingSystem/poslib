@@ -62,6 +62,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   plan, reviewed, then applied.
 - =lisp/pos-search.el= :: where a query is found in the archives under
   a root, on disk or at their keepers.
+- =lisp/pos-http.el= :: one HTTP exchange, as a client makes it, for
+  the keeper's protocol and for signing in.
 - =lisp/pos-signin.el= :: signing in to a keeper that takes OAuth 2.0
   tokens, and the token kept, which pyposlib reads too.
 - =lisp/pos-remote.el= :: the client's side of an archive kept away from
