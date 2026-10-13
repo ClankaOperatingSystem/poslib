@@ -36,6 +36,8 @@
 
 (require 'seq)
 
+;;;; The rules
+
 (defun pos-path-safe-p (path)
   "Return non-nil if PATH is a plain relative path beneath a directory.
 It has no empty part, no part that is . or .., and no backslash."
@@ -47,6 +49,8 @@ It has no empty part, no part that is . or .., and no backslash."
 (defun pos-path-within-p (path container)
   "Return non-nil if PATH is CONTAINER or beneath it."
   (or (equal path container) (string-prefix-p (concat container "/") path)))
+
+;;;; Where a node's configuration is
 
 (defconst pos-path-config-directories '(".clanka" ".clankos" ".pos")
   "The names a configuration directory may have.")

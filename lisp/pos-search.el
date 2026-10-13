@@ -1,6 +1,7 @@
 ;;; pos-search.el --- Where a query is found in an archive -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2026 Chris Gough
+
 ;; Author: Chris Gough
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 

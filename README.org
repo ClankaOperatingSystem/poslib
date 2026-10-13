@@ -15,7 +15,8 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-corpus.el= :: the corpus: every Org file the tree's
   declarations reach, a product's among them, each with the scope it
   belongs to, from one walk that every command reads.
-- =lisp/pos-capture.el= :: capture to an intray.
+- =lisp/pos-capture.el= :: capture to an intray, and the open items like
+  a title, reported before it is written.
 - =lisp/pos-state.el= :: an item's state set with Org's own command, the
   item named by its ID or by file and line, and the change recorded in
   the item's =LOGBOOK= drawer.
@@ -135,9 +136,11 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 * Configure
 
 - Which files a command reads is declared in the tree's =.pos/=,
-  =.clanka/= or =.clankos/= configurations, as =doc/pos-directory.txt= says: every Org
-  file beneath the root but those under =exclude=, and those of a
-  repository with no configuration.
+  =.clanka/= or =.clankos/= configurations, as =doc/pos-directory.txt=
+  says: every Org file beneath the root but those under =exclude=,
+  those of a methodology, and those of a repository no node declares.
+  A declared child with no configuration is a product: read, and never
+  written.
 - =pos-config.el= at the repository root; =pos-load-config= loads it.
   Sets =pos-refile-rules=, where a refile plan proposes a heading go.
   A setting it once set and no longer reads is reported.
