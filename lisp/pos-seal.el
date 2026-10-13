@@ -49,6 +49,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'pos-bytes)
 (require 'pos-path)
 (require 'pos-cid)
@@ -502,10 +503,16 @@ Hidden directories and nested archives are not entered, nor links followed."
               ((pos-seal--staging-p path) (delete-directory path))
               (t (pos-seal--drop-staging path)))))))
 
+(cl-defstruct (pos-seal--event-made (:constructor pos-seal--event-made-make)
+                                    (:copier nil))
+  "An event made for a seal.
+Its ledger FILE's name, the NAME that names it, its hash or its CID,
+and its BYTES."
+  file name bytes)
+
 (defun pos-seal--event-of (plan item add collections empty)
-  "Return the event of PLAN sealing ADD as ITEM, as (FILE NAME BYTES).
-FILE is its ledger file's name and NAME what names it; COLLECTIONS and
-EMPTY are the item's collections and empty directories.
+  "Return the event of PLAN sealing ADD as ITEM, a `pos-seal--event-made'.
+COLLECTIONS and EMPTY are the item's collections and empty directories.
 A ledger with no event yet, or one whose head is a block, takes a schema 3
 event: a DAG-JSON block named by its CID, its root the fold of what the
 ledger enrols.  A schema 1 or 2 ledger takes a schema 2 event, named by
@@ -530,7 +537,8 @@ its hash, until it is converted."
                        (add . ,add) (root . ,(pos-cid-directory .archive))
                        (collections . ,collections)))))
                  (name (if blocks (pos-ledger-event-cid bytes) (pos-bytes-sha bytes))))
-      (list (pos-ledger-event-file-name (1+ events) name) name bytes))))
+      (pos-seal--event-made-make :file (pos-ledger-event-file-name (1+ events) name)
+                                 :name name :bytes bytes))))
 
 (defun pos-seal--event (plan destination add collections)
   "Write the event of PLAN sealing ADD at DESTINATION; return what names it.
@@ -538,9 +546,10 @@ COLLECTIONS are the item's."
   (let* ((item (file-relative-name destination (alist-get 'archive plan)))
          (event (pos-seal--event-of plan item add collections
                                     (pos-seal-empty-directories destination item))))
-    (pos-ledger-write-new (expand-file-name (nth 0 event) (alist-get 'ledger plan))
-                        (nth 2 event))
-    (nth 1 event)))
+    (pos-ledger-write-new (expand-file-name (pos-seal--event-made-file event)
+                                            (alist-get 'ledger plan))
+                          (pos-seal--event-made-bytes event))
+    (pos-seal--event-made-name event)))
 
 (defun pos-seal--sealed (plan)
   "Return the items PLAN's events have sealed so far, refusing a stranger's.
@@ -799,7 +808,7 @@ it resumes.  Return (EVENT-FILE . ROOT)."
            (entries-of (lambda () (pos-seal--entries (pos-seal--files .source rel))))
            (send
             (lambda (item add collections empty files)
-              (pcase-let ((`(,file ,_ ,bytes)
+              (pcase-let (((cl-struct pos-seal--event-made file bytes)
                            (pos-seal--event-of plan item add collections empty)))
                 (pos-seal-send-event keeper version file bytes files claims)
                 (pos-ledger-write-new (expand-file-name file .ledger) bytes)))))
