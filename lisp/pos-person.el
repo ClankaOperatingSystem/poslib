@@ -76,12 +76,6 @@
 
 ;;;; Names
 
-(defun pos-person--one-line-p (text)
-  "Return non-nil if TEXT is a string of one line that is not blank."
-  (and (stringp text)
-       (not (string-empty-p (string-trim text)))
-       (not (string-match-p "[[:cntrl:]]" text))))
-
 (defun pos-person--slug (name)
   "Return the file name of the person NAME, without its extension.
 Lower case, with one hyphen for each run of other characters than
@@ -162,42 +156,6 @@ extension.  Refuse a person with no entity."
       (user-error "No person-entity for %s; add the person first" person))
     file))
 
-(defun pos-person--buffer (root file)
-  "Return a buffer visiting FILE, in the tree at ROOT, to write it.
-Refuse symlinks, unsaved or stale buffers and foreign locks."
-  (let ((name (file-relative-name file root)))
-    (when (file-symlink-p file)
-      (user-error "The file is a symlink: %s" name))
-    (when (stringp (file-locked-p file))
-      (user-error "%s is locked by another editor; save it there first" name))
-    (with-current-buffer (pos-visit file)
-      (when (buffer-modified-p)
-        (user-error "Save the modified buffer of %s first" name))
-      (unless (verify-visited-file-modtime (current-buffer))
-        (user-error "%s changed on disk; revert its buffer first" name))
-      (current-buffer))))
-
-(defmacro pos-person--writing (buffer &rest body)
-  "Evaluate BODY in BUFFER as one change, then save it.
-BUFFER is one `pos-person--buffer' returned.  The file is locked
-while BODY runs.  Return what BODY returns."
-  (declare (indent 1) (debug (form body)))
-  `(let ((enable-local-variables nil)
-         (enable-local-eval nil)
-         (make-backup-files nil)
-         (auto-save-default nil)
-         (create-lockfiles t)
-         (vc-handled-backends nil)
-         (require-final-newline t))
-     (with-current-buffer ,buffer
-       (unwind-protect
-           (progn
-             (lock-buffer)
-             (atomic-change-group
-               (prog1 (org-with-wide-buffer ,@body)
-                 (save-buffer))))
-         (unlock-buffer)))))
-
 (defun pos-person--write-new (file text)
   "Write TEXT to FILE, which is not there, making its directory."
   (let ((make-backup-files nil)
@@ -240,7 +198,7 @@ person-entities directory of ROOT's configuration directory, named
 for NAME in lower case with hyphens.  Return the file's name.
 Refuse a root with no configuration, a NAME with no letter or
 digit, and a person recorded already."
-  (unless (pos-person--one-line-p name)
+  (unless (pos-one-line-p name)
     (user-error "A person's name is one nonempty line"))
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (name (string-trim name))
@@ -266,7 +224,7 @@ digit, and a person recorded already."
 ROOT is the tree's root and WHERE a path relative to it.  Do nothing
 if ENTITY links to ID already."
   (unless (member id (pos-person--linked-ids entity))
-    (pos-person--writing (pos-person--buffer root entity)
+    (pos-writing (pos-buffer-to-write root entity)
       (goto-char (point-max))
       (unless (bolp) (insert "\n"))
       (unless (save-excursion (forward-line -1) (looking-at-p "- \\[\\[id:"))
@@ -312,7 +270,7 @@ there, and MADE is non-nil."
       (if found
           (cons found nil)
         (let ((id (pos-new-id)))
-          (pos-person--writing buffer
+          (pos-writing buffer
             (goto-char (point-min))
             (if (re-search-forward people nil t)
                 (org-end-of-subtree t t)
@@ -356,11 +314,8 @@ is not a scope's, and a scope another repository holds."
            (identity
             (cond
              ((not config)
-              (unless (pos-corpus-writable-p corpus file)
-                (user-error "Not a file this root may write: %s"
-                            (file-relative-name file root)))
               (pos-person--heading-identity
-               (pos-person--buffer root file)
+               (pos-buffer-to-write root file corpus)
                (pos-person--linked-ids entity) name))
              ((file-exists-p file)
               (cons (or (pos-person--file-id file)
@@ -417,7 +372,7 @@ file, and (FILE . COUNT) for each file whose links were renamed.
 Refuse an ID no person-entity links to or no identity has, and a
 file this root may not write, a symlink, an unsaved or stale buffer
 or a foreign lock, before anything is written."
-  (unless (and (pos-person--one-line-p name)
+  (unless (and (pos-one-line-p name)
                (not (string-match-p "[][]" name)))
     (user-error "A name is one nonempty line without square brackets"))
   (let* ((root (file-name-as-directory (expand-file-name root)))
@@ -447,9 +402,9 @@ or a foreign lock, before anything is written."
     (unless holder
       (user-error "No identity this root may write has the ID %s" id))
     ;; Every refusal comes before the first write.
-    (let ((buffers (mapcar (lambda (file) (cons file (pos-person--buffer root file)))
+    (let ((buffers (mapcar (lambda (file) (cons file (pos-buffer-to-write root file)))
                            (seq-uniq (cons holder mentions)))))
-      (pos-person--writing (cdr (assoc holder buffers))
+      (pos-writing (cdr (assoc holder buffers))
         (goto-char (point-min))
         (re-search-forward property)
         (if (org-before-first-heading-p)
@@ -462,7 +417,7 @@ or a foreign lock, before anything is written."
           (org-back-to-heading t)
           (org-edit-headline name)))
       (dolist (file mentions)
-        (let ((count (pos-person--writing (cdr (assoc file buffers))
+        (let ((count (pos-writing (cdr (assoc file buffers))
                        (pos-person--relabel id name))))
           (when (> count 0)
             (push (cons file count) changed)))))
@@ -477,10 +432,7 @@ it.  Refuse a file this root may not write, symlinks, unsaved or
 stale buffers, foreign locks and a line that is not an item's."
   (let* ((place (pos-state-locate root corpus target))
          (file (car place)))
-    (unless (pos-corpus-writable-p corpus file)
-      (user-error "Not a file this root may write: %s"
-                  (file-relative-name file root)))
-    (with-current-buffer (pos-person--buffer root file)
+    (with-current-buffer (pos-buffer-to-write root file corpus)
       (org-with-wide-buffer
        (goto-char (point-min))
        (forward-line (1- (cdr place)))
@@ -510,7 +462,7 @@ stale buffers, foreign locks and a line that is not an item's."
 
 (defun pos-person--note-p (note)
   "Return non-nil if NOTE is nil or one nonempty line."
-  (or (null note) (pos-person--one-line-p note)))
+  (or (null note) (pos-one-line-p note)))
 
 (defun pos-person-wait-on (root target person &optional note)
   "Make the item TARGET names in the tree at ROOT wait on PERSON.
@@ -534,7 +486,7 @@ STATE TITLE) as the item is afterwards."
       (user-error "The item is WAITING already; its record takes no note"))
     (pcase-let ((`(,_file ,id ,name ,_made)
                  (pos-person-identity root person (pos-scope-path scope))))
-      (pos-person--writing (marker-buffer item)
+      (pos-writing (marker-buffer item)
         (goto-char item)
         (org-entry-put nil pos-waiting-on-property
                        (format "[[id:%s][%s]]" id name))))
@@ -559,7 +511,7 @@ Refuse an item that is not WAITING and the STATE WAITING."
            (item (pos-person--item root (pos-corpus root) target)))
       (unless (equal "WAITING" (nth 2 (pos-person--item-now item)))
         (user-error "The item is not WAITING"))
-      (pos-person--writing (marker-buffer item)
+      (pos-writing (marker-buffer item)
         (goto-char item)
         (org-entry-delete nil pos-waiting-on-property))
       (pos-set-state root (pos-person--item-place root item) state note))))

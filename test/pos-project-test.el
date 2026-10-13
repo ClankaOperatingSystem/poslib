@@ -139,10 +139,6 @@ The path is relative to the root."
                      (with-output-to-string (pos-project-batch))))
       (should-not command-line-args-left))))
 
-(defconst pos-project-test-stamp
-  "\\[[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [[:alpha:]]+ [0-9]\\{2\\}:[0-9]\\{2\\}\\]"
-  "A regexp matching an inactive timestamp with a time.")
-
 (ert-deftest pos-project/a-status-is-set-and-the-change-recorded ()
   "The STATUS is changed in the project's file, and the change recorded.
 The record is a line at the head of a LOGBOOK drawer beneath the
@@ -162,8 +158,8 @@ the one it has are returned."
                (concat "\\`:PROPERTIES:\n:ID: .*\n:STATUS:   DONE\n"
                        ":OUTCOME:  Painted\\.\n:CREATED: .*\n:END:\n"
                        ":LOGBOOK:\n"
-                       "- Status \"DONE\" +from \"WIP\" +" pos-project-test-stamp "\n"
-                       "- Status \"WIP\" +from \"COMMITTED\" +" pos-project-test-stamp
+                       "- Status \"DONE\" +from \"WIP\" +" pos-test-stamp "\n"
+                       "- Status \"WIP\" +from \"COMMITTED\" +" pos-test-stamp
                        " \\\\\\\\\n  Bought the paint\n"
                        ":END:\n"
                        "#\\+TITLE: Paint\n\n\\* TODO Review Paint :review:\n")

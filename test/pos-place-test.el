@@ -31,10 +31,6 @@
 (require 'pos-place)
 (require 'pos-test-support)
 
-(defconst pos-place-test-stamp
-  "\\[[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [[:alpha:]]+ [0-9]\\{2\\}:[0-9]\\{2\\}\\]"
-  "A regexp matching an inactive timestamp with a time.")
-
 (defconst pos-place-test-intray
   (concat "* Unsorted\n"
           "** TODO Call the roofer\n:PROPERTIES:\n:ID:       roofer\n:END:\n"
@@ -89,9 +85,9 @@ With a state, the item is set to it and that change is recorded too."
                                             "Tasks" "NEXT"))))
     (should (string-match-p
              (concat "^\\*\\* NEXT Sort the shelf\n:LOGBOOK:\n"
-                     "- Refiled on " pos-place-test-stamp " \\\\\\\\\n"
+                     "- Refiled on " pos-test-stamp " \\\\\\\\\n"
                      "  From intray\\.org, Unsorted\n"
-                     "- State \"NEXT\" +from \"TODO\" +" pos-place-test-stamp "\n"
+                     "- State \"NEXT\" +from \"TODO\" +" pos-test-stamp "\n"
                      ":END:\n")
              (pos-place-test-file root "tasks.org")))))
 

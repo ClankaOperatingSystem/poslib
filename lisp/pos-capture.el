@@ -84,9 +84,7 @@ titles, a BODY with a line that begins with a star, which Org would
 read as a heading, symlinks, unsaved or stale buffers and foreign
 locks."
   (interactive "DRoot: \nsTask: ")
-  (unless (and (stringp title)
-               (not (string-empty-p (string-trim title)))
-               (not (string-match-p "[[:cntrl:]]" title)))
+  (unless (pos-one-line-p title)
     (user-error "Capture needs a nonempty, single-line title"))
   (when (and body (string-empty-p (string-trim body)))
     (setq body nil))
@@ -95,45 +93,24 @@ locks."
       (user-error "A line of the body begins with a star"))
     (when (string-match-p "[^[:print:]\n\t]" body)
       (user-error "The body has a control character")))
-  (let ((file (expand-file-name "intray.org" root))
-        (enable-local-variables nil)
-        (enable-local-eval nil)
-        (make-backup-files nil)
-        (auto-save-default nil)
-        (create-lockfiles t))
-    (unless (and (file-regular-p file) (not (file-symlink-p file)))
-      (user-error "Intray must be an existing regular file, not a symlink"))
-    (when (stringp (file-locked-p file))
-      (user-error "Intray is locked by another editor; save it there first"))
-    (with-current-buffer (pos-visit file)
-      (when (buffer-modified-p)
-        (user-error "Save the intray's modified buffer before capturing"))
-      (unless (verify-visited-file-modtime (current-buffer))
-        (user-error "Intray changed on disk; revert its buffer first"))
-      (save-restriction
-        (widen)
-        (save-excursion
-          (unwind-protect
-              (progn
-                (lock-buffer)
-                (atomic-change-group
-                  (pos-goto-unsorted-end)
-                  (let ((line (line-number-at-pos)))
-                    (insert "** TODO " (string-trim title) "\n")
-                    (forward-line -1)
-                    ;; Not `org-id-get-create', which also writes the
-                    ;; ID to `org-id-locations-file'.
-                    (org-entry-put (point) "ID" (pos-new-id))
-                    (org-entry-put (point) "CREATED"
-                                   (format-time-string
-                                    (org-time-stamp-format t t)))
-                    (when body
-                      (org-end-of-meta-data t)
-                      (unless (bolp) (insert "\n"))
-                      (insert (string-trim body) "\n"))
-                    (save-buffer)
-                    line)))
-            (unlock-buffer)))))))
+  (let ((file (expand-file-name "intray.org" root)))
+    (unless (file-regular-p file)
+      (user-error "Intray must be an existing regular file"))
+    (pos-writing (pos-buffer-to-write root file)
+      (pos-goto-unsorted-end)
+      (let ((line (line-number-at-pos)))
+        (insert "** TODO " (string-trim title) "\n")
+        (forward-line -1)
+        ;; Not `org-id-get-create', which also writes the ID to
+        ;; `org-id-locations-file'.
+        (org-entry-put (point) "ID" (pos-new-id))
+        (org-entry-put (point) "CREATED"
+                       (format-time-string (org-time-stamp-format t t)))
+        (when body
+          (org-end-of-meta-data t)
+          (unless (bolp) (insert "\n"))
+          (insert (string-trim body) "\n"))
+        line))))
 
 (defun pos-capture-batch ()
   "Capture POS_CAPTURE_TITLE into POS_CAPTURE_ROOT's intray.
