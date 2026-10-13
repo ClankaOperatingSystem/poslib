@@ -233,8 +233,5 @@ intray and the row counts as unwritable."
       (should (equal "* Unsorted\n** TODO a\n"
                      (pos-test-text root "intray.org"))))))
 
-(provide 'pos-test)
-;;; pos-test.el ends here
-
 (provide 'pos-refile-test)
 ;;; pos-refile-test.el ends here

@@ -42,9 +42,6 @@
 (require 'pos)
 (require 'pos-corpus)
 
-(provide 'pos)
-;;; pos.el ends here
-
 (defcustom pos-refile-rules nil
   "Where a heading belongs, as (REGEXP . FILE); the first match wins.
 FILE is an Org file relative to the root, which a refile plan proposes
@@ -229,9 +226,6 @@ repository's, is left and counted unwritable."
   (let ((root (file-name-as-directory pos-directory)))
     (princ (pos-refile-report (pos-refile-apply root file dry-run) dry-run))
     (terpri)))
-
-(provide 'pos)
-;;; pos.el ends here
 
 (provide 'pos-refile)
 ;;; pos-refile.el ends here

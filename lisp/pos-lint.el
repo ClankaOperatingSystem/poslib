@@ -37,6 +37,7 @@
 (require 'cl-lib)
 (require 'pos)
 (require 'pos-corpus)
+(require 'pos-tree)
 
 ;;;; Checks of a file
 
