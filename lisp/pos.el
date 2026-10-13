@@ -40,6 +40,8 @@
 ;; - `pos-goto-unsorted-end': the place in the intray for a new item.
 ;; - `pos-item', `pos-item-at-point', `pos-item-format': an item as a
 ;;   command finds it or leaves it, the one at point, and its line.
+;; - `pos-finding', `pos-finding-format', `pos-finding<': what a check
+;;   found wrong, as a line, and in order.
 ;;; Code:
 (require 'org)
 (require 'org-archive)
@@ -319,6 +321,24 @@ The file is relative to ROOT where ROOT is given."
   (format "%s:%d: %s %s"
           (if root (file-relative-name (pos-item-file item) root) (pos-item-file item))
           (pos-item-line item) (pos-item-state item) (pos-item-title item)))
+
+;;;; Findings
+
+(cl-defstruct (pos-finding (:constructor pos-finding-make) (:copier nil))
+  "What a check of the corpus found wrong, at LINE of FILE: its MESSAGE."
+  file line message)
+
+(defun pos-finding-format (finding root)
+  "Return FINDING as a line, FILE:LINE: MESSAGE, the file relative to ROOT."
+  (format "%s:%d: %s\n"
+          (file-relative-name (pos-finding-file finding) root)
+          (pos-finding-line finding) (pos-finding-message finding)))
+
+(defun pos-finding< (a b)
+  "Return non-nil if the finding A comes before B: by file, then by line."
+  (or (string< (pos-finding-file a) (pos-finding-file b))
+      (and (string= (pos-finding-file a) (pos-finding-file b))
+           (< (pos-finding-line a) (pos-finding-line b)))))
 
 ;;;; The intray's Unsorted
 
