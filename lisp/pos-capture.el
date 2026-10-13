@@ -47,7 +47,7 @@ A word is a run of letters and digits of more than three characters."
                (split-string (downcase title) "[^[:alnum:]]+" t))))
 
 (defun pos-capture-like (root title)
-  "Return (FILE LINE STATE TITLE) for each open item of ROOT like TITLE.
+  "Return the open items of ROOT like TITLE, each a `pos-item'.
 The items are those of the corpus of ROOT in a state that is not
 done.  Two titles are like when the words they have in common are at
 least `pos-capture-like-share' of the words either has, by
@@ -68,10 +68,7 @@ least `pos-capture-like-share' of the words either has, by
                             (>= (/ (float (length both))
                                    (length (seq-union words theirs)))
                                 pos-capture-like-share))
-                   (push (list file (line-number-at-pos)
-                               (substring-no-properties (org-get-todo-state))
-                               other)
-                         like)))))
+                   (push (pos-item-at-point file) like)))))
            nil 'file))))
     (nreverse like)))
 
@@ -127,8 +124,8 @@ not empty, write nothing and print those lines alone."
                      (expand-file-name "intray.org" root)
                      (pos-capture root title (getenv "POS_CAPTURE_BODY"))
                      (string-trim title))))
-    (pcase-dolist (`(,file ,line ,state ,other) like)
-      (princ (format "Like: %s:%d: %s %s\n" file line state other)))))
+    (dolist (item like)
+      (princ (format "Like: %s\n" (pos-item-format item))))))
 
 (provide 'pos-capture)
 ;;; pos-capture.el ends here

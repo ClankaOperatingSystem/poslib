@@ -96,14 +96,13 @@ An open task beneath an open task is its parent's."
     (nreverse results)))
 
 (defun pos-salvage-open-tasks (source)
-  "Return (FILE LINE STATE TITLE) for each open task of SOURCE.
+  "Return the open tasks of SOURCE, each a `pos-item'.
 SOURCE is a file or a directory.  The topmost of a nest only."
   (mapcan (lambda (file)
             (pos-salvage--map-open
              file
              (lambda ()
-               (list file (line-number-at-pos) (org-get-todo-state)
-                     (substring-no-properties (org-get-heading t t t t))))))
+               (pos-item-at-point file))))
           (pos-salvage--files source)))
 
 (defun pos-salvage--close-subtree ()
@@ -175,8 +174,8 @@ keeps the task's state and takes its ID, or a new one if it had
 none, and says where it was salvaged from, by a file link.  The
 original is left in `pos-salvage-closed-state', as is each open task
 beneath it, without its ID, and says where the copy is, by an id
-link.  With DRY-RUN nothing is written.  Return (FILE LINE STATE
-TITLE) for each task, as it stood.  Refuse a SOURCE that is not
+link.  With DRY-RUN nothing is written.  Return each task, a
+`pos-item', as it stood.  Refuse a SOURCE that is not
 beneath ROOT, holds the intray, or holds a file that is not the
 root's to write, within another repository of the tree or a product;
 an intray that is not a regular file or that an editor holds; and a
@@ -201,7 +200,7 @@ file whose buffer has unsaved changes or is older than the file."
           (user-error "Intray must be an existing regular file"))
         (let ((intray (pos-buffer-to-write root intray-file))
               (buffers (mapcar (lambda (file) (cons file (pos-buffer-to-write root file)))
-                               (delete-dups (mapcar #'car tasks)))))
+                               (delete-dups (mapcar #'pos-item-file tasks)))))
           (pcase-dolist (`(,file . ,buffer) buffers)
             (pos-writing buffer
               (pos-salvage--map-open
@@ -216,10 +215,7 @@ DRY-RUN words it as what would be done."
    (format "%s %d open task%s to intray.org\n"
            (if dry-run "Would salvage" "Salvaged")
            (length tasks) (if (= (length tasks) 1) "" "s"))
-   (mapconcat (pcase-lambda (`(,file ,line ,state ,title))
-                (format "%s:%d: %s %s\n"
-                        (file-relative-name file root) line state title))
-              tasks "")))
+   (mapconcat (lambda (task) (concat (pos-item-format task root) "\n")) tasks "")))
 
 (provide 'pos-salvage)
 ;;; pos-salvage.el ends here

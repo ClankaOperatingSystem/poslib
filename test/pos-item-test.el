@@ -47,8 +47,9 @@ The line goes where Org puts it, above the property drawer.  The item
 is returned as it is afterwards, with its timestamp."
   (pos-item-test-with-tasks
       "* TODO Call the roofer\n:PROPERTIES:\n:ID:       roofer\n:END:\nBody.\n"
-    (should (equal (list (expand-file-name "tasks.org" root) 1 "TODO"
-                         "Call the roofer" "<2031-03-04 Tue>")
+    (should (equal (pos-item-make :file (expand-file-name "tasks.org" root) :line 1
+                                  :state "TODO" :title "Call the roofer"
+                                  :planning "<2031-03-04 Tue>")
                    (pos-set-date root "roofer" "scheduled" "2031-03-04")))
     (should (equal (concat "* TODO Call the roofer\nSCHEDULED: <2031-03-04 Tue>\n"
                            ":PROPERTIES:\n:ID:       roofer\n:END:\nBody.\n")
@@ -60,7 +61,7 @@ The item keeps its scheduled date."
   (pos-item-test-with-tasks
       "* Tasks\n** NEXT File the return\nSCHEDULED: <2031-03-04 Tue>\n"
     (should (equal "<2031-03-31 Mon>"
-                   (nth 4 (pos-set-date root "tasks.org:2" "deadline" "2031-03-31"))))
+                   (pos-item-planning (pos-set-date root "tasks.org:2" "deadline" "2031-03-31"))))
     (should (string-match-p
              (concat "\\`\\* Tasks\n\\*\\* NEXT File the return\n"
                      "\\(DEADLINE: <2031-03-31 Mon> SCHEDULED: <2031-03-04 Tue>"
@@ -71,7 +72,7 @@ The item keeps its scheduled date."
   "The date \"none\" removes the date.
 The item then has no timestamp of that kind."
   (pos-item-test-with-tasks "* TODO Mow\nSCHEDULED: <2031-03-04 Tue>\n"
-    (should-not (nth 4 (pos-set-date root "tasks.org:1" "scheduled" "none")))
+    (should-not (pos-item-planning (pos-set-date root "tasks.org:1" "scheduled" "none")))
     (should (equal "* TODO Mow\n" (pos-item-test-tasks root)))))
 
 (ert-deftest pos-item/a-repeater-is-written-when-given-and-kept-when-not ()
@@ -79,9 +80,9 @@ The item then has no timestamp of that kind."
 A date without one keeps the repeater the item has, as Org does."
   (pos-item-test-with-tasks "* TODO Water\nSCHEDULED: <2031-03-04 Tue +1w>\n"
     (should (equal "<2031-03-05 Wed +2d>"
-                   (nth 4 (pos-set-date root "tasks.org:1" "scheduled" "2031-03-05 +2d"))))
+                   (pos-item-planning (pos-set-date root "tasks.org:1" "scheduled" "2031-03-05 +2d"))))
     (should (equal "<2031-03-07 Fri +2d>"
-                   (nth 4 (pos-set-date root "tasks.org:1" "scheduled" "2031-03-07"))))
+                   (pos-item-planning (pos-set-date root "tasks.org:1" "scheduled" "2031-03-07"))))
     (should (equal "* TODO Water\nSCHEDULED: <2031-03-07 Fri +2d>\n"
                    (pos-item-test-tasks root)))))
 
@@ -105,16 +106,16 @@ So are a day no month has and an unknown kind of date."
 Adding a tag the item has and removing one it lacks change nothing."
   (pos-item-test-with-tasks "* TODO Call the roofer :home:\n* NEXT Other\n"
     (should (equal '("home" "phone")
-                   (nth 4 (pos-set-tags root "tasks.org:1" '("+phone" "+home" "-errand")))))
+                   (pos-item-tags (pos-set-tags root "tasks.org:1" '("+phone" "+home" "-errand")))))
     (should (equal '("phone")
-                   (nth 4 (pos-set-tags root "tasks.org:1" '("-home")))))
+                   (pos-item-tags (pos-set-tags root "tasks.org:1" '("-home")))))
     (should (string-match-p "\\`\\* TODO Call the roofer +:phone:\n\\* NEXT Other\n\\'"
                             (pos-item-test-tasks root)))))
 
 (ert-deftest pos-item/removing-the-last-tag-leaves-the-heading-bare ()
   "An item whose only tag is removed has no tags and no trailing space."
   (pos-item-test-with-tasks "* TODO Mow :home:\n"
-    (should-not (nth 4 (pos-set-tags root "tasks.org:1" '("-home"))))
+    (should-not (pos-item-tags (pos-set-tags root "tasks.org:1" '("-home"))))
     (should (equal "* TODO Mow\n" (pos-item-test-tasks root)))))
 
 (ert-deftest pos-item/a-change-that-is-not-a-tag-is-refused ()

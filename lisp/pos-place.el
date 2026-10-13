@@ -109,8 +109,8 @@ slash-separated, as \"Tasks\" or \"Tasks/House\"; the item becomes
 the last of its children, with its properties, body and own
 children.  With STATE, one of `pos-todo-keywords', the item is set
 to it as `pos-set-state' does.  The move is recorded in the item's
-LOGBOOK drawer with the place it came from.  Return (FILE LINE STATE
-TITLE) as the item is afterwards.  Refuse a heading that is the item
+LOGBOOK drawer with the place it came from.  Return the item, a
+`pos-item', as the item is afterwards.  Refuse a heading that is the item
 or within it, a path FILE does not have, and what `pos-set-state'
 refuses of either file."
   (when (and state (not (member state (pos-state-states))))
@@ -177,11 +177,7 @@ refuses of either file."
                                (org-paste-subtree (1+ (cdr heading)))
                                (org-back-to-heading t)
                                (prog1
-                                   (list to-file (line-number-at-pos)
-                                         (substring-no-properties
-                                          (org-get-todo-state))
-                                         (substring-no-properties
-                                          (org-get-heading t t t t)))
+                                   (pos-item-at-point to-file)
                                  ;; The file that gains the item is
                                  ;; saved first: a failure between the
                                  ;; two saves leaves it twice, not lost.
@@ -215,9 +211,9 @@ is after the move.  Exit 2 on any other arguments."
                          (and (org-at-heading-p)
                               (substring-no-properties
                                (org-get-heading t t t t))))))
-               (`(,file ,line ,now ,placed) (pos-place root target to under state)))
+               (placed (pos-place root target to under state)))
     (setq command-line-args-left nil)
-    (princ (format "%s:%d: %s %s\n" file line now placed))
+    (princ (concat (pos-item-format placed) "\n"))
     (dolist (link (and title (pos-place-stale-links root (car old) title)))
       (princ (format "Link to the old place: %s:%d\n" (car link) (cdr link))))))
 

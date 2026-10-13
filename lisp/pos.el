@@ -38,6 +38,8 @@
 ;;   headings of a file, one of them by its line, and whether one has
 ;;   an open task below it.
 ;; - `pos-goto-unsorted-end': the place in the intray for a new item.
+;; - `pos-item', `pos-item-at-point', `pos-item-format': an item as a
+;;   command finds it or leaves it, the one at point, and its line.
 ;;; Code:
 (require 'org)
 (require 'org-archive)
@@ -293,6 +295,30 @@ The files are those of the corpus a command may write."
 (defconst pos-waiting-on-property "WAITING_ON"
   "The property of a WAITING item that links to the person it waits on.
 Its value is a link by ID to a person-identity of the item's scope.")
+
+;;;; Items
+
+(cl-defstruct (pos-item (:constructor pos-item-make) (:copier nil))
+  "An item of the corpus, as a command finds it or leaves it.
+FILE is the item's file and LINE the line of its heading; STATE is
+its TODO keyword and TITLE its heading without it.  PLANNING is the
+scheduled date or deadline a command set, as written, and TAGS the
+item's own tags a command set, a list; each nil when the command did
+not ask for it."
+  file line state title planning tags)
+
+(defun pos-item-at-point (file)
+  "Return the item at point, a heading of FILE, as a `pos-item'."
+  (pos-item-make :file file :line (line-number-at-pos)
+                 :state (substring-no-properties (org-get-todo-state))
+                 :title (substring-no-properties (org-get-heading t t t t))))
+
+(defun pos-item-format (item &optional root)
+  "Return ITEM as a line, FILE:LINE: STATE TITLE.
+The file is relative to ROOT where ROOT is given."
+  (format "%s:%d: %s %s"
+          (if root (file-relative-name (pos-item-file item) root) (pos-item-file item))
+          (pos-item-line item) (pos-item-state item) (pos-item-title item)))
 
 ;;;; The intray's Unsorted
 

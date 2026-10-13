@@ -122,8 +122,8 @@ line that is no item."
 TARGET is the item's ID, or FILE:LINE, the file relative to ROOT and
 the line of the heading.  STATE is one of `pos-todo-keywords'.  NOTE
 is one line, or nil.  The change is made by `org-todo' and recorded
-in the item's LOGBOOK drawer.  Return (FILE LINE STATE TITLE) as the
-item is afterwards; a repeating item set to a done state is open
+in the item's LOGBOOK drawer.  Return the item, a `pos-item', as it
+is afterwards; a repeating item set to a done state is open
 again, on its next date.  Refuse a file the root may not write,
 symlinks, unsaved or stale buffers and foreign locks."
   (unless (member state (pos-state-states))
@@ -147,9 +147,7 @@ symlinks, unsaved or stale buffers and foreign locks."
          (org-back-to-heading t)
          (pos-state-log state previous (and note (string-trim note)))
          (org-back-to-heading t)
-         (list file (line-number-at-pos)
-               (substring-no-properties (org-get-todo-state))
-               (substring-no-properties (org-get-heading t t t t))))))))
+         (pos-item-at-point file))))))
 
 (defun pos-state-batch ()
   "Set the state of an item of `pos-directory' and print the item.
@@ -159,10 +157,9 @@ takes them.  Exit 2 on any other arguments."
     (message "Usage: TARGET %s [NOTE]" (string-join (pos-state-states) "|"))
     (kill-emacs 2))
   (pcase-let* ((`(,target ,state ,note) command-line-args-left)
-               (`(,file ,line ,now ,title)
-                (pos-set-state pos-directory target state note)))
+               (item (pos-set-state pos-directory target state note)))
     (setq command-line-args-left nil)
-    (princ (format "%s:%d: %s %s\n" file line now title))))
+    (princ (concat (pos-item-format item) "\n"))))
 
 (provide 'pos-state)
 ;;; pos-state.el ends here
