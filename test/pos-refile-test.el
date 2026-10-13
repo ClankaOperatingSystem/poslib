@@ -53,7 +53,7 @@ property drawer, which begin with a colon, are not what the entry
 says; blank lines are passed over and the line is trimmed.  An entry
 with no body has an empty excerpt."
   (should (equal "book it"
-                 (pos--excerpt (pos-test-lines "** TODO Dentist checkup"
+                 (pos-refile--excerpt (pos-test-lines "** TODO Dentist checkup"
                                                "SCHEDULED: <2026-09-14 Mon>"
                                                ":PROPERTIES:"
                                                ":ID: a"
@@ -61,16 +61,16 @@ with no body has an empty excerpt."
                                                ""
                                                "  book it  "
                                                "*** sub"))))
-  (should (equal "" (pos--excerpt "** TODO Dentist checkup")))
-  (should (equal "" (pos--excerpt "** TODO x\nDEADLINE: <2026-09-14 Mon>"))))
+  (should (equal "" (pos-refile--excerpt "** TODO Dentist checkup")))
+  (should (equal "" (pos-refile--excerpt "** TODO x\nDEADLINE: <2026-09-14 Mon>"))))
 
 (ert-deftest pos-refile/an-excerpt-fits-a-table-cell ()
   "An excerpt has its bars made slashes and is cut to sixty columns.
 A bar would end the plan table's cell; a long line would push the
 other columns off the screen.  The cut is marked with an ellipsis."
-  (should (equal "hinge / latch" (pos--excerpt "* TODO x\nhinge | latch")))
+  (should (equal "hinge / latch" (pos-refile--excerpt "* TODO x\nhinge | latch")))
   (should (equal (concat (make-string 59 ?a) "…")
-                 (pos--excerpt (concat "* TODO x\n" (make-string 70 ?a))))))
+                 (pos-refile--excerpt (concat "* TODO x\n" (make-string 70 ?a))))))
 
 ;;;; Refile
 
