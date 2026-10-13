@@ -40,6 +40,14 @@
 ;; - `pos-project-promote': command.
 ;; - `pos-project-batch': shell entry; create WITHIN NAME TITLE OUTCOME
 ;;   REVIEW [NEXT], status PROJECT STATUS [NOTE], or promote PROJECT.
+;; - `pos-project-statuses': the values a project file's STATUS property
+;;   takes, each with what it says.
+;; - `pos-project-active-p': non-nil if STATUS, a project file's, says
+;;   the project is not closed.
+;; - `pos-project-begun-p': non-nil if STATUS, a project file's, says
+;;   the project is begun.
+;; - `pos-project-status-line': a regexp matching a STATUS property's
+;;   line, its value in group 1.
 
 ;;; Code:
 

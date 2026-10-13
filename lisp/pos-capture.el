@@ -24,6 +24,8 @@
 ;; - `pos-capture-like': the open items whose titles are like a title.
 ;; - `pos-capture-batch': shell entry; reads POS_CAPTURE_ROOT,
 ;;   POS_CAPTURE_TITLE, POS_CAPTURE_BODY and POS_CAPTURE_CHECK.
+;; - `pos-capture-like-share': the share of words two titles have in
+;;   common that makes them like.
 
 ;;; Code:
 

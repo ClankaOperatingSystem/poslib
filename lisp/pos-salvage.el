@@ -38,6 +38,8 @@
 ;; - `pos-salvage-open-tasks': the open tasks of an item.
 ;; - `pos-salvage': command.
 ;; - `pos-salvage-report': what a salvage did, as text.
+;; - `pos-salvage-closed-state': the state a salvaged task is left in
+;;   where it stood.
 
 ;;; Code:
 

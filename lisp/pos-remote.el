@@ -47,6 +47,10 @@
 ;; the keeper names.  Nothing here seals: `pos-seal' calls it for an
 ;; archive a keeper keeps.  Loading this module gives pos-ledger.el
 ;; `pos-remote-ask', so that a check of a kept archive asks its keeper.
+;; - `pos-remote-versions': the versions of the protocol this client
+;;   speaks, ascending.
+;; - `pos-remote-keeper-function': the function a keeper's URL is made a
+;;   keeper with.
 
 ;;; Code:
 

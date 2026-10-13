@@ -30,6 +30,10 @@
 ;; - `pos-index-fetch': a buffer of a file fetched from its keeper.
 ;; - `pos-index-bytes': the bytes of the file a link names, wherever it is.
 ;; - Org follows ipfs: links through it.
+;; - `pos-index-file': where a scope keeps its index, relative to the
+;;   scope.
+;; - `pos-index-follow': visit the archived file an Org ipfs: link
+;;   names; PATH is after ipfs:.
 
 ;;; Code:
 

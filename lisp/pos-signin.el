@@ -34,6 +34,15 @@
 ;; - `pos-signin-token': the token a request to a keeper carries.
 ;; - `pos-signin-adopt': after a refusal, find that a keeper not seen
 ;;   before takes a token already kept.
+;; - `pos-signin-well-known': the path, at a keeper's origin, of how to
+;;   sign in to it (RFC 9728).
+;; - `pos-signin-soon': a token expiring within this many seconds is
+;;   refreshed first.
+;; - `pos-signin-browse-function': the function a person's browser is
+;;   sent to the issuer with.
+;; - `pos-signin-fetch-function': the function an exchange with a keeper
+;;   or an issuer is made with.
+;; - `pos-signin-file': where the tokens are kept.
 
 ;;; Code:
 
