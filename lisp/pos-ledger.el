@@ -45,6 +45,7 @@
 (require 'subr-x)
 (require 'pos-bytes)
 (require 'pos-cid)
+(require 'pos-node)
 (require 'pos-path)
 
 (defconst pos-ledger-integrity "archive-integrity"
@@ -59,7 +60,6 @@
 (defconst pos-ledger-declaration "#+COLLECTION: t"
   "The line in a collection's README.org that declares it one.")
 
-(declare-function pos-tree-read-config "pos-tree" (text))
 (declare-function pos-remote-describe "pos-remote" (archive))
 (defvar pos-remote-keeper-function)
 
@@ -187,9 +187,8 @@ An archive not yet made holds nothing."
 (defun pos-ledger--uuid-p (string)
   "Return non-nil if STRING is a UUID in canonical form."
   (and (stringp string)
-       (string-match-p (concat "\\`[0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}"
-                               "-[0-9a-f]\\{4\\}-[0-9a-f]\\{12\\}\\'")
-                       string)))
+       (let ((case-fold-search nil))
+         (string-match-p pos-node-uuid-regexp string))))
 
 (defun pos-ledger--hex-p (value)
   "Return non-nil if VALUE is a lower-case hex SHA-256."
@@ -506,13 +505,12 @@ configuration that is refused, and for two in one node."
       (pos-ledger-refuse 'config "Configuration refused (two-configurations): %s"
                          node))
     (when files
-      (require 'pos-tree)
       (let* ((file (expand-file-name (car files) node))
              (config
               (condition-case err
-                  (pos-tree-read-config
+                  (pos-node-read-config
                    (decode-coding-string (pos-bytes-read file) 'utf-8))
-                (pos-tree-refused
+                (pos-node-refused
                  (pos-ledger-refuse 'config "Configuration refused (%s): %s"
                                     (cadr err) file))))
              (path (directory-file-name

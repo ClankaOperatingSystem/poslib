@@ -20,8 +20,7 @@
 
 ;;; Commentary:
 
-;; Run: make test.  The configuration fixtures in
-;; fixtures/pos-directory/ are for pyposlib too.  The trees are real:
+;; Run: make test.  The trees are real:
 ;; each test makes repositories with git init in a temporary directory,
 ;; as doc/pos-directory.txt asks, and a child's remote is a repository
 ;; beside the tree.
@@ -127,51 +126,6 @@ plan.  Fail if ten rounds do not settle it."
 (defun pos-tree-test-status (dir)
   "Return what git status reports of the repository at DIR."
   (pos-test-git dir "status" "--porcelain"))
-
-;;;; The file
-
-(defun pos-tree-test-sorted (value)
-  "Return VALUE with every alist in it sorted by key, keys as strings."
-  (cond
-   ((vectorp value) (vconcat (mapcar #'pos-tree-test-sorted value)))
-   ((and (consp value) (consp (car value)))
-    (sort (mapcar (lambda (pair)
-                    (cons (format "%s" (car pair)) (pos-tree-test-sorted (cdr pair))))
-                  value)
-          (lambda (a b) (string< (car a) (car b)))))
-   (t value)))
-
-(ert-deftest pos-tree/a-config-is-read-as-the-fixtures-say ()
-  "Each fixture's file gives its configuration, or its kind of refusal."
-  (let ((fixtures (pos-fixtures "pos-directory")))
-    (should (> (length fixtures) 20))
-    (dolist (named fixtures)
-      (ert-info ((car named) :prefix "fixture: ")
-        (let-alist (cdr named)
-          (if .refused
-              (should (equal .refused
-                             (condition-case err
-                                 (progn (pos-tree-read-config .yaml) "accepted")
-                               (pos-tree-refused (symbol-name (nth 1 err))))))
-            (should (equal (pos-tree-test-sorted .config)
-                           (pos-tree-test-sorted
-                            (pos-tree-read-config .yaml))))))))))
-
-(ert-deftest pos-tree/a-declaration-is-read-as-the-fixtures-say ()
-  "Each fixture's methodology.yaml gives its declaration, or its kind of refusal."
-  (let ((fixtures (pos-fixtures "pos-methodology")))
-    (should (> (length fixtures) 5))
-    (dolist (named fixtures)
-      (ert-info ((car named) :prefix "fixture: ")
-        (let-alist (cdr named)
-          (if .refused
-              (should (equal .refused
-                             (condition-case err
-                                 (progn (pos-tree-read-methodology .yaml) "accepted")
-                               (pos-tree-refused (symbol-name (nth 1 err))))))
-            (should (equal (pos-tree-test-sorted .declaration)
-                           (pos-tree-test-sorted
-                            (pos-tree-read-methodology .yaml))))))))))
 
 ;;;; Mounts
 
@@ -328,7 +282,7 @@ the key."
                              (pos-tree-test-config
                               (pos-tree-test-child "work" child)))
         (ert-info (file :prefix "file: ")
-          (should (equal (pos-tree-config-file root) file))
+          (should (equal (pos-node-config-file root) file))
           (should (equal (pos-tree-test-summary (pos-tree-plan root))
                          '("exclude . work" "clone work"))))))))
 
@@ -341,8 +295,8 @@ the key."
         (pos-tree-test-write root ".clanka/config.yaml" "pos: 2\nprojects: projects/\n")
         (pos-tree-test-write root other "pos: 2\nprojects: projects/\n")
         (should (eq 'two-configurations
-                    (condition-case err (pos-tree-config-file root)
-                      (pos-tree-refused (nth 1 err)))))
+                    (condition-case err (pos-node-config-file root)
+                      (pos-node-refused (nth 1 err)))))
         (should (equal (pos-tree-test-summary (pos-tree-plan root))
                        '("config-refused .")))
         ;; Every path in a plan is relative to the root.
@@ -495,31 +449,6 @@ beneath it vendor is walked and attic is not, the reverse of the root."
       (should (equal (seq-filter (lambda (line) (string-prefix-p "undeclared" line))
                                  (pos-tree-test-summary (pos-tree-plan root)))
                      '("undeclared child/vendor/lib" "undeclared attic/lib"))))))
-
-(ert-deftest pos-tree/an-exclude-entry-is-a-name-or-a-path-read-exactly ()
-  "An entry is a name at any depth or a path beneath the node, read exactly.
-journal/ is a path of one name: the node's own journal and what lies
-beneath it, not a journal deeper down, where the name journal is one
-at any depth.  A name is matched letter for letter, so attic leaves
-Attic to be walked, and only * stands for other text: ? and [ are
-themselves."
-  (let ((path (pos-tree-exclusions
-               `((exclude . ,(pos-tree--exclusions ["journal/" "meta/notes/"])))))
-        (name '("journal" "attic" "tmp*" "what?" "[draft]")))
-    (should (equal '("journal/" "meta/notes") path))
-    (should (pos-tree-unwalked-p "journal" path))
-    (should (pos-tree-unwalked-p "journal/2026" path))
-    (should-not (pos-tree-unwalked-p "a/b/journal" path))
-    (should (pos-tree-unwalked-p "meta/notes/old" path))
-    (should (pos-tree-unwalked-p "a/b/journal" name))
-    (should (pos-tree-unwalked-p "a/attic" name))
-    (should-not (pos-tree-unwalked-p "a/Attic" name))
-    (should (pos-tree-unwalked-p "tmpfiles" name))
-    (should-not (pos-tree-unwalked-p "a/Tmpfiles" name))
-    (should (pos-tree-unwalked-p "what?" name))
-    (should-not (pos-tree-unwalked-p "whats" name))
-    (should (pos-tree-unwalked-p "[draft]" name))
-    (should-not (pos-tree-unwalked-p "d" name))))
 
 (ert-deftest pos-tree/archive-scopes-are-not-looked-for-in-excluded-directories ()
   "An archives directory beneath an excluded one is no scope of the node.

@@ -425,22 +425,13 @@ a rumour already sealed word for word is cited, not sealed again."
   (pos-test-with-scope
     (let* ((target (expand-file-name "archives/journal/h.md" scope))
            (run (lambda (&rest args)
-                  (with-temp-buffer
-                    (insert "handover\n")
-                    (list (apply #'call-process-region (point-min) (point-max)
-                                 (expand-file-name invocation-name invocation-directory)
-                                 t t nil "-Q" "--batch"
-                                 "-L" (file-name-directory
-                                       (expand-file-name (locate-library "markdown-mode")))
-                                 "-L"
-                                 (file-name-directory (expand-file-name (locate-library "pos-seal")))
-                                 "-l" "pos-seal" "-f" "pos-seal-batch" "write-new" target args)
-                          (buffer-string))))))
+                  (apply #'pos-test-program "handover\n" "pos-seal-batch"
+                         "write-new" target args))))
       (let ((planned (funcall run)))
-        (ert-info ((cadr planned)) (should (equal 0 (car planned)))))
+        (ert-info ((cdr planned)) (should (equal 0 (car planned)))))
       (should-not (file-exists-p target))
       (let ((applied (funcall run "--apply")))
-        (ert-info ((cadr applied)) (should (equal 0 (car applied)))))
+        (ert-info ((cdr applied)) (should (equal 0 (car applied)))))
       (should (equal "handover\n" (pos-bytes-read target)))
       (should-not (file-exists-p (expand-file-name "_seal" scope))))))
 
@@ -450,12 +441,8 @@ a rumour already sealed word for word is cited, not sealed again."
     (let* ((source (expand-file-name "trial" scope))
            (target (expand-file-name "archives/trial" scope))
            (run (lambda (&rest args)
-                  (apply #'call-process (expand-file-name invocation-name invocation-directory)
-                         nil nil nil "-Q" "--batch"
-                         "-L" (file-name-directory
-                               (expand-file-name (locate-library "markdown-mode")))
-                         "-L" (file-name-directory (expand-file-name (locate-library "pos-seal")))
-                         "-l" "pos-seal" "-f" "pos-seal-batch" "seal" source target args))))
+                  (car (apply #'pos-test-program nil "pos-seal-batch"
+                              "seal" source target args)))))
       (should (equal 0 (funcall run)))
       (should-not (file-exists-p target))
       (should (equal 0 (funcall run "--apply")))
@@ -519,20 +506,11 @@ archive, are refused."
   "The link command prints the link on one line; a path never sealed exits 2."
   (pos-test-with-scope
     (let* ((archive (pos-test-scope-sealed scope))
-           (run (lambda (path)
-                  (with-temp-buffer
-                    (list (call-process (expand-file-name invocation-name invocation-directory)
-                                        nil '(t nil) nil "-Q" "--batch"
-                                        "-L" (file-name-directory
-                                              (expand-file-name (locate-library "markdown-mode")))
-                                        "-L" (file-name-directory
-                                              (expand-file-name (locate-library "pos-seal")))
-                                        "-l" "pos-seal" "-f" "pos-seal-batch" "link" path)
-                          (buffer-string))))))
-      (should (equal (list 0 (concat (pos-links-link (expand-file-name "trial/result.md" archive))
+           (run (lambda (path) (pos-test-program nil "pos-seal-batch" "link" path))))
+      (should (equal (cons 0 (concat (pos-links-link (expand-file-name "trial/result.md" archive))
                                      "\n"))
                      (funcall run (expand-file-name "trial/result.md" archive))))
-      (should (equal '(2 "") (funcall run (expand-file-name "other" archive)))))))
+      (should (equal '(2 . "") (funcall run (expand-file-name "other" archive)))))))
 
 (ert-deftest pos-seal/reading-links-reads-nothing-else ()
   "A #+SETUPFILE in an item is not followed while its links are read."

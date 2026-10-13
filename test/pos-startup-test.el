@@ -153,7 +153,7 @@ and each responsibility has one of its own."
 (ert-deftest pos-startup/archives-attics-hidden-and-underscore-directories-are-not-read ()
   "The files read are the Org files outside the directories set aside.
 The root's configuration declares no exclude, so the default list
-`pos-tree-default-exclude' is in force: archives, attic, node_modules,
+`pos-node-default-exclude' is in force: archives, attic, node_modules,
 and any directory whose name begins with a dot or an underscore.  In
 the tree, archives/old.org, projects/alpha/attic/draft.org,
 _tmp/scratch.org and .hidden/secret.org are inside such directories;
@@ -237,7 +237,7 @@ notes.org is not read, and the corpus records the refusal."
 A refusal is `pos-tree-refused'.  Here reading any configuration
 signals a plain error instead, and the report signals it on."
   (pos-startup-test-with-tree
-    (cl-letf (((symbol-function 'pos-tree-read-config)
+    (cl-letf (((symbol-function 'pos-node-read-config)
                (lambda (_text) (error "The configuration cannot be read"))))
       (should (equal '(error "The configuration cannot be read")
                      (should-error (pos-startup-report root) :type 'error))))))
