@@ -60,12 +60,15 @@
 (defconst pos-ledger-declaration "#+COLLECTION: t"
   "The line in a collection's README.org that declares it one.")
 
-(declare-function pos-remote-describe "pos-remote" (archive))
-(defvar pos-remote-keeper-function)
-
 (defvar pos-ledger-offline nil
   "Non-nil if a check is to ask no keeper.
 The environment's POS_ARCHIVE_OFFLINE, set to anything, says the same.")
+
+(defvar pos-ledger-ask-function nil
+  "The function a keeper is asked what it has of a ledger with, or nil.
+Called with the keeper's URL; it gives back what the keeper describes,
+as `pos-remote-describe' does.  pos-remote.el sets it when loaded.
+While it is nil a check that would ask a keeper refuses `remote'.")
 
 (define-error 'pos-ledger-refused "Archive integrity refused")
 
@@ -573,8 +576,9 @@ bytes the keeper has erased, sorted.  Nil if no keeper is to be asked.
 Refuse as the keeper does."
   (unless (or pos-ledger-offline
               (not (member (getenv "POS_ARCHIVE_OFFLINE") '(nil ""))))
-    (require 'pos-remote)
-    (let* ((described (pos-remote-describe (funcall pos-remote-keeper-function url)))
+    (unless pos-ledger-ask-function
+      (pos-ledger-refuse 'remote "No client to ask a keeper with; load pos-remote"))
+    (let* ((described (funcall pos-ledger-ask-function url))
            (erased (append (alist-get 'erased described) nil)))
       `((head . ,(alist-get 'head described))
         (events . ,(alist-get 'events described))

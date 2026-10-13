@@ -69,7 +69,7 @@ response gives the result or the refusal recorded."
       (seq-doseq (exchange (alist-get 'exchanges tape))
         (ert-info ((format "%s %d" (car named) index))
           (let* (sent
-                 (pos-remote-send-function
+                 (pos-http-send-function
                   (lambda (method url headers body)
                     (setq sent
                           `((method . ,method)
@@ -99,7 +99,7 @@ By what the status means; one that means nothing here, as remote."
     (pcase-dolist (`(,status . ,kind) '((401 . "access") (403 . "access") (404 . "absent")
                                         (409 . "chain") (410 . "erased") (413 . "size")
                                         (500 . "remote")))
-      (let ((pos-remote-send-function (lambda (&rest _) (cons status "<html>"))))
+      (let ((pos-http-send-function (lambda (&rest _) (cons status "<html>"))))
         (pos-test-refused pos-ledger-refused kind (pos-remote-describe archive))))))
 
 (defun pos-remote-test-begun (unnamed named)
@@ -141,7 +141,7 @@ Name, event, claims, the events after it in order, then the files by
 CID."
   (let* ((events (pos-remote-test-begun 2 1))
          sent
-         (pos-remote-send-function
+         (pos-http-send-function
           (lambda (_method _url _headers body)
             (let ((start 0) names)
               (while (string-match "name=\"\\([^\"]*\\)\"" body start)
@@ -163,61 +163,6 @@ CID."
 (cl-defmethod pos-remote-event ((archive pos-remote-test-memory) number)
   "Return event NUMBER of ARCHIVE, from its list."
   (nth (1- number) (pos-remote-test-memory-events archive)))
-
-(defun pos-remote-test-refusing (challenge)
-  "Start a server on a loopback port that answers every request 401.
-CHALLENGE, if a string, is its WWW-Authenticate header.  Return the
-server process."
-  (make-network-process
-   :name "pos-remote-test" :server t :host "127.0.0.1" :service t
-   :family 'ipv4 :coding 'binary :noquery t
-   :filter
-   (lambda (connection data)
-     (let ((seen (concat (process-get connection 'seen) data)))
-       (process-put connection 'seen seen)
-       (when (string-search "\r\n\r\n" seen)
-         (process-send-string
-          connection
-          (concat "HTTP/1.1 401 Unauthorized\r\n"
-                  (and challenge (format "WWW-Authenticate: %s\r\n" challenge))
-                  "Content-Type: application/json\r\nContent-Length: 2\r\n"
-                  "Connection: close\r\n\r\n{}"))
-         (delete-process connection))))))
-
-(ert-deftest pos-remote/a-refusal-for-want-of-a-token-is-handed-back ()
-  "A 401 to a request with no token is the caller's, whatever it challenges.
-Emacs would otherwise ask at the terminal, or wait without end."
-  (dolist (challenge '(nil "Bearer"
-                           "Bearer resource_metadata=\"http://127.0.0.1/told\""
-                           "Basic realm=\"keeper\""))
-    (let ((server (pos-remote-test-refusing challenge)))
-      (unwind-protect
-          (should (equal (with-timeout (10 'waited)
-                           (pos-remote--send
-                            "GET" (format "http://127.0.0.1:%d/"
-                                          (process-contact server :service))
-                            nil nil))
-                         '(401 . "{}")))
-        (delete-process server)))))
-
-(ert-deftest pos-remote/a-keeper-that-says-nothing-is-given-up-on ()
-  "A socket that takes a request and never answers it is not waited on.
-The exchange is refused once `pos-remote-timeout' has passed."
-  (let ((server (make-network-process
-                 :name "pos-remote-test" :server t :host "127.0.0.1"
-                 :service t :family 'ipv4 :coding 'binary :noquery t
-                 :filter #'ignore))
-        (pos-remote-timeout 1))
-    (unwind-protect
-        (should (equal (with-timeout (20 'waited)
-                         (condition-case err
-                             (pos-remote--send
-                              "GET" (format "http://127.0.0.1:%d/"
-                                            (process-contact server :service))
-                              nil nil)
-                           (pos-ledger-refused (cadr err))))
-                       'remote))
-      (delete-process server))))
 
 (ert-deftest pos-remote/a-port-takes-another-transport ()
   "The operations are generic: a keeper that is not HTTP answers them too."

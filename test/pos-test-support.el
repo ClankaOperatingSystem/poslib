@@ -282,7 +282,7 @@ nobody."
     `(let* ((,keeper ,recorded)
             (,tape (and ,keeper (pos-test-tape ,keeper)))
             (pos-ledger-offline (not ,tape))
-            (pos-remote-send-function (or ,tape pos-remote-send-function))
+            (pos-http-send-function (or ,tape pos-http-send-function))
             (pos-remote-keeper-function
              (if ,tape
                  (lambda (url)
