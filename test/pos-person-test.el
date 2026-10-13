@@ -332,10 +332,11 @@ read without the line that follows it."
                      (pos-person--file-id (expand-file-name "a.org" root)))))))
 
 (defun pos-person-test--findings (root)
-  "Return the person findings of ROOT, each (FILE LINE MESSAGE).
+  "Return the person findings of ROOT, each as (FILE LINE MESSAGE).
 FILE is relative to ROOT."
   (mapcar (lambda (finding)
-            (cons (file-relative-name (car finding) root) (cdr finding)))
+            (list (file-relative-name (pos-finding-file finding) root)
+                  (pos-finding-line finding) (pos-finding-message finding)))
           (pos-person-lint root)))
 
 (ert-deftest pos-person/records-the-commands-made-have-no-finding ()
@@ -360,8 +361,9 @@ An item of the root may wait on an identity of a scope beneath it."
      root '((".pos/person-identities/eve.org" . "#+TITLE: Eve@root\n")))
     (let ((pos-directory root))
       (should (equal (pos-lint)
-                     (list (list (expand-file-name ".pos/person-identities/eve.org" root)
-                                 1 "person-identity has no ID")))))))
+                     (list (pos-finding-make
+                            :file (expand-file-name ".pos/person-identities/eve.org" root)
+                            :line 1 :message "person-identity has no ID")))))))
 
 (ert-deftest pos-person/an-identity-belongs-to-a-person-and-is-named-for-it ()
   "An identity no entity links to, one misnamed and one that links are found.

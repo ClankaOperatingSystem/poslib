@@ -54,7 +54,7 @@ is not reported."
   (pos-test-with-files root
       '(("intray.org" . "* DONE parent\n** TODO child\n* DONE fine\n"))
     (let ((file (expand-file-name "intray.org" root)))
-      (should (equal (list (list file 1 "done entry has open children"))
+      (should (equal (list (pos-finding-make :file file :line 1 :message "done entry has open children"))
                      (pos-lint-done-with-open-children file))))))
 
 (ert-deftest pos-lint/a-clean-tree-lints-silent ()
@@ -117,11 +117,11 @@ A word never in any sequence, like LATER, is just a word."
                                          "* TODO fine"
                                          "* BACKLOG mend the fence")))
     (let ((file (expand-file-name "intray.org" root)))
-      (should (equal (list (list file 1
+      (should (equal (list (pos-finding-make :file file :line 1 :message
                                  "stale keyword CANCELED (not in the sequence)")
-                           (list file 2
+                           (pos-finding-make :file file :line 2 :message
                                  "stale keyword CLARIFY (not in the sequence)")
-                           (list file 5
+                           (pos-finding-make :file file :line 5 :message
                                  "stale keyword BACKLOG (not in the sequence)"))
                      (pos-lint-stale-keyword file))))))
 
@@ -143,10 +143,10 @@ and an item of a file not named intray.org are not reported."
                                          "** NEXT elsewhere"))
         ("tasks.org" . "* Unsorted\n** NEXT not an intray\n"))
     (let ((file (expand-file-name "intray.org" root)))
-      (should (equal (list (list file 3 "NEXT item in the intray: clarified, to be placed")
-                           (list file 4 "SOMEDAY item in the intray: clarified, to be placed")
-                           (list file 5 "DONE item in the intray: finished, to be retired")
-                           (list file 6 "CANCELLED item in the intray: finished, to be retired"))
+      (should (equal (list (pos-finding-make :file file :line 3 :message "NEXT item in the intray: clarified, to be placed")
+                           (pos-finding-make :file file :line 4 :message "SOMEDAY item in the intray: clarified, to be placed")
+                           (pos-finding-make :file file :line 5 :message "DONE item in the intray: finished, to be retired")
+                           (pos-finding-make :file file :line 6 :message "CANCELLED item in the intray: finished, to be retired"))
                      (pos-lint-clarified-in-intray file)))
       (should-not (pos-lint-clarified-in-intray
                    (expand-file-name "tasks.org" root))))))
@@ -189,10 +189,10 @@ record; letter says both in its text.  A child's text is not the item's."
              "Asked the council on [2026-10-03 Sat]."
              "* NEXT not waiting")))
     (let ((file (expand-file-name "tasks.org" root)))
-      (should (equal (list (list file 1 (concat "WAITING item does not say who or"
+      (should (equal (list (pos-finding-make :file file :line 1 :message (concat "WAITING item does not say who or"
                                                 " what it waits on, or since when"))
-                           (list file 4 "WAITING item does not say since when")
-                           (list file 6 (concat "WAITING item does not say who or"
+                           (pos-finding-make :file file :line 4 :message "WAITING item does not say since when")
+                           (pos-finding-make :file file :line 6 :message (concat "WAITING item does not say who or"
                                                 " what it waits on")))
                      (pos-lint-waiting-without-who-or-when file))))))
 
@@ -205,7 +205,7 @@ removes it.  The match is case-insensitive, as Org's is."
     (let ((file (expand-file-name "life/life-areas.org" root))
           (text (concat "#+TODO line overrides the one sequence;"
                         " run pos-normalise-keywords")))
-      (should (equal (list (list file 2 text))
+      (should (equal (list (pos-finding-make :file file :line 2 :message text))
                      (pos-lint-todo-line file))))))
 
 (ert-deftest pos-lint/a-todo-line-inside-a-block-is-text-and-is-left ()
@@ -224,7 +224,7 @@ reported and removed."
                               "* TODO a")))
     (pos-test-with-files root `(("notes.org" . ,text))
       (let ((file (expand-file-name "notes.org" root)))
-        (should (equal '(8) (mapcar #'cadr (pos-lint-todo-line file))))
+        (should (equal '(8) (mapcar #'pos-finding-line (pos-lint-todo-line file))))
         (should (equal '(:lines-removed 1 :respelled 0)
                        (pos-normalise-keywords-in-file file)))
         (should (equal (replace-regexp-in-string
@@ -247,7 +247,7 @@ the first word of a title."
                              " run pos-normalise-keywords\n")
                      (pos-lint-format
                       (seq-filter (lambda (finding)
-                                    (string-prefix-p "#+TODO" (nth 2 finding)))
+                                    (string-prefix-p "#+TODO" (pos-finding-message finding)))
                                   (pos-lint))
                       root))))
     (let ((pos-visit-corpus (pos-corpus root)))
@@ -266,7 +266,7 @@ that heading; the finding keeps it from being forgotten there."
                           "** Merged copy from life/life-areas.org:4"
                           "welder")))
     (let ((file (expand-file-name "intray.org" root)))
-      (should (equal (list (list file 3
+      (should (equal (list (pos-finding-make :file file :line 3 :message
                                  (concat "merged copy awaiting reconciliation"
                                          " with its parent")))
                      (pos-lint-merged-copy file))))))
@@ -279,10 +279,12 @@ any other.  A plain heading, Finances, is no task and is not compared."
   (pos-test-with-files root
       '(("intray.org" . "* TODO fix the gate\n* Finances\n")
         ("life/home/areas.org" . "* Finances\n** NEXT Fix the gate\n"))
-    (should (equal (list (list (expand-file-name "intray.org" root) 1
-                               "duplicate task (also life/home/areas.org:2)")
-                         (list (expand-file-name "life/home/areas.org" root) 2
-                               "duplicate task (also intray.org:1)"))
+    (should (equal (list (pos-finding-make
+                          :file (expand-file-name "intray.org" root) :line 1
+                          :message "duplicate task (also life/home/areas.org:2)")
+                         (pos-finding-make
+                          :file (expand-file-name "life/home/areas.org" root) :line 2
+                          :message "duplicate task (also intray.org:1)"))
                    (pos-lint-duplicate-tasks root)))))
 
 (provide 'pos-lint-test)

@@ -21,7 +21,7 @@
 ;;; Commentary:
 
 ;; The lint of a tree's Org files: the corpus, pos-corpus.el.  A check
-;; returns findings, each (FILE LINE MESSAGE).  Nothing is written.
+;; returns findings, each a `pos-finding'.  Nothing is written.
 ;;
 ;; - `pos-lint': the findings of every check, sorted by file and line;
 ;;   from M-x, shown in a compilation buffer.
@@ -43,7 +43,7 @@
 
 (defun pos--finding (file message)
   "Return a finding for the heading at point in FILE with MESSAGE."
-  (list file (line-number-at-pos) message))
+  (pos-finding-make :file file :line (line-number-at-pos) :message message))
 
 (defun pos-lint-done-with-open-children (file)
   "Report done entries in FILE with open children."
@@ -182,14 +182,16 @@ Each copy names the others."
         (when (> (length copies) 1)
           (dolist (copy copies)
             (pcase-let ((`(,_ ,file ,line) copy))
-              (push (list file line
-                          (format "duplicate task (also %s)"
+              (push (pos-finding-make
+                     :file file :line line
+                     :message
+                     (format "duplicate task (also %s)"
                                   (mapconcat
                                    (lambda (other)
                                      (pcase-let ((`(,_ ,ofile ,oline) other))
                                        (format "%s:%d"
                                                (file-relative-name ofile root) oline)))
-                                   (remove copy copies) ", ")))
+                                  (remove copy copies) ", ")))
                     findings))))))
     (nreverse findings)))
 
@@ -226,22 +228,30 @@ check bin/ does not hold, are each a finding at the methodology."
                                                      '((checks . [])))))
               (let ((command (expand-file-name (concat "bin/" check) dir)))
                 (if (not (file-executable-p command))
-                    (push (list at 1 (format "check %s is not in bin/ of %s" check name))
+                    (push (pos-finding-make
+                           :file at :line 1
+                           :message (format "check %s is not in bin/ of %s" check name))
                           findings)
                   (pcase-let ((`(,status ,output . ,errors)
                                (pos-lint--check-output command project)))
                     (if (memq status '(0 1))
                         (dolist (line (split-string output "\n" t))
                           (push (if (string-match "\\`\\(.+?\\):\\([0-9]+\\): \\(.*\\)\\'" line)
-                                    (list (expand-file-name (match-string 1 line) project)
-                                          (string-to-number (match-string 2 line))
-                                          (match-string 3 line))
-                                  (list (directory-file-name project) 1 line))
+                                    (pos-finding-make
+                                     :file (expand-file-name (match-string 1 line) project)
+                                     :line (string-to-number (match-string 2 line))
+                                     :message (match-string 3 line))
+                                  (pos-finding-make :file (directory-file-name project)
+                                                    :line 1 :message line))
                                 findings))
-                      (push (list at 1 (format "check %s could not check: %s" check errors))
+                      (push (pos-finding-make
+                             :file at :line 1
+                             :message (format "check %s could not check: %s" check errors))
                             findings))))))
           (pos-node-refused
-           (push (list at 1 (format "declaration refused: %s: %s" (nth 1 err) (nth 2 err)))
+           (push (pos-finding-make
+                  :file at :line 1
+                  :message (format "declaration refused: %s: %s" (nth 1 err) (nth 2 err)))
                  findings)))))
     (nreverse findings)))
 
@@ -257,11 +267,7 @@ check bin/ does not hold, are each a finding at the methodology."
 
 (defun pos-lint-format (findings root)
   "Render FINDINGS as \"file:line: message\" lines relative to ROOT."
-  (mapconcat (lambda (finding)
-               (pcase-let ((`(,file ,line ,message) finding))
-                 (format "%s:%d: %s\n"
-                         (file-relative-name file root) line message)))
-             findings ""))
+  (mapconcat (lambda (finding) (pos-finding-format finding root)) findings ""))
 
 (defun pos-lint ()
   "Lint the files of the corpus; return findings sorted by file and line.
@@ -277,10 +283,7 @@ Interactively, show them in a compilation buffer."
                          (pos-corpus-files pos-visit-corpus))
                  (mapcan (lambda (check) (funcall check root))
                          pos-lint-repo-checks))
-                (lambda (a b)
-                  (or (string< (car a) (car b))
-                      (and (string= (car a) (car b))
-                           (< (cadr a) (cadr b))))))))
+                #'pos-finding<)))
     (when (called-interactively-p 'any)
       (with-current-buffer (get-buffer-create "*pos-lint*")
         (let ((inhibit-read-only t))
