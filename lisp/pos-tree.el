@@ -54,6 +54,7 @@
 
 (require 'cl-lib)
 (require 'pos-bytes)
+(require 'pos-git)
 (require 'pos-node)
 (require 'pos-path)
 (require 'seq)
@@ -67,30 +68,17 @@
 
 ;;;; Git
 
-(defun pos-tree--git (dir &rest args)
-  "Run git in DIR with ARGS; return (STATUS . OUTPUT).
-OUTPUT is what git printed, less its final newline."
-  (with-temp-buffer
-    (let* ((default-directory (file-name-as-directory dir))
-           (status (apply #'process-file "git" nil (list t nil) nil args)))
-      (cons status (string-trim-right (buffer-string) "\n")))))
-
-(defun pos-tree--git-line (dir &rest args)
-  "Return what git printed in DIR with ARGS, or nil if it failed."
-  (let ((result (apply #'pos-tree--git dir args)))
-    (and (eq (car result) 0) (cdr result))))
-
 (defun pos-tree--repository-p (dir)
   "Return non-nil if DIR is the root of a repository's working tree."
   (file-exists-p (expand-file-name ".git" dir)))
 
 (defun pos-tree--tracked-p (dir path)
   "Return non-nil if the repository at DIR tracks PATH."
-  (eq 0 (car (pos-tree--git dir "ls-files" "--error-unmatch" "--" path))))
+  (eq 0 (car (pos-git dir "ls-files" "--error-unmatch" "--" path))))
 
 (defun pos-tree--exclude-file (dir)
   "Return the info/exclude file of the repository at DIR, or nil."
-  (when-let* ((file (pos-tree--git-line dir "rev-parse" "--git-path" "info/exclude")))
+  (when-let* ((file (pos-git-line dir "rev-parse" "--git-path" "info/exclude")))
     (expand-file-name file dir)))
 
 (defun pos-tree--excluded-p (dir path)
@@ -126,13 +114,13 @@ two configurations."
   (when-let* ((text (if branch
                        (when-let* ((file (pos-node-one-config
                                           (split-string
-                                           (or (apply #'pos-tree--git-line
+                                           (or (apply #'pos-git-line
                                                       dir "ls-tree" "--name-only"
                                                       "-r" branch "--"
                                                       (pos-path-config-paths))
                                                "")
                                            "\n" t))))
-                         (pos-tree--git-line dir "show" (concat branch ":" file)))
+                         (pos-git-line dir "show" (concat branch ":" file)))
                      (when-let* ((file (pos-node-config-file dir)))
                        (with-temp-buffer
                          (insert-file-contents (expand-file-name file dir))
@@ -391,11 +379,11 @@ finding, else nil."
        ((not (pos-tree--repository-p path))
         (pos-tree--find plan "path-taken" shown "not a repository")
         nil)
-       ((not (equal (pos-tree--git-line path "config" "--get" "remote.origin.url")
+       ((not (equal (pos-git-line path "config" "--get" "remote.origin.url")
                     .remote))
         (pos-tree--find plan "other-remote" shown)
         (cons nil path))
-       ((not (equal (pos-tree--git-line path "symbolic-ref" "--short" "-q" "HEAD")
+       ((not (equal (pos-git-line path "symbolic-ref" "--short" "-q" "HEAD")
                     .branch))
         (pos-tree--find plan "off-branch" shown (concat "declared " .branch))
         (cons nil path))
@@ -581,7 +569,7 @@ tracks it and, if so, the commit that added it."
   (pos-tree--find plan
    "name-taken" (pos-tree--rel plan (expand-file-name path dir))
    (if (pos-tree--tracked-p dir path)
-       (let ((added (pos-tree--git-line dir "log" "--diff-filter=A"
+       (let ((added (pos-git-line dir "log" "--diff-filter=A"
                                         "--format=%h" "--" path)))
          (if (member added '(nil ""))
              "tracked, not yet committed"
@@ -831,7 +819,7 @@ if ROOT is not a repository, or SOURCE not a source."
 (defun pos-tree--run (dir &rest args)
   "Run git in DIR with ARGS, never prompting; refuse if git fails."
   (let* ((process-environment (cons "GIT_TERMINAL_PROMPT=0" process-environment))
-         (result (apply #'pos-tree--git dir args)))
+         (result (apply #'pos-git dir args)))
     (unless (eq (car result) 0)
       (pos-tree-refuse 'failed "git %s: %s" (string-join args " ") (cdr result)))))
 
@@ -875,9 +863,9 @@ SOURCE is the directory an install copies."
          (make-directory (file-name-directory path) t)
          (if .of
              (let ((of (expand-file-name .of root)))
-               (if (or (pos-tree--git-line of "rev-parse" "--verify" "--quiet"
+               (if (or (pos-git-line of "rev-parse" "--verify" "--quiet"
                                            (concat "refs/heads/" .branch))
-                       (pos-tree--git-line of "rev-parse" "--verify" "--quiet"
+                       (pos-git-line of "rev-parse" "--verify" "--quiet"
                                            (concat "refs/remotes/origin/" .branch)))
                    (pos-tree--run of "worktree" "add" "--quiet" path .branch)
                  (pos-tree--run of "worktree" "add" "--quiet" "-b" .branch path)))

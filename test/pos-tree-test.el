@@ -28,6 +28,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'pos-git)
 (require 'pos-tree)
 (require 'pos-fixtures)
 
@@ -904,15 +905,15 @@ the exclude file held before stays."
       (pos-tree-test-write root "work/older/archives/evidence" "older\n")
       (write-region "/private-file\n" nil file nil 'silent)
       (pos-tree-test-settle root)
-      (should (eq 0 (car (pos-tree--git root "check-ignore" "-q" "work/archives/evidence"))))
-      (should (eq 0 (car (pos-tree--git root "check-ignore" "-q" "work/older/archives/evidence"))))
-      (should (eq 1 (car (pos-tree--git root "check-ignore" "-q" "archives/evidence"))))
+      (should (eq 0 (car (pos-git root "check-ignore" "-q" "work/archives/evidence"))))
+      (should (eq 0 (car (pos-git root "check-ignore" "-q" "work/older/archives/evidence"))))
+      (should (eq 1 (car (pos-git root "check-ignore" "-q" "archives/evidence"))))
       (should (pos-tree--tracked-p root "work/archive-integrity/README"))
       (pos-tree-test-write root "work/.clanka/config.yml"
                            (pos-tree-test-config))
       (pos-tree-ignore-archives root)
-      (should (eq 1 (car (pos-tree--git root "check-ignore" "-q" "work/archives/evidence"))))
-      (should (eq 0 (car (pos-tree--git root "check-ignore" "-q" "work/older/archives/evidence"))))
+      (should (eq 1 (car (pos-git root "check-ignore" "-q" "work/archives/evidence"))))
+      (should (eq 0 (car (pos-git root "check-ignore" "-q" "work/older/archives/evidence"))))
       (should (file-exists-p (expand-file-name "work/archives/evidence" root)))
       (should (string-prefix-p "/private-file\n"
                                (with-temp-buffer (insert-file-contents file) (buffer-string)))))))

@@ -33,6 +33,10 @@
 ;; - `pos-ledger-kept': the keeper an archive is kept by, if it has one.
 ;; - `pos-ledger-named': the id an archive's ledger is to have, if named.
 ;; - `pos-ledger-check': the report on every archive under a root.
+;; - `pos-ledger-against-disk': how an archive on disk compares with
+;;   its ledger, a `pos-comparison'.
+;; - `pos-ledger-anchor-base', `pos-ledger-anchor-home': where a
+;;   root's checkpoints lie, and where a new one goes.
 ;; - `pos-ledger-refuse': signal a refusal, for this module and its callers.
 ;;
 ;; JSON values are Lisp values: objects alists, arrays vectors, strings,
@@ -637,12 +641,24 @@ its own."
                 (walk path))))))
       (sort found #'pos-ledger--path<))))
 
+(defun pos-ledger-anchor-base (root)
+  "Return the directory ROOT's checkpoints lie beside.
+ROOT itself, or its parent where ROOT is named archives."
+  (let ((root (file-truename (pos-ledger-checked root))))
+    (if (equal (file-name-nondirectory root) "archives")
+        (file-name-directory root)
+      root)))
+
+(defun pos-ledger-anchor-home (base)
+  "Return the directory for new checkpoints beside BASE.
+In the integrity directory where BASE has one, else the legacy anchors."
+  (if (file-directory-p (expand-file-name pos-ledger-integrity base))
+      (expand-file-name (concat pos-ledger-integrity "/checkpoints") base)
+    (expand-file-name pos-ledger-anchors base)))
+
 (defun pos-ledger--anchor-homes (root)
   "Return the checkpoint directories covering ROOT, legacy and current."
-  (let* ((root (file-truename (pos-ledger-checked root)))
-         (base (if (equal (file-name-nondirectory root) "archives")
-                   (file-name-directory root)
-                 root)))
+  (let ((base (pos-ledger-anchor-base root)))
     (list (expand-file-name pos-ledger-anchors base)
           (expand-file-name (concat pos-ledger-integrity "/checkpoints") base))))
 
@@ -823,6 +839,27 @@ Its README.org has the declaration line, or it is a capsule."
       (unless (assoc (car pair) known) (push (car pair) new)))
     (list (sort missing #'string<) (sort changed #'string<) (sort new #'string<))))
 
+(cl-defstruct (pos-comparison (:constructor pos-ledger--comparison-make)
+                              (:copier nil))
+  "How an archive on disk compares with what its ledger enrols.
+MISSING are the enrolled paths the disk lacks, CHANGED those whose
+bytes or mode differ, NEW the disk's paths the ledger lacks, each
+sorted.  INVENTORY is the disk's, as `pos-ledger-inventory' reads it;
+ACTUAL is the same with a CID in each entry the ledger records one
+for; and CIDS are the CIDs of what is on disk, as `pos-cid-tree' gives
+them, nil when nothing is."
+  missing changed new inventory actual cids)
+
+(defun pos-ledger-against-disk (archive known)
+  "Return how ARCHIVE on disk compares with KNOWN, the entries its ledger enrols.
+A `pos-comparison'."
+  (let* ((inventory (pos-ledger-inventory archive))
+         (cids (pos-ledger-cids archive))
+         (actual (pos-ledger-with-cids known inventory cids)))
+    (pcase-let ((`(,missing ,changed ,new) (pos-ledger-differences known actual)))
+      (pos-ledger--comparison-make :missing missing :changed changed :new new
+                                   :inventory inventory :actual actual :cids cids))))
+
 (defun pos-ledger-check (root)
   "Return the check report on every archive under ROOT.
 A list of alists, one an archive: archive, kept, keeper, head, events,
@@ -842,14 +879,16 @@ clone does not keep the bit."
                     (pos-ledger-history archive))
                    (_ (pos-ledger-as-named archive files))
                    (kept (pos-ledger-kept archive))
+                   (compared (unless kept (pos-ledger-against-disk archive known)))
                    (actual (if kept (pos-ledger-kept-entries archive known)
-                             (pos-ledger-inventory archive)))
+                             (pos-comparison-inventory compared)))
                    (cids (if kept (and known (pos-ledger-fold known empty))
-                           (pos-ledger-cids archive)))
+                           (pos-comparison-cids compared)))
                    (`(,missing ,changed ,new)
-                    (unless kept
-                      (pos-ledger-differences
-                       known (pos-ledger-with-cids known actual cids))))
+                    (and compared
+                         (list (pos-comparison-missing compared)
+                               (pos-comparison-changed compared)
+                               (pos-comparison-new compared))))
                    (writable
                     (unless kept
                       (sort (seq-filter (lambda (name)

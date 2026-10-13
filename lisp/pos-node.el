@@ -349,6 +349,24 @@ for another."
                    name)))
               exclusions)))
 
+(defun pos-node--parsed (text what key version)
+  "Return TEXT, a WHAT's YAML, parsed and checked to be a mapping at VERSION.
+KEY is the key that names its version.  Refuse `not-yaml', then
+`not-a-mapping', then `unknown-version'."
+  (let ((parsed (condition-case nil
+                    (yaml-parse-string text :object-type 'alist
+                                       :object-key-type 'string
+                                       :sequence-type 'array
+                                       :string-values t)
+                  (error (pos-node-refuse 'not-yaml "Not readable as YAML")))))
+    (unless (pos-node--mapping-p parsed)
+      (pos-node-refuse 'not-a-mapping "%s is not a mapping" what))
+    (let ((found (car (pos-node--typed (cdr (assoc key parsed)) 'integer))))
+      (when (and found (/= found version))
+        (pos-node-refuse 'unknown-version "Not a version this reader knows: %s"
+                         found)))
+    parsed))
+
 (defun pos-node-read-config (text)
   "Return the configuration in TEXT, a config.yaml's, checked.
 An alist of projects, methodologies, image, bin, exclude, children,
@@ -361,18 +379,7 @@ scalar is read as the text written, and the keys' types decide what
 it is.  Signal `pos-node-refused', with the refusal's kind and a
 message, for a file doc/pos-directory.txt does not allow."
   (let ((reading (pos-node--reading-make))
-        (parsed (condition-case nil
-                    (yaml-parse-string text :object-type 'alist
-                                       :object-key-type 'string
-                                       :sequence-type 'array
-                                       :string-values t)
-                  (error (pos-node-refuse 'not-yaml "Not readable as YAML")))))
-    (unless (pos-node--mapping-p parsed)
-      (pos-node-refuse 'not-a-mapping "The file is not a mapping"))
-    (let ((version (car (pos-node--typed (cdr (assoc "pos" parsed)) 'integer))))
-      (when (and version (/= version 2))
-        (pos-node-refuse 'unknown-version "Not a version this reader knows: %s"
-                         version)))
+        (parsed (pos-node--parsed text "The file" "pos" 2)))
     (let* ((top (pos-node--mapping reading
                  parsed "The file"
                  '(("pos" integer t) ("projects" string nil)
@@ -489,18 +496,7 @@ filled in; checks, a vector of names; and warnings, a vector of
 strings, one for each key this reader does not know.  Signal
 `pos-node-refused' for a file doc/pos-methodology.txt does not allow."
   (let ((reading (pos-node--reading-make))
-        (parsed (condition-case nil
-                    (yaml-parse-string text :object-type 'alist
-                                       :object-key-type 'string
-                                       :sequence-type 'array
-                                       :string-values t)
-                  (error (pos-node-refuse 'not-yaml "Not readable as YAML")))))
-    (unless (pos-node--mapping-p parsed)
-      (pos-node-refuse 'not-a-mapping "The declaration is not a mapping"))
-    (let ((version (car (pos-node--typed (cdr (assoc "methodology" parsed)) 'integer))))
-      (when (and version (/= version 1))
-        (pos-node-refuse 'unknown-version "Not a version this reader knows: %s"
-                         version)))
+        (parsed (pos-node--parsed text "The declaration" "methodology" 1)))
     (let ((top (pos-node--mapping reading
                 parsed "The declaration"
                 '(("methodology" integer t) ("canon" sequence nil)

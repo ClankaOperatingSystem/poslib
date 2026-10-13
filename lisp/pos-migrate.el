@@ -203,12 +203,8 @@ EDGES is an alist of node and the nodes it points to."
 (defun pos-migrate--rumour (target root date)
   "Return (DESTINATION . TEXT), the rumour of TARGET, dated DATE.
 TARGET's path is given from ROOT, the archive's scope."
-  (let ((path (file-relative-name target root)))
-    (pos-seal-rumour
-     date (concat "#+TITLE: Rumour of " path "\n#+DATE: " date "\n\n"
-                  "On " date ", migrating its archive found links to =" path
-                  "=, which content identity cannot cite. It was then "
-                  (pos-links-description target root) ".\n"))))
+  (pos-seal-rumour-about target root date "migrating its archive found links to"
+                         ", which content identity cannot cite"))
 
 (defun pos-migrate--converted-p (archive)
   "Return non-nil if ARCHIVE's ledger records CIDs for every entry."
@@ -498,23 +494,10 @@ dates rumours; LEDGER-ID names a ledger that has none."
         (archive . ,archive) (stage . ,stage) (root . ,root) (date . ,date)
         (exclude . ,(vconcat exclude)) (include . ,(vconcat include))
         (inventory_sha256 . ,inventory-sha)
-        (discard . ,(vconcat discard)) (remove . ,(vconcat remove))
-        (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r)))) renames)))
-        (collections . ,(vconcat collections))
-        (declarations . ,(vconcat (mapcar (lambda (d) `((readme . ,(car d)) (kind . ,(cdr d))))
-                                          declarations)))
+        ,@(pos-migrate--prepared discard remove renames collections declarations)
         (rumours . ,(vconcat (mapcar (lambda (r) `((destination . ,(car r)) (text . ,(cdr r))))
                                      (seq-sort-by #'car #'string< rumours))))
-        (links . ,(vconcat
-                   (mapcar #'pos-resolution-alist
-                           (sort resolved
-                                 (lambda (a b)
-                                   (let ((fa (pos-resolution-file a))
-                                         (fb (pos-resolution-file b)))
-                                     (if (equal fa fb)
-                                         (< (pos-resolution-offset a)
-                                            (pos-resolution-offset b))
-                                       (string< fa fb))))))))
+        (links . ,(vconcat (pos-links-in-order (mapcar #'pos-resolution-alist resolved))))
         (canon . ,(vconcat canon))
         (final_inventory_sha256
          . ,(pos-bytes-sha (pos-bytes-json (pos-ledger-inventory stage))))
@@ -584,6 +567,16 @@ LEDGER-ID names a ledger that has none."
 
 ;;;; Application
 
+(defun pos-migrate--prepared (discard remove renames collections declarations)
+  "Return what `pos-migrate--prepare' found, as a plan writes it.
+An alist of DISCARD, REMOVE, RENAMES, COLLECTIONS and DECLARATIONS,
+the lists as vectors and the pairs as objects."
+  `((discard . ,(vconcat discard)) (remove . ,(vconcat remove))
+    (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r)))) renames)))
+    (collections . ,(vconcat collections))
+    (declarations . ,(vconcat (mapcar (lambda (d) `((readme . ,(car d)) (kind . ,(cdr d))))
+                                      declarations)))))
+
 (defun pos-migrate--rebuild (plan build)
   "Rebuild PLAN's archive in BUILD, as planned; refuse any difference."
   (let-alist plan
@@ -591,13 +584,8 @@ LEDGER-ID names a ledger that has none."
                  (pos-migrate--prepare .archive build (append .exclude nil)
                                        (append .include nil))))
       (unless (equal (pos-bytes-json
-                      `((discard . ,(vconcat discard)) (remove . ,(vconcat remove))
-                        (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r))))
-                                                     renames)))
-                        (collections . ,(vconcat collections))
-                        (declarations . ,(vconcat (mapcar (lambda (d) `((readme . ,(car d))
-                                                                        (kind . ,(cdr d))))
-                                                          declarations)))))
+                      (pos-migrate--prepared discard remove renames collections
+                                             declarations))
                      (pos-bytes-json
                       `((discard . ,.discard) (remove . ,.remove) (renames . ,.renames)
                         (collections . ,.collections) (declarations . ,.declarations))))
@@ -609,10 +597,7 @@ LEDGER-ID names a ledger that has none."
             (make-directory (file-name-directory there) t)
             (pos-migrate--write-over there (encode-coding-string .text 'utf-8))))))
     (dolist (rel (seq-uniq (mapcar (lambda (l) (alist-get 'file l)) .links)))
-      (let ((edits (delq nil (mapcar (lambda (l) (let-alist l
-                                                   (and (equal .file rel) (not (equal .from .to))
-                                                        (list .offset .from .to))))
-                                     .links)))
+      (let ((edits (pos-links-edits .links rel))
             (file (expand-file-name rel build)))
         (when edits
           (pos-migrate--write-over file (pos-links-rewrite (pos-bytes-read file) edits)))))
@@ -677,8 +662,7 @@ interrupted.  Return (EVENT-FILE . ROOT)."
           (let* ((file (expand-file-name .file root)) (now (pos-bytes-read file)))
             (cond ((equal (pos-bytes-sha now) .sha256)
                    (pos-migrate--write-over
-                    file (pos-links-rewrite now (mapcar (lambda (e) (let-alist e (list .offset .from .to)))
-                                                        .edits))))
+                    file (pos-links-rewrite now (pos-links-edits .edits))))
                   ((seq-every-p (lambda (e) (let-alist e
                                               (string-match-p (regexp-quote .to)
                                                               (decode-coding-string now 'utf-8))))
