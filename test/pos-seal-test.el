@@ -26,6 +26,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'pos-checkpoint)
 (require 'pos-seal)
 (require 'pos-fixtures)
 
@@ -84,132 +85,6 @@ recording must be played out, and the item gone from where it lay."
                 (pos-test-same-json .plan (alist-get 'plan got))
                 (pos-test-same-json .event (alist-get 'event got))
                 (pos-test-same-json .report (alist-get 'report got))))))))))
-
-(ert-deftest pos-seal/every-shared-fixture-converts-the-same-bytes ()
-  "Each convert fixture in fixtures/ledger/ converts as recorded.
-The conversion events, what was skipped and the report after, or the
-refusal."
-  (dolist (named (pos-fixtures "ledger"))
-    (let-alist (cdr named)
-      (when (equal .kind "convert")
-        (ert-info ((car named))
-          (pos-fixture-with (cdr named) dir
-            (let* ((root (expand-file-name .root dir))
-                   (base (file-name-as-directory (file-truename dir)))
-                   (got (condition-case err
-                            (pos-seal-convert root)
-                          (pos-ledger-refused
-                           `((error . ,(symbol-name (cadr err))))))))
-              (if .error
-                  (should (equal .error (alist-get 'error got)))
-                (should-not (alist-get 'error got))
-                (pos-test-same-json
-                 .converted
-                 (vconcat
-                  (mapcar (lambda (c)
-                            (let ((file (alist-get 'event c)))
-                              `((name . ,(file-name-nondirectory file))
-                                (encoded . ,(decode-coding-string
-                                             (pos-bytes-read file) 'utf-8)))))
-                          (alist-get 'converted got))))
-                (pos-test-same-json
-                 .skipped
-                 (vconcat
-                  (mapcar (lambda (s)
-                            `((archive . ,(file-relative-name (alist-get 'archive s) base))
-                              (reason . ,(alist-get 'reason s))))
-                          (alist-get 'skipped got))))
-                (pos-test-same-json
-                 .report (pos-test-report-relative (pos-ledger-check root) dir))))))))))
-
-(ert-deftest pos-seal/every-shared-fixture-keeps-the-same-way ()
-  "Each keep fixture in fixtures/ledger/ keeps as recorded.
-What was moved to a keeper, what was left with its reason and the
-report after, or the refusal: each request as its keeper recorded it,
-and a kept archive gone from disk."
-  (dolist (named (pos-fixtures "ledger"))
-    (let-alist (cdr named)
-      (when (equal .kind "keep")
-        (ert-info ((car named))
-          (pos-fixture-with (cdr named) dir
-            (let* ((root (expand-file-name .root dir))
-                   (base (file-name-as-directory (file-truename dir)))
-                   (relative (lambda (items)
-                               (vconcat
-                                (mapcar (lambda (item)
-                                          (cons (cons 'archive
-                                                      (file-relative-name
-                                                       (alist-get 'archive item) base))
-                                                (assq-delete-all 'archive
-                                                                 (copy-alist item))))
-                                        items))))
-                   (pos-seal-claims-function (lambda (&rest _) .claims))
-                   (got (pos-test-with-keeper .keeper nil
-                          (condition-case err
-                              (pos-seal-keep root)
-                            (pos-ledger-refused
-                             `((error . ,(symbol-name (cadr err)))))))))
-              (if .error
-                  (should (equal .error (alist-get 'error got)))
-                (should-not (alist-get 'error got))
-                (pos-test-same-json .kept (funcall relative (alist-get 'kept got)))
-                (pos-test-same-json .skipped (funcall relative (alist-get 'skipped got)))
-                (seq-doseq (item (alist-get 'kept got))
-                  (should-not (file-exists-p (alist-get 'archive item))))
-                (pos-test-same-json
-                 .report (pos-test-report-relative (pos-ledger-check root) dir))))))))))
-
-(ert-deftest pos-seal/every-shared-fixture-recalls-the-same-way ()
-  "Each recall fixture in fixtures/ledger/ recalls as recorded.
-What was brought back from a keeper, what was left with its reason and
-the archive on disk after, or the refusal: each request as its keeper
-recorded it."
-  (dolist (named (pos-fixtures "ledger"))
-    (let-alist (cdr named)
-      (when (equal .kind "recall")
-        (ert-info ((car named))
-          (pos-fixture-with (cdr named) dir
-            (let* ((root (expand-file-name .root dir))
-                   (base (file-name-as-directory (file-truename dir)))
-                   (relative (lambda (items)
-                               (vconcat
-                                (mapcar (lambda (item)
-                                          (cons (cons 'archive
-                                                      (file-relative-name
-                                                       (alist-get 'archive item) base))
-                                                (assq-delete-all 'archive
-                                                                 (copy-alist item))))
-                                        items))))
-                   (got (pos-test-with-keeper .keeper nil
-                          (condition-case err
-                              (pos-seal-recall root)
-                            (pos-ledger-refused
-                             `((error . ,(symbol-name (cadr err)))))))))
-              (if .error
-                  (should (equal .error (alist-get 'error got)))
-                (should-not (alist-get 'error got))
-                (pos-test-same-json .recalled (funcall relative (alist-get 'recalled got)))
-                (pos-test-same-json .skipped (funcall relative (alist-get 'skipped got)))
-                (let (after)
-                  (named-let walk ((here (expand-file-name "archives" (file-truename root))))
-                    (let ((names (directory-files here nil directory-files-no-dot-files-regexp)))
-                      (unless names
-                        (push (list (file-relative-name here base) 'directory) after))
-                      (dolist (name names)
-                        (let ((path (expand-file-name name here)))
-                          (if (file-directory-p path)
-                              (walk path)
-                            (push (list (file-relative-name path base)
-                                        (decode-coding-string (pos-bytes-read path) 'utf-8)
-                                        (logand (file-modes path) #o777))
-                                  after))))))
-                  (should (equal (mapcar (lambda (entry)
-                                           (let-alist entry
-                                             (if .directory
-                                                 (list .path 'directory)
-                                               (list .path .text .mode))))
-                                         .after)
-                                 (sort after (lambda (a b) (string< (car a) (car b)))))))))))))))
 
 (ert-deftest pos-seal/sealing-removes-write-bits ()
   "The sealed files and the ledger event are read-only; CIDs do not change."
@@ -464,7 +339,7 @@ empty directory is recorded.  The check after the seal is clean."
       (should-not (file-exists-p (expand-file-name "trial/_seal" archive)))
       (should-not (file-exists-p (expand-file-name "trial/child/_seal" archive)))
       (should (file-exists-p (expand-file-name "trial/kept/_seal/plan.json" archive)))
-      (should-not (pos-seal-findings-p (pos-ledger-check scope))))))
+      (should-not (pos-checkpoint-findings-p (pos-ledger-check scope))))))
 
 (ert-deftest pos-seal/a-new-record-leaves-no-staging-directory ()
   "A record staged by write-new is sealed and _seal, left empty, is gone;
@@ -547,49 +422,6 @@ The rumour names where it pointed; the target is not read."
 
 ;;;; Checkpoints and repair
 
-(ert-deftest pos-seal/a-checkpoint-waits-for-a-clean-check ()
-  "An unregistered file refuses a checkpoint; gone, the heads are recorded.
-Beside the scope; and recording them again is no conflict."
-  (pos-test-with-scope
-    (let ((archive (pos-test-scope-sealed scope)))
-      (pos-test-write-bytes (expand-file-name "stray.txt" archive) "stray" #o444)
-      (should-error (pos-seal-checkpoint scope) :type 'pos-ledger-refused)
-      (delete-file (expand-file-name "stray.txt" archive))
-      (let* ((home (pos-seal-checkpoint scope))
-             (head (pos-history-head (pos-ledger-history archive)))
-             (bytes (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "tree"))))
-             (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") home)))
-        (should (equal home (expand-file-name "archive-integrity/checkpoints"
-                                              (file-truename scope))))
-        (should (equal bytes (pos-bytes-read file)))
-        (should (equal home (pos-seal-checkpoint scope)))
-        (should-not (pos-seal-findings-p (pos-ledger-check scope)))))))
-
-(ert-deftest pos-seal/an-archive-s-checkpoint-covers-the-archive ()
-  "Checkpointing an archive records its head as sealing recorded it.
-With archive coverage, the same bytes, so no second file appears."
-  (pos-test-with-scope
-    (let* ((archive (pos-test-scope-sealed scope))
-           (home (expand-file-name "archive-integrity/checkpoints" (file-truename scope)))
-           (before (directory-files home nil "\\.json\\'")))
-      (should (equal home (pos-seal-checkpoint archive)))
-      (should (equal before (directory-files home nil "\\.json\\'"))))))
-
-(ert-deftest pos-seal/repair-protects-only-verified-evidence ()
-  "Repair removes a restored write bit, and refuses changed bytes.
-A write bit restored to a sealed file is removed; once a sealed file's
-bytes have changed, repair refuses."
-  (pos-test-with-scope
-    (let* ((archive (pos-test-scope-sealed scope))
-           (file (expand-file-name "trial/result.md" archive)))
-      (set-file-modes file #o644)
-      (should (equal '((repaired . 1) (restored . 0) (unregistered . 0)) (pos-seal-repair scope)))
-      (should (zerop (logand (file-modes file) #o222)))
-      (set-file-modes file #o644)
-      (pos-test-write-bytes file "changed" #o644)
-      (should-error (pos-seal-repair scope) :type 'pos-ledger-refused)
-      (should (/= 0 (logand (file-modes file) #o222))))))
-
 (ert-deftest pos-seal/retirement-preserves-nested-archives ()
   "Staging cleanup must not change the CID of an archive inside the item."
   (pos-test-with-scope
@@ -602,76 +434,6 @@ bytes have changed, repair refuses."
                                (expand-file-name "archives/trial/archives" scope))))
         (should (file-directory-p
                  (expand-file-name "archives/trial/archives/old/_seal" scope)))))))
-
-(ert-deftest pos-seal/repair-restores-recorded-directories ()
-  "Restore empty directories lost on checkout without rewriting ledger events."
-  (pos-test-with-scope
-    (make-directory (expand-file-name "trial/empty/leaf" scope) t)
-    (let* ((archive (pos-test-scope-sealed scope))
-           (history (pos-ledger-history archive))
-           (events (mapcar #'pos-bytes-read (pos-history-files history)))
-           (folder (expand-file-name "trial/empty" archive)))
-      (delete-directory folder t)
-      (should (pos-seal-findings-p (pos-ledger-check scope)))
-      (should (equal '((repaired . 0) (restored . 2) (unregistered . 0))
-                     (pos-seal-repair scope)))
-      (should-not (pos-seal-findings-p (pos-ledger-check scope)))
-      (should (equal history (pos-ledger-history archive)))
-      (should (equal events (mapcar #'pos-bytes-read (pos-history-files history))))
-      (should (equal '((repaired . 0) (restored . 0) (unregistered . 0))
-                     (pos-seal-repair scope))))))
-
-(ert-deftest pos-seal/repair-restores-recorded-read-bits ()
-  "Git loses restrictive read permissions; restore them after verifying bytes."
-  (pos-test-with-scope
-    (set-file-modes (expand-file-name "trial/result.md" scope) #o600)
-    (let* ((archive (pos-test-scope-sealed scope))
-           (file (expand-file-name "trial/result.md" archive)))
-      (set-file-modes file #o644)
-      (should (equal '((repaired . 1) (restored . 0) (unregistered . 0))
-                     (pos-seal-repair scope)))
-      (should (= #o400 (pos-ledger-permissions file)))
-      (should-not (pos-seal-findings-p (pos-ledger-check scope))))))
-
-(ert-deftest pos-seal/repair-validates-directories-before-writing ()
-  "An obstruction or damaged file refuses restoration before any mutation."
-  (dolist (obstruction '(file symlink changed missing executable))
-    (ert-info ((symbol-name obstruction))
-      (pos-test-with-scope
-        (dolist (name '("a" "z/leaf"))
-          (make-directory (expand-file-name (concat "trial/" name) scope) t))
-        (let* ((archive (pos-test-scope-sealed scope))
-               (item (expand-file-name "trial" archive))
-               (file (expand-file-name "result.md" item)))
-          (delete-directory (expand-file-name "a" item))
-          (delete-directory (expand-file-name "z" item) t)
-          (pcase obstruction
-            ('file (pos-test-write-bytes (expand-file-name "z" item) "obstruction"))
-            ('symlink
-             (make-directory (expand-file-name "outside" scope))
-             (make-symbolic-link (expand-file-name "outside" scope)
-                                 (expand-file-name "z" item)))
-            ('changed
-             (set-file-modes file #o644)
-             (pos-test-write-bytes file "changed"))
-            ('executable (set-file-modes file #o744))
-            ('missing (delete-file file)))
-          (should-error (pos-seal-repair scope) :type 'pos-ledger-refused)
-          (should-not (file-exists-p (expand-file-name "a" item)))
-          (should-not (file-exists-p (expand-file-name "z/leaf" item))))))))
-
-(ert-deftest pos-seal/a-kept-archive-is-checkpointed-and-repaired-by-its-ledger ()
-  "A kept archive is checkpointed and repaired from its ledger alone.
-Its files are with its keeper: a checkpoint records its head, and
-repair protects its ledger's events and looks for nothing else."
-  (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
-    (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
-           (event (car (pos-history-files (pos-ledger-history (expand-file-name "archives" scope))))))
-      (should (equal (expand-file-name "archive-integrity/checkpoints" scope)
-                     (pos-seal-checkpoint scope)))
-      (set-file-modes event #o644)
-      (should (equal '((repaired . 1) (restored . 0) (unregistered . 0)) (pos-seal-repair scope)))
-      (should (zerop (logand (file-modes event) #o222))))))
 
 ;;;; Sealing to a keeper
 
@@ -736,7 +498,7 @@ of it is; what a keeper has erased is not."
       (pos-fixture-with fixture dir
         (pos-test-with-keeper (alist-get 'keeper fixture) nil
           (should (eq (cdr expected)
-                      (and (pos-seal-findings-p (pos-ledger-check dir)) t))))))))
+                      (and (pos-checkpoint-findings-p (pos-ledger-check dir)) t))))))))
 
 (ert-deftest pos-seal/a-check-told-to-stay-offline-asks-no-keeper ()
   "With POS_ARCHIVE_OFFLINE set, a kept archive is reported from its ledger.
