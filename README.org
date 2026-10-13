@@ -57,6 +57,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   the tree, rewritten to cite it: a plan made from the seal plan,
   reviewed, then applied after the seal.
 - =lisp/pos-seal.el= :: sealing items into archives: a plan, reviewed, then applied.
+- =lisp/pos-cli.el= :: the three programs a shell runs, =pos-seal-batch=,
+  =pos-tree-batch= and =pos-migrate-batch=: the command line read, what
+  comes back printed, and the exit.
 - =lisp/pos-index.el= :: the CID index, ephemera, and Org's =ipfs:= links.
 - =lisp/pos-migrate.el= :: a legacy archive brought under a ledger: the
   plan, reviewed, then applied.

@@ -38,7 +38,7 @@
 ;; - `pos-seal-apply': apply a plan, given its reviewed hash.
 ;; - `pos-seal-convert': bring schema 2 ledgers to schema 3.
 ;; - `pos-seal-keep': move archives on disk to their keepers.
-;; - `pos-seal-batch': the command line.
+;; - `pos-seal-batch': the command line, in pos-cli.el.
 
 ;;; Code:
 
@@ -48,14 +48,6 @@
 (require 'pos-ledger)
 (require 'pos-links)
 (require 'pos-remote)
-
-(declare-function pos-index-bytes "pos-index" (uri &optional directory))
-(declare-function pos-search-command "pos-search" (args))
-(declare-function pos-referrers-print "pos-referrers" (root path))
-(declare-function pos-salvage "pos-salvage" (root source &optional dry-run))
-(declare-function pos-salvage-report "pos-salvage" (root tasks dry-run))
-(declare-function pos-relink-plan "pos-relink" (root seal-plan))
-(declare-function pos-relink-apply "pos-relink" (plan expected))
 
 ;;;; Items
 
@@ -1242,7 +1234,7 @@ reason."
     `((kept . ,(vconcat (nreverse kept)))
       (skipped . ,(vconcat (nreverse skipped))))))
 
-;;;; Command line
+;;;; Recall
 
 (defun pos-seal--check-recallable (archive history)
   "Return the paths HISTORY enrols that ARCHIVE lacks on disk.
@@ -1333,156 +1325,7 @@ and skipped, each an archive with the reason."
     `((recalled . ,(vconcat (nreverse recalled)))
       (skipped . ,(vconcat (nreverse skipped))))))
 
-(defconst pos-seal-usage
-  "Usage: COMMAND ...  (help prints this; Emacs itself takes --help)
-
-  seal SOURCE DESTINATION [--apply]
-      print the plan to seal SOURCE at DESTINATION, in an archive
-  write-new DESTINATION [--links-from DIR] [--apply]
-      print the plan to seal a new record, read from standard input;
-      its links read as written from DESTINATION, or from DIR
-  salvage ROOT SOURCE [--dry-run]
-      copy each open task of SOURCE, a file or directory about to be
-      sealed, to the intray of the tree at ROOT, and close the
-      original; run before the seal is planned
-  relink ROOT PLAN
-      print the plan to rewrite the links to the item PLAN seals, a
-      seal plan in a file, in the Org files of the tree at ROOT; made
-      before PLAN is applied, and applied after it
-  apply PLAN HASH
-      apply a reviewed plan; PLAN is a file holding the plan exactly
-      as seal, write-new or relink printed it, and HASH is the SHA-256
-      of that file's bytes in lower-case hex, as sha256sum PLAN prints it
-  check ROOT
-      report every archive under ROOT, as JSON
-  checkpoint ROOT
-      record the ledger heads under ROOT, once the check is clean
-  repair ROOT
-      restore recorded directories and read bits; remove write bits; never enrols
-  convert ROOT
-      bring each schema 2 ledger under ROOT to schema 3, once it is clean
-  keep ROOT
-      move to its keeper each archive under ROOT a keeper is to keep
-  recall ROOT
-      bring back from its keeper each archive under ROOT a keeper keeps
-  link PATH
-      print the ipfs:// link to PATH, a sealed path in an archive
-  fetch LINK
-      print the bytes of the archived file LINK names, an ipfs:// link,
-      from a scope above the current directory: on disk or its keeper's
-  links-into ROOT PATH
-      print each link in the Org files of the tree at ROOT that leads
-      to PATH or into it, by file or by ID, as FILE:LINE: LINK -> FILE
-  search ROOT QUERY [--mode MODE] [--limit N] [--within CID]
-      print each line QUERY is found on in the archives under ROOT, on
-      disk or at their keepers, as LINK:LINE:TEXT; exit 1 with none
-  sign-in URL
-      sign in to the keeper at URL, in a browser, and keep the token
-
---apply applies a program's own plan at once and prints both.
-Exit 0 done or clean, 1 findings, 2 refused.
-"
-  "The command line's usage.")
-
-(defun pos-seal-batch ()
-  "Run a command from `command-line-args-left', as in `pos-seal-usage'."
-  (condition-case err
-      (pcase (prog1 command-line-args-left (setq command-line-args-left nil))
-        (`("seal" ,source ,destination . ,rest)
-         (unless (member rest '(nil ("--apply")))
-           (message "Usage: seal SOURCE DESTINATION [--apply]")
-           (kill-emacs 2))
-         (let ((plan (pos-seal-plan source destination)))
-           (pos-bytes-print (if rest
-                                (let* ((hash (pos-bytes-sha (pos-bytes-json plan)))
-                                       (result (pos-seal-apply plan hash)))
-                                  `((plan . ,plan) (hash . ,hash)
-                                    (event . ,(car result)) (root . ,(cdr result))))
-                              plan))))
-        (`("write-new" ,destination . ,rest)
-         (let ((links-from (and (equal (car rest) "--links-from") (cadr rest))))
-           (when links-from (setq rest (cddr rest)))
-           (unless (and (member rest '(nil ("--apply")))
-                        (or links-from (not (member "--links-from" rest))))
-             (message "Usage: write-new DESTINATION [--links-from DIR] [--apply]")
-             (kill-emacs 2))
-           (let* ((bytes (with-temp-buffer
-                           (set-buffer-multibyte nil)
-                           (insert-file-contents-literally "/dev/stdin")
-                           (buffer-string)))
-                  (plan (pos-seal-stage bytes destination nil links-from)))
-             (pos-bytes-print (if rest
-                                  (let* ((hash (pos-bytes-sha (pos-bytes-json plan)))
-                                         (result (pos-seal-apply plan hash)))
-                                    `((plan . ,plan) (hash . ,hash)
-                                      (event . ,(car result)) (root . ,(cdr result))))
-                                plan)))))
-        (`("salvage" ,root ,source . ,rest)
-         (unless (member rest '(nil ("--dry-run")))
-           (message "Usage: salvage ROOT SOURCE [--dry-run]")
-           (kill-emacs 2))
-         (require 'pos-salvage)
-         (let ((root (file-name-as-directory (expand-file-name root))))
-           (condition-case err
-               (princ (pos-salvage-report
-                       root (pos-salvage root source (and rest t)) (and rest t)))
-             (user-error
-              (message "salvage: %s" (error-message-string err))
-              (kill-emacs 2)))))
-        (`("relink" ,root ,plan-file)
-         (require 'pos-relink)
-         (pos-bytes-print (pos-relink-plan root (pos-bytes-parse (pos-bytes-read plan-file)))))
-        (`("apply" ,plan-file ,hash)
-         (let ((plan (pos-bytes-parse (pos-bytes-read plan-file))))
-           (if (equal (alist-get 'operation plan) "relink")
-               (progn
-                 (require 'pos-relink)
-                 (pos-bytes-print `((rewritten . ,(vconcat (pos-relink-apply plan hash))))))
-             (let ((result (pos-seal-apply plan hash)))
-               (pos-bytes-print `((event . ,(car result)) (root . ,(cdr result))))))))
-        (`("check" ,root)
-         (let ((report (vconcat (pos-ledger-check root))))
-           (pos-bytes-print report)
-           (kill-emacs (if (pos-seal-findings-p report) 1 0))))
-        (`("checkpoint" ,root)
-         (princ (pos-bytes-json `((checkpointed . ,(pos-seal-checkpoint root))))))
-        (`("repair" ,root)
-         (princ (pos-bytes-json (pos-seal-repair root))))
-        (`("convert" ,root)
-         (pos-bytes-print (pos-seal-convert root)))
-        (`("keep" ,root)
-         (pos-bytes-print (pos-seal-keep root)))
-        (`("recall" ,root)
-         (pos-bytes-print (pos-seal-recall root)))
-        (`("link" ,path)
-         (princ (pos-links-link path))
-         (terpri))
-        (`("fetch" ,link)
-         (require 'pos-index)
-         ;; The file's bytes as they are: `princ' would encode them.
-         (send-string-to-terminal (pos-index-bytes link)))
-        (`("links-into" ,root ,path)
-         (require 'pos-referrers)
-         (pos-referrers-print (file-name-as-directory (expand-file-name root)) path))
-        (`("search" ,root ,query . ,options)
-         (require 'pos-search)
-         (let ((status (pos-search-command (cons root (cons query options)))))
-           (unless status
-             (message "Usage: search ROOT QUERY [--mode MODE] [--limit N] [--within CID]")
-             (kill-emacs 2))
-           (kill-emacs status)))
-        (`("sign-in" ,url)
-         (princ (json-serialize (pos-signin url) :false-object :false))
-         (terpri))
-        (`(,(or "help" "-h" "--help")) (princ pos-seal-usage))
-        (_ (message "%s" pos-seal-usage)
-           (kill-emacs 2)))
-    (pos-ledger-refused
-     (message "%s: %s" (nth 1 err) (nth 2 err))
-     (kill-emacs 2))
-    (json-error
-     (message "plan: Not a readable plan")
-     (kill-emacs 2))))
+(autoload 'pos-seal-batch "pos-cli")
 
 (provide 'pos-seal)
 ;;; pos-seal.el ends here
