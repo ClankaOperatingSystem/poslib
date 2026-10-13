@@ -580,7 +580,7 @@ that has a configuration, or a heading with an ID under
 
 (defun pos-person-lint (root)
   "Report what is wrong with the person records of the tree at ROOT.
-Findings, each (FILE LINE MESSAGE): a person-identity that has no
+Findings, each a `pos-finding': a person-identity that has no
 ID, that no person-entity links to, that is not named for its person
 and scope, a difference of case apart, or that links to anything; a
 link in a person-entity to no person-identity; and an item whose
@@ -596,27 +596,35 @@ a scope that is neither the item's nor beneath it."
                                       people))))
         (cond
          ((not id)
-          (push (list file line "person-identity has no ID") findings))
+          (push (pos-finding-make :file file :line line
+                                  :message "person-identity has no ID")
+                findings))
          ((not person)
-          (push (list file line "person-identity that no person-entity links to")
+          (push (pos-finding-make
+                 :file file :line line
+                 :message "person-identity that no person-entity links to")
                 findings))
          (t
           (let ((expected (pos-person-identity-name (car person) root scope)))
             (unless (string-equal-ignore-case expected (or name ""))
-              (push (list file line
-                          (format "person-identity is not named for its person and scope: %s"
-                                  expected))
+              (push (pos-finding-make
+                     :file file :line line
+                     :message (format "person-identity is not named for its person and scope: %s"
+                                      expected))
                     findings)))))
         (when (string-match-p "\\[\\[" text)
-          (push (list file line "person-identity links to something; it links to nothing")
+          (push (pos-finding-make
+                 :file file :line line
+                 :message "person-identity links to something; it links to nothing")
                 findings))))
     (pcase-dolist (`(,_name ,file . ,_ids) people)
       (with-temp-buffer
         (insert-file-contents file)
         (while (re-search-forward "\\[\\[id:\\([^]]+\\)\\]" nil t)
           (unless (pos-person--identity-of (match-string 1) identities)
-            (push (list file (line-number-at-pos)
-                        (format "link to no person-identity: %s" (match-string 1)))
+            (push (pos-finding-make
+                   :file file :line (line-number-at-pos)
+                   :message (format "link to no person-identity: %s" (match-string 1)))
                   findings)))))
     (pcase-dolist (`(,file . ,scope) (pos-corpus-entries corpus))
       (with-current-buffer (pos-visit file)
@@ -635,15 +643,17 @@ a scope that is neither the item's nor beneath it."
                                           (line-number-at-pos))))
                (cond
                 ((not identity)
-                 (push (list file line
-                             (format "%s does not link to a person-identity"
-                                     pos-waiting-on-property))
+                 (push (pos-finding-make
+                        :file file :line line
+                        :message (format "%s does not link to a person-identity"
+                                         pos-waiting-on-property))
                        findings))
                 ((not (pos-person--within-p scope (pos-identity-scope identity)))
-                 (push (list file line
-                             (format "%s links to an identity of another scope: %s"
-                                     pos-waiting-on-property
-                                     (pos-scope-path (pos-identity-scope identity))))
+                 (push (pos-finding-make
+                        :file file :line line
+                        :message (format "%s links to an identity of another scope: %s"
+                                         pos-waiting-on-property
+                                         (pos-scope-path (pos-identity-scope identity))))
                        findings)))))))))
     (nreverse findings)))
 
