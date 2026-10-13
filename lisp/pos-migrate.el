@@ -35,6 +35,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'pos-bytes)
 (require 'pos-path)
 (require 'pos-cid)
@@ -242,11 +243,19 @@ A capsule's links are left as written."
     (unless (file-symlink-p file)
       (set-file-modes file (logior (file-modes file) #o200)))))
 
+(cl-defstruct (pos-migrate--prepared (:constructor pos-migrate--prepared-make)
+                                     (:copier nil))
+  "What preparing a stage did.
+DISCARD are the junk paths removed that the ledger did not enrol, and
+REMOVE those it did, with the enrolled paths missing; RENAMES the
+hidden entries renamed, (FROM . TO) each; COLLECTIONS the collections
+declared; and DECLARATIONS what declared each, (README . KIND)."
+  discard remove renames collections declarations)
+
 (defun pos-migrate--prepare (archive stage exclude &optional include)
   "Build STAGE from ARCHIVE, and return what was done there.
 Junk is removed, hidden entries renamed and collections, less EXCLUDE
-and with INCLUDE, declared.  Return (DISCARD REMOVE RENAMES COLLECTIONS
-DECLARATIONS)."
+and with INCLUDE, declared.  A `pos-migrate--prepared'."
   (pos-migrate--stage archive stage)
   (let* ((known (pos-history-entries (pos-ledger-history archive)))
          (actual (pos-ledger-inventory archive))
@@ -263,8 +272,9 @@ DECLARATIONS)."
                                  (seq-remove (lambda (c) (pos-ledger-capsule-p
                                                           (expand-file-name c stage)))
                                              collections))))
-      (list (sort discard #'string<) (sort (append missing remove) #'string<)
-            renames collections declarations))))
+      (pos-migrate--prepared-make
+       :discard (sort discard #'string<) :remove (sort (append missing remove) #'string<)
+       :renames renames :collections collections :declarations declarations))))
 
 (defun pos-migrate--meant (path written archive stage renames)
   "Return the absolute path meant by a link to PATH from directory WRITTEN.
@@ -469,8 +479,8 @@ dates rumours; LEDGER-ID names a ledger that has none."
       (when changed
         (pos-ledger-refuse 'differs "Enrolled evidence changed in %s: %S" archive changed)))
     (pcase-let* ((inventory-sha (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory archive))))
-                 (`(,discard ,remove ,renames ,collections ,declarations)
-                  (pos-migrate--prepare archive stage exclude include))
+                 (prepared (pos-migrate--prepare archive stage exclude include))
+                 ((cl-struct pos-migrate--prepared remove renames collections) prepared)
                  (files (seq-filter (lambda (rel)
                                       (and (string-match-p "\\.\\(org\\|md\\)\\'" rel)
                                            (file-regular-p (expand-file-name rel stage))))
@@ -494,7 +504,7 @@ dates rumours; LEDGER-ID names a ledger that has none."
         (archive . ,archive) (stage . ,stage) (root . ,root) (date . ,date)
         (exclude . ,(vconcat exclude)) (include . ,(vconcat include))
         (inventory_sha256 . ,inventory-sha)
-        ,@(pos-migrate--prepared discard remove renames collections declarations)
+        ,@(pos-migrate--prepared-alist prepared)
         (rumours . ,(vconcat (mapcar (lambda (r) `((destination . ,(car r)) (text . ,(cdr r))))
                                      (seq-sort-by #'car #'string< rumours))))
         (links . ,(vconcat (pos-links-in-order (mapcar #'pos-resolution-alist resolved))))
@@ -567,25 +577,25 @@ LEDGER-ID names a ledger that has none."
 
 ;;;; Application
 
-(defun pos-migrate--prepared (discard remove renames collections declarations)
-  "Return what `pos-migrate--prepare' found, as a plan writes it.
-An alist of DISCARD, REMOVE, RENAMES, COLLECTIONS and DECLARATIONS,
+(defun pos-migrate--prepared-alist (prepared)
+  "Return PREPARED, what `pos-migrate--prepare' found, as a plan writes it.
+An alist of discard, remove, renames, collections and declarations,
 the lists as vectors and the pairs as objects."
-  `((discard . ,(vconcat discard)) (remove . ,(vconcat remove))
-    (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r)))) renames)))
-    (collections . ,(vconcat collections))
-    (declarations . ,(vconcat (mapcar (lambda (d) `((readme . ,(car d)) (kind . ,(cdr d))))
-                                      declarations)))))
+  (pcase-let (((cl-struct pos-migrate--prepared discard remove renames collections
+                          declarations)
+               prepared))
+    `((discard . ,(vconcat discard)) (remove . ,(vconcat remove))
+      (renames . ,(vconcat (mapcar (lambda (r) `((from . ,(car r)) (to . ,(cdr r)))) renames)))
+      (collections . ,(vconcat collections))
+      (declarations . ,(vconcat (mapcar (lambda (d) `((readme . ,(car d)) (kind . ,(cdr d))))
+                                        declarations))))))
 
 (defun pos-migrate--rebuild (plan build)
   "Rebuild PLAN's archive in BUILD, as planned; refuse any difference."
   (let-alist plan
-    (pcase-let ((`(,discard ,remove ,renames ,collections ,declarations)
-                 (pos-migrate--prepare .archive build (append .exclude nil)
-                                       (append .include nil))))
-      (unless (equal (pos-bytes-json
-                      (pos-migrate--prepared discard remove renames collections
-                                             declarations))
+    (let ((prepared (pos-migrate--prepare .archive build (append .exclude nil)
+                                          (append .include nil))))
+      (unless (equal (pos-bytes-json (pos-migrate--prepared-alist prepared))
                      (pos-bytes-json
                       `((discard . ,.discard) (remove . ,.remove) (renames . ,.renames)
                         (collections . ,.collections) (declarations . ,.declarations))))

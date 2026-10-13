@@ -177,7 +177,7 @@ origin never seen adopts the token after its first refusal."
     (should (equal "refresh-2"
                    (alist-get 'refresh_token
                               (cdr (assoc "https://issuer.example a-public-client"
-                                          (car (pos-signin--load)))))))))
+                                          (pos-signin--kept-tokens (pos-signin--load)))))))))
 
 (ert-deftest pos-signin/a-token-that-cannot-be-refreshed-is-no-token ()
   "A token that cannot be refreshed is no token at all."

@@ -33,6 +33,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'ol)
 (require 'pos-bytes)
 (require 'pos-cid)
@@ -92,11 +93,17 @@ is written (doc/formats.org, \"Links\")."
                 (and (file-exists-p file) file)))
             (cdr (assoc cid index))))
 
+(cl-defstruct (pos-index--held (:constructor pos-index--held-make) (:copier nil))
+  "A file a keeper has.
+The keeper's base URL, the CID the ledger enrols the file under, the
+file's NAME, and its BYTES once read."
+  url cid name bytes)
+
 (defun pos-index--kept (scope index cid path)
   "Return where a keeper has the file INDEX gives for CID and PATH in SCOPE.
-As (URL FILE-CID NAME): the keeper's base URL, the CID the ledger enrols
-the file under, and the file's name; or nil if INDEX gives no file a
-keeper keeps.  A directory is not a file: the protocol reads none."
+A `pos-index--held', its bytes not yet read; or nil if INDEX gives no
+file a keeper keeps.  A directory is not a file: the protocol reads
+none."
   (seq-some
    (lambda (base)
      (let* ((file (expand-file-name (concat base (when path (concat "/" path))) scope))
@@ -107,7 +114,8 @@ keeper keeps.  A directory is not a file: the protocol reads none."
             (entry (and url (assoc (file-relative-name file archive)
                                    (pos-history-entries (pos-ledger-history archive))))))
        (and entry
-            (list url (alist-get 'cid (cdr entry)) (file-name-nondirectory file)))))
+            (pos-index--held-make :url url :cid (alist-get 'cid (cdr entry))
+                                  :name (file-name-nondirectory file)))))
    (cdr (assoc cid index))))
 
 (defun pos-index-resolve (scope uri)
@@ -118,7 +126,7 @@ at.  The index is rebuilt if it does not have it."
                (`(,cid . ,path) (pos-index--parse uri))
                (kept (lambda (index)
                        (pcase (pos-index--kept scope index cid path)
-                         (`(,url ,file-cid ,_)
+                         ((cl-struct pos-index--held url (cid file-cid))
                           (concat (string-remove-suffix "/" url) "/ipfs/" file-cid))))))
     (or (pos-index--lookup scope (pos-index--load scope) cid path)
         (funcall kept (pos-index--load scope))
@@ -128,16 +136,16 @@ at.  The index is rebuilt if it does not have it."
 
 (defun pos-index--kept-read (scope uri)
   "Return what a keeper has of the file URI names, from SCOPE's index.
-As (BYTES FILE-CID NAME): the bytes the keeper answers with, the CID
-the ledger enrols the file under, and the file's name; or nil if no
-keeper keeps such a file."
+A `pos-index--held' with the bytes the keeper answers with; or nil if
+no keeper keeps such a file."
   (pcase-let* ((scope (file-name-as-directory (file-truename scope)))
                (`(,cid . ,path) (pos-index--parse uri)))
-    (pcase (or (pos-index--kept scope (pos-index--load scope) cid path)
-               (pos-index--kept scope (pos-index-build scope) cid path))
-      (`(,url ,file-cid ,name)
-       (list (pos-remote-read (funcall pos-remote-keeper-function url) file-cid)
-             file-cid name)))))
+    (when-let* ((held (or (pos-index--kept scope (pos-index--load scope) cid path)
+                          (pos-index--kept scope (pos-index-build scope) cid path))))
+      (setf (pos-index--held-bytes held)
+            (pos-remote-read (funcall pos-remote-keeper-function (pos-index--held-url held))
+                             (pos-index--held-cid held)))
+      held)))
 
 (defun pos-index-fetch (scope uri)
   "Return a buffer holding the file URI names, fetched from its keeper.
@@ -145,7 +153,7 @@ SCOPE's index says which keeper has it; nil if none does.  The buffer
 is read-only, visits no file, and has the coding and the mode the
 file's name and bytes give, as visiting the file would."
   (pcase (pos-index--kept-read scope uri)
-    (`(,bytes ,_ ,name)
+    ((cl-struct pos-index--held bytes name)
      (let ((buffer (generate-new-buffer name))
            (file (expand-file-name name scope)))
        (with-current-buffer buffer
@@ -211,7 +219,7 @@ directory is not a file."
     (or (and file (pos-bytes-read file))
         (seq-some (lambda (scope)
                     (pcase (pos-index--kept-read scope uri)
-                      (`(,bytes ,file-cid ,_)
+                      ((cl-struct pos-index--held bytes (cid file-cid))
                        (unless (equal file-cid (pos-cid-bytes bytes))
                          (pos-ledger-refuse
                           'entry "The keeper's bytes are not those of %s" file-cid))
