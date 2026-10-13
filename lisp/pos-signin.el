@@ -37,6 +37,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'subr-x)
 (require 'url-parse)
 (require 'url-util)
@@ -88,13 +89,20 @@ The file pos/tokens.json under $XDG_CONFIG_HOME, or under ~/.config."
   (and (listp value)
        (mapcar (lambda (pair) (cons (pos-bytes-key (car pair)) (cdr pair))) value)))
 
+(cl-defstruct (pos-signin--kept (:constructor pos-signin--kept-make) (:copier nil))
+  "What the token file keeps.
+TOKENS are the tokens by \"ISSUER CLIENT\", and KEEPERS the issuer and
+client each keeper takes, by the keeper's origin; each an alist by
+string."
+  tokens keepers)
+
 (defun pos-signin--load ()
-  "Return what is kept, as (TOKENS . KEEPERS).
-Each an alist by string: TOKENS by \"ISSUER CLIENT\", KEEPERS by origin."
+  "Return what is kept, a `pos-signin--kept'."
   (let ((kept (ignore-errors
                 (pos-bytes-parse (pos-bytes-read (pos-signin-file))))))
-    (cons (pos-signin--object (and (listp kept) (alist-get 'tokens kept)))
-          (pos-signin--object (and (listp kept) (alist-get 'keepers kept))))))
+    (pos-signin--kept-make
+     :tokens (pos-signin--object (and (listp kept) (alist-get 'tokens kept)))
+     :keepers (pos-signin--object (and (listp kept) (alist-get 'keepers kept))))))
 
 (defun pos-signin--save (kept)
   "Replace the file whole with KEPT, readable by its owner alone."
@@ -105,7 +113,8 @@ Each an alist by string: TOKENS by \"ISSUER CLIENT\", KEEPERS by origin."
       (set-file-modes dir #o700))
     (let ((temp (make-temp-file (expand-file-name "tokens-" dir))))
       (set-file-modes temp #o600)
-      (pos-bytes-write temp (pos-bytes-json `((tokens . ,(car kept)) (keepers . ,(cdr kept)))))
+      (pos-bytes-write temp (pos-bytes-json `((tokens . ,(pos-signin--kept-tokens kept))
+                                              (keepers . ,(pos-signin--kept-keepers kept)))))
       (set-file-modes temp #o600)
       (rename-file temp file t))))
 
@@ -123,9 +132,14 @@ Each an alist by string: TOKENS by \"ISSUER CLIENT\", KEEPERS by origin."
   (and (eql (car answer) 200)
        (ignore-errors (pos-bytes-parse (cdr answer)))))
 
+(cl-defstruct (pos-signin--how (:constructor pos-signin--how-make) (:copier nil))
+  "How to sign in to a keeper.
+The ISSUER, the CLIENT to sign in as, and the SCOPES to ask for, a list."
+  issuer client scopes)
+
 (defun pos-signin--told (url)
   "Return how to sign in to the keeper at URL, or refuse `access'.
-As (ISSUER CLIENT SCOPES), SCOPES a list."
+A `pos-signin--how'."
   (let* ((origin (pos-signin--origin url))
          (told (pos-signin--json
                 (funcall pos-signin-fetch-function
@@ -137,7 +151,7 @@ As (ISSUER CLIENT SCOPES), SCOPES a list."
     (unless (and (stringp issuer) (stringp client) (vectorp scopes)
                  (seq-every-p #'stringp scopes))
       (pos-ledger-refuse 'access "This keeper does not say how to sign in: %s" origin))
-    (list issuer client (append scopes nil))))
+    (pos-signin--how-make :issuer issuer :client client :scopes (append scopes nil))))
 
 (defun pos-signin--endpoints (issuer)
   "Return (AUTHORIZATION . TOKEN), ISSUER's endpoints, from its discovery."
@@ -174,7 +188,7 @@ when the answer gives none."
 One about to expire is refreshed first, and what is kept rewritten; nil
 if none is kept or it cannot be refreshed.  KEPT is changed in place."
   (let* ((key (concat issuer " " client))
-         (token (cdr (assoc key (car kept))))
+         (token (cdr (assoc key (pos-signin--kept-tokens kept))))
          (refresh (and (listp token) (alist-get 'refresh_token token))))
     (cond
      ((not (and (listp token) (stringp (alist-get 'access_token token)))) nil)
@@ -192,9 +206,10 @@ if none is kept or it cannot be refreshed.  KEPT is changed in place."
                   (append (alist-get 'scopes token) nil) refresh)
                (pos-ledger-refused nil))))
         (when renewed
-          (setcar kept (cons (cons key renewed)
-                             (seq-remove (lambda (pair) (equal (car pair) key))
-                                         (car kept))))
+          (setf (pos-signin--kept-tokens kept)
+                (cons (cons key renewed)
+                      (seq-remove (lambda (pair) (equal (car pair) key))
+                                  (pos-signin--kept-tokens kept))))
           (pos-signin--save kept)
           (alist-get 'access_token renewed)))))))
 
@@ -202,7 +217,7 @@ if none is kept or it cannot be refreshed.  KEPT is changed in place."
   "Return the token a request to the keeper at URL carries, or nil.
 The one kept for its origin, refreshed if it is about to expire."
   (let* ((kept (pos-signin--load))
-         (entry (cdr (assoc (pos-signin--origin url) (cdr kept)))))
+         (entry (cdr (assoc (pos-signin--origin url) (pos-signin--kept-keepers kept)))))
     (when (listp entry)
       (let ((issuer (alist-get 'issuer entry)) (client (alist-get 'client_id entry)))
         (and (stringp issuer) (stringp client)
@@ -211,9 +226,10 @@ The one kept for its origin, refreshed if it is about to expire."
 (defun pos-signin--record (kept url issuer client)
   "Record in KEPT that the keeper at URL takes ISSUER's token for CLIENT."
   (let ((origin (pos-signin--origin url)))
-    (setcdr kept (cons (cons origin `((issuer . ,issuer) (client_id . ,client)))
-                       (seq-remove (lambda (pair) (equal (car pair) origin))
-                                   (cdr kept))))))
+    (setf (pos-signin--kept-keepers kept)
+          (cons (cons origin `((issuer . ,issuer) (client_id . ,client)))
+                (seq-remove (lambda (pair) (equal (car pair) origin))
+                            (pos-signin--kept-keepers kept))))))
 
 (defun pos-signin-adopt (url)
   "Return a token for the keeper at URL, not seen before, if one is kept.
@@ -221,9 +237,9 @@ That is, if one is kept for the issuer and client the keeper names:
 signing in to one of a keeper's ledgers serves its others.  The origin
 is then recorded.  Nil otherwise."
   (let ((kept (pos-signin--load)))
-    (unless (assoc (pos-signin--origin url) (cdr kept))
+    (unless (assoc (pos-signin--origin url) (pos-signin--kept-keepers kept))
       (pcase (condition-case nil (pos-signin--told url) (pos-ledger-refused nil))
-        (`(,issuer ,client ,_)
+        ((cl-struct pos-signin--how issuer client)
          (let ((token (pos-signin--usable kept issuer client)))
            (when token
              (pos-signin--record kept url issuer client)
@@ -302,7 +318,7 @@ the person's browser is sent to the issuer and the code it brings back
 to a loopback address, within TIMEOUT seconds, 300 by default, is
 exchanged for a token.  Return an alist: keeper, issuer, client_id,
 expires_at and opened, whether a browser was."
-  (pcase-let* ((`(,issuer ,client ,scopes) (pos-signin--told url))
+  (pcase-let* (((cl-struct pos-signin--how issuer client scopes) (pos-signin--told url))
                (kept (pos-signin--load))
                (key (concat issuer " " client))
                (opened nil))
@@ -340,13 +356,15 @@ expires_at and opened, whether a browser was."
         (unless granted
           (pos-ledger-refuse 'access "The issuer gave no token for the code: %s" issuer))
         (setq kept (pos-signin--load))
-        (setcar kept (cons (cons key granted)
-                           (seq-remove (lambda (pair) (equal (car pair) key))
-                                       (car kept))))))
+        (setf (pos-signin--kept-tokens kept)
+              (cons (cons key granted)
+                    (seq-remove (lambda (pair) (equal (car pair) key))
+                                (pos-signin--kept-tokens kept))))))
     (pos-signin--record kept url issuer client)
     (pos-signin--save kept)
     `((keeper . ,(pos-signin--origin url)) (issuer . ,issuer) (client_id . ,client)
-      (expires_at . ,(alist-get 'expires_at (cdr (assoc key (car kept)))))
+      (expires_at . ,(alist-get 'expires_at
+                                (cdr (assoc key (pos-signin--kept-tokens kept)))))
       (opened . ,(if opened t :false)))))
 
 (provide 'pos-signin)
