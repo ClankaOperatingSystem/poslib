@@ -60,7 +60,8 @@
 ;;   the files, the scope each belongs to, and the scopes, each a
 ;;   `pos-scope'.
 ;; - `pos-corpus-methodologies': the methodologies the nodes declare.
-;; - `pos-corpus-writable-p': whether a command may write a file.
+;; - `pos-corpus-writable-p', `pos-corpus-path-writable-p': whether a
+;;   command may write a file of the corpus, or any path of the tree.
 
 ;;; Code:
 
@@ -312,16 +313,49 @@ whether or not it is there."
                       (pos-tree-methodologies config))))
           (pos-corpus-scopes corpus)))
 
+(defun pos-corpus--anothers-p (corpus relative)
+  "Return non-nil if RELATIVE, a path from the root of CORPUS, is another's.
+At or beneath a repository or a product within the tree."
+  (seq-some (lambda (repository)
+              (or (equal repository relative)
+                  (string-prefix-p (concat repository "/") relative)))
+            (pos-corpus-unwritable corpus)))
+
+(defun pos-corpus--repository-above-p (root path)
+  "Return non-nil if a directory below ROOT and above PATH is a repository.
+On the disk: what the walk did not enter, an attic or an archive, it
+knows nothing of."
+  (let ((dir (file-name-directory (directory-file-name path)))
+        found)
+    (while (and (not found) (string-prefix-p root dir) (not (equal dir root)))
+      (setq found (file-exists-p (expand-file-name ".git" dir))
+            dir (file-name-directory (directory-file-name dir))))
+    found))
+
+(defun pos-corpus-path-writable-p (corpus path)
+  "Return non-nil if a command of the root may write at PATH, in CORPUS's tree.
+PATH need not exist nor be read: an archive a sweep is about to
+make, say.  Nil for a path outside the tree, and for one at or
+beneath another repository of the tree or a product within it, which
+is that repository's own configuration's to govern.  Where the walk
+did not enter, beneath a directory it excludes, a repository on the
+disk above PATH is found as well."
+  (let* ((root (pos-corpus-root corpus))
+         (path (expand-file-name path))
+         (relative (file-relative-name path root)))
+    (not (or (file-name-absolute-p relative)
+             (equal relative "..")
+             (string-prefix-p "../" relative)
+             (pos-corpus--anothers-p corpus relative)
+             (pos-corpus--repository-above-p root path)))))
+
 (defun pos-corpus-writable-p (corpus file)
   "Return non-nil if a command may write FILE, a file of CORPUS.
 A file of the root's repository may be written.  One within another
 repository of the tree is read, and left to that repository's own
 configuration to govern; a symbolic link is never reached."
-  (let ((relative (file-relative-name (expand-file-name file) (pos-corpus-root corpus))))
-    (and (pos-corpus-owner corpus file)
-         (not (seq-some (lambda (repository)
-                          (string-prefix-p (concat repository "/") relative))
-                        (pos-corpus-unwritable corpus))))))
+  (and (pos-corpus-owner corpus file)
+       (pos-corpus-path-writable-p corpus file)))
 
 ;; `pos-corpus-writable-p' asks of a file the corpus reads; a command
 ;; that writes beside a scope's files, as a seal does, asks of the scope.
@@ -329,11 +363,7 @@ configuration to govern; a symbolic link is never reached."
   "Return non-nil if a command may write within SCOPE, a scope of CORPUS.
 A scope at or beneath another repository of the tree is that
 repository's to write."
-  (let ((path (pos-scope-path scope)))
-    (not (seq-some (lambda (repository)
-                     (or (equal repository path)
-                         (string-prefix-p (concat repository "/") path)))
-                   (pos-corpus-unwritable corpus)))))
+  (not (pos-corpus--anothers-p corpus (pos-scope-path scope))))
 
 (provide 'pos-corpus)
 ;;; pos-corpus.el ends here

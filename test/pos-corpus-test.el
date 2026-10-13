@@ -341,6 +341,26 @@ command of this root writes them; the root's own files may be written."
     (should-not (pos-corpus-writable-p corpus "/r/child/projects/p.org"))
     (should-not (pos-corpus-writable-p corpus "/r/not-read.org"))))
 
+(ert-deftest pos-corpus/a-path-need-not-be-read-to-be-the-root-s-to-write ()
+  "A path of the tree is the root's to write unless it is another's.
+An archive a sweep is about to make is not read and not there, and
+may be written; so may the root itself.  A path within a declared
+repository, the repository itself, and a path outside the tree may
+not."
+  (let ((corpus (pos-corpus-test-walk
+                 `(("" dir :config ,(pos-corpus-test-declaring "child"))
+                   ("a.org" file)
+                   ("child" dir :repository t :config ,pos-corpus-test-responsibility)
+                   ("child/intray.org" file)))))
+    (should (pos-corpus-path-writable-p corpus "/r/archive/2026-W36/a.org_archive"))
+    (should (pos-corpus-path-writable-p corpus "/r/"))
+    (should (pos-corpus-path-writable-p corpus "/r/childless.org"))
+    (should-not (pos-corpus-path-writable-p corpus "/r/child/a.org_archive"))
+    (should-not (pos-corpus-path-writable-p corpus "/r/child"))
+    (should-not (pos-corpus-path-writable-p corpus "/r/child/"))
+    (should-not (pos-corpus-path-writable-p corpus "/elsewhere/a.org_archive"))
+    (should-not (pos-corpus-path-writable-p corpus "/r/../a.org_archive"))))
+
 ;;;; Refusals
 
 (ert-deftest pos-corpus/a-refused-configuration-is-a-finding-and-a-leaf ()

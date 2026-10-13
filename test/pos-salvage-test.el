@@ -194,6 +194,31 @@ the second tree, a missing intray is no matter."
   (pos-test-with-files root '(("attic/notes.org" . "* DONE Paint\n"))
     (should-not (pos-salvage root (expand-file-name "attic" root)))))
 
+(ert-deftest pos-salvage/a-file-of-another-repository-is-not-the-root-s-to-salvage ()
+  "An item that holds a repository of the tree is refused before any write.
+A command of the root writes only the root's own files; a repository
+within the item is its own configuration's to govern.  The tasks of
+the item are still listed, those of the repository among them."
+  (pos-test-with-files dir
+      '(("garden/.git/HEAD" . "ref: refs/heads/master\n")
+        ("garden/intray.org" . "* Unsorted\n* Sorted\n")
+        ("garden/attic/notes.org" . "* TODO Ours\n")
+        ("garden/attic/vendor/.git/HEAD" . "ref: refs/heads/master\n")
+        ("garden/attic/vendor/notes.org" . "* TODO Theirs\n"))
+    (let* ((root (file-name-as-directory
+                  (file-truename (expand-file-name "garden" dir))))
+           (attic (expand-file-name "attic" root)))
+      (should (equal '("TODO Ours" "TODO Theirs")
+                     (mapcar (pcase-lambda (`(,_ ,_ ,state ,title))
+                               (concat state " " title))
+                             (pos-salvage-open-tasks attic))))
+      (should-error (pos-salvage root attic) :type 'user-error)
+      (should (equal "* TODO Ours\n" (pos-test-file-string (expand-file-name "attic/notes.org" root))))
+      (should (equal "* TODO Theirs\n"
+                     (pos-test-file-string (expand-file-name "attic/vendor/notes.org" root))))
+      (should (equal "* Unsorted\n* Sorted\n"
+                     (pos-test-file-string (expand-file-name "intray.org" root)))))))
+
 (ert-deftest pos-salvage/after-the-seal-and-the-relink-the-copy-cites-the-item ()
   "The seal and its relink plan finish what salvage began.
 The relink plan, made from the seal plan after the salvage, rewrites

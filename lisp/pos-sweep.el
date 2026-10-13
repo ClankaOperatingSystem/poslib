@@ -326,13 +326,20 @@ showed is archived to its destination, stamped with the week's
 boundary.  Return (:archived :skipped :left :stale): entries archived,
 headings that stayed for an open child, rows left as not sweep, and
 rows whose done entries have changed since the plan: by their digest,
-or by their count alone where the row carries no digest."
+or by their count alone where the row carries no digest.  Refuse,
+before anything is written, a plan with a row marked sweep whose
+destination is not the root's to write: outside the tree, or within
+another repository or a product of it."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (corpus (pos-corpus root))
          (read (pos-sweep-read-plan plan))
          (week (car read))
          (time (pos-sweep-week-time week))
          (archived 0) (skipped nil) (left 0) (stale 0))
+    (pcase-dolist (`(,act ,_relative ,_count ,destination ,_digest) (cdr read))
+      (when (and (equal act "sweep")
+                 (not (pos-corpus-path-writable-p corpus (expand-file-name destination root))))
+        (user-error "Not the root's to write, the destination of a row: %s" destination)))
     (pcase-dolist (`(,act ,relative ,count ,destination ,digest) (cdr read))
       (let ((file (expand-file-name relative root)))
         (cond

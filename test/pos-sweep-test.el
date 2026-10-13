@@ -519,6 +519,28 @@ the row is counted as left."
                (expand-file-name
                 "archive/orgmode/2026-W36/life/notes.org_archive" root))))))
 
+(ert-deftest pos-sweep/a-row-s-destination-that-is-not-the-root-s-is-refused ()
+  "A plan whose row would archive into another repository is refused.
+The destination column is taken as the reviewer left it, so one
+edited to point into a repository of the tree, or outside the tree,
+is refused as a user error before any row is applied: no file is
+archived and nothing is written there."
+  (pos-test-with-files root
+      `(("intray.org" . "* DONE finished\n")
+        ("life/notes.org" . "* DONE shipped\n")
+        ("vendor/lib/.git/HEAD" . ,pos-sweep-test-git-head)
+        ("vendor/lib/README.org" . "* TODO theirs\n"))
+    (dolist (elsewhere '("vendor/lib/notes.org_archive" "../notes.org_archive"))
+      (pos-sweep-test-with-plan plan root pos-sweep-test-week
+        (pos-sweep-test-edit-plan plan "archive/orgmode/2026-W36/life/notes.org_archive"
+                                  elsewhere)
+        (should-error (pos-sweep-apply root plan) :type 'user-error)
+        (should (equal "* DONE finished\n" (pos-sweep-test-text root "intray.org")))
+        (should (equal "* DONE shipped\n" (pos-sweep-test-text root "life/notes.org")))
+        (should-not (file-exists-p (expand-file-name elsewhere root)))
+        (should-not (file-exists-p
+                     (expand-file-name "archive/orgmode/2026-W36/intray.org_archive" root)))))))
+
 (ert-deftest pos-sweep/a-file-whose-done-entries-changed-since-the-plan-is-stale ()
   "A row whose file's done entries changed in number since the plan is stale.
 Whether one was finished or one was deleted since the plan was
