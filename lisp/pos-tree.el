@@ -46,7 +46,7 @@
 ;; - `pos-tree-plan': the plan for the tree at a root.
 ;; - `pos-tree-apply': do a plan, and return the plan that remains.
 ;; - `pos-tree-install': do only what a plan installs and links.
-;; - `pos-tree-batch': the command line.
+;; - `pos-tree-batch': the command line, in pos-cli.el.
 ;; - `pos-tree-refuse', `pos-tree-refused': a refusal of a plan or its
 ;;   doing, and its signal.
 
@@ -939,66 +939,7 @@ rule."
         (pos-tree--do dir action from)))
     (pos-tree-plan root source)))
 
-;;;; Command line
-
-(defconst pos-tree-usage
-  "Usage: COMMAND ...  (help prints this; Emacs itself takes --help)
-
-  plan ROOT [SOURCE]
-      print what needs to be done for the tree at ROOT to be as its
-      configurations declare, as JSON; change nothing.  SOURCE is the
-      directory of skills and commands to install; with none, nothing
-      is installed
-  apply ROOT PLAN [SOURCE]
-      do what the plan in the file PLAN holds, or - for standard input,
-      if the tree at ROOT still gives it with SOURCE; print the plan
-      that remains
-  archives ROOT
-      update only the managed archive rules in Git's info/exclude;
-      print the remaining plan; do not clone repositories, install or
-      link
-  install ROOT SOURCE
-      install from SOURCE and bring the links to it up to date; print
-      the remaining plan; do not clone repositories or change archive
-      rules
-
-Exit 0 nothing to do, 1 something to do or to report, 2 refused.
-"
-  "The command line's usage.")
-
-(defun pos-tree--print (plan)
-  "Print PLAN as JSON and exit, with 0 for an empty plan and 1 otherwise."
-  (pos-bytes-print plan)
-  (kill-emacs (if (and (seq-empty-p (alist-get 'actions plan))
-                       (seq-empty-p (alist-get 'findings plan)))
-                  0
-                1)))
-
-(defun pos-tree-batch ()
-  "Run a command from `command-line-args-left', as in `pos-tree-usage'."
-  (condition-case err
-      (pcase (prog1 command-line-args-left (setq command-line-args-left nil))
-        ((or `("plan" ,root) `("plan" ,root ,source))
-         (pos-tree--print (pos-tree-plan root source)))
-        (`("archives" ,root) (pos-tree--print (pos-tree-ignore-archives root)))
-        (`("install" ,root ,source)
-         (pos-tree--print (pos-tree-install root source)))
-        ((or `("apply" ,root ,file) `("apply" ,root ,file ,source))
-         (pos-tree--print
-          (pos-tree-apply
-           root
-           (pos-bytes-parse
-            (pos-bytes-read (if (equal file "-") "/dev/stdin" file)))
-           source)))
-        (`(,(or "help" "-h" "--help")) (princ pos-tree-usage))
-        (_ (message "%s" pos-tree-usage)
-           (kill-emacs 2)))
-    ((pos-node-refused pos-tree-refused)
-     (message "%s: %s" (nth 1 err) (nth 2 err))
-     (kill-emacs 2))
-    (json-error
-     (message "plan: Not a readable plan")
-     (kill-emacs 2))))
+(autoload 'pos-tree-batch "pos-cli")
 
 (provide 'pos-tree)
 ;;; pos-tree.el ends here
