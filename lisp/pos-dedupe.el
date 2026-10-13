@@ -86,11 +86,11 @@ Keys: :key :heading :file :line :parent :body :id."
 
 (defun pos-dedupe-suggest (group root)
   "Return GROUP as (ACTION . ENTRY) pairs; ACTION is keep, drop or ?.
-Pillar beats intray (under ROOT); in one file, longer body wins;
-two pillar files: ?."
+A copy placed in a file beats one in the intray (under ROOT); in one
+file, the longer body wins; copies in two placed files: ?."
   (let* ((intray (expand-file-name "intray.org" root))
-         (pillar (seq-remove (lambda (e) (equal (plist-get e :file) intray)) group))
-         (candidates (or pillar group))
+         (placed (seq-remove (lambda (e) (equal (plist-get e :file) intray)) group))
+         (candidates (or placed group))
          (files (delete-dups (mapcar (lambda (e) (plist-get e :file)) candidates)))
          (survivor
           (cond ((= 1 (length candidates)) (car candidates))
