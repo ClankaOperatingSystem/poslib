@@ -61,8 +61,8 @@ place.  The heading is named by its title alone, whatever state and
 tags it has, here Tasks/Mend the house.  The item is returned as it
 is afterwards."
   (pos-place-test-with-files
-    (should (equal (list (expand-file-name "tasks.org" root) 4 "TODO"
-                         "Call the roofer")
+    (should (equal (pos-item-make :file (expand-file-name "tasks.org" root) :line 4
+                                  :state "TODO" :title "Call the roofer")
                    (pos-place root "roofer" "tasks.org" "Tasks/Mend the house")))
     (should (equal "* Unsorted\n** TODO Sort the shelf\n"
                    (pos-place-test-file root "intray.org")))
@@ -81,7 +81,7 @@ is afterwards."
   "The record is Org's for a refile, with the old file and outline path.
 With a state, the item is set to it and that change is recorded too."
   (pos-place-test-with-files
-    (should (equal "NEXT" (nth 2 (pos-place root "intray.org:8" "tasks.org"
+    (should (equal "NEXT" (pos-item-state (pos-place root "intray.org:8" "tasks.org"
                                             "Tasks" "NEXT"))))
     (should (string-match-p
              (concat "^\\*\\* NEXT Sort the shelf\n:LOGBOOK:\n"
@@ -94,8 +94,8 @@ With a state, the item is set to it and that change is recorded too."
 (ert-deftest pos-place/an-item-is-placed-within-its-own-file ()
   "The heading may be in the item's own file; the file is saved once."
   (pos-place-test-with-files
-    (should (equal (list (expand-file-name "intray.org" root) 8 "TODO"
-                         "Find the number")
+    (should (equal (pos-item-make :file (expand-file-name "intray.org" root) :line 8
+                                  :state "TODO" :title "Find the number")
                    (pos-place root "intray.org:7" "intray.org" "Unsorted")))
     (should (string-match-p
              (concat "\\`\\* Unsorted\n\\*\\* TODO Call the roofer\n"

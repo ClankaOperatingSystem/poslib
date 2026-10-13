@@ -52,8 +52,8 @@ The record is Org's own for a state change.  An open state adds no
 closing date.  The item is returned as it is afterwards."
   (pos-state-test-with-tasks
       "* TODO Call the roofer\n:PROPERTIES:\n:ID:       roofer\n:END:\nBody.\n* NEXT Other\n"
-    (should (equal (list (expand-file-name "tasks.org" root) 1 "WAITING"
-                         "Call the roofer")
+    (should (equal (pos-item-make :file (expand-file-name "tasks.org" root) :line 1
+                                  :state "WAITING" :title "Call the roofer")
                    (pos-set-state root "roofer" "WAITING" " Asked by phone ")))
     (should (string-match-p
              (concat "\\`\\* WAITING Call the roofer\n"
@@ -68,7 +68,7 @@ closing date.  The item is returned as it is afterwards."
   "An item is named by its file, relative to the root, and its heading's line.
 With no note, the record is the change and its time."
   (pos-state-test-with-tasks "* Tasks\n** TODO First\n** NEXT Second\n"
-    (should (equal "SOMEDAY" (nth 2 (pos-set-state root "tasks.org:3" "SOMEDAY"))))
+    (should (equal "SOMEDAY" (pos-item-state (pos-set-state root "tasks.org:3" "SOMEDAY"))))
     (should (string-match-p
              (concat "\\`\\* Tasks\n\\*\\* TODO First\n\\*\\* SOMEDAY Second\n"
                      ":LOGBOOK:\n- State \"SOMEDAY\" +from \"NEXT\" +"
@@ -100,7 +100,7 @@ days from today.  Org's message naming the next date is shown once."
                  (lambda (format &rest arguments)
                    (when format
                      (push (apply #'format format arguments) messages)))))
-        (should (equal "TODO" (nth 2 (pos-set-state root "tasks.org:1" "DONE")))))
+        (should (equal "TODO" (pos-item-state (pos-set-state root "tasks.org:1" "DONE")))))
       (should (= 1 (seq-count (lambda (message)
                                 (string-prefix-p "Entry repeats" message))
                               messages))))

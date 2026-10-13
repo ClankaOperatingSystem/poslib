@@ -452,13 +452,11 @@ stale buffers, foreign locks and a line that is not an item's."
              (line-number-at-pos)))))
 
 (defun pos-person--item-now (item)
-  "Return (FILE LINE STATE TITLE) of the item at the marker ITEM."
+  "Return the item at the marker ITEM, a `pos-item'."
   (with-current-buffer (marker-buffer item)
     (org-with-wide-buffer
      (goto-char item)
-     (list buffer-file-name (line-number-at-pos)
-           (substring-no-properties (org-get-todo-state))
-           (substring-no-properties (org-get-heading t t t t))))))
+     (pos-item-at-point buffer-file-name))))
 
 (defun pos-person--note-p (note)
   "Return non-nil if NOTE is nil or one nonempty line."
@@ -479,7 +477,7 @@ STATE TITLE) as the item is afterwards."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (corpus (pos-corpus root))
          (item (pos-person--item root corpus target))
-         (waiting (equal "WAITING" (nth 2 (pos-person--item-now item))))
+         (waiting (equal "WAITING" (pos-item-state (pos-person--item-now item))))
          (scope (pos-corpus-owner
                  corpus (buffer-file-name (marker-buffer item)))))
     (when (and waiting note)
@@ -499,7 +497,7 @@ STATE TITLE) as the item is afterwards."
 TARGET is as `pos-set-state' takes it.  The item's
 `pos-waiting-on-property' is removed and the item set by
 `pos-set-state' to STATE, NEXT when nil, with NOTE, one line or
-nil.  Return (FILE LINE STATE TITLE) as the item is afterwards.
+nil.  Return the item, a `pos-item', as it is afterwards.
 Refuse an item that is not WAITING and the STATE WAITING."
   (let ((state (or state "NEXT")))
     (unless (and (member state (pos-state-states))
@@ -509,7 +507,7 @@ Refuse an item that is not WAITING and the STATE WAITING."
       (user-error "A note is one nonempty line"))
     (let* ((root (file-name-as-directory (expand-file-name root)))
            (item (pos-person--item root (pos-corpus root) target)))
-      (unless (equal "WAITING" (nth 2 (pos-person--item-now item)))
+      (unless (equal "WAITING" (pos-item-state (pos-person--item-now item)))
         (user-error "The item is not WAITING"))
       (pos-writing (marker-buffer item)
         (goto-char item)
@@ -685,13 +683,13 @@ Exit 2 on any other arguments."
       ((and `(,(and command (or "wait" "arrived")) . ,rest)
             (guard (memq (length rest)
                          (if (equal command "wait") '(2 3) '(1 2 3)))))
-       (pcase-let ((`(,file ,line ,state ,title)
-                    (apply (if (equal command "wait")
-                               #'pos-person-wait-on
-                             #'pos-person-arrived)
-                           root rest)))
-         (princ (format "%s:%d: %s %s\n" (file-relative-name file root)
-                        line state title))))
+       (princ (concat (pos-item-format
+                       (apply (if (equal command "wait")
+                                  #'pos-person-wait-on
+                                #'pos-person-arrived)
+                              root rest)
+                       root)
+                      "\n")))
       (_ (message "%s\n%s\n%s\n%s\n%s"
                   "Usage: add NAME"
                   "       identity PERSON SCOPE"

@@ -80,9 +80,9 @@ TARGET is as `pos-set-state' takes it.  KIND is \"scheduled\" or
 \"deadline\".  DATE is YYYY-MM-DD, with a repeater such as +1w after
 a space if wanted, or \"none\", which removes the date.  A date given
 without a repeater keeps the repeater the item has, as Org does.
-The change is made by `org-schedule' or `org-deadline'.  Return (FILE
-LINE STATE TITLE TIMESTAMP) as the item is afterwards, TIMESTAMP nil
-when it has no such date.  Refuse what `pos-set-state' refuses."
+The change is made by `org-schedule' or `org-deadline'.  Return the
+item, a `pos-item', as it is afterwards, its PLANNING the date as
+written, nil when it has no such date.  Refuse what `pos-set-state' refuses."
   (unless (member kind '("scheduled" "deadline"))
     (user-error "Unknown date: %s (scheduled or deadline)" kind))
   (let* ((set (if (equal kind "scheduled") #'org-schedule #'org-deadline))
@@ -109,10 +109,9 @@ when it has no such date.  Refuse what `pos-set-state' refuses."
          (insert " " (cdr parsed)))
         (t (funcall set nil (car parsed))))
        (org-back-to-heading t)
-       (list file (line-number-at-pos)
-             (substring-no-properties (org-get-todo-state))
-             (substring-no-properties (org-get-heading t t t t))
-             (pos-item--planning keyword))))))
+       (let ((item (pos-item-at-point file)))
+         (setf (pos-item-planning item) (pos-item--planning keyword))
+         item)))))
 
 (defun pos-set-tags (root target specs)
   "Add and remove tags on the item TARGET names in the tree at ROOT.
@@ -120,7 +119,7 @@ TARGET is as `pos-set-state' takes it.  SPECS is a list of strings,
 each +TAG, which adds the tag, or -TAG, which removes it; a tag is
 letters, digits, and any of _ @ # %.  Adding a tag the item has and
 removing one it lacks change nothing.  The heading is written by
-`org-set-tags'.  Return (FILE LINE STATE TITLE TAGS), TAGS the item's
+`org-set-tags'.  Return the item, a `pos-item', with TAGS the item's
 own tags afterwards.  Refuse what `pos-set-state' refuses."
   (unless specs
     (user-error "No tag to add or remove"))
@@ -139,10 +138,9 @@ own tags afterwards.  Refuse what `pos-set-state' refuses."
              (setq tags (remove tag tags)))))
        (org-set-tags tags)
        (org-back-to-heading t)
-       (list file (line-number-at-pos)
-             (substring-no-properties (org-get-todo-state))
-             (substring-no-properties (org-get-heading t t t t))
-             tags)))))
+       (let ((item (pos-item-at-point file)))
+         (setf (pos-item-tags item) tags)
+         item)))))
 
 (defun pos-item-batch ()
   "Set a date or the tags of an item of `pos-directory' and print the item.
@@ -155,12 +153,12 @@ arguments."
   (pcase command-line-args-left
     (`(,(and command (or "schedule" "deadline")) ,target ,date)
      (setq command-line-args-left nil)
-     (pcase-let ((`(,file ,line ,state ,title ,stamp)
-                  (pos-set-date
+     (let* ((item (pos-set-date
                    pos-directory target
                    (if (equal command "schedule") "scheduled" "deadline")
-                   date)))
-       (princ (format "%s:%d: %s %s%s\n" file line state title
+                   date))
+            (stamp (pos-item-planning item)))
+       (princ (format "%s%s\n" (pos-item-format item)
                       (if stamp
                           (format " %s %s" (if (equal command "schedule")
                                                org-scheduled-string
@@ -169,9 +167,9 @@ arguments."
                         "")))))
     (`("tag" ,target . ,(and specs (guard specs)))
      (setq command-line-args-left nil)
-     (pcase-let ((`(,file ,line ,state ,title ,tags)
-                  (pos-set-tags pos-directory target specs)))
-       (princ (format "%s:%d: %s %s%s\n" file line state title
+     (let* ((item (pos-set-tags pos-directory target specs))
+            (tags (pos-item-tags item)))
+       (princ (format "%s%s\n" (pos-item-format item)
                       (if tags (format " :%s:" (string-join tags ":")) "")))))
     (_
      (message (concat "Usage: schedule TARGET DATE|none\n"

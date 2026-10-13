@@ -83,8 +83,9 @@ task is not listed.  The files are those a corpus reads by name:
 here .draft.org is hidden and data.txt is not Org.  A single file is
 an item too."
   (pos-salvage-test-with-garden
-    (let ((tasks `((,notes 5 "NEXT" "Buy a hinge")
-                   (,notes 16 "TODO" "Call the joiner"))))
+    (let ((tasks (list (pos-item-make :file notes :line 5 :state "NEXT" :title "Buy a hinge")
+                       (pos-item-make :file notes :line 16 :state "TODO"
+                                      :title "Call the joiner"))))
       (should (equal tasks (pos-salvage-open-tasks attic)))
       (should (equal tasks (pos-salvage-open-tasks notes))))))
 
@@ -98,8 +99,9 @@ its repeater is not followed.  It cites the copy by an id link.  The
 done task and the prose are as they were.  The tasks are returned as
 they stood."
   (pos-salvage-test-with-garden
-    (should (equal `((,notes 5 "NEXT" "Buy a hinge")
-                     (,notes 16 "TODO" "Call the joiner"))
+    (should (equal (list (pos-item-make :file notes :line 5 :state "NEXT" :title "Buy a hinge")
+                         (pos-item-make :file notes :line 16 :state "TODO"
+                                        :title "Call the joiner"))
                    (pos-salvage root attic)))
     (let* ((copied (pos-test-file-string intray))
            (id (pos-salvage-test-new-id copied)))
@@ -209,8 +211,8 @@ the item are still listed, those of the repository among them."
                   (file-truename (expand-file-name "garden" dir))))
            (attic (expand-file-name "attic" root)))
       (should (equal '("TODO Ours" "TODO Theirs")
-                     (mapcar (pcase-lambda (`(,_ ,_ ,state ,title))
-                               (concat state " " title))
+                     (mapcar (lambda (task)
+                               (concat (pos-item-state task) " " (pos-item-title task)))
                              (pos-salvage-open-tasks attic))))
       (should-error (pos-salvage root attic) :type 'user-error)
       (should (equal "* TODO Ours\n" (pos-test-file-string (expand-file-name "attic/notes.org" root))))

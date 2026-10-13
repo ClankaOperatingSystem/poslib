@@ -246,7 +246,8 @@ recorded with the note, and the item as it is afterwards returned."
            (now (pos-person-wait-on root "projects/mend-roof.org:1" "Ada Brook"
                                     "Asked for a price"))
            (text (pos-test-file-string file)))
-      (should (equal now (list file 1 "WAITING" "Buy slates")))
+      (should (equal now (pos-item-make :file file :line 1 :state "WAITING"
+                                        :title "Buy slates")))
       (should (string-match
                (concat "\\`\\* WAITING Buy slates\n:PROPERTIES:\n:WAITING_ON: "
                        "\\[\\[id:\\([-[:xdigit:]]\\{36\\}\\)\\]"
@@ -265,8 +266,9 @@ recorded with the note, and the item as it is afterwards returned."
     (pos-person-add root "Ada Brook")
     (pos-test-write-files
      root '(("projects/mend-roof.org" . "* People\n* NEXT Buy slates\n* NEXT Hire a ladder\n")))
-    (should (equal (cdr (pos-person-wait-on root "projects/mend-roof.org:2" "Ada Brook"))
-                   '(6 "WAITING" "Buy slates")))
+    (should (equal (pos-person-wait-on root "projects/mend-roof.org:2" "Ada Brook")
+                   (pos-item-make :file (expand-file-name "projects/mend-roof.org" root)
+                                  :line 6 :state "WAITING" :title "Buy slates")))
     (should (string-match-p "^\\* NEXT Hire a ladder$"
                             (pos-test-file-string
                              (expand-file-name "projects/mend-roof.org" root))))))
@@ -279,8 +281,9 @@ A note is refused for it, since no change of state would hold it."
     (pos-test-write-files root '(("home/index.org" . "* WAITING Hear back\n")))
     (should-error (pos-person-wait-on root "home/index.org:1" "Ada Brook" "A note")
                   :type 'user-error)
-    (should (equal (cdr (pos-person-wait-on root "home/index.org:1" "Ada Brook"))
-                   '(1 "WAITING" "Hear back")))
+    (should (equal (pos-person-wait-on root "home/index.org:1" "Ada Brook")
+                   (pos-item-make :file (expand-file-name "home/index.org" root)
+                                  :line 1 :state "WAITING" :title "Hear back")))
     (let ((text (pos-test-file-string (expand-file-name "home/index.org" root))))
       (should (string-match-p ":WAITING_ON: \\[\\[id:[^]]+\\]\\[Ada-Brook@home\\]\\]" text))
       (should-not (string-match-p "LOGBOOK" text)))))
@@ -309,10 +312,10 @@ An item that is not WAITING is refused, and so is the state WAITING."
       (should-error (pos-person-arrived root "projects/mend-roof.org:1" "WAITING")
                     :type 'user-error)
       (should (equal (pos-person-arrived root "projects/mend-roof.org:1")
-                     (list file 1 "NEXT" "Buy slates")))
+                     (pos-item-make :file file :line 1 :state "NEXT" :title "Buy slates")))
       (should-not (string-match-p "WAITING_ON" (pos-test-file-string file)))
       (pos-person-wait-on root "projects/mend-roof.org:1" "Ada Brook")
-      (should (equal (nth 2 (pos-person-arrived root "projects/mend-roof.org:1"
+      (should (equal (pos-item-state (pos-person-arrived root "projects/mend-roof.org:1"
                                                 "DONE" "Slates came"))
                      "DONE")))))
 
