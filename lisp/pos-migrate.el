@@ -30,7 +30,8 @@
 ;; describes it; application replays the plan into a fresh copy, checks
 ;; it against the plan, and swaps it in.
 ;;
-;; - `pos-migrate-plan', `pos-migrate-apply', `pos-migrate-batch'.
+;; - `pos-migrate-plan', `pos-migrate-apply': the two steps.
+;; - `pos-migrate-batch': the command line, in pos-cli.el.
 
 ;;; Code:
 
@@ -686,34 +687,7 @@ interrupted.  Return (EVENT-FILE . ROOT)."
       (pos-seal-checkpoint-head .archive (pos-bytes-sha bytes))
       (cons event (alist-get 'root (pos-bytes-parse bytes))))))
 
-;;;; Command line
-
-(defun pos-migrate-batch ()
-  "Run a migration command from `command-line-args-left'.
-plan ARCHIVE [ROOT [DIR...]] prints a plan, each DIR excluding a
-candidate collection, or with a leading + including one; apply PLAN HASH
-applies it.  Exit 0 done, 2 refused."
-  (condition-case err
-      (pcase (prog1 command-line-args-left (setq command-line-args-left nil))
-        (`("plan" ,archive . ,rest)
-         ;; After ROOT, +DIR includes a collection and DIR excludes one.
-         (let ((names (cdr rest)))
-           (pos-bytes-print (pos-migrate-plan
-                             archive (car rest)
-                             (seq-remove (lambda (n) (string-prefix-p "+" n)) names) nil nil
-                             (mapcar (lambda (n) (substring n 1))
-                                     (seq-filter (lambda (n) (string-prefix-p "+" n)) names))))))
-        (`("apply" ,plan-file ,hash)
-         (let ((result (pos-migrate-apply (pos-bytes-parse (pos-bytes-read plan-file)) hash)))
-           (pos-bytes-print `((event . ,(car result)) (root . ,(cdr result))))))
-        (_ (message "Usage: plan ARCHIVE [ROOT [DIR... +DIR...]] | apply PLAN HASH")
-           (kill-emacs 2)))
-    (pos-ledger-refused
-     (message "%s: %s" (nth 1 err) (nth 2 err))
-     (kill-emacs 2))
-    (json-error
-     (message "plan: Not a readable plan")
-     (kill-emacs 2))))
+(autoload 'pos-migrate-batch "pos-cli")
 
 (provide 'pos-migrate)
 ;;; pos-migrate.el ends here
