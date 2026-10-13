@@ -47,7 +47,7 @@
 ;;;; Dedupe
 
 (defun pos-dedupe-test-copy (file line &optional body parent)
-  "Return the `pos--task-entries' entry for a copy of \"Fix the gate\".
+  "Return the `pos-dedupe--task-entries' entry for a copy of \"Fix the gate\".
 The copy is in FILE under /repo/, at LINE, with BODY, default empty,
 under PARENT, default none, and has no ID."
   (list :key "fix the gate" :heading "Fix the gate"

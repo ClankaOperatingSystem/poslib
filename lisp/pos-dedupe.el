@@ -44,7 +44,7 @@
 (require 'pos-roam)
 (require 'pos-corpus)
 
-(defun pos--subtree-body ()
+(defun pos-dedupe--subtree-body ()
   "Return the subtree at point below its heading, trimmed.
 A property drawer is not body: two copies alike but for their IDs say
 the same thing."
@@ -59,7 +59,7 @@ the same thing."
                         (buffer-substring-no-properties (point) end))))
       (string-trim (concat planning rest)))))
 
-(defun pos--task-entries (root)
+(defun pos-dedupe--task-entries (root)
   "Return a plist per keyword heading in covered files under ROOT.
 Keys: :key :heading :file :line :parent :body :id."
   (mapcan (lambda (file)
@@ -73,7 +73,7 @@ Keys: :key :heading :file :line :parent :body :id."
                          :file file
                          :line (line-number-at-pos)
                          :parent (car (last (org-get-outline-path)))
-                         :body (pos--subtree-body)
+                         :body (pos-dedupe--subtree-body)
                          :id (org-entry-get nil "ID")))))))
           (pos-files root)))
 
@@ -82,7 +82,7 @@ Keys: :key :heading :file :line :parent :body :id."
   (seq-filter (lambda (group) (> (length group) 1))
               (mapcar #'cdr
                       (seq-group-by (lambda (entry) (plist-get entry :key))
-                                    (pos--task-entries root)))))
+                                    (pos-dedupe--task-entries root)))))
 
 (defun pos-dedupe-suggest (group root)
   "Return GROUP as (ACTION . ENTRY) pairs; ACTION is keep, drop or ?.
@@ -175,7 +175,7 @@ table, the \"id:\" links the index records to each copy that has an ID."
       (when current (push (nreverse current) groups))
       (nreverse groups))))
 
-(defun pos--merge-under (drop keep origin)
+(defun pos-dedupe--merge-under (drop keep origin)
   "Paste subtree DROP under KEEP, without keyword, headed ORIGIN."
   (progn
     (with-current-buffer (marker-buffer drop)
@@ -287,13 +287,13 @@ wrote."
         (setq vanished (1+ vanished))
       (setq resolved 1)
       (let ((keep-body (with-current-buffer (marker-buffer keep)
-                         (goto-char keep) (pos--subtree-body)))
+                         (goto-char keep) (pos-dedupe--subtree-body)))
             (keep-id (org-entry-get keep "ID")))
         (pcase-dolist (`(,drop . ,label) drops)
           (if (not (pos-marker-still-at-p drop key))
               (setq vanished (1+ vanished))
             (let ((drop-body (with-current-buffer (marker-buffer drop)
-                               (goto-char drop) (pos--subtree-body)))
+                               (goto-char drop) (pos-dedupe--subtree-body)))
                   (drop-id (org-entry-get drop "ID")))
               (when drop-id
                 (if keep-id
@@ -306,7 +306,7 @@ wrote."
               (when (and (not (string-empty-p drop-body))
                          (not (string= drop-body keep-body)))
                 (setq merged (1+ merged))
-                (unless dry-run (pos--merge-under drop keep label)))
+                (unless dry-run (pos-dedupe--merge-under drop keep label)))
               (unless dry-run
                 (with-current-buffer (marker-buffer drop)
                   (goto-char drop)

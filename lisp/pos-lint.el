@@ -41,7 +41,7 @@
 
 ;;;; Checks of a file
 
-(defun pos--finding (file message)
+(defun pos-lint--finding (file message)
   "Return a finding for the heading at point in FILE with MESSAGE."
   (pos-finding-make :file file :line (line-number-at-pos) :message message))
 
@@ -51,7 +51,7 @@
    file
    (lambda ()
      (when (and (org-entry-is-done-p) (pos-open-descendant-p))
-       (pos--finding file "done entry has open children")))))
+       (pos-lint--finding file "done entry has open children")))))
 
 (defconst pos-lint-stale-keywords
   '("BACKLOG" "WIP" "BLOCKED" "CANCELED" "CLARIFY" "DELEGATE" "DELEGATED"
@@ -65,7 +65,7 @@
    (lambda ()
      (let ((word (car (split-string (org-get-heading t t t t)))))
        (when (member word pos-lint-stale-keywords)
-         (pos--finding file (format "stale keyword %s (not in the sequence)" word)))))))
+         (pos-lint--finding file (format "stale keyword %s (not in the sequence)" word)))))))
 
 (defun pos-lint-todo-line (file)
   "Report #+TODO lines in FILE, each as `pos-next-todo-line' has it.
@@ -78,7 +78,7 @@ None is reported in a file the root may not write, by
       (let ((findings nil))
         (while (and (not (pos-visit-own-keywords-p file))
                     (pos-next-todo-line))
-          (push (pos--finding file "#+TODO line overrides the one sequence; run pos-normalise-keywords")
+          (push (pos-lint--finding file "#+TODO line overrides the one sequence; run pos-normalise-keywords")
                 findings))
         (nreverse findings)))))
 
@@ -88,7 +88,7 @@ None is reported in a file the root may not write, by
    file
    (lambda ()
      (when (string-prefix-p "Merged copy from " (org-get-heading t t t t))
-       (pos--finding file "merged copy awaiting reconciliation with its parent")))))
+       (pos-lint--finding file "merged copy awaiting reconciliation with its parent")))))
 
 (defun pos-lint-clarified-in-intray (file)
   "Report items under Unsorted in FILE, an intray.org, that are not TODO.
@@ -102,14 +102,14 @@ work is; a done one is finished and waits to be retired."
        (let ((state (org-get-todo-state)))
          (when (and state (not (string= state "TODO"))
                     (string= "Unsorted" (or (car (org-get-outline-path)) "")))
-           (pos--finding
+           (pos-lint--finding
             file
             (format (if (org-entry-is-done-p)
                         "%s item in the intray: finished, to be retired"
                       "%s item in the intray: clarified, to be placed")
                     state))))))))
 
-(defun pos--entry-text ()
+(defun pos-lint--entry-text ()
   "Return the text of the entry at point, without its children.
 The planning line and the drawers are part of it."
   (save-excursion
@@ -128,7 +128,7 @@ it, or in a date in its own text, a timestamp or YYYY-MM-DD."
    file
    (lambda ()
      (when (equal (org-get-todo-state) "WAITING")
-       (let* ((text (pos--entry-text))
+       (let* ((text (pos-lint--entry-text))
               (end (save-excursion (outline-next-heading) (point)))
               (own (save-excursion
                      (org-end-of-meta-data t)
@@ -142,11 +142,11 @@ it, or in a date in its own text, a timestamp or YYYY-MM-DD."
                          (string-match-p
                           "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}" own))))
          (cond ((and who since) nil)
-               (who (pos--finding
+               (who (pos-lint--finding
                      file "WAITING item does not say since when"))
-               (since (pos--finding
+               (since (pos-lint--finding
                        file "WAITING item does not say who or what it waits on"))
-               (t (pos--finding
+               (t (pos-lint--finding
                    file (concat "WAITING item does not say who or what it"
                                 " waits on, or since when")))))))))
 
@@ -161,7 +161,7 @@ it, or in a date in its own text, a timestamp or YYYY-MM-DD."
 
 ;;;; Checks of the tree
 
-(defun pos--task-headings (root)
+(defun pos-lint--task-headings (root)
   "Return (KEY FILE LINE) for keyword headings in the files of ROOT's corpus.
 KEY is the lower-cased heading text."
   (mapcan (lambda (file)
@@ -177,7 +177,7 @@ KEY is the lower-cased heading text."
   "Report task headings in more than one file of ROOT's corpus.
 Each copy names the others."
   (let ((findings nil))
-    (dolist (group (seq-group-by #'car (pos--task-headings root)))
+    (dolist (group (seq-group-by #'car (pos-lint--task-headings root)))
       (let ((copies (cdr group)))
         (when (> (length copies) 1)
           (dolist (copy copies)

@@ -63,7 +63,7 @@ doc/pos-directory.txt has it.")
 
 ;;;; Weeks
 
-(defun pos-week-name (time)
+(defun pos-sweep-week-name (time)
   "Return the ISO 8601 week name of TIME, e.g. \"2026-W36\"."
   (format-time-string "%G-W%V" time))
 
@@ -105,7 +105,7 @@ The sweep boundary that closes the week: its Sunday at `pos-sweep-hour'."
 
 ;;;; Archiving a file
 
-(defun pos--fix-last-archived (archive-buffer relative-file time)
+(defun pos-sweep--fix-last-archived (archive-buffer relative-file time)
   "Stamp the last entry in ARCHIVE-BUFFER with RELATIVE-FILE and TIME.
 Replaces the absolute path and wall clock, so any checkout writes
 the same bytes."
@@ -157,7 +157,7 @@ when none would be archived."
         (substring (sha1 (mapconcat #'identity (nreverse texts) "\n")) 0 12)
       "")))
 
-(defun pos-archive-done-in-file (file archive relative time)
+(defun pos-sweep-archive-done-in-file (file archive relative time)
   "Archive the done entries of FILE into ARCHIVE, stamped TIME.
 RELATIVE is FILE's path as the archive records it, relative to the
 scope the archive belongs to.  A done entry with an open entry beneath
@@ -178,7 +178,7 @@ it stays.  Return (:archived COUNT :skipped HEADINGS)."
              ;; Subtree gone; resume here.
              (setq org-map-continue-from (point))
              (org-archive-subtree)
-             (pos--fix-last-archived (pos-visit archive) relative time)
+             (pos-sweep--fix-last-archived (pos-visit archive) relative time)
              (setq archived (1+ archived)))))
        nil 'file)
       (save-buffer))
@@ -272,7 +272,7 @@ WEEK defaults to the one the latest boundary closed.  One table row
 per file with done entries, the last column a digest of them that an
 apply holds the file to; a done entry with an open entry beneath it
 is named below the table and stays."
-  (let* ((week (or week (pos-week-name (pos-sweep-boundary (current-time)))))
+  (let* ((week (or week (pos-sweep-week-name (pos-sweep-boundary (current-time)))))
          (rows (pos-sweep-rows (pos-corpus root) week)))
     (with-temp-buffer
       (insert (format "#+TITLE: Sweep %s\n\n" week)
@@ -354,7 +354,7 @@ another repository or a product of it."
          (t
           (pcase-let* ((`(,_kind ,_entry . ,dir)
                         (pos-sweep-adapter corpus (pos-corpus-owner corpus file)))
-                       (result (pos-archive-done-in-file
+                       (result (pos-sweep-archive-done-in-file
                                 file (expand-file-name destination root)
                                 (file-relative-name file dir) time)))
             (setq archived (+ archived (plist-get result :archived))
@@ -380,7 +380,7 @@ WEEK defaults to the one the latest boundary closed.  Return what
 `pos-sweep-apply' returns."
   (interactive)
   (let* ((root (file-name-as-directory pos-directory))
-         (week (or week (pos-week-name (pos-sweep-boundary (current-time)))))
+         (week (or week (pos-sweep-week-name (pos-sweep-boundary (current-time)))))
          (plan (make-temp-file "pos-sweep-" nil ".org" (pos-sweep-plan root week))))
     (unwind-protect
         (let ((result (pos-sweep-apply root plan)))
@@ -396,7 +396,7 @@ WEEK defaults to the one the latest boundary closed.  One plan for
 each week beneath the _sweep/ of each scope whose sweep is sealed.
 A scope in another repository of the tree is left to that repository."
   (let* ((corpus (pos-corpus root))
-         (week (or week (pos-week-name (pos-sweep-boundary (current-time)))))
+         (week (or week (pos-sweep-week-name (pos-sweep-boundary (current-time)))))
          (seen nil) plans)
     (dolist (scope (pos-corpus-scopes corpus))
       (when (and (pos-scope-config scope)
