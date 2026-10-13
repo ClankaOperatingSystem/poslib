@@ -42,6 +42,23 @@
 ;;
 ;; The data of a view is gathered while its text is made, an item for
 ;; each line, so the two forms cannot differ in what they list.
+;; - `pos-startup-scheduled-days': days, from today, that the scheduled
+;;   view covers.
+;; - `pos-startup-review-days': days, from today, that the reviews view
+;;   covers.
+;; - `pos-startup-finished-days': days, to today, that the finished view
+;;   covers.
+;; - `pos-startup-review-tag': the tag of a heading that schedules a
+;;   review of its scope.
+;; - `pos-startup-review-covers-property': the property of a review
+;;   heading that names other scopes it covers.
+;; - `pos-startup-next-action-states': the states of an item that is a
+;;   project's next action.
+;; - `pos-startup-prompts': the questions a session opens with.
+;; - `pos-startup-views': the names of the views, in the order they are
+;;   printed.
+;; - `pos-startup-default-views': the views `pos-startup-report' prints
+;;   when none is named.
 
 ;;; Code:
 

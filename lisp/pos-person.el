@@ -51,6 +51,15 @@
 ;; - `pos-person-batch': shell entry; add NAME, identity PERSON SCOPE,
 ;;   rename ID NAME, wait TARGET PERSON [NOTE], or arrived TARGET
 ;;   [STATE [NOTE]].
+;; - `pos-person-entities-directory': the directory of person-entities,
+;;   in the root's configuration directory.
+;; - `pos-person-identities-directory': the directory of person-
+;;   identities, in a scope's configuration directory.
+;; - `pos-person-heading': the top-level heading of a project's file
+;;   that holds its person-identities.
+;; - `pos-person-identity-name': the name of the identity that the
+;;   person NAME has in SCOPE.
+;; - `pos-identity': a person-identity of a tree.
 
 ;;; Code:
 

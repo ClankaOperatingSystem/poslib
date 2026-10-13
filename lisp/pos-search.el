@@ -38,6 +38,13 @@
 ;;
 ;; A hit is an alist as the wire has it: ref, range with lines a vector
 ;; of the first and last line, and passage.
+;; - `pos-search-modes': the modes this library matches itself; a keeper
+;;   may declare more.
+;; - `pos-search-limit': hits answered where no limit is asked for; the
+;;   protocol wants at least 100.
+;; - `pos-search-by-path': PATHS in the archive's order: bytewise.
+;; - `pos-search-beneath': a function of a path: whether it is WITHIN, a
+;;   CID of CIDS, or beneath.
 
 ;;; Code:
 

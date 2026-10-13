@@ -44,6 +44,31 @@
 ;; - `pos-sweep-destination', `pos-sweep-close-plans': the adapters,
 ;;   by the sweep's kind.
 ;; - `pos-sweep-batch': the command line.
+;; - `pos-sweep-default-path': where a sweep writes beneath a scope that
+;;   names no path.
+;; - `pos-sweep-week-name': the ISO 8601 week name of TIME, e.g.
+;;   "2026-W36".
+;; - `pos-sweep-weekday': sweep weekday; 0 is Sunday.
+;; - `pos-sweep-hour': sweep hour, local time.
+;; - `pos-sweep-boundary': the latest sweep boundary at or before NOW.
+;; - `pos-sweep-week-time': the boundary time of WEEK, an ISO week name
+;;   such as "2026-W36".
+;; - `pos-sweep-done-entries': (COUNT . SKIPPED) for the done entries of
+;;   FILE, changing nothing.
+;; - `pos-sweep-done-digest': a short digest of the done entries of FILE
+;;   that would be archived.
+;; - `pos-sweep-archive-done-in-file': archive the done entries of FILE
+;;   into ARCHIVE, stamped TIME.
+;; - `pos-sweep-adapter': (KIND ENTRY . DIR): how SCOPE's done items are
+;;   retired.
+;; - `pos-sweep-rows': the rows of a sweep of CORPUS for WEEK, changing
+;;   nothing.
+;; - `pos-sweep-read-plan': (WEEK . ROWS) from the plan in FILE.
+;; - `pos-sweep-report': a report of RESULT, a sweep of WEEK; DRY-RUN
+;;   words it.
+;; - `pos-sweep-close-apply': apply PLANS, as `pos-sweep-close' gives
+;;   them, each under its own hash.
+;; - `pos-sweep-usage': what `pos-sweep-batch' prints for help.
 
 ;;; Code:
 

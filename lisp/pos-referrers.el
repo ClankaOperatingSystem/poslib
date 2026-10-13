@@ -31,6 +31,10 @@
 ;;   `pos-referrer'.
 ;; - `pos-referrers-print': the same, printed, a line for each.
 ;; - `pos-referrers-ids': each Org ID of a tree and where it is held.
+;; - `pos-referrers-line': the line, from 1, that byte OFFSET of BYTES
+;;   is on.
+;; - `pos-referrers-links': the links in CORPUS that lead to PATH,
+;;   absolute, or into it.
 
 ;;; Code:
 

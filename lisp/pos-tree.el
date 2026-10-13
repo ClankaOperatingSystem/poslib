@@ -49,6 +49,8 @@
 ;; - `pos-tree-batch': the command line, in pos-cli.el.
 ;; - `pos-tree-refuse', `pos-tree-refused': a refusal of a plan or its
 ;;   doing, and its signal.
+;; - `pos-tree-ignore-archives': apply only archive exclusions at ROOT;
+;;   return the remaining tree plan.
 
 ;;; Code:
 

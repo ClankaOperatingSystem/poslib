@@ -48,6 +48,9 @@
 ;; - `pos-node-methodologies': the methodologies a configuration declares.
 ;; - `pos-node-refuse', `pos-node-refused': a refusal, and its signal.
 ;; - `pos-node-uuid-regexp': a UUID as a ledger's ID is written.
+;; - `pos-node-methodology-file': the declaration at a methodology's
+;;   root, doc/pos-methodology.txt.
+;; - `pos-node-url-p': non-nil if VALUE is a URL: a scheme, then ://.
 
 ;;; Code:
 

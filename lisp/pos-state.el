@@ -31,6 +31,14 @@
 ;;
 ;; - `pos-set-state': command.
 ;; - `pos-state-batch': shell entry; TARGET STATE [NOTE].
+;; - `pos-state-states': the states of `pos-todo-keywords', open and
+;;   done.
+;; - `pos-state-locate': (FILE . LINE) that TARGET names in CORPUS, the
+;;   corpus of ROOT.
+;; - `pos-state-log': record at point the change from PREVIOUS to STATE,
+;;   with NOTE if non-nil.
+;; - `pos-state-at-item': call FUNCTION at the heading of the item
+;;   TARGET names in the tree at ROOT.
 
 ;;; Code:
 

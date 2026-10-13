@@ -46,6 +46,17 @@
 ;; Checkpoints and repair are pos-checkpoint.el's; bringing a ledger
 ;; to schema 3, and moving an archive to its keeper and back, are
 ;; pos-keep.el's.
+;; - `pos-seal-uuid': a random UUID, version 4, in canonical form.
+;; - `pos-seal-rumour': (DESTINATION . TEXT), the rumour of TEXT dated
+;;   DATE.
+;; - `pos-seal-rumour-about': (DESTINATION . TEXT), the rumour of
+;;   TARGET, outside the archive of SCOPE.
+;; - `pos-seal-tool-directory': the directory this library is installed
+;;   in: the parent of its Lisp directory.
+;; - `pos-seal-tool-commit': the commit the tool installed in DIRECTORY
+;;   is at, or nil.
+;; - `pos-seal-held-at-once': cIDs a keeper is asked about in one
+;;   request: the least it takes.
 
 ;;; Code:
 

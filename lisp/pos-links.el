@@ -30,6 +30,33 @@
 ;; - `pos-resolution': what becomes of one when its item is sealed.
 ;; - `pos-links-link': the ipfs:// link to a sealed path in an archive.
 ;; - `pos-links-archive-of': the outermost archive above a path.
+;; - `pos-links-no-file': the directory an id link leads into when no
+;;   file holds its ID.
+;; - `pos-links-org-files': the Org files beneath DIR that a link by ID
+;;   may lead to.
+;; - `pos-links-annotate': the annotation replacing LINK's whole in
+;;   FILE, marked LABEL.
+;; - `pos-links-edits': the edits among LINKS, as `pos-links-rewrite'
+;;   takes them.
+;; - `pos-links-in-order': LINKS, alists with file and offset, sorted by
+;;   file then offset.
+;; - `pos-links-rewrite': BYTES with each (OFFSET FROM TO) of REWRITES
+;;   applied.
+;; - `pos-resolution-offset': the byte offset of the text replaced by
+;;   RESOLUTION.
+;; - `pos-resolution-from': the text replaced by RESOLUTION.
+;; - `pos-resolution-rewrite': RESOLUTION as (OFFSET FROM TO), for `pos-
+;;   links-rewrite'.
+;; - `pos-resolution-alist': RESOLUTION as a plan records it, an alist.
+;; - `pos-links-sealed': the ipfs:// link to archived TARGET, as sealed,
+;;   or refuse.
+;; - `pos-links-garden': the root of the garden holding SCOPE.
+;; - `pos-links-outside-garden-p': non-nil if TARGET lies outside the
+;;   garden holding SCOPE.
+;; - `pos-links-description': the description of TARGET a rumour gives,
+;;   from SCOPE's garden.
+;; - `pos-links-within-scope-p': non-nil if ARCHIVE is SCOPE's own, or a
+;;   scope's within it.
 
 ;;; Code:
 
