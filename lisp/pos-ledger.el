@@ -33,6 +33,9 @@
 ;; - `pos-ledger-kept': the keeper an archive is kept by, if it has one.
 ;; - `pos-ledger-named': the id an archive's ledger is to have, if named.
 ;; - `pos-ledger-check': the report on every archive under a root.
+;; - `pos-ledger-write-new', `pos-ledger-checkpoint-head',
+;;   `pos-ledger-record-with-cid': a file published read-only, a
+;;   head recorded beside its archive, and a file's entry with its CID.
 ;; - `pos-ledger-against-disk': how an archive on disk compares with
 ;;   its ledger, a `pos-comparison'.
 ;; - `pos-ledger-anchor-base', `pos-ledger-anchor-home': where a
@@ -746,6 +749,32 @@ within are known by the names their events are enrolled under."
         (pos-ledger-refuse
          'anchor "Missing anchored ledger (archive removed or history truncated): %s"
          (string-join absent ", "))))))
+
+;;;; Writing beside an archive
+
+(defun pos-ledger-write-new (file bytes &optional mode)
+  "Publish BYTES at FILE, which must not exist, read-only for all.
+With MODE, a recorded mode that has no write bit, the file has it."
+  (make-directory (file-name-directory file) t)
+  (let ((temp (make-temp-file (expand-file-name "_integrity-" (file-name-directory file)))))
+    (unwind-protect
+        (progn
+          (pos-bytes-write temp bytes)
+          (set-file-modes temp (or mode #o444))
+          (add-name-to-file temp file))
+      (delete-file temp))))
+
+(defun pos-ledger-checkpoint-head (archive head)
+  "Record HEAD for ARCHIVE in a checkpoint beside it."
+  (let* ((bytes (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "archive"))))
+         (folder (pos-ledger-anchor-home (file-name-directory archive)))
+         (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") folder)))
+    (unless (file-exists-p file)
+      (pos-ledger-write-new file bytes))))
+
+(defun pos-ledger-record-with-cid (file)
+  "Return FILE's record, as `pos-ledger-record' gives it, with its CID first."
+  (cons (cons 'cid (pos-cid-file file)) (pos-ledger-record file)))
 
 ;;;; Check
 

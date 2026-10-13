@@ -653,7 +653,7 @@ interrupted.  Return (EVENT-FILE . ROOT)."
           (when (file-exists-p anchors) (delete-directory anchors))))
       ;; 3. The conversion event.
       (unless (file-exists-p event)
-        (pos-seal-write-new event bytes))
+        (pos-ledger-write-new event bytes))
       ;; 4. Write bits, canon, checkpoint.
       (pos-migrate--protect .archive)
       (seq-doseq (c .canon)
@@ -668,7 +668,7 @@ interrupted.  Return (EVENT-FILE . ROOT)."
                                                               (decode-coding-string now 'utf-8))))
                                 .edits))
                   (t (pos-ledger-refuse 'plan "Canon changed since review: %s" file)))))))
-      (pos-seal-checkpoint-head .archive (pos-bytes-sha bytes))
+      (pos-ledger-checkpoint-head .archive (pos-bytes-sha bytes))
       (cons event (alist-get 'root (pos-bytes-parse bytes))))))
 
 (autoload 'pos-migrate-batch "pos-cli")
