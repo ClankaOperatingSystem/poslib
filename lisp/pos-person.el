@@ -61,7 +61,7 @@
 (require 'pos)
 (require 'pos-corpus)
 (require 'pos-state)
-(require 'pos-tree)
+(require 'pos-node)
 
 (defconst pos-person-entities-directory "person-entities"
   "The directory of person-entities, in the root's configuration directory.")
@@ -99,7 +99,7 @@ slash; for the root, the name of ROOT's directory."
 (defun pos-person--config-directory (dir)
   "Return the configuration directory of the node at DIR, or nil.
 Absolute, as a directory name."
-  (when-let* ((file (pos-tree-config-file dir)))
+  (when-let* ((file (pos-node-config-file dir)))
     (file-name-as-directory
      (expand-file-name (file-name-directory file) dir))))
 

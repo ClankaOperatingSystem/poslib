@@ -145,6 +145,36 @@ Signal an error if git did not succeed."
   (pos-test-git dir "init" "-q" "-b" "master")
   dir)
 
+;;;; Programs
+
+(defun pos-test-program (input command &rest args)
+  "Run COMMAND of pos-seal as a program, with ARGS, and INPUT on its input.
+A fresh Emacs with this library and what it requires on its load
+path, as a shell would run it.  INPUT is a string, or nil for none.
+Return (STATUS . OUTPUT), OUTPUT the bytes the program printed."
+  (let ((program (expand-file-name invocation-name invocation-directory))
+        (arguments
+         (append (list "-Q" "--batch")
+                 (mapcan (lambda (library)
+                           (list "-L" (file-name-directory
+                                       (expand-file-name (locate-library library)))))
+                         '("markdown-mode" "yaml" "pos-seal"))
+                 (list "-l" "pos-seal" "-f" command)
+                 args))
+        (out (generate-new-buffer " *pos-test-program*"))
+        (coding-system-for-read 'binary))
+    (unwind-protect
+        (progn
+          (with-current-buffer out (set-buffer-multibyte nil))
+          (cons (if input
+                    (with-temp-buffer
+                      (insert input)
+                      (apply #'call-process-region (point-min) (point-max)
+                             program nil (list out nil) nil arguments))
+                  (apply #'call-process program nil (list out nil) nil arguments))
+                (with-current-buffer out (buffer-string))))
+      (kill-buffer out))))
+
 ;;;; Time
 
 (defun pos-test-time (year month day hour minute)
