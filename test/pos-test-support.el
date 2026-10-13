@@ -154,6 +154,10 @@ Signal an error if git did not succeed."
 (defconst pos-test-sunday (encode-time (list 0 0 23 6 9 2026 nil -1 nil))
   "Sunday 2026-09-06 23:00 local: the sweep boundary the tests use.")
 
+(defconst pos-test-stamp
+  "\\[[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [[:alpha:]]+ [0-9]\\{2\\}:[0-9]\\{2\\}\\]"
+  "A regexp matching an inactive timestamp with a time, as a record is stamped.")
+
 ;;;; Bytes and JSON
 
 (defun pos-test-write-bytes (file bytes &optional mode)

@@ -51,19 +51,12 @@
 (require 'pos-bytes)
 (require 'pos-corpus)
 (require 'pos-links)
-(require 'pos-place)
 
 (defcustom pos-project-statuses '("COMMITTED" "WIP" "DONE")
   "The values a project file's STATUS property takes.
 COMMITTED is a project not begun, WIP one begun, DONE one closed."
   :type '(repeat string)
   :group 'pos)
-
-(defun pos-project--one-line-p (text)
-  "Return non-nil if TEXT is a string of one line that is not blank."
-  (and (stringp text)
-       (not (string-empty-p (string-trim text)))
-       (not (string-match-p "[[:cntrl:]]" text))))
 
 (defun pos-project--text (id title outcome review next created)
   "Return the text of a project file.
@@ -96,11 +89,11 @@ taken, as a file or a directory."
                (let ((case-fold-search nil))
                  (string-match-p "\\`[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\'" name)))
     (user-error "A name is lower-case letters, digits and hyphens: %s" name))
-  (unless (pos-project--one-line-p title)
+  (unless (pos-one-line-p title)
     (user-error "A title is one nonempty line"))
-  (when (and next (not (pos-project--one-line-p next)))
+  (when (and next (not (pos-one-line-p next)))
     (user-error "A next action is one nonempty line"))
-  (unless (pos-project--one-line-p outcome)
+  (unless (pos-one-line-p outcome)
     (user-error "An outcome is one nonempty line"))
   (unless (and (stringp review)
                (string-match-p "\\`[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\'" review))
@@ -173,45 +166,31 @@ PREVIOUS STATUS).  Refuse the status the project has, and what
   (unless (member status pos-project-statuses)
     (user-error "Unknown status: %s (one of %s)"
                 status (string-join pos-project-statuses ", ")))
-  (when (and note (not (pos-project--one-line-p note)))
+  (when (and note (not (pos-one-line-p note)))
     (user-error "A note is one nonempty line"))
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (corpus (pos-corpus root))
-         (file (pos-project--status-file corpus project))
-         (enable-local-variables nil)
-         (enable-local-eval nil)
-         (make-backup-files nil)
-         (auto-save-default nil)
-         (create-lockfiles t)
-         (vc-handled-backends nil))
-    (with-current-buffer (pos-place-buffer root corpus file)
-      (org-with-wide-buffer
-       (goto-char (point-min))
-       (re-search-forward pos-project--status-line)
-       (let ((previous (match-string-no-properties 1)))
-         (when (equal previous status)
-           (user-error "The project is already %s" status))
-         (unwind-protect
-             (progn
-               (lock-buffer)
-               (atomic-change-group
-                 (replace-match status t t nil 1)
-                 (re-search-forward "^:END:[ \t]*\n")
-                 (if (looking-at-p ":LOGBOOK:[ \t]*\n")
-                     (forward-line 1)
-                   (insert ":LOGBOOK:\n:END:\n")
-                   (forward-line -1))
-                 (insert (format "- Status %-12s from %-12s %s%s\n"
-                                 (format "\"%s\"" status)
-                                 (format "\"%s\"" previous)
-                                 (format-time-string
-                                  (org-time-stamp-format t t))
-                                 (if note
-                                     (concat " \\\\\n  " (string-trim note))
-                                   "")))
-                 (save-buffer)
-                 (list file previous status)))
-           (unlock-buffer)))))))
+         (file (pos-project--status-file corpus project)))
+    (pos-writing (pos-buffer-to-write root file corpus)
+      (goto-char (point-min))
+      (re-search-forward pos-project--status-line)
+      (let ((previous (match-string-no-properties 1)))
+        (when (equal previous status)
+          (user-error "The project is already %s" status))
+        (replace-match status t t nil 1)
+        (re-search-forward "^:END:[ \t]*\n")
+        (if (looking-at-p ":LOGBOOK:[ \t]*\n")
+            (forward-line 1)
+          (insert ":LOGBOOK:\n:END:\n")
+          (forward-line -1))
+        (insert (format "- Status %-12s from %-12s %s%s\n"
+                        (format "\"%s\"" status)
+                        (format "\"%s\"" previous)
+                        (format-time-string (org-time-stamp-format t t))
+                        (if note
+                            (concat " \\\\\n  " (string-trim note))
+                          "")))
+        (list file previous status)))))
 
 (defun pos-project--relink (file rewrite)
   "Return (BYTES . COUNT) for FILE with its path links rewritten.

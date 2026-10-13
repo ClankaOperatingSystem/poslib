@@ -43,26 +43,6 @@
 (require 'pos-corpus)
 (require 'pos-state)
 
-(defun pos-place-buffer (root corpus file)
-  "Return a buffer visiting FILE of CORPUS, the corpus of ROOT, to write it.
-Refuse a file the tree does not read or the root may not write,
-symlinks, unsaved or stale buffers and foreign locks."
-  (let ((name (file-relative-name file root)))
-    (unless (member file (pos-corpus-files corpus))
-      (user-error "Not a file the tree reads: %s" name))
-    (unless (pos-corpus-writable-p corpus file)
-      (user-error "Not a file this root may write: %s" name))
-    (when (file-symlink-p file)
-      (user-error "The file is a symlink: %s" name))
-    (when (stringp (file-locked-p file))
-      (user-error "%s is locked by another editor; save it there first" name))
-    (with-current-buffer (pos-visit file)
-      (when (buffer-modified-p)
-        (user-error "Save the modified buffer of %s first" name))
-      (unless (verify-visited-file-modtime (current-buffer))
-        (user-error "%s changed on disk; revert its buffer first" name))
-      (current-buffer))))
-
 (defun pos-place--heading (under)
   "Return (MARKER . LEVEL) of the heading UNDER names in the current buffer.
 UNDER is a slash-separated outline path, each name a heading's whole
@@ -140,12 +120,6 @@ refuses of either file."
          (corpus (pos-corpus root))
          (place (pos-state-locate root corpus target))
          (to-file (expand-file-name file root))
-         (enable-local-variables nil)
-         (enable-local-eval nil)
-         (make-backup-files nil)
-         (auto-save-default nil)
-         (create-lockfiles t)
-         (vc-handled-backends nil)
          (org-log-done 'time)
          (org-log-repeat 'time)
          (org-log-into-drawer t)
@@ -153,71 +127,72 @@ refuses of either file."
          (org-enforce-todo-dependencies nil)
          (org-enforce-todo-checkbox-dependencies nil)
          (kill-ring nil)
-         (from (pos-place-buffer root corpus (car place)))
-         (to (pos-place-buffer root corpus to-file))
+         (from (pos-buffer-to-write root (car place) corpus))
+         (to (pos-buffer-to-write root to-file corpus))
          (heading (with-current-buffer to (pos-place--heading under))))
     (unless heading
       (user-error "No heading %s in %s" under file))
-    (with-current-buffer from
-      (org-with-wide-buffer
-       (goto-char (point-min))
-       (forward-line (1- (cdr place)))
-       (unless (and (org-at-heading-p) (org-get-todo-state))
-         (user-error "No item at %s:%d"
-                     (file-relative-name (car place) root) (cdr place)))
-       (let ((previous (org-get-todo-state))
-             (end (save-excursion (org-end-of-subtree t t) (point)))
-             (came-from (string-join
-                         (cons (file-relative-name (car place) root)
-                               (org-get-outline-path))
-                         ", ")))
-         (when (and (eq from to) (<= (point) (car heading)) (< (car heading) end))
-           (user-error "The heading %s is the item or within it" under))
-         (when (equal previous state)
-           (user-error "The item is already %s" state))
-         (unwind-protect
-             (progn
-               (lock-buffer)
-               (with-current-buffer to (lock-buffer))
-               (let ((changes (list (prepare-change-group from)
-                                    (prepare-change-group to)))
-                     done)
-                 (unwind-protect
-                     (progn
-                       (mapc #'activate-change-group changes)
-                       (when state
-                         (org-todo state)
-                         (org-back-to-heading t)
-                         (pos-state-log state previous nil)
-                         (org-back-to-heading t))
-                       (pos-place--log came-from)
-                       (org-back-to-heading t)
-                       (org-cut-subtree)
-                       (prog1
-                           (with-current-buffer to
-                             (org-with-wide-buffer
-                              (goto-char (car heading))
-                              (org-end-of-subtree t t)
-                              (unless (bolp) (insert "\n"))
-                              (org-paste-subtree (1+ (cdr heading)))
-                              (org-back-to-heading t)
-                              (prog1
-                                  (list to-file (line-number-at-pos)
-                                        (substring-no-properties
-                                         (org-get-todo-state))
-                                        (substring-no-properties
-                                         (org-get-heading t t t t)))
-                                ;; The file that gains the item is
-                                ;; saved first: a failure between the
-                                ;; two saves leaves it twice, not lost.
-                                (save-buffer))))
-                         (unless (eq from to) (save-buffer))
-                         (setq done t)))
-                   (mapc (if done #'accept-change-group #'cancel-change-group)
-                         changes))))
-           (unlock-buffer)
-           (with-current-buffer to (unlock-buffer))
-           (set-marker (car heading) nil)))))))
+    (pos-with-write-settings
+     (with-current-buffer from
+       (org-with-wide-buffer
+        (goto-char (point-min))
+        (forward-line (1- (cdr place)))
+        (unless (and (org-at-heading-p) (org-get-todo-state))
+          (user-error "No item at %s:%d"
+                      (file-relative-name (car place) root) (cdr place)))
+        (let ((previous (org-get-todo-state))
+              (end (save-excursion (org-end-of-subtree t t) (point)))
+              (came-from (string-join
+                          (cons (file-relative-name (car place) root)
+                                (org-get-outline-path))
+                          ", ")))
+          (when (and (eq from to) (<= (point) (car heading)) (< (car heading) end))
+            (user-error "The heading %s is the item or within it" under))
+          (when (equal previous state)
+            (user-error "The item is already %s" state))
+          (unwind-protect
+              (progn
+                (lock-buffer)
+                (with-current-buffer to (lock-buffer))
+                (let ((changes (list (prepare-change-group from)
+                                     (prepare-change-group to)))
+                      done)
+                  (unwind-protect
+                      (progn
+                        (mapc #'activate-change-group changes)
+                        (when state
+                          (org-todo state)
+                          (org-back-to-heading t)
+                          (pos-state-log state previous nil)
+                          (org-back-to-heading t))
+                        (pos-place--log came-from)
+                        (org-back-to-heading t)
+                        (org-cut-subtree)
+                        (prog1
+                            (with-current-buffer to
+                              (org-with-wide-buffer
+                               (goto-char (car heading))
+                               (org-end-of-subtree t t)
+                               (unless (bolp) (insert "\n"))
+                               (org-paste-subtree (1+ (cdr heading)))
+                               (org-back-to-heading t)
+                               (prog1
+                                   (list to-file (line-number-at-pos)
+                                         (substring-no-properties
+                                          (org-get-todo-state))
+                                         (substring-no-properties
+                                          (org-get-heading t t t t)))
+                                 ;; The file that gains the item is
+                                 ;; saved first: a failure between the
+                                 ;; two saves leaves it twice, not lost.
+                                 (save-buffer))))
+                          (unless (eq from to) (save-buffer))
+                          (setq done t)))
+                    (mapc (if done #'accept-change-group #'cancel-change-group)
+                          changes))))
+            (unlock-buffer)
+            (with-current-buffer to (unlock-buffer))
+            (set-marker (car heading) nil))))))))
 
 (defun pos-place-batch ()
   "Place an item of `pos-directory' and print it, then each stale link.

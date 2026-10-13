@@ -28,6 +28,11 @@
 ;; - `pos-files': the Org files of a tree.
 ;; - `pos-todo-keywords', `pos-visit': the TODO sequence, and a buffer
 ;;   visiting a file with it in force.
+;; - `pos-buffer-to-write', `pos-writing', `pos-with-write-settings':
+;;   a buffer a command may write, refused before the first write;
+;;   one change to it, locked, saved or undone; and how Emacs writes
+;;   for a command.
+;; - `pos-one-line-p': whether a title or a note is one line.
 ;; - `pos-normalise-keywords': remove #+TODO lines from the files.
 ;; - `pos-map-headings', `pos-marker-at', `pos-open-descendant-p': the
 ;;   headings of a file, one of them by its line, and whether one has
@@ -102,6 +107,68 @@ the user's setting."
       (find-file-noselect file)
     (let ((org-todo-keywords pos-todo-keywords))
       (find-file-noselect file))))
+
+;;;; Writing a file
+
+(defun pos-one-line-p (text)
+  "Return non-nil if TEXT is a string of one line that is not blank."
+  (and (stringp text)
+       (not (string-empty-p (string-trim text)))
+       (not (string-match-p "[[:cntrl:]]" text))))
+
+(defmacro pos-with-write-settings (&rest body)
+  "Evaluate BODY with Emacs reading and writing files as a command does.
+No local variables read, no backup or auto-save files, a lock file
+while a buffer is locked, no version control, and a final newline."
+  (declare (indent 0) (debug t))
+  `(let ((enable-local-variables nil)
+         (enable-local-eval nil)
+         (make-backup-files nil)
+         (auto-save-default nil)
+         (create-lockfiles t)
+         (vc-handled-backends nil)
+         (require-final-newline t))
+     ,@body))
+
+(defun pos-buffer-to-write (root file &optional corpus)
+  "Return a buffer visiting FILE, in the tree at ROOT, to write it.
+With CORPUS, the corpus of ROOT, refuse a file the tree does not read
+or the root may not write.  Refuse a symbolic link, a file another
+editor holds locked, and a buffer with unsaved changes or older than
+the file.  A command asks for each buffer it will write before its
+first write, so that every refusal comes first."
+  (let ((name (file-relative-name file root)))
+    (when corpus
+      (unless (pos-corpus-owner corpus file)
+        (user-error "Not a file the tree reads: %s" name))
+      (unless (pos-corpus-writable-p corpus file)
+        (user-error "Not a file this root may write: %s" name)))
+    (when (file-symlink-p file)
+      (user-error "The file is a symlink: %s" name))
+    (when (stringp (file-locked-p file))
+      (user-error "%s is locked by another editor; save it there first" name))
+    (with-current-buffer (pos-with-write-settings (pos-visit file))
+      (when (buffer-modified-p)
+        (user-error "Save the modified buffer of %s first" name))
+      (unless (verify-visited-file-modtime (current-buffer))
+        (user-error "%s changed on disk; revert its buffer first" name))
+      (current-buffer))))
+
+(defmacro pos-writing (buffer &rest body)
+  "Evaluate BODY in BUFFER, widened, as one change, then save it.
+BUFFER is one `pos-buffer-to-write' returned.  The file is locked
+while BODY runs; what BODY changes is saved, or undone if it signals.
+Return what BODY returns."
+  (declare (indent 1) (debug (form body)))
+  `(pos-with-write-settings
+     (with-current-buffer ,buffer
+       (unwind-protect
+           (progn
+             (lock-buffer)
+             (atomic-change-group
+               (prog1 (org-with-wide-buffer ,@body)
+                 (save-buffer))))
+         (unlock-buffer)))))
 
 ;;;; The root and its settings
 

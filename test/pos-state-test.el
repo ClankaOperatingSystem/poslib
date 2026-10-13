@@ -32,10 +32,6 @@
 (require 'pos-state)
 (require 'pos-test-support)
 
-(defconst pos-state-test-stamp
-  "\\[[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\} [[:alpha:]]+ [0-9]\\{2\\}:[0-9]\\{2\\}\\]"
-  "A regexp matching an inactive timestamp with a time.")
-
 (defun pos-state-test-day (days)
   "Return the date DAYS from today, as YYYY-MM-DD."
   (format-time-string "%Y-%m-%d" (time-add nil (days-to-time days))))
@@ -63,7 +59,7 @@ closing date.  The item is returned as it is afterwards."
              (concat "\\`\\* WAITING Call the roofer\n"
                      ":PROPERTIES:\n:ID:       roofer\n:END:\n"
                      ":LOGBOOK:\n"
-                     "- State \"WAITING\" +from \"TODO\" +" pos-state-test-stamp
+                     "- State \"WAITING\" +from \"TODO\" +" pos-test-stamp
                      " \\\\\\\\\n  Asked by phone\n"
                      ":END:\nBody.\n\\* NEXT Other\n\\'")
              (pos-state-test-tasks root)))))
@@ -76,7 +72,7 @@ With no note, the record is the change and its time."
     (should (string-match-p
              (concat "\\`\\* Tasks\n\\*\\* TODO First\n\\*\\* SOMEDAY Second\n"
                      ":LOGBOOK:\n- State \"SOMEDAY\" +from \"NEXT\" +"
-                     pos-state-test-stamp "\n:END:\n\\'")
+                     pos-test-stamp "\n:END:\n\\'")
              (pos-state-test-tasks root)))))
 
 (ert-deftest pos-state/a-done-state-adds-the-closing-date ()
@@ -87,7 +83,7 @@ With no note, the record is the change and its time."
         (pos-set-state root "tasks.org:1" state)
         (should (string-match-p
                  (format "\\`\\* %s Pay the bill\nCLOSED: %s\n:LOGBOOK:\n"
-                         state pos-state-test-stamp)
+                         state pos-test-stamp)
                  (pos-state-test-tasks root)))))))
 
 (ert-deftest pos-state/a-repeating-item-set-done-is-open-on-its-next-date ()
@@ -115,7 +111,7 @@ days from today.  Org's message naming the next date is shown once."
                text))
       (should (string-match-p "^\\* TODO Weekly review" text))
       (should-not (string-match-p "CLOSED" text))
-      (should (string-match-p (concat "^:LAST_REPEAT: " pos-state-test-stamp) text))
+      (should (string-match-p (concat "^:LAST_REPEAT: " pos-test-stamp) text))
       (should (string-match-p "^- State \"DONE\" +from \"TODO\"" text)))))
 
 (ert-deftest pos-state/what-cannot-be-set-is-refused-and-the-file-unchanged ()
