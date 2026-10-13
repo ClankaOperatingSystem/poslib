@@ -177,9 +177,10 @@ original is left in `pos-salvage-closed-state', as is each open task
 beneath it, without its ID, and says where the copy is, by an id
 link.  With DRY-RUN nothing is written.  Return (FILE LINE STATE
 TITLE) for each task, as it stood.  Refuse a SOURCE that is not
-beneath ROOT or holds the intray, an intray that is not a regular
-file or that an editor holds, and a file whose buffer has unsaved
-changes or is older than the file."
+beneath ROOT, holds the intray, or holds a file that is not the
+root's to write, within another repository of the tree or a product;
+an intray that is not a regular file or that an editor holds; and a
+file whose buffer has unsaved changes or is older than the file."
   (let* ((root (file-name-as-directory (expand-file-name root)))
          (source (expand-file-name source))
          (intray-file (expand-file-name "intray.org" root))
@@ -194,6 +195,10 @@ changes or is older than the file."
       (user-error "Salvage needs a file or directory beneath the root: %s" source))
     (when (member intray-file files)
       (user-error "The item holds the intray: %s" source))
+    (let ((corpus (pos-corpus root)))
+      (dolist (file files)
+        (unless (pos-corpus-path-writable-p corpus file)
+          (user-error "Not the root's to write, within another repository: %s" file))))
     (let ((tasks (pos-salvage-open-tasks source)))
       (unless (or dry-run (not tasks))
 	(unless (and (file-regular-p intray-file) (not (file-symlink-p intray-file)))
