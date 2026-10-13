@@ -42,6 +42,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
 
@@ -127,25 +128,31 @@
 
 ;;;; Nodes
 
-;; A node is (CID TSIZE FILESIZE): its binary CID, the bytes of its
-;; whole DAG, and for files the bytes of content.
+(cl-defstruct (pos-cid--node (:constructor pos-cid--node-make) (:copier nil))
+  "A node of a DAG: its binary CID, and TSIZE, the bytes of its whole DAG.
+For a file, SIZE is the bytes of its content; nil for a directory."
+  cid tsize size)
+
+(cl-defstruct (pos-cid--link (:constructor pos-cid--link-make) (:copier nil))
+  "A link from a node to a child: the child's binary CID, NAME and TSIZE."
+  cid name tsize)
 
 (defun pos-cid--pb-node (links data)
-  "Return the dag-pb block of LINKS and DATA, links first.
-Each link is (CID NAME TSIZE)."
+  "Return the dag-pb block of LINKS and DATA, links first."
   (concat (mapconcat (lambda (link)
                        (pos-cid--bytes-field
-                        2 (concat (pos-cid--bytes-field 1 (nth 0 link))
-                                  (pos-cid--bytes-field 2 (nth 1 link))
-                                  (pos-cid--varint-field 3 (nth 2 link)))))
+                        2 (concat (pos-cid--bytes-field 1 (pos-cid--link-cid link))
+                                  (pos-cid--bytes-field 2 (pos-cid--link-name link))
+                                  (pos-cid--varint-field 3 (pos-cid--link-tsize link)))))
                      links)
           (pos-cid--bytes-field 1 data)))
 
 (defun pos-cid--pb (links data)
   "Return the node of the dag-pb block of LINKS and DATA."
   (let ((block (pos-cid--pb-node links data)))
-    (list (pos-cid--cid pos-cid--dag-pb block)
-          (apply #'+ (length block) (mapcar (lambda (l) (nth 2 l)) links)))))
+    (pos-cid--node-make
+     :cid (pos-cid--cid pos-cid--dag-pb block)
+     :tsize (apply #'+ (length block) (mapcar #'pos-cid--link-tsize links)))))
 
 (defconst pos-cid--mask64 (1- (ash 1 64)) "The low 64 bits.")
 
@@ -230,9 +237,12 @@ next byte."
           (let ((prefix (format "%02X" index)))
             (push (if (cdr slot)
                       (let ((sub (pos-cid--shard (nreverse slot) (1+ level))))
-                        (list (nth 0 sub) prefix (nth 1 sub)))
+                        (pos-cid--link-make :cid (pos-cid--node-cid sub) :name prefix
+                                            :tsize (pos-cid--node-tsize sub)))
                     (let ((link (cdar slot)))
-                      (list (nth 0 link) (concat prefix (nth 1 link)) (nth 2 link))))
+                      (pos-cid--link-make :cid (pos-cid--link-cid link)
+                                          :name (concat prefix (pos-cid--link-name link))
+                                          :tsize (pos-cid--link-tsize link))))
                   links)))))
     (pos-cid--pb (nreverse links)
                  (concat (pos-cid--varint-field 1 5)
@@ -241,34 +251,39 @@ next byte."
                          (pos-cid--varint-field 6 pos-cid--hamt-fanout)))))
 
 (defun pos-cid--directory-node (links)
-  "Return the node of a directory linking LINKS, each (CID NAME TSIZE).
+  "Return the node of a directory linking LINKS.
 A plain directory node, or a HAMT shard where that node would exceed
 `pos-cid-sharding-threshold' bytes."
   (let ((data (pos-cid--varint-field 1 1)))
     (if (> (length (pos-cid--pb-node links data)) pos-cid-sharding-threshold)
         (pos-cid--shard (mapcar (lambda (link)
-                                  (cons (pos-cid-murmur3-x64-64 (nth 1 link)) link))
+                                  (cons (pos-cid-murmur3-x64-64 (pos-cid--link-name link))
+                                        link))
                                 links)
                         0)
       (pos-cid--pb links data))))
 
 (defun pos-cid--leaf (bytes)
   "Return the raw leaf node of BYTES."
-  (list (pos-cid--cid pos-cid--raw bytes) (length bytes) (length bytes)))
+  (pos-cid--node-make :cid (pos-cid--cid pos-cid--raw bytes)
+                      :tsize (length bytes) :size (length bytes)))
 
 (defun pos-cid--file-links (children)
   "Return (LINKS . DATA) of the file node linking CHILDREN, each a node."
-  (let ((sizes (mapcar (lambda (c) (nth 2 c)) children)))
-    (cons (mapcar (lambda (c) (list (nth 0 c) "" (nth 1 c))) children)
+  (let ((sizes (mapcar #'pos-cid--node-size children)))
+    (cons (mapcar (lambda (c) (pos-cid--link-make :cid (pos-cid--node-cid c) :name ""
+                                                  :tsize (pos-cid--node-tsize c)))
+                  children)
           (concat (pos-cid--varint-field 1 2)
                   (pos-cid--varint-field 3 (apply #'+ sizes))
                   (mapconcat (lambda (s) (pos-cid--varint-field 4 s)) sizes)))))
 
 (defun pos-cid--file-node (children)
   "Return the file node linking CHILDREN, each a node."
-  (let ((parts (pos-cid--file-links children)))
-    (append (pos-cid--pb (car parts) (cdr parts))
-            (list (apply #'+ (mapcar (lambda (c) (nth 2 c)) children))))))
+  (let* ((parts (pos-cid--file-links children))
+         (node (pos-cid--pb (car parts) (cdr parts))))
+    (setf (pos-cid--node-size node) (apply #'+ (mapcar #'pos-cid--node-size children)))
+    node))
 
 (defun pos-cid-blocks (bytes)
   "Return the blocks of the unibyte string BYTES as a file, (CID . BLOCK) each.
@@ -280,17 +295,17 @@ file's own CID among them; CID is text.  Equal blocks appear once."
     (while (progn
              (let* ((chunk (substring bytes start (min size (+ start pos-cid-chunk-size))))
                     (node (pos-cid--leaf chunk)))
-               (unless (assoc (pos-cid--text (car node)) held)
-                 (push (cons (pos-cid--text (car node)) chunk) held))
+               (unless (assoc (pos-cid--text (pos-cid--node-cid node)) held)
+                 (push (cons (pos-cid--text (pos-cid--node-cid node)) chunk) held))
                (push node nodes))
              (setq start (+ start pos-cid-chunk-size))
              (< start size)))
     (pos-cid--balance
      (nreverse nodes)
      (lambda (node children)
-       (unless (assoc (pos-cid--text (car node)) held)
+       (unless (assoc (pos-cid--text (pos-cid--node-cid node)) held)
          (let ((parts (pos-cid--file-links children)))
-           (push (cons (pos-cid--text (car node))
+           (push (cons (pos-cid--text (pos-cid--node-cid node))
                        (pos-cid--pb-node (car parts) (cdr parts)))
                  held)))))
     (nreverse held)))
@@ -321,10 +336,10 @@ content is needed."
   (let ((cid (make-string 36 0)) (start 0) leaves)
     (while (progn
              (let ((n (- (min size (+ start pos-cid-chunk-size)) start)))
-               (push (list cid n n) leaves))
+               (push (pos-cid--node-make :cid cid :tsize n :size n) leaves))
              (setq start (+ start pos-cid-chunk-size))
              (< start size)))
-    (nth 1 (pos-cid--balance (nreverse leaves)))))
+    (pos-cid--node-tsize (pos-cid--balance (nreverse leaves)))))
 
 (defun pos-cid--chunk (file start end)
   "Return bytes START to END of FILE."
@@ -381,7 +396,8 @@ VISIT receives a relative path and a node."
                               (funcall visit child n)
                               n))
                            (t (error "Not a regular file: %s" path)))))
-               (list (nth 0 node) (car entry) (nth 1 node))))
+               (pos-cid--link-make :cid (pos-cid--node-cid node) :name (car entry)
+                                   :tsize (pos-cid--node-tsize node))))
            (pos-cid--entries dir)))
          (node (pos-cid--directory-node links)))
     (funcall visit (if (string-empty-p rel) "." rel) node)
@@ -393,17 +409,17 @@ VISIT receives a relative path and a node."
   "Return the CID of the unibyte string BYTES, as a file's content."
   (when (multibyte-string-p bytes)
     (error "Encode the string first: CIDs are of bytes"))
-  (pos-cid--text (car (pos-cid--content (length bytes)
-                                        (lambda (start end)
-                                          (substring bytes start end))))))
+  (pos-cid--text (pos-cid--node-cid
+                  (pos-cid--content (length bytes)
+                                    (lambda (start end) (substring bytes start end))))))
 
 (defun pos-cid-file (file)
   "Return the CID of FILE's content."
-  (pos-cid--text (car (pos-cid--file file))))
+  (pos-cid--text (pos-cid--node-cid (pos-cid--file file))))
 
 (defun pos-cid-directory (dir)
   "Return the CID of the tree at DIR."
-  (pos-cid--text (car (pos-cid--directory dir "" #'ignore))))
+  (pos-cid--text (pos-cid--node-cid (pos-cid--directory dir "" #'ignore))))
 
 (defun pos-cid-tree (dir)
   "Return the CID of every file and directory under DIR, root included.
@@ -411,7 +427,7 @@ An alist of relative path and CID; the root is \".\"."
   (let (cids)
     (pos-cid--directory dir ""
                         (lambda (rel node)
-                          (push (cons rel (pos-cid--text (car node))) cids)))
+                          (push (cons rel (pos-cid--text (pos-cid--node-cid node))) cids)))
     (nreverse cids)))
 
 (defun pos-cid-decode (text)
@@ -422,8 +438,9 @@ An alist of relative path and CID; the root is \".\"."
 
 (defun pos-cid--inventory-directory (node rel visit)
   "Return the node of the directory NODE at REL, calling VISIT on each CID.
-NODE maps names to child NODEs, or to (CID TSIZE TEXT) for files; VISIT
-receives a relative path and a CID as text, files as given."
+NODE maps names to child NODEs, or for a file to (NODE . TEXT), its
+node and its CID as text; VISIT receives a relative path and a CID as
+text, files as given."
   (let* ((names (sort (hash-table-keys node)
                       (lambda (a b)
                         (string< (encode-coding-string a 'utf-8)
@@ -434,12 +451,14 @@ receives a relative path and a CID as text, files as given."
                           (path (concat rel (unless (string-empty-p rel) "/") name))
                           (n (if (hash-table-p child)
                                  (pos-cid--inventory-directory child path visit)
-                               (funcall visit path (nth 2 child))
-                               child)))
-                     (list (nth 0 n) (encode-coding-string name 'utf-8) (nth 1 n))))
+                               (funcall visit path (cdr child))
+                               (car child))))
+                     (pos-cid--link-make :cid (pos-cid--node-cid n)
+                                         :name (encode-coding-string name 'utf-8)
+                                         :tsize (pos-cid--node-tsize n))))
                  names))
          (n (pos-cid--directory-node links)))
-    (funcall visit (if (string-empty-p rel) "." rel) (pos-cid--text (car n)))
+    (funcall visit (if (string-empty-p rel) "." rel) (pos-cid--text (pos-cid--node-cid n)))
     n))
 
 (defun pos-cid-block (codec block)
@@ -479,8 +498,8 @@ relative path and CID, files as given, the root \".\"."
         (when (gethash name node)
           (error "A file and a directory share a path: %s" path))
         (puthash name
-                 (list (pos-cid-decode (nth 1 entry))
-                       (pos-cid--file-tsize (nth 2 entry))
+                 (cons (pos-cid--node-make :cid (pos-cid-decode (nth 1 entry))
+                                           :tsize (pos-cid--file-tsize (nth 2 entry)))
                        (nth 1 entry))
                  node)))
     (dolist (path empty)
