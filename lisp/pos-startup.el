@@ -52,6 +52,7 @@
 (require 'pos)
 (require 'pos-corpus)
 (require 'pos-person)
+(require 'pos-project)
 (require 'pos-roam)
 (require 'pos-node)
 
@@ -80,18 +81,6 @@
 Its value is paths apart by spaces, each from the directory of the
 heading's file to a scope.  A space within a path is written %20."
   :type 'string
-  :group 'pos)
-
-(defcustom pos-startup-active-statuses '("COMMITTED" "WIP")
-  "Values of a project file's STATUS property that make it active.
-An active project is expected to have a review scheduled."
-  :type '(repeat string)
-  :group 'pos)
-
-(defcustom pos-startup-stuck-statuses '("WIP")
-  "Values of a project file's STATUS property that make it begun.
-A begun project is expected to have a next action."
-  :type '(repeat string)
   :group 'pos)
 
 (defcustom pos-startup-next-action-states '("NEXT" "WAITING")
@@ -208,7 +197,7 @@ configuration names it."
      (goto-char (point-min))
      (let ((end (save-excursion
                   (or (re-search-forward "^\\*+ " nil t) (point-max)))))
-       (when (re-search-forward "^:STATUS:[ \t]+\\(\\S-+\\)" end t)
+       (when (re-search-forward pos-project-status-line end t)
          (match-string-no-properties 1))))))
 
 (defun pos-startup--scope-named (name file)
@@ -479,7 +468,7 @@ the root's apart.  The root's reviews are of the whole tree."
 
 (defun pos-startup--reviews-to-schedule ()
   "Return the view of the scopes of `pos-startup--corpus' with no review scheduled.
-Active projects, by `pos-startup-active-statuses', responsibilities,
+Active projects, by `pos-project-statuses', responsibilities,
 and the root, named \".\" as its configuration names it: each that no
 review covers, by `pos-startup--reviews-of-scopes'.  A fourth list,
 printed only when it has a line, gives each path a review names that
@@ -491,7 +480,7 @@ is no scope's."
       (let* ((status (pos-startup--file-status file))
              (owner (pos-corpus-owner pos-startup--corpus file))
              (scope (pos-scope-path owner)))
-        (when (and (member status pos-startup-active-statuses)
+        (when (and (pos-project-active-p status)
                    (not (member scope reviewed)))
           (pos-startup--scope-row owner status)
           (push (format "%-54s %s" scope status) projects))))
@@ -524,18 +513,12 @@ is no scope's."
                    (cdr reviews)))))))))
 
 (defun pos-startup--has-next-p (file)
-  "Return non-nil if FILE has a NEXT item."
-  (let ((pos-startup-next-action-states '("NEXT")))
-    (pos-startup--has-next-action-p file)))
-
-(defun pos-startup--has-next-action-p (file)
-  "Return non-nil if FILE has an item that is a next action.
-Its state is one of `pos-startup-next-action-states'."
+  "Return non-nil if FILE has an item in one of the states NEXT alone."
   (with-current-buffer (pos-visit file)
     (catch 'found
       (org-map-entries
        (lambda ()
-         (when (member (org-get-todo-state) pos-startup-next-action-states)
+         (when (equal (org-get-todo-state) "NEXT")
            (throw 'found t)))
        nil 'file)
       nil)))
@@ -544,13 +527,12 @@ Its state is one of `pos-startup-next-action-states'."
                                     (:copier nil))
   "What the files of one project say of it.
 PATH is the project's, and OWNER its scope.  STATUS is that of its
-files; HAS-NEXT is non-nil if one of them has an item in one of
-`pos-startup-next-action-states', and NEXT is the title of the first
-such item.  OUTCOME is as `pos-startup--outcome' gives it.  REVIEW is
-the earliest date, as YYYY-MM-DD, an open heading tagged
-`pos-startup-review-tag' is scheduled on.  Each of these is nil if
-no file of the project has it."
-  path owner status has-next outcome next review)
+files, and NEXT the title of the first item in one of them in one of
+`pos-startup-next-action-states'.  OUTCOME is as `pos-startup--outcome'
+gives it.  REVIEW is the earliest date, as YYYY-MM-DD, an open
+heading tagged `pos-startup-review-tag' is scheduled on.  Each of
+these is nil if no file of the project has it."
+  path owner status outcome next review)
 
 (defun pos-startup--project-of (file projects)
   "Return the one of PROJECTS that FILE belongs to, or a new one.
@@ -561,61 +543,48 @@ A new one has its path and owner alone."
                   projects)
         (pos-startup--project-make :path path :owner owner))))
 
-(defun pos-startup--stuck ()
-  "Return the view of the projects of `pos-startup--corpus' with no next action.
-Begun projects, by `pos-startup-stuck-statuses', none of whose files
-has an item in one of `pos-startup-next-action-states'."
+(defun pos-startup--read-projects ()
+  "Return the projects of `pos-startup--corpus', each read from its files.
+A `pos-startup--project' for each, in the order of their paths."
   (let (projects)
     (dolist (file (pos-startup--files-of-kind 'project))
       (let ((project (pos-startup--project-of file projects)))
         (cl-pushnew project projects)
-        (setf (pos-startup--project-status project)
-              (or (pos-startup--project-status project)
-                  (pos-startup--file-status file))
-              (pos-startup--project-has-next project)
-              (or (pos-startup--project-has-next project)
-                  (pos-startup--has-next-action-p file)))))
-    (pos-startup--list
-     "Projects with no next action"
-     (mapcar (pcase-lambda ((cl-struct pos-startup--project path owner status))
-               (pos-startup--scope-row owner status)
-               (format "%-54s %s" path status))
-             (seq-sort-by #'pos-startup--project-path #'string<
-                          (seq-filter
-                           (pcase-lambda ((cl-struct pos-startup--project status has-next))
-                             (and (member status pos-startup-stuck-statuses)
-                                  (not has-next)))
-                           projects))))))
+        (pos-startup--read-project project file)))
+    (seq-sort-by #'pos-startup--project-path #'string< projects)))
+
+(defun pos-startup--project-rows (title projects)
+  "Return the view TITLE listing PROJECTS, each a line of its path and status."
+  (pos-startup--list
+   title
+   (mapcar (pcase-lambda ((cl-struct pos-startup--project path owner status))
+             (pos-startup--scope-row owner status)
+             (format "%-54s %s" path status))
+           projects)))
+
+(defun pos-startup--stuck ()
+  "Return the view of the projects of `pos-startup--corpus' with no next action.
+Begun projects, by `pos-project-statuses', none of whose files has an
+item in one of `pos-startup-next-action-states'."
+  (pos-startup--project-rows
+   "Projects with no next action"
+   (seq-filter (pcase-lambda ((cl-struct pos-startup--project status next))
+                 (and (pos-project-begun-p status) (not next)))
+               (pos-startup--read-projects))))
 
 (defun pos-startup--no-outcome ()
   "Return the view of the active projects with no outcome.
 The projects of `pos-startup--corpus' that are active by
-`pos-startup-active-statuses', with no file that has an outcome as
-`pos-startup--outcome' gives it.  A project is what lies
-where a responsibility's projects belong, and its outcome says why it
-is done and how it is known to be finished."
-  (let (projects)
-    (dolist (file (pos-startup--files-of-kind 'project))
-      (let ((project (pos-startup--project-of file projects)))
-        (cl-pushnew project projects)
-        (setf (pos-startup--project-status project)
-              (or (pos-startup--project-status project)
-                  (pos-startup--file-status file))
-              (pos-startup--project-outcome project)
-              (or (pos-startup--project-outcome project)
-                  (with-current-buffer (pos-visit file) (pos-startup--outcome))))))
-    (pos-startup--list
-     (concat "Projects with no outcome: why is each done, "
-             "and how is it known to be finished?")
-     (mapcar (pcase-lambda ((cl-struct pos-startup--project path owner status))
-               (pos-startup--scope-row owner status)
-               (format "%-54s %s" path status))
-             (seq-sort-by #'pos-startup--project-path #'string<
-                          (seq-filter
-                           (pcase-lambda ((cl-struct pos-startup--project status outcome))
-                             (and (member status pos-startup-active-statuses)
-                                  (not outcome)))
-                           projects))))))
+`pos-project-statuses', with no file that has an outcome as
+`pos-startup--outcome' gives it.  A project is what lies where a
+responsibility's projects belong, and its outcome says why it is done
+and how it is known to be finished."
+  (pos-startup--project-rows
+   (concat "Projects with no outcome: why is each done, "
+           "and how is it known to be finished?")
+   (seq-filter (pcase-lambda ((cl-struct pos-startup--project status outcome))
+                 (and (pos-project-active-p status) (not outcome)))
+               (pos-startup--read-projects))))
 
 (defun pos-startup--outcome ()
   "Return the OUTCOME property the current buffer has before its first heading.
@@ -667,18 +636,13 @@ project has; its review is the earliest of its files'."
 
 (defun pos-startup--projects ()
   "Return the projects view of `pos-startup--corpus'.
-Each active project, by `pos-startup-active-statuses': its STATUS,
+Each active project, by `pos-project-statuses': its STATUS,
 the date of its next review, its next action and its outcome, each
 read from the project's files and none written anywhere else, but
 that a review elsewhere that names the project is a review of it,
 by `pos-startup--reviews-of-scopes'.  What a project lacks is shown
 as a dash."
-  (let ((covered (car (pos-startup--reviews-of-scopes)))
-        projects)
-    (dolist (file (pos-startup--files-of-kind 'project))
-      (let ((project (pos-startup--project-of file projects)))
-        (cl-pushnew project projects)
-        (pos-startup--read-project project file)))
+  (let ((covered (car (pos-startup--reviews-of-scopes))))
     (pos-startup--list
      "Projects"
      (mapcan
@@ -696,11 +660,9 @@ as a dash."
           (list (format "%-54s %-9s review %-10s" path status (or review "-"))
                 (format "  next: %s" (or next "-"))
                 (format "  outcome: %s" (or outcome "-")))))
-      (seq-sort-by #'pos-startup--project-path #'string<
-                   (seq-filter (lambda (project)
-                                 (member (pos-startup--project-status project)
-                                         pos-startup-active-statuses))
-                               projects))))))
+      (seq-filter (lambda (project)
+                    (pos-project-active-p (pos-startup--project-status project)))
+                  (pos-startup--read-projects))))))
 
 (defun pos-startup--intray ()
   "Return the intray view of `pos-startup--corpus'.
