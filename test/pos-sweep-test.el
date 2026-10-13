@@ -41,7 +41,7 @@
 (require 'ert)
 (require 'cl-lib)
 (require 'pos-sweep)
-(require 'pos-tree)
+(require 'pos-node)
 (require 'pos-test-support)
 
 ;;;; Fixtures
@@ -367,7 +367,7 @@ may be given with or without its slash."
 The reader strips the slash a path is written with, so the week
 directories lie directly beneath the path named."
   (let ((entry (aref (alist-get 'archives
-                                (pos-tree-read-config
+                                (pos-node-read-config
                                  (pos-sweep-test-config
                                   (pos-sweep-test-entry "." "sweep: weekly"
                                                         "path: history/"))))

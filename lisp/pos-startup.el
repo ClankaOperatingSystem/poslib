@@ -53,7 +53,7 @@
 (require 'pos-corpus)
 (require 'pos-person)
 (require 'pos-roam)
-(require 'pos-tree)
+(require 'pos-node)
 
 (defcustom pos-startup-scheduled-days 14
   "Days, from today, that the scheduled view covers."
@@ -875,13 +875,13 @@ is refused is one line naming the refusal."
     (pcase-dolist (`(,scope ,name . ,dir)
                    (pos-corpus-methodologies pos-startup--corpus))
       (condition-case err
-          (seq-doseq (kind (alist-get 'canon (or (pos-tree-read-methodology-file dir)
+          (seq-doseq (kind (alist-get 'canon (or (pos-node-read-methodology-file dir)
                                                  '((canon . [])))))
             (push (list (pos-scope-path scope) name (alist-get 'kind kind)
                         (alist-get 'at kind)
                         (concat "start at " (alist-get 'entrance kind)))
                   rows))
-        (pos-tree-refused
+        (pos-node-refused
          (push (list (pos-scope-path scope) name
                      (format "(refused: %s: %s)" (nth 1 err) (nth 2 err)))
                rows))))

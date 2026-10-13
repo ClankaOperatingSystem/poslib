@@ -37,7 +37,7 @@
 (require 'cl-lib)
 (require 'pos)
 (require 'pos-corpus)
-(require 'pos-tree)
+(require 'pos-node)
 
 ;;;; Checks of a file
 
@@ -222,7 +222,7 @@ check bin/ does not hold, are each a finding at the methodology."
       (let ((at (directory-file-name dir))
             (project (pos-scope-dir scope)))
         (condition-case err
-            (seq-doseq (check (alist-get 'checks (or (pos-tree-read-methodology-file dir)
+            (seq-doseq (check (alist-get 'checks (or (pos-node-read-methodology-file dir)
                                                      '((checks . [])))))
               (let ((command (expand-file-name (concat "bin/" check) dir)))
                 (if (not (file-executable-p command))
@@ -240,7 +240,7 @@ check bin/ does not hold, are each a finding at the methodology."
                                 findings))
                       (push (list at 1 (format "check %s could not check: %s" check errors))
                             findings))))))
-          (pos-tree-refused
+          (pos-node-refused
            (push (list at 1 (format "declaration refused: %s: %s" (nth 1 err) (nth 2 err)))
                  findings)))))
     (nreverse findings)))

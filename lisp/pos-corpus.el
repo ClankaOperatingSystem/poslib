@@ -67,7 +67,7 @@
 
 (require 'cl-lib)
 (require 'seq)
-(require 'pos-tree)
+(require 'pos-node)
 
 (cl-defstruct (pos-scope (:constructor pos-scope--make) (:copier nil))
   "A scope of the tree: the root, a responsibility, a project or a product.
@@ -76,7 +76,7 @@ relative to the root, \".\" for the root itself; for a one-file
 project it is the file's path without its extension.  DIR is the
 directory the scope is, absolute, as a directory name; for a one-file
 project, the directory holding the file.  CONFIG is the scope's
-configuration as `pos-tree-read-config' gives it, or nil for one that
+configuration as `pos-node-read-config' gives it, or nil for one that
 has none.  NODE is the nearest scope at or above this one that has a
 configuration, or nil for the root."
   kind path dir config node)
@@ -125,7 +125,7 @@ above SCOPE with a configuration."
               (if (equal (pos-scope-path node) ".")
                   (cdr methodology)
                 (concat (pos-scope-path node) "/" (cdr methodology))))
-            (pos-tree-methodologies config))))
+            (pos-node-methodologies config))))
 
 (defun pos-corpus--walk (root lister)
   "Walk the tree at ROOT and return its corpus, asking LISTER what is where.
@@ -141,9 +141,9 @@ two-configurations, and :names, the names in it, sorted."
            ;; and the caller does not enter the directory.
            (condition-case err
                (if (eq text 'two-configurations)
-                   (pos-tree-refuse 'two-configurations "The node has two configurations")
-                 (pos-tree-read-config text))
-             (pos-tree-refused
+                   (pos-node-refuse 'two-configurations "The node has two configurations")
+                 (pos-node-read-config text))
+             (pos-node-refused
               (push (cons (if (equal path "") "." path)
                           (format "config-refused: %s: %s" (nth 1 err) (nth 2 err)))
                     findings)
@@ -187,7 +187,7 @@ two-configurations, and :names, the names in it, sorted."
                  ('dir
                   (let ((text (plist-get info :config)))
                     (cond
-                     ((pos-tree-unwalked-p (string-remove-prefix exclusions-node path)
+                     ((pos-node-unwalked-p (string-remove-prefix exclusions-node path)
                                            exclusions))
                      ;; A methodology's files are not the project's canon.
                      ((member path (pos-corpus--methodology-paths scope))
@@ -211,7 +211,7 @@ two-configurations, and :names, the names in it, sorted."
                             (push (cons path "project-holds-projects: a project is a leaf")
                                   findings))
                           (descend path node
-                                   (if declares (pos-tree-exclusions config) exclusions)
+                                   (if declares (pos-node-exclusions config) exclusions)
                                    (if declares (concat path "/") exclusions-node)
                                    nil (declared-by config path)))))
                      ;; One with none is a product, read under the
@@ -219,7 +219,7 @@ two-configurations, and :names, the names in it, sorted."
                      ((member path declared)
                       (push path unwritable)
                       (descend path (make-scope 'product path nil (nearest-node scope))
-                               (pos-tree-exclusions nil) (concat path "/") nil nil))
+                               (pos-node-exclusions nil) (concat path "/") nil nil))
                      ;; A configuration that no node declares is not in
                      ;; the tree.
                      (text
@@ -242,7 +242,7 @@ two-configurations, and :names, the names in it, sorted."
              (config (and text (read-config "" text)))
              (root-scope (make-scope 'root "." config nil)))
         (when (or config (not text))
-          (descend "" root-scope (pos-tree-exclusions config) "" nil
+          (descend "" root-scope (pos-node-exclusions config) "" nil
                    (declared-by config "")))
         (pos-corpus--make
          :root (file-name-as-directory root)
@@ -266,11 +266,11 @@ As `pos-corpus--walk' asks: for a path, what is there."
               ;; Two configurations have no text to read: the walk is
               ;; told, and refuses the node.
               :config (condition-case nil
-                          (when-let* ((file (pos-tree-config-file full)))
+                          (when-let* ((file (pos-node-config-file full)))
                             (with-temp-buffer
                               (insert-file-contents (expand-file-name file full))
                               (buffer-string)))
-                        (pos-tree-refused 'two-configurations))
+                        (pos-node-refused 'two-configurations))
               :names (sort (directory-files full nil directory-files-no-dot-files-regexp)
                            #'string<)))
        (t (list :kind 'file))))))
@@ -310,7 +310,7 @@ whether or not it is there."
                                     (file-name-as-directory
                                      (expand-file-name (cdr methodology)
                                                        (pos-scope-dir scope))))))
-                      (pos-tree-methodologies config))))
+                      (pos-node-methodologies config))))
           (pos-corpus-scopes corpus)))
 
 (defun pos-corpus--anothers-p (corpus relative)

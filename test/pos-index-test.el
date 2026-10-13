@@ -187,23 +187,9 @@ nothing."
       (let* ((archive (pos-test-scope-sealed scope))
              (cid (cdr (assoc "trial" (pos-ledger-fold-cids archive))))
              (default-directory (file-name-as-directory scope))
-             (run (lambda (link)
-                    (with-temp-buffer
-                      (set-buffer-multibyte nil)
-                      (let ((coding-system-for-read 'binary))
-                        (list (call-process
-                               (expand-file-name invocation-name invocation-directory)
-                               nil '(t nil) nil "-Q" "--batch"
-                               "-L" (file-name-directory
-                                     (expand-file-name (locate-library "markdown-mode")))
-                               "-L" (file-name-directory
-                                     (expand-file-name (locate-library "yaml")))
-                               "-L" (file-name-directory
-                                     (expand-file-name (locate-library "pos-seal")))
-                               "-l" "pos-seal" "-f" "pos-seal-batch" "fetch" link)
-                              (buffer-string)))))))
-        (should (equal (list 0 bytes) (funcall run (concat "ipfs://" cid "/bytes.bin"))))
-        (should (equal '(2 "") (funcall run (concat "ipfs://" cid "/other.bin"))))))))
+             (run (lambda (link) (pos-test-program nil "pos-seal-batch" "fetch" link))))
+        (should (equal (cons 0 bytes) (funcall run (concat "ipfs://" cid "/bytes.bin"))))
+        (should (equal '(2 . "") (funcall run (concat "ipfs://" cid "/other.bin"))))))))
 
 (ert-deftest pos-index/a-fetched-file-is-decoded-as-its-bytes-say ()
   "A kept file of bytes that are not text is shown undecoded.

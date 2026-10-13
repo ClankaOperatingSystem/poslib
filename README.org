@@ -39,6 +39,10 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-bytes.el= :: a file's bytes, their hash, and DAG-JSON.
 - =lisp/pos-path.el= :: the rules for a path written in a ledger or a
   configuration, and where a node's configuration is.
+- =lisp/pos-node.el= :: what a node declares, read and checked: its
+  configuration, as =doc/pos-directory.txt= has it, and a methodology's
+  declaration, as =doc/pos-methodology.txt= has it; and the
+  directories a walk of the node does not enter.
 - =lisp/pos-cid.el= :: IPFS CIDs of files and trees, computed locally.
 - =lisp/pos-ledger.el= :: archive integrity ledgers, read and checked.
 - =lisp/pos-links.el= :: the links in Org and Markdown files: found,
