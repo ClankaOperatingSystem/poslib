@@ -119,14 +119,14 @@ The file is written outside ROOT and deleted afterwards."
   "A week is named by its ISO year and week number, as 2026-W36.
 Sunday is the last day of an ISO week, so the sweep boundary, Sunday
 night, names the week it closes."
-  (should (equal "2026-W36" (pos-week-name (pos-test-time 2026 9 6 23 0)))))
+  (should (equal "2026-W36" (pos-sweep-week-name (pos-test-time 2026 9 6 23 0)))))
 
 (ert-deftest pos-sweep/the-iso-year-can-differ-from-the-calendar-year ()
   "The week's year is the ISO year, which need not be the calendar year.
 2027-01-01 is a Friday in the last week of 2026, so it is 2026-W53,
 while 2026-01-01 is 2026-W01."
-  (should (equal "2026-W01" (pos-week-name (pos-test-time 2026 1 1 12 0))))
-  (should (equal "2026-W53" (pos-week-name (pos-test-time 2027 1 1 12 0)))))
+  (should (equal "2026-W01" (pos-sweep-week-name (pos-test-time 2026 1 1 12 0))))
+  (should (equal "2026-W53" (pos-sweep-week-name (pos-test-time 2027 1 1 12 0)))))
 
 (ert-deftest pos-sweep/the-boundary-itself-is-the-boundary ()
   "A sweep run at the boundary, Sunday 23:00, finds that very moment.
@@ -183,7 +183,7 @@ Across years with 52 and 53 weeks, and whichever weekday the year
 begins on."
   (dolist (week '("2020-W01" "2020-W53" "2021-W01" "2024-W52" "2025-W01"
                   "2026-W01" "2026-W36" "2026-W53" "2027-W01"))
-    (should (equal week (pos-week-name (pos-sweep-week-time week))))))
+    (should (equal week (pos-sweep-week-name (pos-sweep-week-time week))))))
 
 (ert-deftest pos-sweep/a-string-that-is-not-a-week-is-refused ()
   "A string not of the form YYYY-Wnn is a `user-error', not a time.
@@ -219,7 +219,7 @@ nested one records the outline path it came from."
   (pos-test-with-files root `(("intray.org" . ,pos-sweep-test-intray))
     (let* ((file (expand-file-name "intray.org" root))
            (archive (pos-sweep-destination 'weekly nil root file pos-sweep-test-week))
-           (result (pos-archive-done-in-file file archive "intray.org" pos-test-sunday))
+           (result (pos-sweep-archive-done-in-file file archive "intray.org" pos-test-sunday))
            (archived (pos-test-file-string archive)))
       (should (equal 3 (plist-get result :archived)))
       (should (equal '("parent with open child") (plist-get result :skipped)))
@@ -246,7 +246,7 @@ A header with no entries under it would be noise in the archive tree."
   (pos-test-with-files root '(("todo.org" . "* TODO only open\n"))
     (let* ((file (expand-file-name "todo.org" root))
            (archive (pos-sweep-destination 'weekly nil root file pos-sweep-test-week))
-           (result (pos-archive-done-in-file file archive "todo.org" pos-test-sunday)))
+           (result (pos-sweep-archive-done-in-file file archive "todo.org" pos-test-sunday)))
       (should (equal 0 (plist-get result :archived)))
       (should-not (file-exists-p archive)))))
 
@@ -259,7 +259,7 @@ belongs to."
   (pos-test-with-files root '(("life/life-areas.org" . "* DONE finished\n"))
     (let* ((file (expand-file-name "life/life-areas.org" root))
            (archive (pos-sweep-destination 'weekly nil root file pos-sweep-test-week)))
-      (pos-archive-done-in-file file archive "life/life-areas.org" pos-test-sunday)
+      (pos-sweep-archive-done-in-file file archive "life/life-areas.org" pos-test-sunday)
       (let ((archived (pos-test-file-string archive)))
         (should (string-search ":ARCHIVE_FILE: life/life-areas.org" archived))
         (should (string-search "Archived entries from file life/life-areas.org"
@@ -277,7 +277,7 @@ children is stamped once, on the parent."
                                                "** DONE child two")))
     (let* ((file (expand-file-name "intray.org" root))
            (archive (pos-sweep-destination 'weekly nil root file pos-sweep-test-week)))
-      (pos-archive-done-in-file file archive "intray.org" pos-test-sunday)
+      (pos-sweep-archive-done-in-file file archive "intray.org" pos-test-sunday)
       (with-temp-buffer
         (insert-file-contents archive)
         (org-mode)
@@ -298,7 +298,7 @@ clutter for Git to ignore or a person to delete."
     (let* ((file (expand-file-name "intray.org" root))
            (archive (pos-sweep-destination 'weekly nil root file pos-sweep-test-week))
            (backup-enable-predicate (lambda (_name) t)))
-      (pos-archive-done-in-file file archive "intray.org" pos-test-sunday)
+      (pos-sweep-archive-done-in-file file archive "intray.org" pos-test-sunday)
       (should-not (directory-files-recursively root "~\\'")))))
 
 ;;;; Adapters
@@ -670,7 +670,7 @@ stamped with the boundary too."
   (pos-test-with-files root '(("intray.org" . "* DONE finished\n"))
     (let* ((pos-directory root)
            (boundary (pos-sweep-boundary (current-time)))
-           (archive (concat "archive/orgmode/" (pos-week-name boundary)
+           (archive (concat "archive/orgmode/" (pos-sweep-week-name boundary)
                             "/intray.org_archive")))
       (pos-sweep)
       (should (string-search

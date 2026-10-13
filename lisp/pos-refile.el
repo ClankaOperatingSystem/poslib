@@ -71,7 +71,7 @@ as the target of a heading REGEXP matches."
                        (save-excursion (org-end-of-subtree t t) (point)))))))
            nil 'file))))
 
-(defun pos--excerpt (subtree)
+(defun pos-refile--excerpt (subtree)
   "Return SUBTREE's first body line, shortened, for a table cell."
   (let ((line (seq-find (lambda (l)
                           (and (not (string-empty-p (string-trim l)))
@@ -101,7 +101,7 @@ One row per entry; each subtree quoted below."
                           line
                           (replace-regexp-in-string "|" "/" heading)
                           (or target "")
-                          (pos--excerpt subtree)))))
+                          (pos-refile--excerpt subtree)))))
       (org-mode)
       (org-table-map-tables #'org-table-align t)
       ;; Example blocks keep quoted headings as text.
@@ -128,7 +128,7 @@ One row per entry; each subtree quoted below."
               rows))
       (nreverse rows))))
 
-(defun pos--goto-refile-target (under)
+(defun pos-refile--goto-refile-target (under)
   "Move point to the refile target; return the paste level.
 UNDER is a slash-separated outline path; empty means end of file.
 Return nil if the path is absent."
@@ -181,7 +181,7 @@ repository's, is left and counted unwritable."
             (setq unwritable (1+ unwritable)))
            (t
             (with-current-buffer (pos-visit target-file)
-              (let ((level (save-excursion (pos--goto-refile-target under))))
+              (let ((level (save-excursion (pos-refile--goto-refile-target under))))
                 (if (null level)
                     (setq missing (1+ missing))
                   (setq moved (1+ moved))
@@ -189,7 +189,7 @@ repository's, is left and counted unwritable."
                     (with-current-buffer intray
                       (goto-char marker)
                       (org-cut-subtree))
-                    (pos--goto-refile-target under)
+                    (pos-refile--goto-refile-target under)
                     (org-paste-subtree level))))))))))
     (unless dry-run
       (with-current-buffer intray (when (buffer-modified-p) (save-buffer)))
