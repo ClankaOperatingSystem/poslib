@@ -95,23 +95,23 @@ in Emacs.  A bracket expression is the same in both.  Signal
       (string-match-p regexp "")
       regexp)))
 
-(defun pos-search-matcher (query mode &optional modes)
-  "Return a function of a line: whether QUERY hits it in MODE, one of MODES.
+(defun pos-search-matcher (query mode)
+  "Return a function of a line: whether QUERY hits it in MODE.
 Literal: QUERY's characters occur in it as given.  Regex: QUERY is a
 POSIX extended regular expression found within it.  Refuse `mode' for
-a mode not in MODES, `pos-search-modes' by default, and `request' for
-an expression that does not parse."
-  (let ((modes (or modes pos-search-modes)))
-    (unless (member mode modes)
-      (pos-ledger-refuse 'mode "Not a mode this keeper searches in, %s: %s" modes mode))
-    (if (equal mode "literal")
-        (lambda (line) (string-search query line))
-      (let ((regexp (condition-case err
-                        (pos-search--regexp query)
-                      (invalid-regexp
-                       (pos-ledger-refuse 'request "Not a regular expression: %s"
-                                          (error-message-string err))))))
-        (lambda (line) (string-match-p regexp line))))))
+a mode not in `pos-search-modes', and `request' for an expression that
+does not parse."
+  (unless (member mode pos-search-modes)
+    (pos-ledger-refuse 'mode "Not a mode this keeper searches in, %s: %s"
+                       pos-search-modes mode))
+  (if (equal mode "literal")
+      (lambda (line) (string-search query line))
+    (let ((regexp (condition-case err
+                      (pos-search--regexp query)
+                    (invalid-regexp
+                     (pos-ledger-refuse 'request "Not a regular expression: %s"
+                                        (error-message-string err))))))
+      (lambda (line) (string-match-p regexp line)))))
 
 (defun pos-search-lines (bytes)
   "Return the lines of BYTES as the protocol counts them, or nil.
@@ -137,19 +137,18 @@ its terminator."
               hits)))
     (nreverse hits)))
 
-(defun pos-search-found (sources query &optional mode limit modes)
+(defun pos-search-found (sources query &optional mode limit)
   "Return the hits of QUERY over SOURCES, in their order.
 Each source is (REF . READ), READ a function of no arguments giving the
 file's bytes; the order is the archive's, by path bytewise, which the
 protocol wants of literal and regex.  MODE is literal where nil; LIMIT,
-a positive integer, keeps the first hits, `pos-search-limit' where nil;
-MODES is what is served, `pos-search-modes' by default."
+a positive integer, keeps the first hits, `pos-search-limit' where nil."
   (unless (and (stringp query) (not (string-empty-p query)))
     (pos-ledger-refuse 'request "Expected q, the query"))
   (let ((limit (or limit pos-search-limit)))
     (unless (and (integerp limit) (> limit 0))
       (pos-ledger-refuse 'request "limit is a positive integer: %S" limit))
-    (let ((hit-p (pos-search-matcher query (or mode "literal") modes))
+    (let ((hit-p (pos-search-matcher query (or mode "literal")))
           hits (left limit))
       (cl-loop for (ref . read) in sources
                while (> left 0)
@@ -213,7 +212,7 @@ CID, one of schema 1, is hashed from disk as link hashes it."
              (seq-filter (lambda (path) (and (assoc path cids) (funcall chosen path)))
                          (pos-search-by-path (mapcar (lambda (pair) (pos-bytes-key (car pair)))
                                                      entries))))
-     query mode limit pos-search-modes)))
+     query mode limit)))
 
 ;;;; A scope
 

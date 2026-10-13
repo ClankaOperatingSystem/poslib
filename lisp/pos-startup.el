@@ -53,6 +53,7 @@
 (require 'pos-corpus)
 (require 'pos-person)
 (require 'pos-roam)
+(require 'pos-tree)
 
 (defcustom pos-startup-scheduled-days 14
   "Days, from today, that the scheduled view covers."

@@ -463,14 +463,6 @@ With MODE, a recorded mode that has no write bit, the file has it."
           (add-name-to-file temp file))
       (delete-file temp))))
 
-(defun pos-seal--entries-of (plan)
-  "Return the entries the item now at PLAN's destination has."
-  (let-alist plan
-    (mapcar (lambda (pair)
-              (let ((path (pos-bytes-key (car pair))))
-                (cons path (pos-seal--entry (expand-file-name path .archive)))))
-            .add)))
-
 (defun pos-seal-checkpoint-head (archive head)
   "Record HEAD for ARCHIVE in a checkpoint beside it."
   (let* ((bytes (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "archive"))))

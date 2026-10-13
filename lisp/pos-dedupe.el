@@ -38,7 +38,6 @@
 ;;; Code:
 
 (require 'org)
-(require 'org-id)
 (require 'seq)
 (require 'cl-lib)
 (require 'pos)

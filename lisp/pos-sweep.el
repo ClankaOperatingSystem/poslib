@@ -42,7 +42,7 @@
 ;; - `pos-sweep': both at once, for M-x.
 ;; - `pos-sweep-close': the seal plans of the weeks that have closed.
 ;; - `pos-sweep-destination', `pos-sweep-close-plans': the adapters,
-;;   generic over the sweep's kind.
+;;   by the sweep's kind.
 ;; - `pos-sweep-batch': the command line.
 
 ;;; Code:
@@ -215,40 +215,30 @@ nearest up; none means weekly beneath the root of CORPUS."
       (setq node (pos-scope-node node)))
     (or found (cons 'weekly (cons nil (pos-corpus-root corpus))))))
 
-(cl-defgeneric pos-sweep-destination (kind entry dir file week)
+(defun pos-sweep-destination (kind entry dir file week)
   "Return the archive file for FILE's done items in WEEK.
 KIND is the sweep's kind and ENTRY its archives entry, as
-`pos-sweep-adapter' gives them; DIR is the archive scope's directory.")
-
-(cl-defmethod pos-sweep-destination ((_kind (eql weekly)) entry dir file week)
-  "Return FILE's archive beneath DIR at ENTRY's path, in WEEK's directory.
-One directory per week, one archive file per source."
-  (expand-file-name (concat (file-relative-name file dir) "_archive")
-                    (expand-file-name
-                     week (expand-file-name (or (alist-get 'path entry)
-                                                pos-sweep-default-path)
-                                            dir))))
-
-(cl-defmethod pos-sweep-destination ((_kind (eql sealed)) _entry dir file week)
-  "Return FILE's archive beneath DIR's _sweep/, in WEEK's directory.
-The week's directory stays there until sweeps no longer write into
+`pos-sweep-adapter' gives them; DIR is the archive scope's directory.
+One directory per week, one archive file per source: a weekly sweep's
+beneath DIR at ENTRY's path, a sealed sweep's beneath DIR's _sweep/,
+where the week's directory stays until sweeps no longer write into
 it, a week after the week ended, and is then sealed."
   (expand-file-name (concat (file-relative-name file dir) "_archive")
-                    (expand-file-name week (expand-file-name "_sweep" dir))))
+                    (expand-file-name
+                     week (expand-file-name (if (eq kind 'sealed)
+                                                "_sweep"
+                                              (or (alist-get 'path entry)
+                                                  pos-sweep-default-path))
+                                            dir))))
 
-(cl-defgeneric pos-sweep-close-plans (kind dir week)
+(defun pos-sweep-close-plans (kind dir week)
   "Return the seal plans that close the weeks before WEEK in DIR, or nil.
-KIND is the sweep's kind and DIR the archive scope's directory.")
-
-(cl-defmethod pos-sweep-close-plans ((_kind (eql weekly)) _dir _week)
-  "Return nil: a weekly sweep's files stay as they are, and nothing closes."
-  nil)
-
-(cl-defmethod pos-sweep-close-plans ((_kind (eql sealed)) dir week)
-  "Return a seal plan for each week beneath DIR's _sweep/ before WEEK.
-Each is sealed into DIR's archive at sweep/ under the week's name."
+KIND is the sweep's kind and DIR the archive scope's directory.  A
+weekly sweep's files stay as they are, and nothing closes.  A sealed
+sweep seals each week beneath DIR's _sweep/ before WEEK into DIR's
+archive at sweep/ under the week's name."
   (let ((staging (expand-file-name "_sweep" dir)))
-    (when (file-directory-p staging)
+    (when (and (eq kind 'sealed) (file-directory-p staging))
       (mapcar (lambda (closed)
                 (pos-seal-plan (expand-file-name closed staging)
                                (expand-file-name (concat "archives/sweep/" closed) dir)))

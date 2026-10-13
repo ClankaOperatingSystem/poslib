@@ -36,7 +36,6 @@
 
 (require 'cl-lib)
 (require 'pos-bytes)
-(require 'pos-ledger)
 (require 'pos-links)
 (require 'pos-corpus)
 

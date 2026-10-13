@@ -39,7 +39,6 @@
 (require 'org-id)
 (require 'seq)
 (require 'cl-lib)
-(require 'pos-roam)
 (require 'pos-corpus)
 
 (defgroup pos nil

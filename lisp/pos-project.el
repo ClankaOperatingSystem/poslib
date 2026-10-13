@@ -50,7 +50,6 @@
 (require 'pos)
 (require 'pos-bytes)
 (require 'pos-corpus)
-(require 'pos-ledger)
 (require 'pos-links)
 (require 'pos-place)
 

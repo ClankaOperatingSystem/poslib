@@ -66,7 +66,6 @@
 
 (require 'cl-lib)
 (require 'seq)
-(require 'pos-ledger)
 (require 'pos-tree)
 
 (cl-defstruct (pos-scope (:constructor pos-scope--make) (:copier nil))
