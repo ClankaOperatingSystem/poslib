@@ -27,6 +27,10 @@
 ;; - `pos-path-within-p': whether a path is another or lies beneath it.
 ;; - `pos-path-config-paths': every path a node's configuration may have.
 ;; - `pos-path-config-files': the configuration files a node has.
+;; - `pos-path-config-directories': the names a configuration directory
+;;   may have.
+;; - `pos-path-config-names': the names a configuration file may have
+;;   within its directory.
 
 ;;; Code:
 

@@ -45,6 +45,60 @@
 ;; JSON values are Lisp values: objects alists, arrays vectors, strings,
 ;; integers and :null.  Refusals signal `pos-ledger-refused' with a kind
 ;; symbol and a message.
+;; - `pos-ledger-integrity': the folder beside an archive holding its
+;;   ledger and checkpoints.
+;; - `pos-ledger-directory': the legacy ledger's directory, at the top
+;;   of an archive.
+;; - `pos-ledger-anchors': the legacy checkpoints' directory, beside the
+;;   root they cover.
+;; - `pos-ledger-declaration': the line in a collection's README.org
+;;   that declares it one.
+;; - `pos-ledger-offline': non-nil if a check is to ask no keeper.
+;; - `pos-ledger-ask-function': the function a keeper is asked what it
+;;   has of a ledger with, or nil.
+;; - `pos-ledger-event-cid': the CID a schema 3 event of BYTES is named
+;;   by.
+;; - `pos-ledger-event-cid-p': non-nil if VALUE has the form of a schema
+;;   3 event's CID.
+;; - `pos-ledger-link': a DAG-JSON link to CID.
+;; - `pos-ledger-as-block': BYTES, an event written with a final
+;;   newline, as a block without it.
+;; - `pos-ledger-regular': FILE's attributes, refusing all but a regular
+;;   file of one link.
+;; - `pos-ledger-permissions': FILE's permission bits.
+;; - `pos-ledger-record': FILE's entry: its SHA-256, size and mode less
+;;   write bits.
+;; - `pos-ledger-entry-names': DIR's entry names, sorted.
+;; - `pos-ledger-folder': ARCHIVE's ledger folder: beside it, else the
+;;   legacy one inside.
+;; - `pos-ledger-identity': the ledger_id of the last of the event FILES
+;;   that has one.
+;; - `pos-ledger-as-named': refuse `identity' unless ARCHIVE's ledger,
+;;   of event FILES, is the one named.
+;; - `pos-ledger-kept-here': the archive of the scope DIR, if kept by a
+;;   keeper and not here.
+;; - `pos-ledger-kept-entries': KNOWN, the ledger's entries, as the
+;;   inventory of the kept ARCHIVE.
+;; - `pos-ledger-checked': ROOT absolute, refusing a symlink in it or
+;;   its ancestors.
+;; - `pos-ledger-roots': the outermost archives under ROOT, in path
+;;   order.
+;; - `pos-ledger-checkpoint-files': the checkpoint files covering ROOT
+;;   and ARCHIVES.
+;; - `pos-ledger-cids': the CIDs of ARCHIVE and everything in it, as
+;;   `pos-cid-tree'.
+;; - `pos-ledger-fold': the CIDs the enrolled ENTRIES and the EMPTY
+;;   directories give.
+;; - `pos-ledger-with-cids': ACTUAL with a CID from CIDS in each entry
+;;   KNOWN records one for.
+;; - `pos-ledger-capsule-p': non-nil if DIRECTORY has a capsule's
+;;   manifest.
+;; - `pos-ledger-declared-p': non-nil if DIRECTORY declares itself a
+;;   collection.
+;; - `pos-ledger-differences': the missing, changed and new paths
+;;   between KNOWN and ACTUAL.
+;; - `pos-event': an event file, read and checked against the history
+;;   before it.
 
 ;;; Code:
 

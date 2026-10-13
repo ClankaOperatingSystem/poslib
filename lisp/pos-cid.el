@@ -39,6 +39,13 @@
 ;; A directory whose node would exceed 256 KiB is a HAMT shard, as IPFS
 ;; makes it: entries placed by the bytes of the murmur3-x64-64 hash of
 ;; their names, 256 slots a level.
+;; - `pos-cid-chunk-size': bytes per file chunk.
+;; - `pos-cid-file-max-links': most links in one file node.
+;; - `pos-cid-sharding-threshold': largest directory block, in bytes,
+;;   before IPFS shards it.
+;; - `pos-cid-dag-json': multicodec for dag-json.
+;; - `pos-cid-murmur3-x64-64': the first 64 bits of MurmurHash3 x64 128
+;;   of BYTES, seed 0.
 
 ;;; Code:
 

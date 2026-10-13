@@ -29,6 +29,24 @@
 ;; - `pos-lint-repo-checks': the checks made of the whole tree.
 ;; - `pos-lint-format': findings as file:line: message lines.
 ;; - `pos-lint-batch': the command line.
+;; - `pos-lint-done-with-open-children': report done entries in FILE
+;;   with open children.
+;; - `pos-lint-stale-keywords': retired keywords; headings starting with
+;;   one are plain text.
+;; - `pos-lint-stale-keyword': report headings in FILE that start with a
+;;   retired keyword.
+;; - `pos-lint-todo-line': report #+TODO lines in FILE, each as `pos-
+;;   next-todo-line' has it.
+;; - `pos-lint-merged-copy': report merged copies in FILE awaiting
+;;   reconciliation.
+;; - `pos-lint-clarified-in-intray': report items under Unsorted in
+;;   FILE, an intray.org, that are not TODO.
+;; - `pos-lint-waiting-without-who-or-when': report WAITING items in
+;;   FILE that do not say who or what, or since when.
+;; - `pos-lint-duplicate-tasks': report task headings in more than one
+;;   file of ROOT's corpus.
+;; - `pos-lint-methodology-checks': run each check a methodology of
+;;   ROOT's projects declares; return findings.
 
 ;;; Code:
 

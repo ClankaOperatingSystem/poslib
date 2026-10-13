@@ -42,6 +42,24 @@
 ;;   command finds it or leaves it, the one at point, and its line.
 ;; - `pos-finding', `pos-finding-format', `pos-finding<': what a check
 ;;   found wrong, as a line, and in order.
+;; - `pos-new-id': a new ID for an item or a file, in lower case.
+;; - `pos-done-keywords': the done keywords of `pos-todo-keywords'.
+;; - `pos-visit-corpus': the corpus whose files are being visited, or
+;;   nil.
+;; - `pos-visit-own-keywords-p': non-nil if the keywords FILE was
+;;   written with stand.
+;; - `pos-config-file': per-repository configuration, relative to `pos-
+;;   directory'.
+;; - `pos-retired-settings': settings pos-config.el once set, each with
+;;   what replaced it.
+;; - `pos-next-todo-line': move past the next #+TODO line in force;
+;;   return non-nil if there is one.
+;; - `pos-normalise-keywords-in-file': remove #+TODO lines from FILE;
+;;   respell CANCELED as CANCELLED.
+;; - `pos-marker-still-at-p': non-nil if MARKER is at a heading matching
+;;   KEY.
+;; - `pos-waiting-on-property': the property of a WAITING item that
+;;   links to the person it waits on.
 ;;; Code:
 (require 'org)
 (require 'org-archive)

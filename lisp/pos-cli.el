@@ -32,6 +32,8 @@
 ;;
 ;; - `pos-seal-batch', `pos-tree-batch', `pos-migrate-batch': the programs.
 ;; - `pos-cli-run': run a command, with every refusal printed and exit 2.
+;; - `pos-cli-seal-usage': the usage of `pos-seal-batch'.
+;; - `pos-cli-tree-usage': the usage of `pos-tree-batch'.
 
 ;;; Code:
 

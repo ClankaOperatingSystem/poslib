@@ -36,6 +36,14 @@
 ;;
 ;; - `pos-views-show': show one view.
 ;; - `pos-views-weekly': show the views of a weekly review.
+;; - `pos-views-visit': visit the item of the current line, or the scope
+;;   it names.
+;; - `pos-views-set-state': set the item of the current line to STATE,
+;;   with NOTE, and read again.
+;; - `pos-views-next': move to the next line that is of an item or a
+;;   scope.
+;; - `pos-views-previous': move to the previous line that is of an item
+;;   or a scope.
 
 ;;; Code:
 

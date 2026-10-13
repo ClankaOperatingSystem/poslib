@@ -62,6 +62,15 @@
 ;; - `pos-corpus-methodologies': the methodologies the nodes declare.
 ;; - `pos-corpus-writable-p', `pos-corpus-path-writable-p': whether a
 ;;   command may write a file of the corpus, or any path of the tree.
+;; - `pos-corpus-org-regexp': matches the name of an Org file that is
+;;   read.
+;; - `pos-corpus-org-file-p': non-nil if NAME names an Org file read
+;;   into the corpus.
+;; - `pos-corpus-projects-dir': the path, relative to the root, of
+;;   SCOPE's projects directory, or nil.
+;; - `pos-corpus-scopes-of-kind': the scopes of CORPUS of KIND.
+;; - `pos-corpus-scope-writable-p': non-nil if a command may write
+;;   within SCOPE, a scope of CORPUS.
 
 ;;; Code:
 

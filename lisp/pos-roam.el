@@ -38,6 +38,22 @@
 ;; The files indexed are the corpus, pos-corpus.el: every Org file the
 ;; tree's configurations allow, so the index covers what the commands
 ;; read, no more and no less.
+;; - `pos-roam-files': the Org files under ROOT that the index covers:
+;;   its corpus.
+;; - `pos-roam-own-index-p': non-nil if ROOT lies in `org-roam-
+;;   directory', whose index serves.
+;; - `pos-roam-db-location': where the index of ROOT is kept.
+;; - `pos-roam-with-index': run BODY with the index of ROOT bound and up
+;;   to date.
+;; - `pos-roam-sync': bring the index of ROOT up to date; return the
+;;   database's location.
+;; - `pos-roam-id-at': the `:ID:' of the heading at LINE of FILE, or
+;;   nil.
+;; - `pos-roam-referrers': (FILE . POS) for each `id:' link to ID the
+;;   index records.
+;; - `pos-roam-buffer': the buffer visiting FILE, found or made.
+;; - `pos-roam-rewrite-link': point the `id:' link at POS of FILE from
+;;   FROM to TO.
 
 ;;; Code:
 

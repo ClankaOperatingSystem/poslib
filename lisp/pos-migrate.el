@@ -32,6 +32,8 @@
 ;;
 ;; - `pos-migrate-plan', `pos-migrate-apply': the two steps.
 ;; - `pos-migrate-batch': the command line, in pos-cli.el.
+;; - `pos-migrate-junk': hidden files that are never evidence, and are
+;;   removed.
 
 ;;; Code:
 
