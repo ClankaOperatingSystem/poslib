@@ -155,7 +155,7 @@ origin never seen adopts the token after its first refusal."
       (should (equal 1 (length pos-signin-test-asked)))
       (should (eq :false (alist-get 'opened again))))
     (let* (sent
-           (pos-remote-send-function
+           (pos-http-send-function
             (lambda (_method _url headers _body)
               (let ((bearer (cdr (assoc "Authorization" headers))))
                 (push bearer sent)
@@ -204,7 +204,7 @@ origin never seen adopts the token after its first refusal."
   "A request refused for want of a token says how to get one.
 With none kept, it opens nothing."
   (pos-signin-test-with-issuer
-    (let ((pos-remote-send-function (lambda (&rest _) (cons 401 "{\"refused\":\"access\"}"))))
+    (let ((pos-http-send-function (lambda (&rest _) (cons 401 "{\"refused\":\"access\"}"))))
       (should (equal "Not signed in to this keeper; sign in with: sign-in https://one.keeper.example/ledgers/a"
                      (condition-case err
                          (pos-remote-describe

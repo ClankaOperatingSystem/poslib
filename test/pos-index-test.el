@@ -94,7 +94,7 @@ with the bytes \"result\"."
               (asked nil)
               (pos-remote-keeper-function
                (lambda (base) (pos-remote-http-create :url base :token "a-token")))
-              (pos-remote-send-function
+              (pos-http-send-function
                (lambda (method url headers _body)
                  (push (list method url (cdr (assoc "Authorization" headers))) asked)
                  (cons 200 "result"))))
@@ -171,7 +171,7 @@ entry."
                                (concat "ipfs://" (cdr (assoc "trial" cids)) "/result.txt")
                                scope)))
       (should (equal `(("GET" ,(concat url "/ipfs/" file-cid) "Bearer a-token")) asked))
-      (let ((pos-remote-send-function (lambda (&rest _) (cons 200 "another"))))
+      (let ((pos-http-send-function (lambda (&rest _) (cons 200 "another"))))
         (should (equal 'entry
                        (cadr (should-error (pos-index-bytes (concat "ipfs://" file-cid) scope)
                                            :type 'pos-ledger-refused))))))))
@@ -198,7 +198,7 @@ bytes would read as UTF-8.  UTF-8 text is still text."
   (pos-index-test-with-kept
     (let ((uri (concat "ipfs://" (cdr (assoc "trial/result.txt" cids))))
           (bytes (concat (apply #'unibyte-string (number-sequence 0 255)) "\303\251\377")))
-      (let ((pos-remote-send-function (lambda (&rest _) (cons 200 bytes))))
+      (let ((pos-http-send-function (lambda (&rest _) (cons 200 bytes))))
         (with-current-buffer (pos-index-fetch scope uri)
           (unwind-protect
               (progn
@@ -207,7 +207,7 @@ bytes would read as UTF-8.  UTF-8 text is still text."
                 (should (equal bytes (encode-coding-string (buffer-string)
                                                            'no-conversion))))
             (kill-buffer))))
-      (let ((pos-remote-send-function
+      (let ((pos-http-send-function
              (lambda (&rest _) (cons 200 (encode-coding-string "café" 'utf-8)))))
         (with-current-buffer (pos-index-fetch scope uri)
           (unwind-protect

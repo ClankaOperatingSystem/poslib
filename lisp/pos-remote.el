@@ -42,22 +42,21 @@
 ;; what a client sends after an event that names no ledger, so that a
 ;; keeper can tell whose it is.
 ;;
-;; `pos-remote-http' is the protocol's wire.  A refusal signals
-;; `pos-ledger-refused' with the kind the keeper names.  Nothing here
-;; seals: `pos-seal' calls it for an archive a keeper keeps.
+;; `pos-remote-http' is a keeper reached over HTTP, each exchange made
+;; by pos-http.el.  A refusal signals `pos-ledger-refused' with the kind
+;; the keeper names.  Nothing here seals: `pos-seal' calls it for an
+;; archive a keeper keeps.  Loading this module gives pos-ledger.el
+;; `pos-remote-ask', so that a check of a kept archive asks its keeper.
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'subr-x)
-(require 'url)
-(require 'url-http)
 (require 'url-util)
 (require 'pos-bytes)
+(require 'pos-http)
 (require 'pos-ledger)
 (require 'pos-signin)
-
-(defvar url-http-end-of-headers)
 
 ;;;; The port
 
@@ -170,53 +169,6 @@ event names a ledger, since nothing then vouches."
     (413 . size))
   "The kind of refusal a status is, when its body does not say.")
 
-(defvar pos-remote-timeout 300
-  "Seconds an exchange with a keeper may take before it is given up.
-An exchange given up is refused as `remote'.  Nil waits without end.")
-
-(defun pos-remote--send (method url headers body)
-  "Make one HTTP exchange: METHOD on URL with HEADERS, an alist, and BODY.
-BODY is a unibyte string or nil.  Return (STATUS . BYTES).  A keeper
-that has not answered in `pos-remote-timeout' seconds is refused."
-  (let* ((url-request-method method)
-         ;; url.el joins these to the body, and refuses the request if
-         ;; that makes multibyte text of the body's bytes.
-         (url (encode-coding-string url 'utf-8))
-         (url-request-extra-headers
-          (mapcar (lambda (header)
-                    (cons (car header) (encode-coding-string (cdr header) 'utf-8)))
-                  headers))
-         (url-request-data body)
-         (url-mime-encoding-string "identity")
-         (url-show-status nil)
-         (buffer (condition-case err
-                     ;; Left to itself url.el answers a 401's challenge:
-                     ;; it asks at the terminal for a name and password,
-                     ;; and for a scheme it does not know, Bearer among
-                     ;; them, it never finishes.  The refusal is the
-                     ;; caller's to read.  url-http is required above
-                     ;; because loading it here would undo this.
-                     (cl-letf (((symbol-function 'url-http-handle-authentication)
-                                (lambda (_proxy) t)))
-                       (url-retrieve-synchronously url t t pos-remote-timeout))
-                   (error (pos-ledger-refuse 'remote "%s: %s" url
-                                             (error-message-string err))))))
-    (unless buffer
-      (pos-ledger-refuse 'remote "%s: no answer" url))
-    (unwind-protect
-        (with-current-buffer buffer
-          (goto-char (point-min))
-          (unless (and (looking-at "HTTP/[0-9.]+ \\([0-9]+\\)")
-                       (bound-and-true-p url-http-end-of-headers))
-            (pos-ledger-refuse 'remote "%s: no answer" url))
-          (let ((status (string-to-number (match-string 1))))
-            (goto-char url-http-end-of-headers)
-            (forward-line 1)
-            (cons status (encode-coding-string
-                          (buffer-substring-no-properties (point) (point-max))
-                          'binary))))
-      (kill-buffer buffer))))
-
 (defvar pos-remote-keeper-function
   (lambda (url) (pos-remote-http-create :url url :token (getenv "POS_ARCHIVE_TOKEN")))
   "The function a keeper's URL is made a keeper with.
@@ -224,11 +176,6 @@ What it returns answers `pos-remote-describe', `pos-remote-event',
 `pos-remote-append' and `pos-remote-read'.  By default the keeper is
 reached over HTTP, with the bearer token in the environment's
 POS_ARCHIVE_TOKEN, else the one kept for it by signing in.")
-
-(defvar pos-remote-send-function #'pos-remote--send
-  "The function an exchange of `pos-remote-http' is made with.
-Called with a method, a URL, an alist of headers and a body, a unibyte
-string or nil; it gives back (STATUS . BYTES).")
 
 (defun pos-remote--multipart (parts)
   "Return (BODY . CONTENT-TYPE) for PARTS, each (NAME . BYTES), written one way.
@@ -259,7 +206,7 @@ is asked once more with a token already kept that it takes."
                   (unless (member token '(nil "")) token)))
          (exchange
           (lambda (token)
-            (funcall pos-remote-send-function method (concat url path)
+            (funcall pos-http-send-function method (concat url path)
                      (append (when token
                                `(("Authorization" . ,(concat "Bearer " token))))
                              (when content-type
@@ -349,6 +296,14 @@ each left out where nil."
                                      ("limit" . ,(and limit (number-to-string limit)))
                                      ("within" . ,within)))
                        "&")))))
+
+(defun pos-remote-ask (url)
+  "Return what the keeper at URL has of its ledger, as `pos-remote-describe' does.
+The keeper is the one `pos-remote-keeper-function' makes of URL."
+  (pos-remote-describe (funcall pos-remote-keeper-function url)))
+
+;; A ledger asks no keeper itself; this is the client it asks with.
+(setq pos-ledger-ask-function #'pos-remote-ask)
 
 (provide 'pos-remote)
 ;;; pos-remote.el ends here
