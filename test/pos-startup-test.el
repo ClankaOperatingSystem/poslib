@@ -788,6 +788,38 @@ open items and health's has one open and one done."
                        ("intray" . "NEXT Answer the letter")
                        ("intray" . "TODO Sort the shelf")))))))
 
+(ert-deftest pos-startup/the-handover-view-names-the-latest-handover-of-each-node ()
+  "The handover view lists each journal's heading tagged handover and latest.
+Each line has the scope, the date, the title and the record's citation.
+A handover not tagged latest is not listed; nor is a heading tagged
+latest in a file not named journal.org.  Here the root's journal has
+a latest and an earlier handover, and home's has one."
+  (pos-test-with-files root
+      `((".pos/config.yaml" . ,(pos-test-declaring "home"))
+        ("journal.org"
+         . ,(concat "#+TITLE: Journal\n\n"
+                    "* The roof mended :handover:latest:\n:PROPERTIES:\n"
+                    ":DATE:     [2026-10-14 Wed]\n:RECORD:   ipfs://bafyroof\n:END:\n"
+                    "* The roof surveyed :handover:\n:PROPERTIES:\n"
+                    ":DATE:     [2026-10-07 Wed]\n:RECORD:   ipfs://bafysurvey\n:END:\n"))
+        ("notes.org" . "* Not a handover :latest:\n")
+        ("home/.clanka/config.yml" . ,pos-test-child-config)
+        ("home/journal.org"
+         . ,(concat "* Settled in :handover:latest:\n:PROPERTIES:\n"
+                    ":DATE:     [2026-10-01 Thu]\n:RECORD:   ipfs://bafyhome\n:END:\n")))
+    (let ((text (pos-startup-view root "handover")))
+      (should (string-prefix-p "Latest handover\n" text))
+      (should (equal (pos-startup-test-lines text)
+                     '(("home/journal" . "2026-10-01 Settled in ipfs://bafyhome")
+                       ("journal" . "2026-10-14 The roof mended ipfs://bafyroof")))))
+    (should (equal '("Settled in" "The roof mended")
+                   (mapcar (lambda (item) (alist-get 'title item))
+                           (pos-startup-view-items root "handover"))))
+    (should (equal "ipfs://bafyroof"
+                   (alist-get 'RECORD (alist-get 'properties
+                                                 (cadr (pos-startup-view-items
+                                                        root "handover"))))))))
+
 (ert-deftest pos-startup/the-finished-view-lists-what-was-closed-in-the-week ()
   "The finished view lists each done item closed today or in the 7 days before.
 Each line has the scope, the date closed, the state and the title.
@@ -821,7 +853,7 @@ date, and Open is not done; neither is listed."
   "A view with no item says so, as does each empty list within a view.
 The tree here holds one empty intray and nothing else."
   (pos-test-with-files root '(("intray.org" . "* Unsorted\n"))
-    (dolist (view '("waiting" "scheduled" "deadlines" "stuck" "projects"
+    (dolist (view '("handover" "waiting" "scheduled" "deadlines" "stuck" "projects"
                     "intray" "finished" "all"))
       (ert-info ((format "the %s view" view))
         (should (string-suffix-p "\n  (none)\n" (pos-startup-view root view)))))

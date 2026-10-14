@@ -316,6 +316,20 @@ The files are those of the corpus a command may write."
   "The property of a WAITING item that links to the person it waits on.
 Its value is a link by ID to a person-identity of the item's scope.")
 
+(defconst pos-handover-tag "handover"
+  "The tag of a heading in journal.org that is a handover.
+As doc/pos-slots.txt section 4 has it.")
+
+(defconst pos-latest-tag "latest"
+  "The tag of the handover heading that is the node's latest.
+It moves to each new handover.")
+
+(defconst pos-handover-date-property "DATE"
+  "The property of a handover heading that holds its date, an inactive timestamp.")
+
+(defconst pos-handover-record-property "RECORD"
+  "The property of a handover heading that cites its record, an ipfs:// link.")
+
 ;;;; Items
 
 (cl-defstruct (pos-item (:constructor pos-item-make) (:copier nil))
