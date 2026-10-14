@@ -1,0 +1,5 @@
+{
+ "about": "A ref holds no #, which the skills CLI reads as the end of the URL.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://example.org/hello.git\n    ref: v1#x\n",
+ "refused": "bad-value"
+}

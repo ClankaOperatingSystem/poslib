@@ -1,0 +1,5 @@
+{
+ "about": "A source is a methodology or a skills repository.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://example.org/hello.git\n    ref: v1\n    kind: gnome\n",
+ "refused": "bad-value"
+}

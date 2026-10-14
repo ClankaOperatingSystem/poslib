@@ -4,6 +4,7 @@
  "config": {
   "projects": "projects",
   "methodologies": "methodologies",
+  "harnesses": null,
   "image": null,
   "bin": null,
   "exclude": null,
@@ -11,6 +12,8 @@
   "worktrees": [],
   "archives": [],
   "server": null,
-  "warnings": []
+  "warnings": [
+   "methodologies-path: methodologies"
+  ]
  }
 }

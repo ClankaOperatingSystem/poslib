@@ -1,0 +1,5 @@
+{
+ "about": "methodologies is a path or a sequence.",
+ "yaml": "pos: 2\nmethodologies:\n  source: https://example.org/hello.git\n",
+ "refused": "wrong-type"
+}

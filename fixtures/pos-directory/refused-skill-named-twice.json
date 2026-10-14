@@ -1,0 +1,5 @@
+{
+ "about": "A source names a skill once.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://example.org/hello.git\n    ref: v1\n    skills: [hello-greet, hello-greet]\n",
+ "refused": "bad-value"
+}

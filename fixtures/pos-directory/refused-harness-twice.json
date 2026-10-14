@@ -1,0 +1,5 @@
+{
+ "about": "A harness is named once.",
+ "yaml": "pos: 2\nharnesses: [pi, pi]\n",
+ "refused": "bad-value"
+}

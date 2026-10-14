@@ -1,0 +1,5 @@
+{
+ "about": "harnesses is a sequence.",
+ "yaml": "pos: 2\nharnesses: pi\n",
+ "refused": "wrong-type"
+}

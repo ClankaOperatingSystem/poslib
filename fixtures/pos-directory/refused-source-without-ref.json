@@ -1,0 +1,5 @@
+{
+ "about": "A source names the tag or commit to install.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://example.org/hello.git\n",
+ "refused": "missing-key"
+}

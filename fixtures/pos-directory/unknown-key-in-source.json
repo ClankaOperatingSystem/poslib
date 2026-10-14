@@ -1,0 +1,27 @@
+{
+ "about": "A key in a source this version does not define is a warning named by its place; the source is read.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://example.org/hello.git\n    ref: v1\n    branch: master\n",
+ "config": {
+  "projects": null,
+  "methodologies": [
+   {
+    "source": "https://example.org/hello.git",
+    "ref": "v1",
+    "skills": null,
+    "kind": "methodology",
+    "name": "hello"
+   }
+  ],
+  "harnesses": null,
+  "image": null,
+  "bin": null,
+  "exclude": null,
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null,
+  "warnings": [
+   "unknown-key: methodologies[0].branch"
+  ]
+ }
+}

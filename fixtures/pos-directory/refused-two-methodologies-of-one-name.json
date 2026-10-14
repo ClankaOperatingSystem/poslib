@@ -1,0 +1,5 @@
+{
+ "about": "Two methodologies of one name, from two hosts.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://example.org/hello.git\n    ref: v1\n  - source: git@example.com:other/hello.git\n    ref: v1\n",
+ "refused": "bad-value"
+}
