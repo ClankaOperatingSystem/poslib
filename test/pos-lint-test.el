@@ -66,29 +66,74 @@ Open and done tasks in the right places are the normal state."
       (should (equal "" (pos-lint-format nil root))))))
 
 (ert-deftest pos-lint/a-methodologys-checks-are-run-by-the-lint ()
-  "A check a methodology declares is run in the project, its lines findings.
+  "Each executable scripts/check-* of a mounted methodology's skills is run.
 A FILE:LINE: MESSAGE line is a finding at that file, relative to the
 project; another line is a finding at the project; a check that exits
-2 is a finding at the methodology with its standard error; a check
-bin/ does not hold is a finding at the methodology."
+2 is a finding at its skill with its standard error.  A file in
+scripts/lib/, and a check-* that is not executable, are not run."
   (pos-test-with-files root
       '((".clanka/config.yml"
          . "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/adr\n")
         ("intray.org" . "* TODO open\n")
-        ("methodologies/adr/methodology.yaml"
-         . "methodology: 1\nchecks:\n  - adr-check\n  - adr-broken\n  - adr-missing\n")
-        ("methodologies/adr/bin/adr-check"
-         . "#!/bin/sh\necho 'decisions/0002.md:3: status not known'\necho 'index out of date'\nexit 1\n")
-        ("methodologies/adr/bin/adr-broken"
+        ("methodologies/adr/skills/adr-write/SKILL.md"
+         . "---\nname: adr-write\ndescription: Write a decision.\n---\n")
+        ("methodologies/adr/skills/adr-write/scripts/check-status"
+         . "#!/bin/sh\n. \"$(dirname \"$0\")/lib/say\"\nsay 'decisions/0002.md:3: status not known'\necho 'index out of date'\nexit 1\n")
+        ("methodologies/adr/skills/adr-write/scripts/lib/say"
+         . "say() { echo \"$1\"; }\n")
+        ("methodologies/adr/skills/adr-write/scripts/check-idle"
+         . "#!/bin/sh\necho 'never printed'\nexit 1\n")
+        ("methodologies/adr/skills/adr-write/scripts/check-broken"
          . "#!/bin/sh\necho 'no decisions directory' >&2\nexit 2\n"))
-    (dolist (name '("adr-check" "adr-broken"))
-      (set-file-modes (expand-file-name (concat "methodologies/adr/bin/" name) root) #o755))
+    (dolist (name '("check-status" "check-broken"))
+      (set-file-modes (expand-file-name
+                       (concat "methodologies/adr/skills/adr-write/scripts/" name) root)
+                      #o755))
     (let ((pos-directory root))
       (should (equal (pos-test-lines
                       ".:1: index out of date"
                       "decisions/0002.md:3: status not known"
-                      "methodologies/adr:1: check adr-broken could not check: no decisions directory"
-                      "methodologies/adr:1: check adr-missing is not in bin/ of adr")
+                      (concat "methodologies/adr/skills/adr-write:1: "
+                              "check check-broken could not check: no decisions directory"))
+                     (pos-lint-format (pos-lint) root))))))
+
+(ert-deftest pos-lint/checks-a-declaration-names-are-reported-and-not-run ()
+  "A methodology.yaml that names checks is a finding at the methodology.
+The commands it names in bin/ are not run."
+  (pos-test-with-files root
+      '((".clanka/config.yml"
+         . "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/adr\n")
+        ("intray.org" . "* TODO open\n")
+        ("methodologies/adr/methodology.yaml" . "methodology: 1\nchecks:\n  - adr-check\n")
+        ("methodologies/adr/bin/adr-check" . "#!/bin/sh\necho 'ran'\nexit 1\n"))
+    (set-file-modes (expand-file-name "methodologies/adr/bin/adr-check" root) #o755)
+    (let ((pos-directory root))
+      (should (equal (pos-test-lines
+                      (concat "methodologies/adr:1: checks in bin/ are not run; move each"
+                              " to a skill's scripts/check-NAME: adr-check"))
+                     (pos-lint-format (pos-lint) root))))))
+
+(ert-deftest pos-lint/the-checks-of-a-skill-installed-from-a-source-are-run ()
+  "The checks of a skill installed from a declared source are run.
+The skill is in .agents/skills/ with a lock entry of the source.  A
+skill of the repository's own, with no lock entry, has none run."
+  (pos-test-with-files root
+      '((".clanka/config.yml"
+         . "pos: 2\nmethodologies:\n  - source: https://example.org/adr.git\n    ref: v1\n")
+        ("intray.org" . "* TODO open\n")
+        ("skills-lock.json"
+         . "{\"version\": 1, \"skills\": {\"adr-write\": {\"source\": \"https://example.org/adr.git\", \"sourceUrl\": \"https://example.org/adr.git\", \"ref\": \"v1\", \"sourceType\": \"git\", \"computedHash\": \"0\"}}}\n")
+        (".agents/skills/adr-write/SKILL.md"
+         . "---\nname: adr-write\ndescription: Write a decision.\n---\n")
+        (".agents/skills/adr-write/scripts/check-status"
+         . "#!/bin/sh\necho 'decisions/0002.md:3: status not known'\nexit 1\n")
+        (".agents/skills/own/SKILL.md" . "---\nname: own\ndescription: Own.\n---\n")
+        (".agents/skills/own/scripts/check-own" . "#!/bin/sh\necho 'ran'\nexit 1\n"))
+    (dolist (path '(".agents/skills/adr-write/scripts/check-status"
+                    ".agents/skills/own/scripts/check-own"))
+      (set-file-modes (expand-file-name path root) #o755))
+    (let ((pos-directory root))
+      (should (equal (pos-test-lines "decisions/0002.md:3: status not known")
                      (pos-lint-format (pos-lint) root))))))
 
 (ert-deftest pos-lint/an-undeclared-entry-of-a-lock-file-is-a-finding ()

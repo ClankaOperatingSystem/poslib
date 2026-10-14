@@ -7,8 +7,8 @@ methodologies path (doc/pos-directory.txt, section 2). A methodology
 supplies skills and commands, which section 6 of that document says
 how the tree tool links into the node. This document says what else a
 methodology holds: a declaration of the kinds of canon its commands
-create and maintain in the node, and of the checks it supplies for
-them; and what a tool does with the declaration. Below, "the project"
+create and maintain in the node; the checks its skills supply for
+them; and what a tool does with both. Below, "the project"
 is the node that declares the methodology, whichever of the two it is.
 A source a node declares under methodologies as a sequence is
 installed in the node instead (pos-directory, section 6), and no
@@ -19,7 +19,8 @@ no locations; it is what its declaring entry says it is. What it holds:
 
     version              one line, which names what the directory holds
     skills/NAME/         a skill, named with the methodology's name and
-                         a hyphen (pos-directory, section 6)
+                         a hyphen (pos-directory, section 6), with its
+                         checks in scripts/ (section 3)
     bin/NAME             a command
     methodology.yaml     the declaration (section 1); optional
 
@@ -41,10 +42,11 @@ The top level is a mapping:
     methodology    1, the version of this document; required
     canon          the kinds of canon this methodology maintains in a
                    project (section 2); absent means none
-    checks         the checks it supplies (section 3); absent means none
+    checks         commands of its bin/, which the lint does not run
+                   and reports (section 3); absent means none
 
 A methodology whose directory has no methodology.yaml declares no
-kinds and no checks: it supplies skills and commands only. A file that
+kinds: it supplies skills, with their checks, and commands only. A file that
 is empty lacks its version (missing-key); one that is not a mapping is
 refused (not-a-mapping).
 
@@ -99,26 +101,40 @@ start-up report prints (section 4).
 
 3. Checks
 
-checks is a sequence of strings, each the name of a command in the
-methodology's bin/ (bad-value for a name with a slash, or one bin/
-does not hold when the methodology is there). A check is run by the
-lint in the project that declares the methodology, after the lint's
-own checks of the project's Org files:
+A check is a script in a skill: skills/NAME/scripts/check-CHECK, an
+executable file, with whatever it needs beside it in the skill, such as
+scripts/lib/. The lint runs every check of every skill of each
+methodology a project declares, after its own checks of the project's
+Org files, in the order of the skills' names and then the checks':
 
-  - It is run with the project's directory as its working directory
-    and no arguments.
-  - It prints findings, one per line, as FILE:LINE: MESSAGE, FILE
-    relative to the project; a line not of that form is a finding at
-    the project itself, with the line as its message.
-  - It exits 0 for no finding, 1 for findings, and 2 when it could not
-    check; the lint reports the last as a finding at the methodology's
-    path, with what the check printed on standard error.
+  - for a methodology mounted beneath the methodologies path, the
+    skills in its skills/;
+  - for a source declared under methodologies as a sequence, the skills
+    installed from it, each a directory in the project's
+    .agents/skills/ with an entry of that source in its
+    skills-lock.json (pos-directory, section 6).
+
+A check
+
+  - is run with the project's directory as its working directory and no
+    arguments;
+  - prints findings, one per line, as FILE:LINE: MESSAGE, FILE relative
+    to the project; a line not of that form is a finding at the project
+    itself, with the line as its message;
+  - exits 0 for no finding, 1 for findings, and 2 when it could not
+    check; the lint reports the last as a finding at the skill's
+    directory, with what the check printed on standard error.
 
 The lint prints a check's findings among its own, FILE relative to the
-root, sorted with them. A declaration the lint cannot read, and a check
-named that bin/ does not hold, are each a finding at the methodology's
-path. A check reads what it likes within the project and writes
-nothing; a check that writes is a defect of the methodology.
+root, sorted with them. A check reads what it likes within the project
+and writes nothing; a check that writes is a defect of the methodology.
+
+checks in a declaration names commands in the methodology's bin/, the
+form a check had before checks were scripts of skills. The lint runs
+none of them: it reports a declaration that has checks as a finding at
+the methodology's path, naming them, so that each can be moved into a
+skill's scripts/. A declaration the lint cannot read is a finding there
+too. A check named with a slash is refused (bad-value).
 
 
 4. What a reader is told
@@ -156,4 +172,6 @@ strings; and warnings, an array of strings.
 The tests of the tools in real repositories include a project with a
 methodology whose Org file is not read as the project's, local and
 mounted; a report that lists a declared kind with its entrance; and a
-lint that runs a check and reports its findings among its own.
+lint that runs the checks of a mounted methodology's skills and of a
+skill installed from a source, and reports their findings among its
+own; and a lint that reports a declaration that names checks.

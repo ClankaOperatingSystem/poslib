@@ -45,8 +45,8 @@
 ;;   FILE that do not say who or what, or since when.
 ;; - `pos-lint-duplicate-tasks': report task headings in more than one
 ;;   file of ROOT's corpus.
-;; - `pos-lint-methodology-checks': run each check a methodology of
-;;   ROOT's projects declares; return findings.
+;; - `pos-lint-methodology-checks': run each check of each methodology
+;;   of ROOT's projects; return findings.
 ;; - `pos-lint-skills-lock': report each entry of a skills-lock.json in
 ;;   ROOT's tree that is undeclared.
 
@@ -232,48 +232,83 @@ error, trimmed."
                                        (buffer-string)))))))
       (delete-file errors))))
 
+(defun pos-lint--skills (dir)
+  "Return the skills of DIR, a methodology: each directory in its skills/.
+A skill holds a SKILL.md.  Absolute, by name."
+  (let ((skills (expand-file-name "skills" dir)))
+    (and (file-directory-p skills)
+         (seq-filter (lambda (skill)
+                       (file-exists-p (expand-file-name "SKILL.md" skill)))
+                     (directory-files skills t directory-files-no-dot-files-regexp)))))
+
+(defun pos-lint--skill-checks (skill)
+  "Return each scripts/check-* of SKILL, a skill's directory, by name.
+Only an executable file is a check."
+  (let ((scripts (expand-file-name "scripts" skill)))
+    (and (file-directory-p scripts)
+         (seq-filter (lambda (file)
+                       (and (file-regular-p file) (file-executable-p file)))
+                     (directory-files scripts t "\\`check-")))))
+
+(defun pos-lint--run-check (command project at)
+  "Run COMMAND, a check, in PROJECT; return its findings.
+Each FILE:LINE: MESSAGE line it prints is a finding at that file,
+relative to PROJECT, and any other line a finding at PROJECT.  A check
+that exits other than 0 or 1 is a finding at AT, the skill's
+directory, with what it printed on standard error."
+  (pcase-let ((`(,status ,output . ,errors) (pos-lint--check-output command project)))
+    (if (memq status '(0 1))
+        (mapcar (lambda (line)
+                  (if (string-match "\\`\\(.+?\\):\\([0-9]+\\): \\(.*\\)\\'" line)
+                      (pos-finding-make
+                       :file (expand-file-name (match-string 1 line) project)
+                       :line (string-to-number (match-string 2 line))
+                       :message (match-string 3 line))
+                    (pos-finding-make :file (directory-file-name project)
+                                      :line 1 :message line)))
+                (split-string output "\n" t))
+      (list (pos-finding-make
+             :file (directory-file-name at) :line 1
+             :message (format "check %s could not check: %s"
+                              (file-name-nondirectory command) errors))))))
+
 (defun pos-lint-methodology-checks (root)
-  "Run each check a methodology of ROOT's projects declares; return findings.
-As doc/pos-methodology.txt section 3 has it: a check is run in the
-project; each FILE:LINE: MESSAGE line it prints is a finding at that
-file, relative to the project, and any other line a finding at the
-project; a check that exits 2 is a finding at the methodology with what
-it printed on standard error.  A declaration that is refused, and a
-check bin/ does not hold, are each a finding at the methodology."
+  "Run each check of each methodology of ROOT's projects; return findings.
+As doc/pos-methodology.txt section 3 has it: each executable
+scripts/check-* of each skill of a mounted methodology, and of each
+skill installed from a source the project declares, is run in the
+project.  A declaration that names checks in bin/, which are not run,
+and one that is refused, are each a finding at the methodology."
   (let (findings)
-    (pcase-dolist (`(,scope ,name . ,dir) (pos-corpus-methodologies (pos-corpus root)))
+    (pcase-dolist (`(,scope ,_name . ,dir) (pos-corpus-methodologies (pos-corpus root)))
       (let ((at (directory-file-name dir))
             (project (pos-scope-dir scope)))
         (condition-case err
-            (seq-doseq (check (alist-get 'checks (or (pos-node-read-methodology-file dir)
-                                                     '((checks . [])))))
-              (let ((command (expand-file-name (concat "bin/" check) dir)))
-                (if (not (file-executable-p command))
-                    (push (pos-finding-make
-                           :file at :line 1
-                           :message (format "check %s is not in bin/ of %s" check name))
-                          findings)
-                  (pcase-let ((`(,status ,output . ,errors)
-                               (pos-lint--check-output command project)))
-                    (if (memq status '(0 1))
-                        (dolist (line (split-string output "\n" t))
-                          (push (if (string-match "\\`\\(.+?\\):\\([0-9]+\\): \\(.*\\)\\'" line)
-                                    (pos-finding-make
-                                     :file (expand-file-name (match-string 1 line) project)
-                                     :line (string-to-number (match-string 2 line))
-                                     :message (match-string 3 line))
-                                  (pos-finding-make :file (directory-file-name project)
-                                                    :line 1 :message line))
-                                findings))
-                      (push (pos-finding-make
-                             :file at :line 1
-                             :message (format "check %s could not check: %s" check errors))
-                            findings))))))
+            (let ((checks (alist-get 'checks (pos-node-read-methodology-file dir))))
+              (unless (seq-empty-p checks)
+                (push (pos-finding-make
+                       :file at :line 1
+                       :message (concat "checks in bin/ are not run; move each"
+                                        " to a skill's scripts/check-NAME: "
+                                        (string-join (append checks nil) ", ")))
+                      findings)))
           (pos-node-refused
            (push (pos-finding-make
                   :file at :line 1
                   :message (format "declaration refused: %s: %s" (nth 1 err) (nth 2 err)))
-                 findings)))))
+                 findings)))
+        (dolist (skill (pos-lint--skills dir))
+          (dolist (check (pos-lint--skill-checks skill))
+            (setq findings (append (reverse (pos-lint--run-check check project skill))
+                                   findings))))))
+    (dolist (scope (pos-corpus-scopes (pos-corpus root)))
+      (when-let* ((config (pos-scope-config scope)))
+        (let ((project (pos-scope-dir scope)))
+          (dolist (name (pos-lock-installed project config))
+            (let ((skill (expand-file-name (concat ".agents/skills/" name) project)))
+              (dolist (check (pos-lint--skill-checks skill))
+                (setq findings (append (reverse (pos-lint--run-check check project skill))
+                                       findings))))))))
     (nreverse findings)))
 
 (defun pos-lint-skills-lock (root)
