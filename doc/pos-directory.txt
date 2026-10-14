@@ -50,10 +50,14 @@ The top level is a mapping:
     projects        where this node's projects belong: a path beneath
                     it, usually projects/. What lies directly there is
                     a project (section 2)
-    methodologies   where this node's methodologies belong: a path
-                    beneath it, usually methodologies/. Each
+    methodologies   the methodologies and other skills repositories
+                    whose skills are installed in this node: a
+                    sequence of sources (section 6). Or a path beneath
+                    the node, usually methodologies/, where each
                     methodology is a child declared directly beneath
-                    this path (section 2)
+                    it (section 2)
+    harnesses       the coding agents the skills of the sources are
+                    installed for (section 6)
     image           the container image this node's commands run in
     bin             where links to this node's commands are made
                     (section 6): a path beneath it, usually bin
@@ -67,8 +71,13 @@ The top level is a mapping:
 A node is a responsibility or a project. The file does not say which:
 where the node lies does (section 2). A file may have projects,
 methodologies, both or neither, so a responsibility may have
-methodologies as a project may. The two are separate paths: where one
-is the other, or beneath it, the file is refused (bad-path).
+methodologies as a project may. Where methodologies is a path, the two
+are separate paths: where one is the other, or beneath it, the file is
+refused (bad-path).
+
+A reader reads methodologies written as a path, and warns of it as
+"methodologies-path: PATH": each methodology the node mounts there can
+be declared as a source instead.
 
 A final slash on any of these paths is dropped.
 
@@ -145,7 +154,8 @@ An entry is a boundary. Its path and everything beneath it is the
 child's and not this node's. The entry does not say what the child is;
 where it is, and what is at the path, do:
 
-    directly beneath the node's methodologies path       a methodology
+    directly beneath the node's methodologies path,
+    where methodologies is a path                        a methodology
     no configuration                                     a product
     a configuration, directly beneath the node's
     projects path                                        a project
@@ -168,9 +178,9 @@ product is a subject, under its own rules, and this document says
 nothing of what is in it but this: its Org files are read as the
 product's.
 
-A methodology is a repository or a directory that supplies skills and
-commands to the node that declares it, a project or a responsibility
-(section 6). Its name is the last part of its path:
+Where methodologies is a path, a methodology mounted beneath it is a
+repository or a directory that supplies skills and commands to the
+node that declares it, a project or a responsibility (section 6). Its name is the last part of its path:
 methodologies/hello is the methodology hello. Nothing at the path
 says it is one; the entry's place does, so the same repository is a
 methodology where a node declares it beneath
@@ -482,6 +492,94 @@ declared at two nodes of a line, and are not reported. The directories
 the exclusions in force name are not looked in, and nothing is
 reported in a product.
 
+A node's sources are the other way skills reach it. methodologies, as a
+sequence, holds one entry for each repository of skills the node
+installs from, a mapping:
+
+    source      the repository's git URL: SCHEME://HOST/PATH, or
+                USER@HOST:PATH for SSH. A private repository is
+                given by its SSH URL
+    ref         the tag or the commit to install, a commit by its full
+                forty-digit id. A branch is not a ref
+    skills      a sequence of the names of the skills to install; all
+                of the repository's when absent
+    kind        methodology, the default, or skills-repository
+
+A source's name is the last part of its URL's path, less a final .git:
+https://example.org/team/pr-gnome.git is pr-gnome. A methodology names
+each of its skills with its name and a hyphen, as pr-gnome-write does.
+A skills repository is one whose skills are named as its owners choose,
+such as a third party's, and is exempt from that rule.
+
+Two sources are the same source when they are equal once each has lost
+a final slash and then a final .git, and, where it begins
+https://github.com/, that beginning. The skills CLI writes a GitHub
+repository's source in its lock file in that shorter form.
+
+A reader refuses (bad-value):
+
+  - a source that is not a git URL of either form, or that begins with
+    a hyphen;
+  - a ref that begins with a hyphen, or holds a space, # or @;
+  - a skill's name that is not words of lower-case letters and digits
+    joined by single hyphens, as the Agent Skills specification has a
+    skill's name, and an empty skills;
+  - a kind other than the two;
+  - a methodology whose name is not such a name, or is clankos;
+  - a skill that a methodology's entry names without its prefix;
+  - one source declared twice, two methodologies of one name, and one
+    skill named by two entries.
+
+harnesses is a sequence of the coding agents the skills are installed
+for, by the names the skills CLI gives them, such as codex, opencode and
+pi. A name is lower-case letters, digits and hyphens, and begins with a
+letter or a digit; one that is not, and one named twice, is refused
+(bad-value). When harnesses is absent, the skills are installed in
+.agents/skills/ alone.
+
+The tool does not install a source: that needs the network, which a
+plan does not use. The image's install command does it, as its own
+document has it, and leaves in the node
+
+    .agents/skills/NAME/   each skill of the sources, a directory
+    skills-lock.json       the skills CLI's record of what it installed
+
+both committed with the node, so that a new clone has its skills with
+no command run. skills-lock.json is a JSON object whose skills maps
+each skill's name to an entry: source, a sourceUrl where the skills CLI
+records one, ref, and other keys this document does not read. An entry
+is a declared source's when its sourceUrl, or its source where it has
+no sourceUrl, is the same source.
+
+The tool compares a node's skills-lock.json with its configuration and
+finds:
+
+    lock-differs     a declared source with no entry; a skill that a
+                     source's entry names, with no entry from that
+                     source; an entry whose ref is not its source's;
+                     and a skills-lock.json that is not such an object
+    lock-undeclared  an entry of no declared source, such as one the
+                     skills CLI wrote when run by hand, or of a skill
+                     its source's entry does not name
+
+Each has the path of the skills-lock.json, and a detail:
+
+    SOURCE at REF: not installed
+    NAME: not installed from SOURCE
+    NAME: LOCKED installed, REF declared
+    not a lock file
+    NAME: from SOURCE, which is not declared
+    NAME: not among the skills of SOURCE
+
+where SOURCE and REF are as the configuration has them, SOURCE is the
+entry's source for an entry of no declared source, and LOCKED is the
+entry's ref, or "no ref" where it has none. The entries are compared in the order of their names,
+then the sources in the order declared, each source's skills in the
+order named. A node that declares no sources and has no
+skills-lock.json has nothing compared. A repository's own skill has no
+entry and is not compared. The lint reports each lock-undeclared
+finding too.
+
 
 7. The two steps
 
@@ -539,6 +637,10 @@ and findings, which the tool reports and does not act on:
     methodology-refused  a methodology with a skill whose name does
                     not begin with the methodology's name and a
                     hyphen: nothing of it is linked
+    lock-differs    a node's skills-lock.json that does not hold
+                    what its sources declare (section 6)
+    lock-undeclared an entry of a node's skills-lock.json that its
+                    sources do not declare (section 6)
 
 A plan is a JSON object:
 
@@ -616,13 +718,16 @@ configures them, and tests the tool's behaviour in them.
 fixtures/pos-directory/ holds configuration files for both libraries.
 Each fixture is a JSON object: about, what it shows; yaml, the file's
 text; and either config, what a reader makes of it, or refused, the
-kind of refusal. config has projects, methodologies, image and bin,
-each a string or null; exclude,
-an array of strings or null; children, worktrees and archives, each an
+kind of refusal. config has projects, image and bin, each a string or
+null; methodologies, a string, an array of sources or null, each source
+an object of source, ref, skills, an array of strings or null, kind,
+and name, the source's name for a methodology and null for a skills
+repository; harnesses and exclude, each an array of strings or null;
+children, worktrees and archives, each an
 array with every default filled in, a child with no remote having null
 for its remote and branch, and an archive carrying sweep and path only
 when written; server, an object or null; and warnings, an array of
-strings, empty when the file holds no key the reader does not know.
+strings, empty when the reader gives no warning.
 
 fixtures/pos-methodology/ holds declarations, as doc/pos-methodology.txt
 section 5 describes them.
@@ -636,4 +741,9 @@ that declares methodologies; a skill with the name of another in a
 directory above it; and a repository holding a tracked skill of one
 slot's name and an untracked command of another's, planned with a
 source that supplies both, which has links for the rest and no
-finding.
+finding; and nodes whose skills-lock.json holds what their sources
+declare, a source not installed, a skill not installed, an entry of
+another ref, an entry of an undeclared source and one of a skill its
+source's entry does not name, a GitHub source written as a URL and in
+the lock file's shorter form, a skills-lock.json that is not a lock
+file, and one in a node that declares no sources.

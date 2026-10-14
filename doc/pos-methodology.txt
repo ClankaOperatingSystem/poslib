@@ -10,6 +10,9 @@ methodology holds: a declaration of the kinds of canon its commands
 create and maintain in the node, and of the checks it supplies for
 them; and what a tool does with the declaration. Below, "the project"
 is the node that declares the methodology, whichever of the two it is.
+A source a node declares under methodologies as a sequence is
+installed in the node instead (pos-directory, section 6), and no
+declaration of it is read.
 
 A methodology has no configuration. It declares no children and names
 no locations; it is what its declaring entry says it is. What it holds:

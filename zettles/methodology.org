@@ -16,8 +16,10 @@ but might not suit the work at hand. A
 [[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]] lists its
 methodologies in its
 [[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]]. Each one is a
-directory or a mounted repository inside the one that lists it. A
-methodology can declare each
+repository named by its git URL and a tag or a commit, whose skills are
+installed in the one that lists it, or a directory or a mounted
+repository inside the one that lists it. A mounted methodology can
+declare each
 [[id:cea827dc-7a1e-4da8-8c15-c32be34b5b54][kind of canon]] it keeps there,
 and the checks it runs on them. A coding agent shows a methodology's
 skills in the directory that lists it and in each directory beneath that
