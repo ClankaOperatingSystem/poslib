@@ -23,7 +23,8 @@
 ;; - `pos-capture': command.
 ;; - `pos-capture-like': the open items whose titles are like a title.
 ;; - `pos-capture-batch': shell entry; reads POS_CAPTURE_ROOT,
-;;   POS_CAPTURE_TITLE, POS_CAPTURE_BODY and POS_CAPTURE_CHECK.
+;;   POS_CAPTURE_TITLE, POS_CAPTURE_BODY and POS_CAPTURE_CHECK; exits
+;;   1 when it refuses, as doc/pos-slots.txt has it.
 ;; - `pos-capture-like-share': the share of words two titles have in
 ;;   common that makes them like.
 
@@ -116,18 +117,23 @@ locks."
 POS_CAPTURE_BODY, if set, is the item's text.  Print the item's line,
 then \"Like: FILE:LINE: STATE TITLE\" for each of `pos-capture-like'
 found before the item was written.  With POS_CAPTURE_CHECK set and
-not empty, write nothing and print those lines alone."
-  (let* ((root (getenv "POS_CAPTURE_ROOT"))
-         (title (getenv "POS_CAPTURE_TITLE"))
-         (check (not (member (getenv "POS_CAPTURE_CHECK") '(nil ""))))
-         (like (pos-capture-like root (or title ""))))
-    (unless check
-      (princ (format "%s:%d: TODO %s\n"
-                     (expand-file-name "intray.org" root)
-                     (pos-capture root title (getenv "POS_CAPTURE_BODY"))
-                     (string-trim title))))
-    (dolist (item like)
-      (princ (format "Like: %s\n" (pos-item-format item))))))
+not empty, write nothing and print those lines alone.  A refusal
+prints its reason and exits 1."
+  (condition-case err
+      (let* ((root (getenv "POS_CAPTURE_ROOT"))
+             (title (getenv "POS_CAPTURE_TITLE"))
+             (check (not (member (getenv "POS_CAPTURE_CHECK") '(nil ""))))
+             (like (pos-capture-like root (or title ""))))
+        (unless check
+          (princ (format "%s:%d: TODO %s\n"
+                         (expand-file-name "intray.org" root)
+                         (pos-capture root title (getenv "POS_CAPTURE_BODY"))
+                         (string-trim title))))
+        (dolist (item like)
+          (princ (format "Like: %s\n" (pos-item-format item)))))
+    (user-error
+     (message "%s" (error-message-string err))
+     (kill-emacs 1))))
 
 (provide 'pos-capture)
 ;;; pos-capture.el ends here

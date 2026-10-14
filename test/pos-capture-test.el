@@ -160,5 +160,22 @@ nothing."
                              intray)
                      (with-output-to-string (pos-capture-batch)))))))
 
+(ert-deftest pos-capture/the-command-exits-1-when-it-refuses ()
+  "A refused capture prints nothing on its output, exits 1 and writes nothing.
+Here the title is blank."
+  (pos-capture-test-with-intray "* Unsorted\n"
+    (let ((process-environment
+           (append (list (concat "POS_CAPTURE_ROOT=" root) "POS_CAPTURE_TITLE=   ")
+                   process-environment))
+          (status nil))
+      (cl-letf (((symbol-function 'kill-emacs)
+                 (lambda (&optional code) (throw 'pos-capture-test-exit code))))
+        (should (equal "" (with-output-to-string
+                            (setq status (catch 'pos-capture-test-exit
+                                           (pos-capture-batch)
+                                           :returned))))))
+      (should (eql 1 status))
+      (should (equal "* Unsorted\n" (pos-capture-test-intray root))))))
+
 (provide 'pos-capture-test)
 ;;; pos-capture-test.el ends here
