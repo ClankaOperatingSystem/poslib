@@ -20,6 +20,10 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-wrap-up.el= :: a session's handover sealed in the node's
   archive and indexed in its =journal.org=, marked the latest; the
   wrap-up slot's filling.
+- =lisp/pos-facts.el= :: what happened in a node since a commit: the
+  commits after it, pushed or not, and the ledger events added, for a
+  handover and for a start-up that finds commits newer than the last
+  one.
 - =lisp/pos-state.el= :: an item's state set with Org's own command, the
   item named by its ID or by file and line, and the change recorded in
   the item's =LOGBOOK= drawer.
