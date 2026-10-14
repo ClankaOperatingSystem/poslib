@@ -31,6 +31,8 @@
 ;;
 ;; - `pos-lock-file': the name of the file, in the node's directory.
 ;; - `pos-lock-differences': the differences at a node.
+;; - `pos-lock-installed': the skills at a node installed from its
+;;   sources.
 
 ;;; Code:
 
@@ -127,6 +129,30 @@ None where CONFIG declares no sources and DIR has no skills-lock.json."
                     (find "lock-differs" skill
                           (format "%s: not installed from %s" skill .source))))))))))))
     (nreverse found)))
+
+(defun pos-lock-installed (dir config)
+  "Return the names of the skills at DIR installed from CONFIG's sources.
+Each has an entry in DIR's skills-lock.json of a source CONFIG
+declares, of a skill that source's entry names if it names any.  By
+name."
+  (let* ((file (expand-file-name pos-lock-file dir))
+         (declared (alist-get 'methodologies config))
+         (entries (and (vectorp declared) (file-exists-p file)
+                       (pos-lock--entries file))))
+    (unless (eq entries :invalid)
+      (mapcar #'car
+              (seq-filter
+               (lambda (pair)
+                 (when-let* ((source (seq-find
+                                      (lambda (source)
+                                        (equal (pos-node-source-key
+                                                (alist-get 'source source))
+                                               (pos-lock--key (cdr pair))))
+                                      declared)))
+                   (let ((skills (alist-get 'skills source)))
+                     (or (not (vectorp skills))
+                         (seq-contains-p skills (car pair))))))
+               entries)))))
 
 (provide 'pos-lock)
 ;;; pos-lock.el ends here
