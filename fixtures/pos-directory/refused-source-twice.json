@@ -1,0 +1,5 @@
+{
+ "about": "One source declared twice: a GitHub URL with and without .git is one source.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://github.com/team/hello.git\n    ref: v1\n  - source: https://github.com/team/hello/\n    ref: v2\n    kind: skills-repository\n",
+ "refused": "bad-value"
+}

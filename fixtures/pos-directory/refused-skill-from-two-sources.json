@@ -1,0 +1,5 @@
+{
+ "about": "One skill named by two sources.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://example.org/a.git\n    ref: v1\n    skills: [tidy]\n    kind: skills-repository\n  - source: https://example.org/b.git\n    ref: v1\n    skills: [tidy]\n    kind: skills-repository\n",
+ "refused": "bad-value"
+}

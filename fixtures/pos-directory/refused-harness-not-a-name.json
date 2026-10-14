@@ -1,0 +1,5 @@
+{
+ "about": "A harness's name is lower-case letters, digits and hyphens.",
+ "yaml": "pos: 2\nharnesses: [Codex]\n",
+ "refused": "bad-value"
+}

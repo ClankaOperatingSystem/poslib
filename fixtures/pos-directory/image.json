@@ -4,6 +4,7 @@
  "config": {
   "projects": "projects",
   "methodologies": null,
+  "harnesses": null,
   "image": "ghcr.io/example/clankos:v1.2.3",
   "bin": null,
   "exclude": null,

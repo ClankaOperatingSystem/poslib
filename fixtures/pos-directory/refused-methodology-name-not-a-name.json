@@ -1,0 +1,5 @@
+{
+ "about": "A methodology's name is a skill's prefix, so it is a name a skill's can begin with.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://example.org/Hello_World.git\n    ref: v1\n",
+ "refused": "bad-value"
+}

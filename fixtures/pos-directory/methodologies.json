@@ -1,9 +1,10 @@
 {
- "about": "A node says where its methodologies belong. The file does not say whether the node is a project or a responsibility: its place does.",
+ "about": "A node says where its methodologies belong, in the path form, which a reader warns of. The file does not say whether the node is a project or a responsibility: its place does.",
  "yaml": "pos: 2\nmethodologies: methodologies\n",
  "config": {
   "projects": null,
   "methodologies": "methodologies",
+  "harnesses": null,
   "image": null,
   "bin": null,
   "exclude": null,
@@ -11,6 +12,8 @@
   "worktrees": [],
   "archives": [],
   "server": null,
-  "warnings": []
+  "warnings": [
+   "methodologies-path: methodologies"
+  ]
  }
 }

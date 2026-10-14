@@ -1,0 +1,5 @@
+{
+ "about": "A source is a git URL, not a path.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: ../hello\n    ref: v1\n",
+ "refused": "bad-value"
+}

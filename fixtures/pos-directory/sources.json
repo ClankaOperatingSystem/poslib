@@ -1,0 +1,48 @@
+{
+ "about": "A node declares its methodologies as sources, each a git URL at a tag or a commit, all of a repository's skills or those named; a skills repository's skills need not carry its name, and the harnesses are the coding agents they are installed for.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: https://example.org/team/pr-gnome.git\n    ref: v1.2.0\n  - source: git@example.org:team/gtd\n    ref: 0123456789abcdef0123456789abcdef01234567\n    skills: [gtd-get-clear, gtd-weekly-review]\n  - source: git@example.org:someone/shared-skills.git\n    ref: v3\n    skills: [share-skill]\n    kind: skills-repository\nharnesses: [codex, opencode, pi]\n",
+ "config": {
+  "projects": null,
+  "methodologies": [
+   {
+    "source": "https://example.org/team/pr-gnome.git",
+    "ref": "v1.2.0",
+    "skills": null,
+    "kind": "methodology",
+    "name": "pr-gnome"
+   },
+   {
+    "source": "git@example.org:team/gtd",
+    "ref": "0123456789abcdef0123456789abcdef01234567",
+    "skills": [
+     "gtd-get-clear",
+     "gtd-weekly-review"
+    ],
+    "kind": "methodology",
+    "name": "gtd"
+   },
+   {
+    "source": "git@example.org:someone/shared-skills.git",
+    "ref": "v3",
+    "skills": [
+     "share-skill"
+    ],
+    "kind": "skills-repository",
+    "name": null
+   }
+  ],
+  "harnesses": [
+   "codex",
+   "opencode",
+   "pi"
+  ],
+  "image": null,
+  "bin": null,
+  "exclude": null,
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null,
+  "warnings": []
+ }
+}

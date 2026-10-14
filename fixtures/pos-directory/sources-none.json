@@ -1,0 +1,17 @@
+{
+ "about": "An empty sequence of sources declares none.",
+ "yaml": "pos: 2\nmethodologies: []\n",
+ "config": {
+  "projects": null,
+  "methodologies": [],
+  "harnesses": null,
+  "image": null,
+  "bin": null,
+  "exclude": null,
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null,
+  "warnings": []
+ }
+}

@@ -46,6 +46,9 @@
 ;; - `pos-node-exclusions', `pos-node-unwalked-p',
 ;;   `pos-node-default-exclude': what a walk of a node does not enter.
 ;; - `pos-node-methodologies': the methodologies a configuration declares.
+;; - `pos-node-source-name', `pos-node-source-key': a source's name, and
+;;   the text it is compared by.
+;; - `pos-node-skill-name-regexp': a skill's name.
 ;; - `pos-node-refuse', `pos-node-refused': a refusal, and its signal.
 ;; - `pos-node-uuid-regexp': a UUID as a ledger's ID is written.
 ;; - `pos-node-methodology-file': the declaration at a methodology's
@@ -93,7 +96,8 @@ Refuse a path that does not stay beneath its node."
 (defun pos-node--typed (value type)
   "Return a list of VALUE read as TYPE, or nil if it is not of TYPE.
 VALUE is as parsed from YAML, every scalar the text that was written.
-TYPE is one of string, integer, sequence and mapping.  A string is
+TYPE is one of string, integer, sequence, path-or-sequence, which is
+a string or a sequence, and mapping.  A string is
 any text but the empty one and the two words for null; an integer is
 a whole number in digits, returned as a number."
   (pcase type
@@ -104,6 +108,8 @@ a whole number in digits, returned as a number."
                    (string-match-p "\\`\\(?:0\\|[1-9][0-9]*\\)\\'" value)
                    (list (string-to-number value))))
     ('sequence (and (vectorp value) (list value)))
+    ('path-or-sequence (or (pos-node--typed value 'string)
+                           (pos-node--typed value 'sequence)))
     ('mapping (and (pos-node--mapping-p value) (list value)))))
 
 (cl-defstruct (pos-node--reading (:constructor pos-node--reading-make)
@@ -372,30 +378,42 @@ KEY is the key that names its version.  Refuse `not-yaml', then
 
 (defun pos-node-read-config (text)
   "Return the configuration in TEXT, a config.yaml's, checked.
-An alist of projects, methodologies, image, bin, exclude, children,
-worktrees, archives, server and warnings, with defaults filled in:
-sequences are vectors and an absent value is :null.  warnings is a
-vector of strings, one for each key this reader does not know, which
-it leaves unread.  The file does not say what its node is: where the
-node lies does, as doc/pos-directory.txt section 2 has it.  Every
-scalar is read as the text written, and the keys' types decide what
-it is.  Signal `pos-node-refused', with the refusal's kind and a
-message, for a file doc/pos-directory.txt does not allow."
+An alist of projects, methodologies, harnesses, image, bin, exclude,
+children, worktrees, archives, server and warnings, with defaults
+filled in: sequences are vectors and an absent value is :null.
+methodologies is a path, or a vector of sources, each an alist of
+source, ref, skills, kind and name.  warnings is a vector of strings,
+one for each key this reader does not know, which it leaves unread,
+and one for methodologies written as a path.  The file does not say
+what its node is: where the node lies does, as doc/pos-directory.txt
+section 2 has it.  Every scalar is read as the text written, and the
+keys' types decide what it is.  Signal `pos-node-refused', with the
+refusal's kind and a message, for a file doc/pos-directory.txt does
+not allow."
   (let ((reading (pos-node--reading-make))
         (parsed (pos-node--parsed text "The file" "pos" 2)))
     (let* ((top (pos-node--mapping reading
                  parsed "The file"
                  '(("pos" integer t) ("projects" string nil)
-                   ("methodologies" string nil) ("image" string nil)
+                   ("methodologies" path-or-sequence nil) ("harnesses" sequence nil)
+                   ("image" string nil)
                    ("bin" string nil) ("exclude" sequence nil) ("children" sequence nil)
                    ("worktrees" sequence nil) ("archives" sequence nil)
                    ("server" mapping nil))))
            (projects (pos-node--location (alist-get 'projects top) "projects"))
-           (methodologies (pos-node--location (alist-get 'methodologies top)
-                                              "methodologies"))
+           (declared (alist-get 'methodologies top))
+           (methodologies (and (stringp declared)
+                               (pos-node--location declared "methodologies")))
+           (sources (and (vectorp declared)
+                         (vconcat (pos-node--sources reading declared))))
+           (harnesses (pos-node--harnesses (alist-get 'harnesses top)))
            (image (alist-get 'image top))
            (bin (pos-node--location (alist-get 'bin top) "bin"))
-           (children (pos-node--children reading (alist-get 'children top)))
+           (children (progn
+                       (when methodologies
+                         (push (format "methodologies-path: %s" methodologies)
+                               (pos-node--reading-warnings reading)))
+                       (pos-node--children reading (alist-get 'children top))))
            (server (assq 'server top)))
       (when (and projects methodologies
                  (or (pos-path-within-p projects methodologies)
@@ -415,7 +433,8 @@ message, for a file doc/pos-directory.txt does not allow."
         (pos-node-refuse 'bad-value
                          "The image is not on one line, as image: NAME, unquoted"))
       `((projects . ,(or projects :null))
-        (methodologies . ,(or methodologies :null))
+        (methodologies . ,(or methodologies sources :null))
+        (harnesses . ,(or harnesses :null))
         (image . ,(or image :null))
         (bin . ,(or bin :null))
         (exclude . ,(or (pos-node--exclusions (alist-get 'exclude top)) :null))
@@ -430,6 +449,121 @@ message, for a file doc/pos-directory.txt does not allow."
                         '(("name" string t) ("mcp" string t)) "server")
                      :null))
         (warnings . ,(vconcat (reverse (pos-node--reading-warnings reading))))))))
+
+;;;; Sources
+
+(defconst pos-node-skill-name-regexp "\\`[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\'"
+  "Matches a skill's name: words of lower-case letters and digits.
+The words are joined by single hyphens, as the Agent Skills
+specification has a skill's name.")
+
+(defun pos-node-source-name (source)
+  "Return the name of SOURCE, a git URL: the last part of its path.
+A final slash and then a final .git are dropped first."
+  (let ((path (string-remove-suffix "/" source)))
+    (string-remove-suffix
+     ".git" (car (last (split-string path (if (pos-node-url-p path) "/" "[/:]")))))))
+
+(defun pos-node-source-key (source)
+  "Return SOURCE, a git URL, as it is compared with another.
+It loses a final slash, then a final .git, and then a beginning
+https://github.com/, which the skills CLI drops in its lock file."
+  (string-remove-prefix
+   "https://github.com/"
+   (string-remove-suffix ".git" (string-remove-suffix "/" source))))
+
+(defun pos-node--source (reading entry index)
+  "Return ENTRY, the source at INDEX in methodologies, checked.
+Warnings are added to READING."
+  (let-alist (pos-node--mapping reading
+              entry "A source"
+              '(("source" string t) ("ref" string t) ("skills" sequence nil)
+                ("kind" string nil))
+              (format "methodologies[%d]" index))
+    (let* ((case-fold-search nil)
+           (kind (or .kind "methodology"))
+           (name (and (equal kind "methodology") (pos-node-source-name .source)))
+           (skills (and .skills
+                        (seq-map (lambda (skill)
+                                   (unless (pos-node--typed skill 'string)
+                                     (pos-node-refuse 'wrong-type
+                                                      "A skill is not a string: %s"
+                                                      .source))
+                                   skill)
+                                 .skills))))
+      (unless (and (not (string-prefix-p "-" .source))
+                   (string-match-p
+                    (concat "\\`\\(?:[A-Za-z][A-Za-z0-9+.-]*://[^/ ]+/"
+                            "\\|[^@/: ]+@[^@/: ]+:\\)[^ ]+\\'")
+                    .source))
+        (pos-node-refuse 'bad-value "Not a git URL: %s" .source))
+      (when (or (string-prefix-p "-" .ref) (string-match-p "[ \t\n#@]" .ref))
+        (pos-node-refuse 'bad-value "Not a ref: %s" .ref))
+      (unless (member kind '("methodology" "skills-repository"))
+        (pos-node-refuse 'bad-value "A source's kind is methodology or skills-repository: %s"
+                         kind))
+      (when (and name (or (not (string-match-p pos-node-skill-name-regexp name))
+                          (equal name "clankos")))
+        (pos-node-refuse 'bad-value "Not a methodology's name: %s" name))
+      (when (and .skills (seq-empty-p .skills))
+        (pos-node-refuse 'bad-value "A source names no skills: %s" .source))
+      (seq-doseq (skill skills)
+        (unless (string-match-p pos-node-skill-name-regexp skill)
+          (pos-node-refuse 'bad-value "Not a skill's name: %s" skill))
+        (when (and name (not (string-prefix-p (concat name "-") skill)))
+          (pos-node-refuse 'bad-value "A skill of %s not named %s-NAME: %s"
+                           name name skill)))
+      (pos-node--once (append skills nil) "A skill")
+      `((source . ,.source) (ref . ,.ref)
+        (skills . ,(if skills (vconcat skills) :null))
+        (kind . ,kind) (name . ,(or name :null))))))
+
+(defun pos-node--sources (reading entries)
+  "Return the sources in ENTRIES, a sequence, checked.
+Warnings are added to READING."
+  (let ((sources (seq-map-indexed (lambda (entry index)
+                                    (pos-node--source reading entry index))
+                                  entries))
+        keys names skills)
+    (dolist (source sources)
+      (let-alist source
+        (let ((key (pos-node-source-key .source)))
+          (when (member key keys)
+            (pos-node-refuse 'bad-value "A source is declared twice: %s" .source))
+          (push key keys))
+        (when (stringp .name)
+          (when (member .name names)
+            (pos-node-refuse 'bad-value "Two methodologies are named %s" .name))
+          (push .name names))
+        (seq-doseq (skill (if (vectorp .skills) .skills []))
+          (when (member skill skills)
+            (pos-node-refuse 'bad-value "A skill is named by two sources: %s" skill))
+          (push skill skills))))
+    sources))
+
+(defun pos-node--once (values what)
+  "Refuse as bad-value if VALUES, each naming a WHAT, hold one twice."
+  (let ((seen nil))
+    (dolist (value values)
+      (when (member value seen)
+        (pos-node-refuse 'bad-value "%s is named twice: %s" what value))
+      (push value seen))))
+
+(defun pos-node--harnesses (value)
+  "Return VALUE, a configuration's harnesses sequence, checked, as a vector.
+Nil for nil."
+  (when value
+    (let ((case-fold-search nil))
+      (pos-node--once
+       (seq-map (lambda (name)
+                  (unless (pos-node--typed name 'string)
+                    (pos-node-refuse 'wrong-type "harnesses: an entry is not a string"))
+                  (unless (string-match-p "\\`[a-z0-9][a-z0-9-]*\\'" name)
+                    (pos-node-refuse 'bad-value "Not a harness's name: %s" name))
+                  name)
+                value)
+       "A harness")
+      (vconcat value))))
 
 ;;;; The declaration
 

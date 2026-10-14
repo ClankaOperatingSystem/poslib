@@ -1,0 +1,5 @@
+{
+ "about": "A source that begins with a hyphen would be read as an option.",
+ "yaml": "pos: 2\nmethodologies:\n  - source: -u@example.org:x\n    ref: v1\n",
+ "refused": "bad-value"
+}
