@@ -56,7 +56,9 @@
 ;;   project's next action.
 ;; - `pos-startup-prompts': the questions a session opens with.
 ;; - `pos-startup-views': the names of the views, in the order they are
-;;   printed.
+;;   printed.  The handover view is the start-up slot's, as
+;;   doc/pos-slots.txt has it: the latest handover of each node, from
+;;   its journal.org.
 ;; - `pos-startup-default-views': the views `pos-startup-report' prints
 ;;   when none is named.
 
@@ -115,14 +117,14 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
   "The questions a session opens with.")
 
 (defconst pos-startup-views
-  '("next" "waiting" "someday" "scheduled" "deadlines" "reviews"
+  '("handover" "next" "waiting" "someday" "scheduled" "deadlines" "reviews"
     "reviews-to-schedule" "stuck" "no-outcome" "projects" "intray" "finished"
     "all")
   "The names of the views, in the order they are printed.")
 
 (defconst pos-startup-default-views
-  '("next" "waiting" "scheduled" "deadlines" "reviews" "reviews-to-schedule"
-    "stuck" "no-outcome" "intray")
+  '("handover" "next" "waiting" "scheduled" "deadlines" "reviews"
+    "reviews-to-schedule" "stuck" "no-outcome" "intray")
   "The views `pos-startup-report' prints when none is named.")
 
 (defconst pos-startup-weekly-views
@@ -702,6 +704,39 @@ been captured and not yet placed."
            nil 'file))))
     (pos-startup--list "Intray, to be placed" (nreverse lines))))
 
+(defun pos-startup--handover ()
+  "Return the handover view of `pos-startup--corpus'.
+Each heading tagged `pos-handover-tag' and `pos-latest-tag' in a file
+named journal.org: the latest handover of its node, with the date its
+`pos-handover-date-property' gives and the citation of its record,
+its `pos-handover-record-property', as doc/pos-slots.txt section 4 has
+them."
+  (let (lines)
+    (dolist (file (pos-corpus-files pos-startup--corpus))
+      (when (string= "journal.org" (file-name-nondirectory file))
+        (with-current-buffer (pos-visit file)
+          (org-map-entries
+           (lambda ()
+             (let ((tags (org-get-tags nil t)))
+               (when (and (member pos-handover-tag tags)
+                          (member pos-latest-tag tags))
+                 (when pos-startup--gathering
+                   (push (pos-startup--item-at-point) pos-startup--items))
+                 (let ((date (org-entry-get nil pos-handover-date-property)))
+                   (push (format "%-54s %s %s %s" (pos-startup--label)
+                                 (if (and date (string-match
+                                                "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}"
+                                                date))
+                                     (match-string 0 date)
+                                   "(undated)")
+                                 (org-link-display-format
+                                  (org-get-heading t t t t))
+                                 (or (org-entry-get nil pos-handover-record-property)
+                                     "(no record)"))
+                         lines)))))
+           nil 'file))))
+    (pos-startup--list "Latest handover" (nreverse lines))))
+
 (defun pos-startup--finished ()
   "Return the finished view of `pos-startup--corpus'.
 Each item in a done state whose CLOSED date is today or within the
@@ -795,6 +830,7 @@ A view of more than one list has a title for each."
       ("no-outcome" (pos-startup--no-outcome))
       ("projects" (pos-startup--projects))
       ("intray" (pos-startup--intray))
+      ("handover" (pos-startup--handover))
       ("finished" (pos-startup--finished))
       ("all"
        (let ((org-agenda-overriding-header "All TODO items"))
