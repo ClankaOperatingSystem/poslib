@@ -1,0 +1,24 @@
+:PROPERTIES:
+:ID:       496e4984-a966-4e69-b44f-f4a669e2d943
+:END:
+#+TITLE: slot
+
+A slot is a name that every node of a tree answers to, with a fixed
+signature and a filling the node may replace.
+
+There are three slots, capture, start-up and wrap-up, and each is a
+skill and a command of the slot's name. The signature is a
+[[id:f6fe4fc1-3277-4d24-bcaa-0b0b2da2f0b8][protocol]]: how the command is
+called, what it prints and how it exits, and the occasion the skill is
+used on. What a filling does behind the signature is the node's own and
+no protocol: one filling of capture files a task in the node's
+[[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]] and another opens
+a ticket in a forge. A node fills a slot with a tracked skill or command
+of the slot's name, and the tree tool, which reads the node's
+[[id:a4295636-b585-4062-92d6-90109d9dfc2d][configuration]], then installs
+nothing under that name; a node with none is given the filling the
+source supplies. A [[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]]
+names its skills after itself, so it fills no slot. The source's wrap-up
+filling seals a session's handover into the node's
+[[id:d9a04968-d3c5-4c68-8078-093ef619dd1d][archive]] and its start-up
+filling reads the latest one back from the node's journal.

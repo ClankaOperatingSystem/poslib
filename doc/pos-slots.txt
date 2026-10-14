@@ -1,0 +1,173 @@
+The slots
+Version 1
+
+A slot is a name every node of a tree answers to, with a signature that
+says how it is called and what it prints. There are three: capture,
+start-up and wrap-up. Each has two parts, a skill and a command, both
+of the slot's name.
+
+A node fills a slot with its own: a tracked skill of the slot's name in
+its .agents/skills/, or a tracked command of the slot's name where its
+configuration says bin. Where a node holds neither, the tree tool
+installs the source's, as doc/pos-directory.txt section 6 has it; where
+it holds one, the tool installs nothing under that name and reports
+nothing. The presence of the name is the declaration.
+
+What is fixed is the name and the signature. The skill's signature is
+its name and the occasion it is used on. The command's is its name, its
+arguments, what it prints and its exit status. What a filling does
+behind the signature is the node's own: the source's capture files a
+task in the node's intray, and a node whose captures are tickets in a
+forge supplies a capture that opens a ticket and prints its address.
+Nothing behind the command is checked.
+
+A skill, the source's or the node's, calls the slot's command by name
+and nothing else of the slot, so either skill works over either command.
+A skill may run other commands besides, git among them; the rule
+concerns the slot. The source's command reads the node's configuration
+for where things are kept.
+
+The source's fillings are what pos-capture.el, pos-startup.el and
+pos-wrap-up.el do; the image links its commands capture, start-up and
+wrap-up to them. Their protocols as the image runs them are the image's
+documents. This document gives what every filling keeps to.
+
+
+1. Capture
+
+    capture -- TITLE [BODY]
+    capture --check -- TITLE
+
+The skill's occasion: something is to be kept for later, a request to
+remember, note or capture, or a task that surfaces and is not for now.
+The skill runs the command once per item, in the node the item is for,
+and repeats the line the command printed. It does not place the item,
+date it or tag it beyond what was given, nor write the destination by
+hand.
+
+TITLE is one line without control characters. BODY is text, for what
+does not fit a title.
+
+The command keeps the item and prints, first, one line:
+
+    LOCATOR: ITEM
+
+LOCATOR is a place a reader can follow: a file and a line, FILE:LINE, or
+an address. ITEM is the item as kept, its keyword included where the
+filling has one. Then zero or more lines, one for each open item like
+the one given:
+
+    Like: LOCATOR: ITEM
+
+With --check, the Like: lines alone, and nothing is kept.
+
+Refused: an empty TITLE, a TITLE with a control character, and whatever
+the filling cannot keep, with the reason on standard error. The
+filling's --help lists its own refusals.
+
+The source's filling writes a TODO under Unsorted in the node's
+intray.org, with ID and CREATED, and its LOCATOR is FILE:LINE.
+
+
+2. Start-up
+
+    start-up [--view NAME]... [--json]
+
+The skill's occasion: the first turn of a session in a node, or a
+request to resume, get oriented or say what is next; not again in the
+same session. The skill runs the command in the node, reads the latest
+handover the handover view names, and, where there are commits or
+uncommitted changes newer than that handover, says so and shows what
+happened since. It takes the session's purpose from what has been said,
+offers a few next actions and begins the chosen one. It does not review
+the whole node, choose for the person, or write a handover for a
+session that left none.
+
+The command prints the prompts a session opens with, then views: each
+a title, then one line per item, SCOPE then ITEM, with (none) for a view
+with no item. With no --view, the filling's default views; with --view
+NAME, repeated, those views. --json prints the same as one line of JSON.
+
+The views and their names are those of pos-startup.el, and one is the
+slot's own:
+
+    handover    the latest handover: where it is marked latest and
+                the citation of its record
+
+A filling prints every view it is asked for; a view it does not keep
+prints (none). The command writes nothing to the node.
+
+The source's filling is pos-startup.el's report: its handover view reads
+each journal.org of the corpus (section 4).
+
+
+3. Wrap-up
+
+    wrap-up [--date DATE] -- TITLE < BODY
+
+The skill's occasion: a request to wrap up, finish for now or leave a
+handover. The skill composes the handover for a resuming session: the
+purpose, what became clearer, what was done and its evidence, what must
+not be redone, each open matter with its home, and the commits. It runs
+the command with it, then commits what the session changed where the
+node's rules allow. It does not push, amend, publish, or create a
+repository, a schedule or a migration.
+
+TITLE is one line without control characters. BODY, on standard input,
+is the handover. DATE is YYYY-MM-DD, today by default.
+
+The command keeps BODY as the node's handover, titled TITLE and dated
+DATE, marks it the latest, and prints one line:
+
+    LOCATOR: TITLE, DATE
+
+LOCATOR is where a resuming session finds the handover: a citation, or
+an address.
+
+Refused: an empty TITLE, a TITLE with a control character, an empty
+BODY, a DATE not of that form, and whatever the filling cannot keep,
+with the reason on standard error.
+
+The source's filling seals BODY as journal/DATE-SLUG.org in the node's
+archive, on disk or at its keeper, where SLUG is TITLE lower-cased with
+each run of characters that are not letters or digits made one hyphen;
+adds the handover's heading to the node's journal.org (section 4); and
+prints the record's ipfs:// citation as LOCATOR. A node with no
+journal.org gets one.
+
+
+4. The journal
+
+journal.org at a node's root is the node's index of handovers, read and
+written by the source's fillings and by any filling that keeps its
+handovers there. A handover is a heading tagged handover, with these
+properties:
+
+    ID        an Org ID
+    DATE      the handover's date, an inactive timestamp
+    RECORD    the citation of the record, an ipfs:// link
+
+The latest handover is the one also tagged latest. Writing a handover
+adds its heading before the first heading of the file, so the file reads
+newest first, and moves the latest tag to it. A tool reads the tags and
+the properties and nothing from a heading's words.
+
+
+5. Exit status
+
+Each command exits 0 when done; 1 when refused, nothing written and the
+reason on standard error; 2 for a command line it does not understand.
+The image's runner has statuses of its own above 124.
+
+
+6. Tests
+
+The install rule is tested in real repositories, as doc/pos-directory.txt
+section 8 has it: a node holding a tracked skill of a slot's name and
+an untracked command of another's, planned with a source that supplies
+both and more, has links for the rest, nothing at those two names and no
+finding.
+
+The source's fillings are tested where they are: pos-capture.el,
+pos-startup.el and pos-wrap-up.el in poslib, and the image's commands in
+the image. A node's own filling is held to the signature by nothing here.

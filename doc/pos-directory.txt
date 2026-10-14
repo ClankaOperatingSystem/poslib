@@ -367,12 +367,14 @@ The tool is given a directory to install from, the source:
 
     version        one line, which names what the source holds
     skills/NAME/   a skill: a directory holding a SKILL.md, whose NAME
-                   begins "clankos-"
+                   begins "clankos-", or is a slot's name
     bin/NAME       a command
 
-Given no source, the tool installs nothing, and keeps the links below
-to what is already installed. A source that names no version, or holds
-a skill named otherwise, is refused (bad-source).
+The slots are capture, start-up and wrap-up, as doc/pos-slots.txt has
+them: a skill and a command of each name, which a repository may
+supply itself. Given no source, the tool installs nothing, and keeps
+the links below to what is already installed. A source that names no
+version, or holds a skill named otherwise, is refused (bad-source).
 
 In the configuration directory at a repository's root, auto/ is the
 tool's alone. Where it is absent, or its version is not the source's,
@@ -399,7 +401,11 @@ file, a directory or another link, the tool leaves it as it is and
 reports it (name-taken), saying whether the repository tracks it and,
 if so, the commit that added it. The other links are made. A coding
 agent may take what holds the name for the skill it was to find, so
-the finding is reported until the name is free. Where .agents or
+the finding is reported until the name is free. A slot's name is the
+exception: what holds it, tracked or not, is the repository's own
+filling of the slot, so the tool makes no link there and reports
+nothing, and the source's skill or command of that name is not
+installed in that repository. Where .agents or
 .agents/skills is a file or a symbolic link, no skill link is made in
 that repository, and that path is reported the same way; so is a part
 of the path a node names as bin.
@@ -626,5 +632,8 @@ declares a mounted methodology and a local one, each holding a skill
 and a command; a methodology with a skill named without its prefix; a
 methodology whose entry is removed; one repository mounted as a
 product in one place and a methodology in another; a responsibility
-that declares methodologies; and a skill with the name of another in a
-directory above it.
+that declares methodologies; a skill with the name of another in a
+directory above it; and a repository holding a tracked skill of one
+slot's name and an untracked command of another's, planned with a
+source that supplies both, which has links for the rest and no
+finding.
