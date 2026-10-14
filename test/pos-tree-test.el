@@ -71,17 +71,20 @@ FILES is a plist of path and text.  Return DIR."
 
 (defun pos-tree-test-source (dir version &rest names)
   "Make at DIR a source to install from, of VERSION, and return DIR.
-Each of NAMES that begins clankos- is a skill, and any other a command.
-What was at DIR is replaced."
+Each of NAMES that begins clankos-, or is a slot's, is a skill, and any
+other a command; one that begins bin/ is a command of the rest of the
+name.  What was at DIR is replaced."
   (delete-directory dir t)
   (pos-tree-test-write dir "version" (concat version "\n"))
   (dolist (name names)
-    (if (string-prefix-p "clankos-" name)
+    (if (and (not (string-prefix-p "bin/" name))
+             (or (string-prefix-p "clankos-" name) (member name pos-tree-slots)))
         (pos-tree-test-write
          dir (format "skills/%s/SKILL.md" name)
          (format "---\nname: %s\ndescription: A skill.\n---\n" name))
-      (pos-tree-test-write dir (concat "bin/" name) "#!/bin/sh\n")
-      (set-file-modes (expand-file-name (concat "bin/" name) dir) #o755)))
+      (let ((command (string-remove-prefix "bin/" name)))
+        (pos-tree-test-write dir (concat "bin/" command) "#!/bin/sh\n")
+        (set-file-modes (expand-file-name (concat "bin/" command) dir) #o755))))
   dir)
 
 (defun pos-tree-test-child (path remote &rest more)
@@ -737,6 +740,34 @@ links are made."
       (should (equal (pos-tree-test-text (expand-file-name "bin/pos-capture" root))
                      "#!/bin/sh\n")))))
 
+(ert-deftest pos-tree/a-slots-name-the-repository-holds-is-its-filling ()
+  "A skill or a command of a slot's name that is there is left, and not found.
+The repository tracks its own capture skill and has an untracked
+wrap-up command.  The source's other skills and commands are linked,
+the slot names the repository lacks among them."
+  (pos-tree-test-with dir
+    (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
+                                         "capture" "start-up" "wrap-up" "clankos-seal"
+                                         "bin/capture" "bin/start-up" "bin/wrap-up"
+                                         "pos-capture"))
+           (root (apply #'pos-tree-test-repository (expand-file-name "root" dir)
+                        ".clanka/config.yml"
+                        (concat (pos-tree-test-config) "bin: bin\n")
+                        (pos-tree-test-skill "capture"))))
+      (pos-tree-test-write root "bin/wrap-up" "#!/bin/sh\n")
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
+      (should-not (file-symlink-p (expand-file-name ".agents/skills/capture" root)))
+      (should (equal (pos-tree-test-text
+                      (expand-file-name ".agents/skills/capture/SKILL.md" root))
+                     (cadr (pos-tree-test-skill "capture"))))
+      (dolist (name '("start-up" "wrap-up" "clankos-seal"))
+        (should (file-symlink-p (expand-file-name (concat ".agents/skills/" name) root))))
+      (dolist (name '("capture" "start-up" "pos-capture"))
+        (should (file-symlink-p (expand-file-name (concat "bin/" name) root))))
+      (should-not (file-symlink-p (expand-file-name "bin/wrap-up" root)))
+      (should (equal (pos-tree-test-text (expand-file-name "bin/wrap-up" root))
+                     "#!/bin/sh\n")))))
+
 (ert-deftest pos-tree/a-skills-path-that-is-not-a-directory-is-found ()
   "Where .agents is a file no skill link is made, and the path is found."
   (pos-tree-test-with dir
@@ -872,7 +903,9 @@ A declared child that is not there is excluded and stays to be cloned."
       (should (equal (pos-tree-test-status root) "")))))
 
 (ert-deftest pos-tree/a-source-that-is-not-one-is-refused ()
-  "A source with no version, or a skill not named clankos-NAME, is refused."
+  "A source with no version, or with a misnamed skill, is refused.
+A skill is named clankos-NAME or with a slot's name; capture here is
+allowed."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
                                           ".clanka/config.yml"
@@ -884,9 +917,12 @@ A declared child that is not there is excluded and stays to be cloned."
       (should (eq 'bad-source
                   (funcall refusal root (expand-file-name "unversioned" dir))))
       (pos-tree-test-write dir "misnamed/version" "1\n")
-      (pos-tree-test-write dir "misnamed/skills/capture/SKILL.md" "---\n---\n")
+      (pos-tree-test-write dir "misnamed/skills/release/SKILL.md" "---\n---\n")
       (should (eq 'bad-source
-                  (funcall refusal root (expand-file-name "misnamed" dir)))))))
+                  (funcall refusal root (expand-file-name "misnamed" dir))))
+      (pos-tree-test-write dir "slot/version" "1\n")
+      (pos-tree-test-write dir "slot/skills/capture/SKILL.md" "---\n---\n")
+      (should-not (funcall refusal root (expand-file-name "slot" dir))))))
 
 (ert-deftest pos-tree/archives-follow-each-scope-and-policy-changes ()
   "Archive excludes follow each scope and change with its policy.

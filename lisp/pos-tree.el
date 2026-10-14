@@ -500,6 +500,12 @@ mounted as declared, by this repository or by a directory of it."
   "https://agentskills.io/client-implementation/adding-skills-support"
   "Where the convention of keeping skills in .agents/skills/ is described.")
 
+(defconst pos-tree-slots '("capture" "start-up" "wrap-up")
+  "The names of the slots, as doc/pos-slots.txt has them.
+A skill or a command of one of these names that a repository holds is
+its own filling of the slot: the tool makes no link there and reports
+nothing.")
+
 (defun pos-tree--version (dir)
   "Return the version of DIR, a source or an auto directory, or nil.
 It is the first line of the file version there."
@@ -526,12 +532,14 @@ for each file."
 
 (defun pos-tree--check-source (source)
   "Refuse SOURCE, a directory to install from, unless it is one.
-It names its version, and each of its skills is named clankos-NAME."
+It names its version, and each of its skills is named clankos-NAME or
+is a slot's, one of `pos-tree-slots'."
   (unless (pos-tree--version source)
     (pos-tree-refuse 'bad-source "The source names no version: %s" source))
   (dolist (name (pos-tree--held source "skills"))
-    (unless (string-prefix-p "clankos-" name)
-      (pos-tree-refuse 'bad-source "A skill's name does not begin clankos-: %s"
+    (unless (or (string-prefix-p "clankos-" name) (member name pos-tree-slots))
+      (pos-tree-refuse 'bad-source
+                       "A skill's name does not begin clankos- and is no slot's: %s"
                        name))))
 
 (defun pos-tree--auto (dir)
@@ -583,9 +591,11 @@ tracks it and, if so, the commit that added it."
 WITHIN is a directory of the repository.  LINKS is an alist
 \(NAME . TARGETS): NAME is to be a link to the entry of that name in
 TARGETS, a directory in one of OWNED, the directories the tool's links
-point into.  A name held by something else is found and left; a name
-LINKS gives twice is found for its second; and another of the tool's
-links there is removed."
+point into.  A name held by something else is found and left, unless
+it is a slot's, one of `pos-tree-slots': what holds that is the
+repository's own filling, left and not found.  A name LINKS gives
+twice is found for its second; and another of the tool's links there
+is removed."
   (let* ((in (expand-file-name within dir))
          (closed (pos-tree--closed dir within))
          (names nil))
@@ -605,6 +615,9 @@ links there is removed."
             (unless (equal (file-symlink-p link) target)
               (pos-tree--act plan "unlink" `(path . ,shown))
               (pos-tree--act plan "link" `(path . ,shown) `(target . ,target))))
+           ((and (member name pos-tree-slots)
+                 (or (file-symlink-p link) (file-exists-p link)))
+            (push name names))
            ((or (file-symlink-p link) (file-exists-p link))
             (push name names)
             (pos-tree--taken plan dir path))
