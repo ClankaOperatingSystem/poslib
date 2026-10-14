@@ -17,6 +17,9 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   belongs to, from one walk that every command reads.
 - =lisp/pos-capture.el= :: capture to an intray, and the open items like
   a title, reported before it is written.
+- =lisp/pos-wrap-up.el= :: a session's handover sealed in the node's
+  archive and indexed in its =journal.org=, marked the latest; the
+  wrap-up slot's filling.
 - =lisp/pos-state.el= :: an item's state set with Org's own command, the
   item named by its ID or by file and line, and the change recorded in
   the item's =LOGBOOK= drawer.
