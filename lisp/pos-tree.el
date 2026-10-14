@@ -57,6 +57,7 @@
 (require 'cl-lib)
 (require 'pos-bytes)
 (require 'pos-git)
+(require 'pos-lock)
 (require 'pos-node)
 (require 'pos-path)
 (require 'seq)
@@ -740,10 +741,20 @@ after it is found for PLAN (methodology-refused) and supplies nothing."
               (push (cons command (expand-file-name "bin" dir)) commands))))))
     (cons (nreverse skills) (nreverse commands))))
 
+(defun pos-tree--lock (plan base config)
+  "Find for PLAN how the skills-lock.json at BASE differs from CONFIG.
+BASE is a node's directory and CONFIG its configuration."
+  (let ((file (pos-tree--rel plan (expand-file-name pos-lock-file base))))
+    (dolist (difference (pos-lock-differences base config))
+      (pos-tree--find plan (alist-get 'finding difference) file
+                      (alist-get 'detail difference)))))
+
 (defun pos-tree--in-directory (plan dir base config)
   "Add to PLAN the links to the methodologies of the node at BASE.
 They are made in DIR.  BASE is a directory of the repository at DIR,
-with CONFIG its own."
+with CONFIG its own.  Find how its skills-lock.json differs from its
+sources too."
+  (pos-tree--lock plan base config)
   (when (stringp (alist-get 'methodologies config))
     (let ((prefix (file-name-as-directory (file-relative-name base dir)))
           (owned (list (expand-file-name (alist-get 'methodologies config) base)))
@@ -796,7 +807,8 @@ the removal of links an earlier tool made."
         (pos-tree--link-in plan dir ".agents/skills" skills owned)
         (when (stringp bin)
           (pos-tree--link-in plan dir bin commands owned))
-        (pos-tree--claude plan dir "" skills owned)))
+        (pos-tree--claude plan dir "" skills owned)
+        (pos-tree--lock plan dir config)))
     (pcase-dolist (`(,base . ,own) (pos-tree--node-locals node))
       (pos-tree--in-directory plan dir base own))
     (dolist (child (pos-tree--node-children node))

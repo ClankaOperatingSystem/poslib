@@ -91,6 +91,22 @@ bin/ does not hold is a finding at the methodology."
                       "methodologies/adr:1: check adr-missing is not in bin/ of adr")
                      (pos-lint-format (pos-lint) root))))))
 
+(ert-deftest pos-lint/an-undeclared-entry-of-a-lock-file-is-a-finding ()
+  "An entry of skills-lock.json of no declared source is found at its line.
+A source declared and not installed is the image's refresh to report,
+and the lint says nothing of it."
+  (pos-test-with-files root
+      '((".clanka/config.yml"
+         . "pos: 2\nmethodologies:\n  - source: https://example.org/a.git\n    ref: v1\n")
+        ("intray.org" . "* TODO open\n")
+        ("skills-lock.json"
+         . "{\n  \"version\": 1,\n  \"skills\": {\n    \"grill-me\": {\n      \"source\": \"someone/skills\",\n      \"sourceType\": \"github\",\n      \"computedHash\": \"0\"\n    }\n  }\n}\n"))
+    (let ((pos-directory root))
+      (should (equal (pos-test-lines
+                      (concat "skills-lock.json:4: lock-undeclared: grill-me: "
+                              "from someone/skills, which is not declared"))
+                     (pos-lint-format (pos-lint) root))))))
+
 (ert-deftest pos-lint/findings-print-file-line-message-relative-to-the-root ()
   "Findings print as file:line: message, relative to the root, in order.
 The order is by file then line, so a compilation buffer walks the

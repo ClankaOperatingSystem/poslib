@@ -47,6 +47,8 @@
 ;;   file of ROOT's corpus.
 ;; - `pos-lint-methodology-checks': run each check a methodology of
 ;;   ROOT's projects declares; return findings.
+;; - `pos-lint-skills-lock': report each entry of a skills-lock.json in
+;;   ROOT's tree that is undeclared.
 
 ;;; Code:
 
@@ -55,6 +57,7 @@
 (require 'cl-lib)
 (require 'pos)
 (require 'pos-corpus)
+(require 'pos-lock)
 (require 'pos-node)
 
 ;;;; Checks of a file
@@ -273,11 +276,35 @@ check bin/ does not hold, are each a finding at the methodology."
                  findings)))))
     (nreverse findings)))
 
+(defun pos-lint-skills-lock (root)
+  "Report each entry of a skills-lock.json in ROOT's tree that is undeclared.
+That is an entry of no source its node's configuration declares, or
+of a skill its source's entry does not name, as section 6 of
+doc/pos-directory.txt has it.  The finding is at the entry's line."
+  (let (findings)
+    (dolist (scope (pos-corpus-scopes (pos-corpus root)))
+      (when-let* ((config (pos-scope-config scope)))
+        (let ((file (expand-file-name pos-lock-file (pos-scope-dir scope))))
+          (dolist (difference (pos-lock-differences (pos-scope-dir scope) config))
+            (let-alist difference
+              (when (equal .finding "lock-undeclared")
+                (push (pos-finding-make
+                       :file file
+                       :line (with-temp-buffer
+                               (insert-file-contents file)
+                               (if (search-forward (format "\"%s\":" .skill) nil t)
+                                   (line-number-at-pos)
+                                 1))
+                       :message (concat "lock-undeclared: " .detail))
+                      findings)))))))
+    (nreverse findings)))
+
 (autoload 'pos-person-lint "pos-person")
 
 (defvar pos-lint-repo-checks
   '(pos-lint-duplicate-tasks
     pos-lint-methodology-checks
+    pos-lint-skills-lock
     pos-person-lint)
   "Whole-tree checks: root to findings.")
 

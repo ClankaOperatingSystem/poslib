@@ -1230,5 +1230,101 @@ The second is found as a name taken, named by more than one."
       (should (equal (pos-tree-test-names root ".agents/skills")
                      '("alpha-greet" "beta-greet"))))))
 
+;;;; Sources and the lock file
+
+(defun pos-tree-test-lock (&rest entries)
+  "Return a skills-lock.json's text recording ENTRIES.
+Each is (NAME SOURCE REF &optional URL): REF nil for none, and URL the
+entry's sourceUrl, as the skills CLI writes it for a git source."
+  (concat "{\n  \"version\": 1,\n  \"skills\": {\n"
+          (mapconcat
+           (lambda (entry)
+             (pcase-let ((`(,name ,source ,ref ,url) entry))
+               (concat (format "    \"%s\": {\n      \"source\": \"%s\",\n" name source)
+                       (if url (format "      \"sourceUrl\": \"%s\",\n" url) "")
+                       (if ref (format "      \"ref\": \"%s\",\n" ref) "")
+                       (format "      \"sourceType\": \"%s\",\n" (if url "git" "github"))
+                       "      \"computedHash\": \"0\"\n    }")))
+           entries ",\n")
+          "\n  }\n}\n"))
+
+(defun pos-tree-test-findings (plan)
+  "Return the findings of PLAN as strings: finding, path and detail."
+  (mapcar (lambda (finding)
+            (let-alist finding (format "%s %s %s" .finding .path .detail)))
+          (alist-get 'findings plan)))
+
+(ert-deftest pos-tree/a-lock-file-that-holds-the-sources-is-not-found ()
+  "Where skills-lock.json holds what the sources declare, nothing is found.
+A GitHub source written as a URL is the lock file's shorter source."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".clanka/config.yml"
+                 (concat "pos: 2\nmethodologies:\n"
+                         "  - source: https://github.com/team/hello.git\n    ref: v1\n"
+                         "  - source: git@example.org:someone/shared.git\n    ref: v2\n"
+                         "    skills: [share-skill]\n    kind: skills-repository\n")
+                 "skills-lock.json"
+                 (pos-tree-test-lock
+                  '("hello-greet" "team/hello" "v1")
+                  '("hello-part" "team/hello" "v1")
+                  '("share-skill" "git@example.org:someone/shared.git" "v2"
+                    "git@example.org:someone/shared.git")))))
+      (should (equal (pos-tree-test-findings (pos-tree-plan root)) nil)))))
+
+(ert-deftest pos-tree/how-a-lock-file-differs-from-the-sources-is-found ()
+  "Each difference is found: entries by name, then sources as declared.
+An entry of another ref, a skill named and not installed, and a source
+not installed differ; an entry of a skill its source does not name,
+and one of no declared source, are undeclared."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".clanka/config.yml"
+                 (concat "pos: 2\nmethodologies:\n"
+                         "  - source: https://example.org/a.git\n    ref: v2\n"
+                         "  - source: git@example.org:b.git\n    ref: v1\n"
+                         "    skills: [b-one, b-two]\n"
+                         "  - source: https://example.org/c.git\n    ref: v1\n")
+                 "skills-lock.json"
+                 (pos-tree-test-lock
+                  '("a-x" "https://example.org/a.git" "v1" "https://example.org/a.git")
+                  '("b-one" "git@example.org:b.git" "v1" "git@example.org:b.git")
+                  '("b-three" "git@example.org:b.git" "v1" "git@example.org:b.git")
+                  '("z-other" "someone/skills" nil)))))
+      (should (equal (pos-tree-test-findings (pos-tree-plan root))
+                     '("lock-differs skills-lock.json a-x: v1 installed, v2 declared"
+                       "lock-undeclared skills-lock.json b-three: not among the skills of git@example.org:b.git"
+                       "lock-undeclared skills-lock.json z-other: from someone/skills, which is not declared"
+                       "lock-differs skills-lock.json b-two: not installed from git@example.org:b.git"
+                       "lock-differs skills-lock.json https://example.org/c.git at v1: not installed"))))))
+
+(ert-deftest pos-tree/a-lock-file-that-is-not-one-is-found ()
+  "A skills-lock.json that is not the skills CLI's object differs."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".clanka/config.yml"
+                 "pos: 2\nmethodologies:\n  - source: https://example.org/a.git\n    ref: v1\n"
+                 "skills-lock.json" "{\"version\": 1, \"skills\": []}\n")))
+      (should (equal (pos-tree-test-findings (pos-tree-plan root))
+                     '("lock-differs skills-lock.json not a lock file"))))))
+
+(ert-deftest pos-tree/each-node-compares-its-own-lock-file ()
+  "A node with no sources has each entry of its lock file undeclared.
+A project that is a directory of the repository compares its own."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".clanka/config.yml"
+                 (pos-tree-test-config "  - path: projects/p\n")
+                 "skills-lock.json" (pos-tree-test-lock '("grill-me" "someone/skills" nil))
+                 "projects/p/.clanka/config.yml"
+                 "pos: 2\nmethodologies:\n  - source: https://example.org/a.git\n    ref: v1\n")))
+      (should (equal (pos-tree-test-findings (pos-tree-plan root))
+                     '("lock-undeclared skills-lock.json grill-me: from someone/skills, which is not declared"
+                       "lock-differs projects/p/skills-lock.json https://example.org/a.git at v1: not installed"))))))
+
 (provide 'pos-tree-test)
 ;;; pos-tree-test.el ends here
