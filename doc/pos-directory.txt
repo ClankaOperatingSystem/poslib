@@ -596,7 +596,10 @@ the image's source counted as declared, and finds:
     lock-differs     a declared source with no entry; a skill that a
                      source's entry names, with no entry from that
                      source; an entry whose ref is not its source's;
-                     and a skills-lock.json that is not such an object
+                     an entry whose skill's directory in
+                     .agents/skills/ is not there, or has another hash
+                     than the entry's computedHash; and a
+                     skills-lock.json that is not such an object
     lock-undeclared  an entry of no declared source, such as one the
                      skills CLI wrote when run by hand, or of a skill
                      its source's entry does not name
@@ -606,13 +609,25 @@ Each has the path of the skills-lock.json, and a detail:
     SOURCE at REF: not installed
     NAME: not installed from SOURCE
     NAME: LOCKED installed, REF declared
+    NAME: not in .agents/skills/
+    NAME: changed since it was installed
     not a lock file
     NAME: from SOURCE, which is not declared
     NAME: not among the skills of SOURCE
 
 where SOURCE and REF are as the configuration has them, SOURCE is the
 entry's source for an entry of no declared source, and LOCKED is the
-entry's ref, or "no ref" where it has none. The entries are compared in the order of their names,
+entry's ref, or "no ref" where it has none.
+
+A skill directory's hash is the skills CLI's computedHash: the SHA-256,
+in lower-case hex, of each file's path relative to the directory, in
+UTF-8, followed by the file's bytes, the files taken in the order of
+their paths in the Unicode collation. A symbolic link is not a file,
+and a directory named .git or node_modules is not looked in. So a skill
+edited where it is installed differs until the install command installs
+it again.
+
+The entries are compared in the order of their names,
 then the sources in the order declared, each source's skills in the
 order named. A node that declares no sources and has no
 skills-lock.json has nothing compared. A repository's own skill has no
