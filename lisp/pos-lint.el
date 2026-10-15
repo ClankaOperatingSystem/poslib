@@ -321,9 +321,10 @@ in its configuration directory, they are what auto/ holds, as
 
 (defun pos-lint-skills-lock (root)
   "Report each entry of a skills-lock.json in ROOT's tree that is undeclared.
-That is an entry of no source its node's configuration declares, or
-of a skill its source's entry does not name, as section 6 of
-doc/pos-directory.txt has it.  The finding is at the entry's line."
+That is an entry of a skill its declared source's entry does not name,
+as section 6 of doc/pos-directory.txt has it.  An entry of a source no
+configuration declares is wild-caught, and not reported.  The finding
+is at the entry's line."
   (let (findings)
     (dolist (scope (pos-corpus-scopes (pos-corpus root)))
       (when-let* ((config (pos-scope-config scope)))

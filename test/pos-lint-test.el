@@ -137,19 +137,20 @@ skill of the repository's own, with no lock entry, has none run."
                      (pos-lint-format (pos-lint) root))))))
 
 (ert-deftest pos-lint/an-undeclared-entry-of-a-lock-file-is-a-finding ()
-  "An entry of skills-lock.json of no declared source is found at its line.
-A source declared and not installed is the image's refresh to report,
-and the lint says nothing of it."
+  "An entry of skills-lock.json of a skill its source does not name is found.
+It is found at its line.  An entry of no declared source is
+wild-caught, and not found.  A source declared and not installed is
+the image's refresh to report, and the lint says nothing of it."
   (pos-test-with-files root
       '((".clanka/config.yml"
-         . "pos: 2\nmethodologies:\n  - source: https://example.org/a.git\n    ref: v1\n")
+         . "pos: 2\nmethodologies:\n  - source: https://example.org/a.git\n    ref: v1\n    skills: [a-one]\n")
         ("intray.org" . "* TODO open\n")
         ("skills-lock.json"
-         . "{\n  \"version\": 1,\n  \"skills\": {\n    \"grill-me\": {\n      \"source\": \"someone/skills\",\n      \"sourceType\": \"github\",\n      \"computedHash\": \"0\"\n    }\n  }\n}\n"))
+         . "{\n  \"version\": 1,\n  \"skills\": {\n    \"a-two\": {\n      \"source\": \"https://example.org/a.git\",\n      \"ref\": \"v1\",\n      \"sourceType\": \"git\",\n      \"computedHash\": \"0\"\n    },\n    \"grill-me\": {\n      \"source\": \"someone/skills\",\n      \"sourceType\": \"github\",\n      \"computedHash\": \"0\"\n    }\n  }\n}\n"))
     (let ((pos-directory root))
       (should (equal (pos-test-lines
-                      (concat "skills-lock.json:4: lock-undeclared: grill-me: "
-                              "from someone/skills, which is not declared"))
+                      (concat "skills-lock.json:4: lock-undeclared: a-two: "
+                              "not among the skills of https://example.org/a.git"))
                      (pos-lint-format (pos-lint) root))))))
 
 (ert-deftest pos-lint/an-entry-of-the-images-skills-is-declared ()

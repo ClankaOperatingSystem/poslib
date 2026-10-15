@@ -25,9 +25,11 @@
 ;; which records what it installed in skills-lock.json beside them.
 ;; This module compares that file with the configuration, with no
 ;; network, as section 6 of doc/pos-directory.txt has it: lock-differs
-;; for what the configuration declares and the file does not hold, and
-;; lock-undeclared for what the file holds and the configuration does
-;; not declare.  At a repository's root the image's skills are one
+;; for what the configuration declares and the file does not hold;
+;; lock-undeclared for a skill of a declared source that the
+;; configuration does not name; and wild-caught for an entry of a
+;; source the configuration does not declare, which someone installed
+;; with the skills CLI and the configuration does not manage.  At a repository's root the image's skills are one
 ;; source more, which no configuration names.  Each entry's
 ;; computedHash is compared with the skill's directory too, so a skill
 ;; edited where it is installed is found.
@@ -208,8 +210,8 @@ Its sourceUrl where it has one, else its source."
 DIR is a node's directory and CONFIG its configuration, as
 `pos-node-read-config' gives it.  IMAGE, if given, is one source more,
 as `pos-lock-image' gives it.  A list of alists, each of finding,
-lock-differs or lock-undeclared; skill, the skill's name, or nil for
-a finding of a whole source or file; and detail.  An entry of a
+lock-differs, lock-undeclared or wild-caught; skill, the skill's name,
+or nil for a finding of a whole source or file; and detail.  An entry of a
 declared source at its ref differs where its skill's directory in
 .agents/skills/ is not there, or has another hash than computedHash.
 The entries come in the order of their names, then the sources in the
@@ -236,7 +238,7 @@ None where CONFIG declares no sources and DIR has no skills-lock.json."
             (let-alist source
               (cond
                ((not source)
-                (find "lock-undeclared" name
+                (find "wild-caught" name
                       (format "%s: from %s, which is not declared"
                               name (alist-get 'source entry))))
                ((and (vectorp .skills) (not (seq-contains-p .skills name)))

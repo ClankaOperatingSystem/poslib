@@ -566,9 +566,12 @@ the image's source counted as declared, and finds:
                      .agents/skills/ is not there, or has another hash
                      than the entry's computedHash; and a
                      skills-lock.json that is not such an object
-    lock-undeclared  an entry of no declared source, such as one the
-                     skills CLI wrote when run by hand, or of a skill
-                     its source's entry does not name
+    lock-undeclared  an entry of a skill that its declared source's
+                     entry does not name
+    wild-caught      an entry of no declared source, such as one the
+                     skills CLI wrote when run by hand. The
+                     configuration does not manage it, and the image's
+                     install command leaves it as it is
 
 Each has the path of the skills-lock.json, and a detail:
 
@@ -598,7 +601,8 @@ then the sources in the order declared, each source's skills in the
 order named. A node that declares no sources and has no
 skills-lock.json has nothing compared. A repository's own skill has no
 entry and is not compared. The lint reports each lock-undeclared
-finding too.
+finding too, and no wild-caught one: a wild-caught skill is not a
+fault.
 
 
 7. The two steps
@@ -654,8 +658,10 @@ and findings, which the tool reports and does not act on:
                     hyphen: nothing of it is linked
     lock-differs    a node's skills-lock.json that does not hold
                     what its sources declare (section 6)
-    lock-undeclared an entry of a node's skills-lock.json that its
-                    sources do not declare (section 6)
+    lock-undeclared an entry of a node's skills-lock.json of a skill
+                    that its declared source does not name (section 6)
+    wild-caught     an entry of a node's skills-lock.json of a source
+                    it does not declare (section 6)
 
 A plan is a JSON object:
 

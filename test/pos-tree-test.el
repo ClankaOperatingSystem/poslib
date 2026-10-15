@@ -1267,8 +1267,8 @@ A GitHub source written as a URL is the lock file's shorter source."
 (ert-deftest pos-tree/how-a-lock-file-differs-from-the-sources-is-found ()
   "Each difference is found: entries by name, then sources as declared.
 An entry of another ref, a skill named and not installed, and a source
-not installed differ; an entry of a skill its source does not name,
-and one of no declared source, are undeclared."
+not installed differ; an entry of a skill its source does not name is
+undeclared, and one of no declared source is wild-caught."
   (pos-tree-test-with dir
     (let ((root (apply
                  #'pos-tree-test-repository
@@ -1290,7 +1290,7 @@ and one of no declared source, are undeclared."
       (should (equal (pos-tree-test-findings (pos-tree-plan root))
                      '("lock-differs skills-lock.json a-x: v1 installed, v2 declared"
                        "lock-undeclared skills-lock.json b-three: not among the skills of git@example.org:b.git"
-                       "lock-undeclared skills-lock.json z-other: from someone/skills, which is not declared"
+                       "wild-caught skills-lock.json z-other: from someone/skills, which is not declared"
                        "lock-differs skills-lock.json b-two: not installed from git@example.org:b.git"
                        "lock-differs skills-lock.json https://example.org/c.git at v1: not installed"))))))
 
@@ -1351,7 +1351,7 @@ So does one whose entry is there and whose directory is not."
                      '("lock-differs skills-lock.json not a lock file"))))))
 
 (ert-deftest pos-tree/each-node-compares-its-own-lock-file ()
-  "A node with no sources has each entry of its lock file undeclared.
+  "A node with no sources has each entry of its lock file wild-caught.
 A project that is a directory of the repository compares its own."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository
@@ -1362,7 +1362,7 @@ A project that is a directory of the repository compares its own."
                  "projects/p/.clanka/config.yml"
                  "pos: 2\nmethodologies:\n  - source: https://example.org/a.git\n    ref: v1\n")))
       (should (equal (pos-tree-test-findings (pos-tree-plan root))
-                     '("lock-undeclared skills-lock.json grill-me: from someone/skills, which is not declared"
+                     '("wild-caught skills-lock.json grill-me: from someone/skills, which is not declared"
                        "lock-differs projects/p/skills-lock.json https://example.org/a.git at v1: not installed"))))))
 
 (provide 'pos-tree-test)
