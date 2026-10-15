@@ -36,7 +36,9 @@
 ;; What is installed comes from a source the tool is given, a
 ;; directory of skills and commands.  It is copied into auto/ in the
 ;; configuration directory of each repository that has a configuration,
-;; and links to it are made where a coding agent and a person look.
+;; and links to its commands are made where a person looks.  Its skills
+;; are installed by the image's install command, as a source of the
+;; repository's skills-lock.json; the tool compares that file with them.
 ;; Nothing is written in a repository with no configuration, a product.
 ;;
 ;; The configurations are read by pos-node.el, which refuses what
@@ -501,10 +503,10 @@ mounted as declared, by this repository or by a directory of it."
   "https://agentskills.io/client-implementation/adding-skills-support"
   "Where the convention of keeping skills in .agents/skills/ is described.")
 
-(defconst pos-tree-slots '("capture" "start-up" "wrap-up")
+(defconst pos-tree-slots pos-lock-slots
   "The names of the slots, as doc/pos-slots.txt has them.
-A skill or a command of one of these names that a repository holds is
-its own filling of the slot: the tool makes no link there and reports
+A command of one of these names that a repository holds is its own
+filling of the slot: the tool makes no link there and reports
 nothing.")
 
 (defun pos-tree--version (dir)
@@ -533,10 +535,17 @@ for each file."
 
 (defun pos-tree--check-source (source)
   "Refuse SOURCE, a directory to install from, unless it is one.
-It names its version, and each of its skills is named clankos-NAME or
-is a slot's, one of `pos-tree-slots'."
+It names its version, its repository and its commit, a full id, and
+each of its skills is named clankos-NAME or is a slot's, one of
+`pos-tree-slots'."
   (unless (pos-tree--version source)
     (pos-tree-refuse 'bad-source "The source names no version: %s" source))
+  (unless (pos-lock--line source "repository")
+    (pos-tree-refuse 'bad-source "The source names no repository: %s" source))
+  (let ((commit (pos-lock--line source "commit")))
+    (unless (and commit (string-match-p "\\`[0-9a-f]\\{40\\}\\'" commit))
+      (pos-tree-refuse 'bad-source "The source names no commit by its full id: %s"
+                       source)))
   (dolist (name (pos-tree--held source "skills"))
     (unless (or (string-prefix-p "clankos-" name) (member name pos-tree-slots))
       (pos-tree-refuse 'bad-source
@@ -545,10 +554,8 @@ is a slot's, one of `pos-tree-slots'."
 
 (defun pos-tree--auto (dir)
   "Return the auto directory of the repository at DIR, or nil.
-It is in the configuration directory at DIR, which a repository whose
-working tree has no configuration lacks."
-  (when-let* ((file (pos-node-config-file dir)))
-    (expand-file-name "auto" (expand-file-name (file-name-directory file) dir))))
+It is `pos-lock-auto'."
+  (pos-lock-auto dir))
 
 (defun pos-tree--own-link-p (link owned)
   "Return non-nil if LINK is a symbolic link whose target is in one of OWNED.
@@ -741,11 +748,12 @@ after it is found for PLAN (methodology-refused) and supplies nothing."
               (push (cons command (expand-file-name "bin" dir)) commands))))))
     (cons (nreverse skills) (nreverse commands))))
 
-(defun pos-tree--lock (plan base config)
+(defun pos-tree--lock (plan base config &optional image)
   "Find for PLAN how the skills-lock.json at BASE differs from CONFIG.
-BASE is a node's directory and CONFIG its configuration."
+BASE is a node's directory and CONFIG its configuration.  IMAGE, if
+given, is the image's skills as a source, as `pos-lock-image' gives it."
   (let ((file (pos-tree--rel plan (expand-file-name pos-lock-file base))))
-    (dolist (difference (pos-lock-differences base config))
+    (dolist (difference (pos-lock-differences base config image))
       (pos-tree--find plan (alist-get 'finding difference) file
                       (alist-get 'detail difference)))))
 
@@ -768,8 +776,9 @@ sources too."
 (defun pos-tree--installs (plan node)
   "Add to PLAN what is installed in NODE and in the repositories beneath it.
 A repository with a configuration has auto/ in its configuration
-directory, replaced from the source when its version is another, and
-links to what auto/ holds and to what its methodologies supply.  A
+directory, replaced from the source when its version is another,
+links to the commands auto/ holds and to what its methodologies
+supply, and its skills-lock.json compared with the source's skills.  A
 node that is a directory of it has links to its own methodologies.
 One with no configuration, a product, has nothing planned in it but
 the removal of links an earlier tool made."
@@ -790,10 +799,7 @@ the removal of links an earlier tool made."
              (at (alist-get 'methodologies config))
              (owned (if (stringp at) (list auto (expand-file-name at dir)) (list auto)))
              (supplied (pos-tree--methodology-links plan dir config))
-             (skills (append (mapcar (lambda (name)
-                                       (cons name (expand-file-name "skills" auto)))
-                                     (pos-tree--held from "skills"))
-                             (car supplied)))
+             (skills (car supplied))
              (commands (append (mapcar (lambda (name)
                                          (cons name (expand-file-name "bin" auto)))
                                        (pos-tree--held from "bin"))
@@ -808,7 +814,8 @@ the removal of links an earlier tool made."
         (when (stringp bin)
           (pos-tree--link-in plan dir bin commands owned))
         (pos-tree--claude plan dir "" skills owned)
-        (pos-tree--lock plan dir config)))
+        (pos-tree--lock plan dir config
+                        (and (file-directory-p from) (pos-lock-image from dir)))))
     (pcase-dolist (`(,base . ,own) (pos-tree--node-locals node))
       (pos-tree--in-directory plan dir base own))
     (dolist (child (pos-tree--node-children node))
