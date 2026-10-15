@@ -66,6 +66,7 @@ The top level is a mapping:
     children    what is declared beneath this one (section 2)
     worktrees   other working trees (section 3)
     archives    where archives are kept (section 4)
+    keeper      the keeper of this node's archives (section 4)
     server      the server this repository is bound to (section 5)
 
 A node is a responsibility or a project. The file does not say which:
@@ -115,6 +116,22 @@ lies, whether or not the walk enters it. A repository mounted in the
 tree is read by its own configuration: the exclusions of the
 repository it is mounted in do not reach into it, and one that
 declares none has the default.
+
+What passes down:
+
+    Key                          Where a node gets it
+    image, exclude, keeper       From its own configuration. If that
+                                 has none, from its parent's, and so on
+                                 up to the configuration in the
+                                 directory that holds .git.
+    server                       From the configuration in the
+                                 directory that holds .git.
+    projects, children,          From its own configuration only.
+    worktrees, bin, harnesses,
+    methodologies
+
+A mounted repository does not read the configuration of the repository
+it is mounted in.
 
 A reader reads the keys written here. A key it does not know, at any
 level, is a warning, which names the key by its place in the file, as
@@ -278,7 +295,8 @@ mapping:
                 ignored by Git
                 remote: by a keeper (doc/remote-archive-protocol.txt)
     url         with remote, the base URL the keeper gives the scope's
-                ledger
+                ledger; absent, the node's keeper with the ledger's
+                id in it
     ledger      the id of the scope's ledger, a UUID in canonical form
                 with lower-case letters; optional, with any kept
     sweep       how the scope's done items are retired (below):
@@ -286,7 +304,10 @@ mapping:
     path        with weekly, where the weekly archive files are written,
                 a path beneath the scope; default archive/orgmode
 
-A scope no entry names keeps its archive uncommitted. In every case the
+keeper is a URL. The client replaces {ledger} in it with the ledger's
+id. A scope no entry names is kept remote by the keeper its node gets
+(section 1). If no configuration in the repository names a keeper, the
+archive stays on disk and Git ignores it. In every case the
 ledger stays with the scope and is committed.
 
 The sweep retires the done items of a scope's Org files each week. An
@@ -347,16 +368,14 @@ mapping:
 
 Absent, the repository is bound to none.
 
-A binding reaches down and never up. The server is configured for
-sessions started in this repository and in the repositories beneath it,
-and for none above it: what a shared repository declares cannot reach
-the repository that contains it.
+A binding covers its own repository. The server is configured for
+sessions started in this repository, and for none in a repository
+mounted in it or containing it.
 
 For each coding agent a tool supports, it writes the file that agent
-reads for MCP servers, in this repository and in each repository
-beneath it. The files are untracked, with their paths in
-.git/info/exclude, and a file a repository tracks is left as it is.
-Nothing is written outside the tree.
+reads for MCP servers, in this repository. The files are untracked,
+with their paths in .git/info/exclude, and a file the repository
+tracks is left as it is. Nothing is written outside the repository.
 
 
 6. What is installed
