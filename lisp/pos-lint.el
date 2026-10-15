@@ -304,12 +304,20 @@ and one that is refused, are each a finding at the methodology."
     (dolist (scope (pos-corpus-scopes (pos-corpus root)))
       (when-let* ((config (pos-scope-config scope)))
         (let ((project (pos-scope-dir scope)))
-          (dolist (name (pos-lock-installed project config))
+          (dolist (name (pos-lock-installed project config (pos-lint--image project)))
             (let ((skill (expand-file-name (concat ".agents/skills/" name) project)))
               (dolist (check (pos-lint--skill-checks skill))
                 (setq findings (append (reverse (pos-lint--run-check check project skill))
                                        findings))))))))
     (nreverse findings)))
+
+(defun pos-lint--image (dir)
+  "Return the image's skills at DIR as a source, or nil.
+DIR is a node's directory; where it is a repository's root with auto/
+in its configuration directory, they are what auto/ holds, as
+`pos-lock-image' gives them."
+  (when-let* ((auto (pos-lock-auto dir)))
+    (and (file-directory-p auto) (pos-lock-image auto dir))))
 
 (defun pos-lint-skills-lock (root)
   "Report each entry of a skills-lock.json in ROOT's tree that is undeclared.
@@ -320,7 +328,9 @@ doc/pos-directory.txt has it.  The finding is at the entry's line."
     (dolist (scope (pos-corpus-scopes (pos-corpus root)))
       (when-let* ((config (pos-scope-config scope)))
         (let ((file (expand-file-name pos-lock-file (pos-scope-dir scope))))
-          (dolist (difference (pos-lock-differences (pos-scope-dir scope) config))
+          (dolist (difference (pos-lock-differences
+                               (pos-scope-dir scope) config
+                               (pos-lint--image (pos-scope-dir scope))))
             (let-alist difference
               (when (equal .finding "lock-undeclared")
                 (push (pos-finding-make

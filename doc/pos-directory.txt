@@ -395,6 +395,10 @@ into another repository.
 The tool is given a directory to install from, the source:
 
     version        one line, which names what the source holds
+    repository     one line, the git URL of the repository the source
+                   was made from
+    commit         one line, the full forty-digit id of the commit it
+                   was made from
     skills/NAME/   a skill: a directory holding a SKILL.md, whose NAME
                    begins "clankos-", or is a slot's name
     bin/NAME       a command
@@ -403,17 +407,16 @@ The slots are capture, start-up and wrap-up, as doc/pos-slots.txt has
 them: a skill and a command of each name, which a repository may
 supply itself. Given no source, the tool installs nothing, and keeps
 the links below to what is already installed. A source that names no
-version, or holds a skill named otherwise, is refused (bad-source).
+version, no repository or no commit by its full id, or holds a skill
+named otherwise, is refused (bad-source).
 
 In the configuration directory at a repository's root, auto/ is the
 tool's alone. Where it is absent, or its version is not the source's,
 it is replaced whole by a copy of the source. It is untracked, with its
 path in .git/info/exclude. What anyone else writes in it is lost.
 
-Links make what is installed found:
+Links make the commands found:
 
-  - For each skill in auto/skills/, .agents/skills/NAME is a link to
-    it.
   - For each command in auto/bin/, where the node at the repository's
     root says bin, NAME in that directory is a link to it.
   - A link is a relative symbolic link. It is untracked, with its path
@@ -433,8 +436,7 @@ agent may take what holds the name for the skill it was to find, so
 the finding is reported until the name is free. A slot's name is the
 exception: what holds it, tracked or not, is the repository's own
 filling of the slot, so the tool makes no link there and reports
-nothing, and the source's skill or command of that name is not
-installed in that repository. Where .agents or
+nothing. Where .agents or
 .agents/skills is a file or a symbolic link, no skill link is made in
 that repository, and that path is reported the same way; so is a part
 of the path a node names as bin.
@@ -445,7 +447,8 @@ A coding agent that reads .claude/skills is served too:
     is absent, and .claude is absent or an ordinary directory, a link
     to ../.agents/skills is made, untracked and excluded.
   - Where .claude/skills is an ordinary directory, the tool makes its
-    skill links there as well, each to the skill in auto/, and writes
+    skill links there as well, each to the skill it links from
+    .agents/skills/, and writes
     beside them a note, README.clankos, untracked and excluded. The
     note says that the directory's skills can be moved to
     .agents/skills/ and the directory replaced by a link to it, lists
@@ -556,6 +559,23 @@ letter or a digit; one that is not, and one named twice, is refused
 (bad-value). When harnesses is absent, the skills are installed in
 .agents/skills/ alone.
 
+The source's skills are installed as a source's are, and no
+configuration declares them. At a repository's root, its node has one
+source more, the image's:
+
+    source      the source's repository
+    ref         the source's commit
+    skills      the source's skills, less a slot's skill that the
+                repository fills itself: something is at
+                .agents/skills/NAME that is not the tool's link into
+                auto/, and that has no entry of the source's
+                repository in skills-lock.json
+
+Given no source, the tool takes the image's from what auto/ holds;
+where auto/ names no repository or commit, the node has no source
+more. A node beneath the root in the same repository has none: a
+coding agent shows a session there the skills of the root.
+
 The tool does not install a source: that needs the network, which a
 plan does not use. The image's install command does it, as its own
 document has it, and leaves in the node
@@ -570,8 +590,8 @@ records one, ref, and other keys this document does not read. An entry
 is a declared source's when its sourceUrl, or its source where it has
 no sourceUrl, is the same source.
 
-The tool compares a node's skills-lock.json with its configuration and
-finds:
+The tool compares a node's skills-lock.json with its configuration,
+the image's source counted as declared, and finds:
 
     lock-differs     a declared source with no entry; a skill that a
                      source's entry names, with no entry from that

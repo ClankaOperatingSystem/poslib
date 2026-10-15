@@ -152,6 +152,31 @@ and the lint says nothing of it."
                               "from someone/skills, which is not declared"))
                      (pos-lint-format (pos-lint) root))))))
 
+(ert-deftest pos-lint/an-entry-of-the-images-skills-is-declared ()
+  "An entry of the image's repository in a root's skills-lock.json is declared.
+auto/ in the configuration directory names the repository and the
+commit the image was built from, and holds the skill.  The checks of
+the installed skill are run."
+  (pos-test-with-files root
+      '((".clanka/config.yml" . "pos: 2\n")
+        ("intray.org" . "* TODO open\n")
+        (".clanka/auto/version" . "1\n")
+        (".clanka/auto/repository" . "https://example.org/clankos.git\n")
+        (".clanka/auto/commit" . "1111111111111111111111111111111111111111\n")
+        (".clanka/auto/skills/clankos-seal/SKILL.md"
+         . "---\nname: clankos-seal\ndescription: Seal.\n---\n")
+        ("skills-lock.json"
+         . "{\"version\": 1, \"skills\": {\"clankos-seal\": {\"source\": \"https://example.org/clankos.git\", \"sourceUrl\": \"https://example.org/clankos.git\", \"ref\": \"1111111111111111111111111111111111111111\", \"sourceType\": \"git\", \"computedHash\": \"0\"}}}\n")
+        (".agents/skills/clankos-seal/SKILL.md"
+         . "---\nname: clankos-seal\ndescription: Seal.\n---\n")
+        (".agents/skills/clankos-seal/scripts/check-seal"
+         . "#!/bin/sh\necho 'intray.org:1: not sealed'\nexit 1\n"))
+    (set-file-modes (expand-file-name ".agents/skills/clankos-seal/scripts/check-seal" root)
+                    #o755)
+    (let ((pos-directory root))
+      (should (equal (pos-test-lines "intray.org:1: not sealed")
+                     (pos-lint-format (pos-lint) root))))))
+
 (ert-deftest pos-lint/findings-print-file-line-message-relative-to-the-root ()
   "Findings print as file:line: message, relative to the root, in order.
 The order is by file then line, so a compilation buffer walks the

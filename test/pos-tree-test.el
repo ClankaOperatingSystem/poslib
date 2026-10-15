@@ -69,13 +69,25 @@ FILES is a plist of path and text.  Return DIR."
   (list (format ".agents/skills/%s/SKILL.md" name)
         (format "---\nname: %s\ndescription: A skill.\n---\n" name)))
 
+(defconst pos-tree-test-image "https://example.org/clankos.git"
+  "The repository a test's source says it was built from.")
+
+(defun pos-tree-test-commit-of (version)
+  "Return the commit a test's source of VERSION names.
+It is VERSION's first character forty times."
+  (make-string 40 (aref version 0)))
+
 (defun pos-tree-test-source (dir version &rest names)
   "Make at DIR a source to install from, of VERSION, and return DIR.
-Each of NAMES that begins clankos-, or is a slot's, is a skill, and any
-other a command; one that begins bin/ is a command of the rest of the
-name.  What was at DIR is replaced."
+It names `pos-tree-test-image' as its repository and the commit
+`pos-tree-test-commit-of' gives.  Each of NAMES that begins clankos-,
+or is a slot's, is a skill, and any other a command; one that begins
+bin/ is a command of the rest of the name.  What was at DIR is
+replaced."
   (delete-directory dir t)
   (pos-tree-test-write dir "version" (concat version "\n"))
+  (pos-tree-test-write dir "repository" (concat pos-tree-test-image "\n"))
+  (pos-tree-test-write dir "commit" (concat (pos-tree-test-commit-of version) "\n"))
   (dolist (name names)
     (if (and (not (string-prefix-p "bin/" name))
              (or (string-prefix-p "clankos-" name) (member name pos-tree-slots)))
@@ -594,6 +606,36 @@ One that is not excluded is, as before."
 
 ;;;; What is installed
 
+(defun pos-tree-test-install (repository source)
+  "Install SOURCE's skills in REPOSITORY as the image's install command does.
+Each skill `pos-lock-image' gives is copied into .agents/skills/, in
+place of the tool's link or an earlier copy; a skill installed from the
+image before that is no longer among them is removed; skills-lock.json
+records them, at the source's commit; and the repository commits it."
+  (let* ((image (pos-lock-image source repository))
+         (names (append (alist-get 'skills image) nil))
+         (skills (expand-file-name ".agents/skills" repository))
+         (lock (expand-file-name "skills-lock.json" repository))
+         (commit (alist-get 'ref image)))
+    (when (file-exists-p lock)
+      (dolist (name (pos-lock-installed repository nil
+                                        `((source . ,pos-tree-test-image))))
+        (let ((path (expand-file-name name skills)))
+          (if (file-symlink-p path) (delete-file path) (delete-directory path t)))))
+    (dolist (name names)
+      (let ((path (expand-file-name name skills)))
+        (when (file-symlink-p path) (delete-file path))
+        (when (file-directory-p path) (delete-directory path t))
+        (make-directory skills t)
+        (copy-directory (expand-file-name (concat "skills/" name) source) path nil nil t)))
+    (pos-tree-test-write
+     repository "skills-lock.json"
+     (apply #'pos-tree-test-lock
+            (mapcar (lambda (name)
+                      (list name pos-tree-test-image commit pos-tree-test-image))
+                    names)))
+    (pos-tree-test-commit repository)))
+
 (defun pos-tree-test-names (dir within)
   "Return the names in WITHIN, a directory of the repository at DIR."
   (let ((in (expand-file-name within dir)))
@@ -607,9 +649,11 @@ One that is not excluded is, as before."
 (ert-deftest pos-tree/each-configured-repository-has-the-same-installed ()
   "A root, a responsibility mounted in it, and a product mounted in that.
 Once settled, the root and the responsibility each hold the source in
-auto/ with a link to its skill, the root has a link to the command
-where it says bin, and the product has nothing of the tool's.  Nothing
-is left to do, and no repository sees a change to commit."
+auto/, the root has a link to the command where it says bin, and each
+finds that its skills-lock.json lacks the source's skill.  Once the
+skill is installed in each, nothing is found, no link to a skill is
+made, and the product has nothing of the tool's.  No repository sees a
+change to commit."
   (pos-tree-test-with dir
     (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
                                          "clankos-capture" "pos-capture"))
@@ -628,15 +672,23 @@ is left to do, and no repository sees a change to commit."
                            (pos-tree-test-child "child" child))
                           "bin: bin\n")))
            (in-child (expand-file-name "child" root))
-           (in-product (expand-file-name "products/product" in-child)))
+           (in-product (expand-file-name "products/product" in-child))
+           (plan (pos-tree-test-settle root source)))
+      (should (equal (pos-tree-test-findings plan)
+                     (list (concat "lock-differs skills-lock.json " pos-tree-test-image
+                                   " at " (pos-tree-test-commit-of "1") ": not installed")
+                           (concat "lock-differs child/skills-lock.json "
+                                   pos-tree-test-image " at "
+                                   (pos-tree-test-commit-of "1") ": not installed"))))
+      (dolist (repository (list root in-child))
+        (pos-tree-test-install repository source))
       (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
       (dolist (repository (list root in-child))
         (should (equal (pos-tree-test-text
                         (expand-file-name ".clanka/auto/version" repository))
                        "1\n"))
-        (should (equal (file-symlink-p
-                        (expand-file-name ".agents/skills/clankos-capture" repository))
-                       "../../.clanka/auto/skills/clankos-capture"))
+        (should-not (file-symlink-p
+                     (expand-file-name ".agents/skills/clankos-capture" repository)))
         (should (file-exists-p
                  (expand-file-name ".agents/skills/clankos-capture/SKILL.md"
                                    repository)))
@@ -672,7 +724,8 @@ Its own skills are not read, and no .claude/skills link is made."
       (should (equal (pos-tree-test-summary (pos-tree-plan root source)) nil)))))
 
 (ert-deftest pos-tree/what-is-installed-stays-until-the-source-changes ()
-  "With the source as it was, or with none, links are kept as they are."
+  "With the source as it was, or with none, nothing is to be done.
+With no source, the skills-lock.json is compared with what auto/ holds."
   (pos-tree-test-with dir
     (let ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
                                         "clankos-capture"))
@@ -680,14 +733,18 @@ Its own skills are not read, and no .claude/skills link is made."
                                           ".clanka/config.yml"
                                           (pos-tree-test-config))))
       (pos-tree-test-settle root source)
+      (pos-tree-test-install root source)
+      (pos-tree-test-settle root source)
+      (should (equal (pos-tree-test-summary (pos-tree-plan root source)) nil))
       (should (equal (pos-tree-test-summary (pos-tree-plan root)) nil))
       (should (equal (pos-tree-test-names root ".agents/skills")
                      '("clankos-capture"))))))
 
 (ert-deftest pos-tree/a-newer-source-replaces-what-was-installed ()
   "A source of another version replaces auto/ whole.
-The link to a skill it leaves out is removed, and a link to one it
-adds is made."
+The skills-lock.json then differs: the skill it keeps is at the old
+commit, the skill it leaves out is no longer the image's, and the skill
+it adds is not installed.  Installing brings the two into line."
   (pos-tree-test-with dir
     (let ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
                                         "clankos-capture" "clankos-old"))
@@ -695,14 +752,18 @@ adds is made."
                                           ".clanka/config.yml"
                                           (pos-tree-test-config))))
       (pos-tree-test-settle root source)
+      (pos-tree-test-install root source)
+      (pos-tree-test-settle root source)
       (pos-tree-test-write root ".clanka/auto/scribble" "a person's\n")
       (pos-tree-test-source source "2" "clankos-capture" "clankos-new")
       (should (equal (sort (pos-tree-test-summary (pos-tree-plan root source))
                            #'string<)
-                     '("exclude . .agents/skills/clankos-new"
-                       "install .clanka/auto 2"
-                       "link .agents/skills/clankos-new -> ../../.clanka/auto/skills/clankos-new"
-                       "unlink .agents/skills/clankos-old")))
+                     '("install .clanka/auto 2"
+                       "lock-differs skills-lock.json"
+                       "lock-differs skills-lock.json"
+                       "lock-undeclared skills-lock.json")))
+      (pos-tree-test-settle root source)
+      (pos-tree-test-install root source)
       (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
       (should (equal (pos-tree-test-names root ".agents/skills")
                      '("clankos-capture" "clankos-new")))
@@ -717,34 +778,32 @@ The finding says whether the repository tracks it, and the other
 links are made."
   (pos-tree-test-with dir
     (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
-                                         "clankos-capture" "clankos-seal"
-                                         "pos-capture"))
-           (root (apply #'pos-tree-test-repository (expand-file-name "root" dir)
-                        ".clanka/config.yml"
-                        (concat (pos-tree-test-config) "bin: bin\n")
-                        (pos-tree-test-skill "clankos-capture")))
+                                         "pos-capture" "pos-seal" "pos-sweep"))
+           (root (pos-tree-test-repository (expand-file-name "root" dir)
+                                           ".clanka/config.yml"
+                                           (concat (pos-tree-test-config) "bin: bin\n")
+                                           "bin/pos-capture" "#!/bin/sh\n"))
            (plan nil))
-      (pos-tree-test-write root "bin/pos-capture" "#!/bin/sh\n")
+      (pos-tree-test-write root "bin/pos-seal" "#!/bin/sh\n")
       (setq plan (pos-tree-test-settle root source))
       (should (equal (pos-tree-test-summary plan)
-                     '("name-taken .agents/skills/clankos-capture"
-                       "name-taken bin/pos-capture")))
+                     '("name-taken bin/pos-capture"
+                       "name-taken bin/pos-seal")))
       (should (string-match-p
                "\\`tracked, added in [0-9a-f]+\\'"
                (alist-get 'detail (aref (alist-get 'findings plan) 0))))
       (should (equal (alist-get 'detail (aref (alist-get 'findings plan) 1))
                      "untracked"))
-      (should-not (file-symlink-p
-                   (expand-file-name ".agents/skills/clankos-capture" root)))
-      (should (file-symlink-p (expand-file-name ".agents/skills/clankos-seal" root)))
+      (should (file-symlink-p (expand-file-name "bin/pos-sweep" root)))
       (should (equal (pos-tree-test-text (expand-file-name "bin/pos-capture" root))
                      "#!/bin/sh\n")))))
 
 (ert-deftest pos-tree/a-slots-name-the-repository-holds-is-its-filling ()
   "A skill or a command of a slot's name that is there is left, and not found.
 The repository tracks its own capture skill and has an untracked
-wrap-up command.  The source's other skills and commands are linked,
-the slot names the repository lacks among them."
+wrap-up command.  The source's other skills are the image's to install,
+the slot names the repository lacks among them, and its other commands
+are linked."
   (pos-tree-test-with dir
     (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
                                          "capture" "start-up" "wrap-up" "clankos-seal"
@@ -755,31 +814,37 @@ the slot names the repository lacks among them."
                         (concat (pos-tree-test-config) "bin: bin\n")
                         (pos-tree-test-skill "capture"))))
       (pos-tree-test-write root "bin/wrap-up" "#!/bin/sh\n")
+      (should (equal (append (alist-get 'skills (pos-lock-image source root)) nil)
+                     '("clankos-seal" "start-up" "wrap-up")))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root source))
+                     '("lock-differs skills-lock.json")))
+      (pos-tree-test-install root source)
       (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
-      (should-not (file-symlink-p (expand-file-name ".agents/skills/capture" root)))
       (should (equal (pos-tree-test-text
                       (expand-file-name ".agents/skills/capture/SKILL.md" root))
                      (cadr (pos-tree-test-skill "capture"))))
       (dolist (name '("start-up" "wrap-up" "clankos-seal"))
-        (should (file-symlink-p (expand-file-name (concat ".agents/skills/" name) root))))
+        (should (file-exists-p
+                 (expand-file-name (concat ".agents/skills/" name "/SKILL.md") root))))
       (dolist (name '("capture" "start-up" "pos-capture"))
         (should (file-symlink-p (expand-file-name (concat "bin/" name) root))))
       (should-not (file-symlink-p (expand-file-name "bin/wrap-up" root)))
       (should (equal (pos-tree-test-text (expand-file-name "bin/wrap-up" root))
                      "#!/bin/sh\n")))))
 
-(ert-deftest pos-tree/a-skills-path-that-is-not-a-directory-is-found ()
-  "Where .agents is a file no skill link is made, and the path is found."
+(ert-deftest pos-tree/a-bin-path-that-is-not-a-directory-is-found ()
+  "Where the path a node names as bin is a file, no command link is made.
+The path is found."
   (pos-tree-test-with dir
     (let ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
-                                        "clankos-capture"))
+                                        "pos-capture"))
           (root (pos-tree-test-repository (expand-file-name "root" dir)
                                           ".clanka/config.yml"
-                                          (pos-tree-test-config)
-                                          ".agents" "a file\n")))
+                                          (concat (pos-tree-test-config) "bin: bin\n")
+                                          "bin" "a file\n")))
       (should (equal (pos-tree-test-summary (pos-tree-test-settle root source))
-                     '("name-taken .agents")))
-      (should (equal (pos-tree-test-text (expand-file-name ".agents" root))
+                     '("name-taken bin")))
+      (should (equal (pos-tree-test-text (expand-file-name "bin" root))
                      "a file\n")))))
 
 (ert-deftest pos-tree/an-ordinary-claude-skills-has-the-links-and-a-note ()
@@ -787,37 +852,45 @@ the slot names the repository lacks among them."
 The note names what in the directory is no skill.  Once the directory
 is replaced by a link, the note is removed from where it was moved to."
   (pos-tree-test-with dir
-    (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
-                                         "clankos-capture"))
-           (root (pos-tree-test-repository
-                  (expand-file-name "root" dir)
-                  ".clanka/config.yml" (pos-tree-test-config)
-                  ".claude/skills/old/SKILL.md" "---\nname: old\n---\n"
-                  ".claude/skills/loose.md" "Not a skill.\n"))
-           (claude (expand-file-name ".claude/skills" root))
+    (let* ((root (apply #'pos-tree-test-repository
+                        (expand-file-name "root" dir)
+                        ".clanka/config.yml"
+                        (pos-tree-test-config "  - path: projects/p\n")
+                        "projects/p/.clanka/config.yml"
+                        (pos-tree-test-project "  - path: methodologies/notes\n")
+                        "projects/p/.claude/skills/old/SKILL.md" "---\nname: old\n---\n"
+                        "projects/p/.claude/skills/loose.md" "Not a skill.\n"
+                        (cl-loop for (path text)
+                                 on (pos-tree-test-method "notes")
+                                 by #'cddr
+                                 append (list (concat "projects/p/methodologies/notes/"
+                                                      path)
+                                              text))))
+           (in-project (expand-file-name "projects/p" root))
+           (claude (expand-file-name ".claude/skills" in-project))
            (note (expand-file-name "README.clankos" claude)))
-      (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
       (dolist (within '(".agents/skills" ".claude/skills"))
         (should (equal (file-symlink-p
-                        (expand-file-name (concat within "/clankos-capture") root))
-                       "../../.clanka/auto/skills/clankos-capture")))
+                        (expand-file-name (concat within "/notes-greet") in-project))
+                       "../../methodologies/notes/skills/notes-greet")))
       (should (string-match-p "^  loose\\.md$" (pos-tree-test-text note)))
       (should-not (string-match-p "^  old$" (pos-tree-test-text note)))
       (should (equal (pos-tree-test-status root) ""))
       ;; The person moves everything and replaces the directory by a link.
-      (rename-file note (expand-file-name ".agents/skills/README.clankos" root))
+      (rename-file note (expand-file-name ".agents/skills/README.clankos" in-project))
       (delete-directory claude t)
       (make-symbolic-link "../.agents/skills" claude)
-      (should (equal (pos-tree-test-summary (pos-tree-plan root source))
-                     '("unlink .agents/skills/README.clankos")))
-      (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
-      (should (equal (pos-tree-test-names root ".agents/skills")
-                     '("clankos-capture"))))))
+      (should (equal (pos-tree-test-summary (pos-tree-plan root))
+                     '("unlink projects/p/.agents/skills/README.clankos")))
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
+      (should (equal (pos-tree-test-names in-project ".agents/skills")
+                     '("notes-greet"))))))
 
 (ert-deftest pos-tree/a-claude-path-that-is-not-a-directory-is-left ()
   "A file, a link or a dangling link at .claude or .claude/skills is left.
-The skills are installed all the same, the tree is clean after, and a
-second plan has nothing to do."
+The skills installed are kept all the same, the tree is clean after,
+and a second plan has nothing to do."
   (dolist (path '(".claude" ".claude/skills"))
     (dolist (kind '(file link dangling))
       (pos-tree-test-with dir
@@ -836,13 +909,14 @@ second plan has nothing to do."
                (pos-tree-test-write root "foreign/kept.md" "existing\n"))
              (make-symbolic-link (expand-file-name "foreign" root) at)))
           (pos-tree-test-commit root)
+          (pos-tree-test-install root source)
           (setq was (file-attributes at))
           (should (equal (pos-tree-test-summary (pos-tree-test-settle root source))
                          nil))
           (should (equal (file-attribute-type (file-attributes at))
                          (file-attribute-type was)))
-          (should (file-symlink-p
-                   (expand-file-name ".agents/skills/clankos-capture" root)))
+          (should (file-exists-p
+                   (expand-file-name ".agents/skills/clankos-capture/SKILL.md" root)))
           (should (equal (pos-tree-test-status root) ""))
           (should (equal (pos-tree-test-summary (pos-tree-plan root source)) nil)))))))
 
@@ -865,6 +939,26 @@ It is removed from a product too, since the tool made it."
                      '("unlink products/product/.agents/skills/r")))
       (pos-tree-test-settle root)
       (should-not (file-symlink-p link)))))
+
+(ert-deftest pos-tree/a-link-to-a-skill-in-auto-is-removed ()
+  "A link an earlier tool made from .agents/skills/ into auto/ is removed.
+The skill is then the image's to install."
+  (pos-tree-test-with dir
+    (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
+                                         "clankos-capture"))
+           (root (pos-tree-test-repository (expand-file-name "root" dir)
+                                           ".clanka/config.yml"
+                                           (pos-tree-test-config)))
+           (link (expand-file-name ".agents/skills/clankos-capture" root)))
+      (pos-tree-test-settle root source)
+      (make-directory (file-name-directory link) t)
+      (make-symbolic-link "../../.clanka/auto/skills/clankos-capture" link)
+      (should (member "unlink .agents/skills/clankos-capture"
+                      (pos-tree-test-summary (pos-tree-plan root source))))
+      (pos-tree-test-settle root source)
+      (should-not (file-symlink-p link))
+      (pos-tree-test-install root source)
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil)))))
 
 (ert-deftest pos-tree/a-link-to-outside-the-tree-is-left ()
   "A link in a repository's skills to somewhere outside the tree is left."
@@ -896,15 +990,15 @@ A declared child that is not there is excluded and stays to be cloned."
                   (pos-tree-test-config
                    (pos-tree-test-child "projects/child" child)))))
       (should (equal (pos-tree-test-summary (pos-tree-install root source))
-                     '("clone projects/child")))
-      (should (file-exists-p
-               (expand-file-name ".agents/skills/clankos-capture/SKILL.md" root)))
+                     '("clone projects/child" "lock-differs skills-lock.json")))
+      (should (file-exists-p (expand-file-name ".clanka/auto/version" root)))
       (should-not (file-exists-p (expand-file-name "projects/child" root)))
       (should (equal (pos-tree-test-status root) "")))))
 
 (ert-deftest pos-tree/a-source-that-is-not-one-is-refused ()
-  "A source with no version, or with a misnamed skill, is refused.
-A skill is named clankos-NAME or with a slot's name; capture here is
+  "A source that names too little, or holds a misnamed skill, is refused.
+It names its version, its repository and its commit, a full id.  A
+skill is named clankos-NAME or with a slot's name; capture here is
 allowed."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository (expand-file-name "root" dir)
@@ -912,15 +1006,28 @@ allowed."
                                           (pos-tree-test-config)))
           (refusal (lambda (root source)
                      (condition-case err (progn (pos-tree-plan root source) nil)
-                       (pos-tree-refused (nth 1 err))))))
+                       (pos-tree-refused (nth 1 err)))))
+          (named (lambda (at &optional commit)
+                   (pos-tree-test-write dir (concat at "/version") "1\n")
+                   (pos-tree-test-write dir (concat at "/repository")
+                                        (concat pos-tree-test-image "\n"))
+                   (pos-tree-test-write dir (concat at "/commit")
+                                        (concat (or commit (pos-tree-test-commit-of "1"))
+                                                "\n")))))
       (pos-tree-test-write dir "unversioned/skills/clankos-a/SKILL.md" "---\n---\n")
       (should (eq 'bad-source
                   (funcall refusal root (expand-file-name "unversioned" dir))))
-      (pos-tree-test-write dir "misnamed/version" "1\n")
+      (pos-tree-test-write dir "unnamed/version" "1\n")
+      (should (eq 'bad-source
+                  (funcall refusal root (expand-file-name "unnamed" dir))))
+      (funcall named "short" "1111111")
+      (should (eq 'bad-source
+                  (funcall refusal root (expand-file-name "short" dir))))
+      (funcall named "misnamed")
       (pos-tree-test-write dir "misnamed/skills/release/SKILL.md" "---\n---\n")
       (should (eq 'bad-source
                   (funcall refusal root (expand-file-name "misnamed" dir))))
-      (pos-tree-test-write dir "slot/version" "1\n")
+      (funcall named "slot")
       (pos-tree-test-write dir "slot/skills/capture/SKILL.md" "---\n---\n")
       (should-not (funcall refusal root (expand-file-name "slot" dir))))))
 
@@ -986,11 +1093,11 @@ It has the skill NAME-greet and each of COMMANDS, a command."
 
 (ert-deftest pos-tree/a-mounted-methodology-is-linked-in-place ()
   "A project's methodology supplies its skill and command by links to it.
-The links are made beside the source's, nothing of it is copied into
-auto/, nothing in it changes, and a second plan is empty."
+The links are made beside the source's command, nothing of it is
+copied into auto/, nothing in it changes, and a second plan is empty."
   (pos-tree-test-with dir
     (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
-                                         "clankos-capture" "pos-capture"))
+                                         "pos-capture"))
            (hello (apply #'pos-tree-test-repository
                          (expand-file-name "origins/hello" dir)
                          (pos-tree-test-method "hello" "hello-greet")))
@@ -1009,17 +1116,14 @@ auto/, nothing in it changes, and a second plan is empty."
       (should (equal (file-symlink-p
                       (expand-file-name ".agents/skills/hello-greet" in-project))
                      "../../methodologies/hello/skills/hello-greet"))
-      (should (equal (file-symlink-p
-                      (expand-file-name ".agents/skills/clankos-capture" in-project))
-                     "../../.clanka/auto/skills/clankos-capture"))
       (should (equal (file-symlink-p (expand-file-name "bin/hello-greet" in-project))
                      "../methodologies/hello/bin/hello-greet"))
       (should (equal (file-symlink-p (expand-file-name "bin/pos-capture" in-project))
                      "../.clanka/auto/bin/pos-capture"))
       (should (file-exists-p
                (expand-file-name ".agents/skills/hello-greet/SKILL.md" in-project)))
-      (should (equal (pos-tree-test-names in-project ".clanka/auto/skills")
-                     '("clankos-capture")))
+      (should (equal (pos-tree-test-names in-project ".clanka/auto/bin")
+                     '("pos-capture")))
       (should (equal (file-symlink-p (expand-file-name ".claude/skills" in-project))
                      "../.agents/skills"))
       (dolist (repository (list root in-project
@@ -1033,7 +1137,7 @@ Its methodology is a directory of the same repository, with no
 remote; the links are relative to the project and excluded."
   (pos-tree-test-with dir
     (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
-                                         "clankos-capture"))
+                                         "pos-capture"))
            (root (apply #'pos-tree-test-repository
                         (expand-file-name "root" dir)
                         ".clanka/config.yml"
@@ -1056,16 +1160,16 @@ remote; the links are relative to the project and excluded."
       (should (equal (file-symlink-p (expand-file-name ".claude/skills" in-project))
                      "../.agents/skills"))
       (should (equal (pos-tree-test-names in-project ".agents/skills") '("notes-greet")))
-      (should (equal (pos-tree-test-names root ".agents/skills") '("clankos-capture")))
+      (should-not (pos-tree-test-names root ".agents/skills"))
       (should (equal (pos-tree-test-status root) ""))
       (should (equal (pos-tree-test-summary (pos-tree-plan root source)) nil)))))
 
 (ert-deftest pos-tree/a-skill-without-its-methodologys-prefix-is-refused ()
   "A methodology with a skill not named after it is found and supplies nothing.
-The source's links are made all the same."
+The source's commands are linked all the same."
   (pos-tree-test-with dir
     (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
-                                         "clankos-capture"))
+                                         "pos-capture"))
            (root (pos-tree-test-repository
                   (expand-file-name "root" dir)
                   ".clanka/config.yml"
@@ -1078,8 +1182,8 @@ The source's links are made all the same."
                      '("methodology-refused methodologies/hello")))
       (should (equal (alist-get 'detail (aref (alist-get 'findings plan) 0))
                      "a skill not named hello-NAME: greet"))
-      (should (equal (pos-tree-test-names root ".agents/skills") '("clankos-capture")))
-      (should-not (file-exists-p (expand-file-name "bin" root))))))
+      (should-not (pos-tree-test-names root ".agents/skills"))
+      (should (equal (pos-tree-test-names root "bin") '("pos-capture"))))))
 
 (ert-deftest pos-tree/a-methodology-no-longer-declared-loses-its-links ()
   "When a methodology's entry goes, its links are removed and it is left.
