@@ -441,26 +441,6 @@ nothing. Where .agents or
 that repository, and that path is reported the same way; so is a part
 of the path a node names as bin.
 
-A coding agent that reads .claude/skills is served too:
-
-  - Where the repository has skills in .agents/skills/, .claude/skills
-    is absent, and .claude is absent or an ordinary directory, a link
-    to ../.agents/skills is made, untracked and excluded.
-  - Where .claude/skills is an ordinary directory, the tool makes its
-    skill links there as well, each to the skill it links from
-    .agents/skills/, and writes
-    beside them a note, README.clankos, untracked and excluded. The
-    note says that the directory's skills can be moved to
-    .agents/skills/ and the directory replaced by a link to it, lists
-    each entry that is not a directory holding a SKILL.md, and so is
-    no skill, and names where that convention is described. A note
-    the repository tracks is not the tool's, and is reported as a
-    name taken. Once .claude/skills is no longer an ordinary directory
-    the note is removed from .agents/skills/, where it went if the
-    directory's entries were moved there.
-  - A .claude or .claude/skills that is a file or a symbolic link is
-    left as it is.
-
 A link an earlier version of this document had the tool make, an
 untracked symbolic link in .agents/skills/ whose target is a skill's
 directory in another repository of the tree, is removed: in a product
@@ -477,7 +457,7 @@ either of which may be absent. Nothing is copied: for each skill,
 .agents/skills/NAME is a link to it in the methodology's directory,
 and for each command, where the node says bin, NAME there is a link
 to it. The links are made as the links above are, relative, untracked
-and excluded, and .claude/skills is served the same way. They are made
+and excluded. They are made
 in the node: at the root of its repository, beside the source's
 links, when the node is a repository; in its directory, when it is
 a directory of a repository. The methodology is whatever is at its
@@ -504,15 +484,6 @@ directory beneath that node in the same repository, a project that is
 such a directory among them, and in no repository mounted there. A
 project that is a repository of its own is shown none of its
 responsibility's.
-
-Where a directory's .agents/skills holds a skill with the name of
-another skill in a directory above it in the same repository, an agent
-shows one and not the other, or two under one name. The tool reports
-the lower (name-repeated) with the path of the upper. Two whose
-SKILL.md are the same text are one skill, as when one methodology is
-declared at two nodes of a line, and are not reported. The directories
-the exclusions in force name are not looked in, and nothing is
-reported in a product.
 
 A node's sources are the other way skills reach it. methodologies, as a
 sequence, holds one entry for each repository of skills the node
@@ -656,10 +627,8 @@ A plan holds actions:
     exclude     a path to add to a .git/info/exclude
     archive-excludes  replace the managed archive block in info/exclude
     install     a repository's auto/ to replace from the source
-    link        a link to a skill or a command, or the .claude/skills
-                link, to make
-    unlink      a link or a note of the tool's that is no longer wanted
-    note        the note to write in an ordinary .claude/skills
+    link        a link to a skill or a command to make
+    unlink      a link of the tool's that is no longer wanted
     configure   an agent's file to write or remove for a server
 
 and findings, which the tool reports and does not act on:
@@ -685,9 +654,6 @@ and findings, which the tool reports and does not act on:
     name-taken      a path where the tool would make a link, held by
                     something that is not the tool's, or named by
                     more than one skill or command
-    name-repeated   a skill with the name of another skill in a
-                    directory above it in the same repository; detail
-                    is the other's path
     methodology-refused  a methodology with a skill whose name does
                     not begin with the methodology's name and a
                     hyphen: nothing of it is linked
@@ -716,7 +682,6 @@ An action is an object whose do is the action's name. With it:
     install     path, that of the auto/ directory, and version
     link        path and target, the text of the link
     unlink      path
-    note        path
 
 A finding is an object with finding, its name, path, and where there
 is more to say, detail. Every path is relative to the root of the
@@ -753,7 +718,7 @@ nothing and changes no link. Initiation and tree-building commands use
 this operation after writing configuration.
 
 The install ROOT SOURCE command applies only the exclude, install,
-link, unlink and note actions from a fresh plan made with SOURCE, the
+link and unlink actions from a fresh plan made with SOURCE, the
 links to each node's methodologies among them, and prints the
 remaining plan. It clones nothing and changes no archive
 rule, so it uses no network. A command run in a tree uses this

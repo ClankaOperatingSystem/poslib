@@ -127,8 +127,7 @@ replaced."
                  ("clone" (format "clone %s" .path))
                  ("install" (format "install %s %s" .path .version))
                  ("link" (format "link %s -> %s" .path .target))
-                 ("unlink" (format "unlink %s" .path))
-                 ("note" (format "note %s" .path)))))
+                 ("unlink" (format "unlink %s" .path)))))
            (alist-get 'actions plan))
    (mapcar (lambda (finding)
              (let-alist finding (format "%s %s" .finding .path)))
@@ -698,15 +697,12 @@ change to commit."
                      (expand-file-name ".agents/skills/clankos-capture" repository)))
         (should (file-exists-p
                  (expand-file-name ".agents/skills/clankos-capture/SKILL.md"
-                                   repository)))
-        (should (equal (file-symlink-p (expand-file-name ".claude/skills" repository))
-                       "../.agents/skills")))
+                                   repository))))
       (should (equal (file-symlink-p (expand-file-name "bin/pos-capture" root))
                      "../.clanka/auto/bin/pos-capture"))
       (should (file-executable-p (expand-file-name "bin/pos-capture" root)))
       (should-not (file-exists-p (expand-file-name "bin" in-child)))
       (should (equal (pos-tree-test-names in-product ".agents/skills") '("release")))
-      (should-not (file-symlink-p (expand-file-name ".claude/skills" in-product)))
       (should-not (file-exists-p (expand-file-name ".clanka" in-product)))
       (dolist (repository (list root in-child in-product))
         (should (equal (pos-tree-test-status repository) "")))
@@ -722,7 +718,7 @@ change to commit."
 
 (ert-deftest pos-tree/a-repository-with-no-configuration-is-left-alone ()
   "Nothing is installed in a repository with no configuration.
-Its own skills are not read, and no .claude/skills link is made."
+Its own skills are not read."
   (pos-tree-test-with dir
     (let ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
                                         "clankos-capture"))
@@ -853,79 +849,6 @@ The path is found."
                      '("name-taken bin")))
       (should (equal (pos-tree-test-text (expand-file-name "bin" root))
                      "a file\n")))))
-
-(ert-deftest pos-tree/an-ordinary-claude-skills-has-the-links-and-a-note ()
-  "A real .claude/skills directory gets the skill links too, and a note.
-The note names what in the directory is no skill.  Once the directory
-is replaced by a link, the note is removed from where it was moved to."
-  (pos-tree-test-with dir
-    (let* ((root (apply #'pos-tree-test-repository
-                        (expand-file-name "root" dir)
-                        ".clanka/config.yml"
-                        (pos-tree-test-config "  - path: projects/p\n")
-                        "projects/p/.clanka/config.yml"
-                        (pos-tree-test-project "  - path: methodologies/notes\n")
-                        "projects/p/.claude/skills/old/SKILL.md" "---\nname: old\n---\n"
-                        "projects/p/.claude/skills/loose.md" "Not a skill.\n"
-                        (cl-loop for (path text)
-                                 on (pos-tree-test-method "notes")
-                                 by #'cddr
-                                 append (list (concat "projects/p/methodologies/notes/"
-                                                      path)
-                                              text))))
-           (in-project (expand-file-name "projects/p" root))
-           (claude (expand-file-name ".claude/skills" in-project))
-           (note (expand-file-name "README.clankos" claude)))
-      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
-      (dolist (within '(".agents/skills" ".claude/skills"))
-        (should (equal (file-symlink-p
-                        (expand-file-name (concat within "/notes-greet") in-project))
-                       "../../methodologies/notes/skills/notes-greet")))
-      (should (string-match-p "^  loose\\.md$" (pos-tree-test-text note)))
-      (should-not (string-match-p "^  old$" (pos-tree-test-text note)))
-      (should (equal (pos-tree-test-status root) ""))
-      ;; The person moves everything and replaces the directory by a link.
-      (rename-file note (expand-file-name ".agents/skills/README.clankos" in-project))
-      (delete-directory claude t)
-      (make-symbolic-link "../.agents/skills" claude)
-      (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("unlink projects/p/.agents/skills/README.clankos")))
-      (should (equal (pos-tree-test-summary (pos-tree-test-settle root)) nil))
-      (should (equal (pos-tree-test-names in-project ".agents/skills")
-                     '("notes-greet"))))))
-
-(ert-deftest pos-tree/a-claude-path-that-is-not-a-directory-is-left ()
-  "A file, a link or a dangling link at .claude or .claude/skills is left.
-The skills installed are kept all the same, the tree is clean after,
-and a second plan has nothing to do."
-  (dolist (path '(".claude" ".claude/skills"))
-    (dolist (kind '(file link dangling))
-      (pos-tree-test-with dir
-        (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
-                                             "clankos-capture"))
-               (root (pos-tree-test-repository (expand-file-name "root" dir)
-                                               ".clanka/config.yml"
-                                               (pos-tree-test-config)))
-               (at (expand-file-name path root))
-               (was nil))
-          (make-directory (file-name-directory at) t)
-          (pcase kind
-            ('file (pos-tree-test-write root path "existing\n"))
-            ((or 'link 'dangling)
-             (when (eq kind 'link)
-               (pos-tree-test-write root "foreign/kept.md" "existing\n"))
-             (make-symbolic-link (expand-file-name "foreign" root) at)))
-          (pos-tree-test-commit root)
-          (pos-tree-test-install root source)
-          (setq was (file-attributes at))
-          (should (equal (pos-tree-test-summary (pos-tree-test-settle root source))
-                         nil))
-          (should (equal (file-attribute-type (file-attributes at))
-                         (file-attribute-type was)))
-          (should (file-exists-p
-                   (expand-file-name ".agents/skills/clankos-capture/SKILL.md" root)))
-          (should (equal (pos-tree-test-status root) ""))
-          (should (equal (pos-tree-test-summary (pos-tree-plan root source)) nil)))))))
 
 (ert-deftest pos-tree/a-link-an-earlier-tool-made-is-removed ()
   "A link from one repository's skills to another's is removed.
@@ -1131,8 +1054,6 @@ copied into auto/, nothing in it changes, and a second plan is empty."
                (expand-file-name ".agents/skills/hello-greet/SKILL.md" in-project)))
       (should (equal (pos-tree-test-names in-project ".clanka/auto/bin")
                      '("pos-capture")))
-      (should (equal (file-symlink-p (expand-file-name ".claude/skills" in-project))
-                     "../.agents/skills"))
       (dolist (repository (list root in-project
                                 (expand-file-name "methodologies/hello" in-project)))
         (should (equal (pos-tree-test-status repository) "")))
@@ -1164,8 +1085,6 @@ remote; the links are relative to the project and excluded."
                      "../../methodologies/notes/skills/notes-greet"))
       (should (equal (file-symlink-p (expand-file-name "bin/notes-take" in-project))
                      "../methodologies/notes/bin/notes-take"))
-      (should (equal (file-symlink-p (expand-file-name ".claude/skills" in-project))
-                     "../.agents/skills"))
       (should (equal (pos-tree-test-names in-project ".agents/skills") '("notes-greet")))
       (should-not (pos-tree-test-names root ".agents/skills"))
       (should (equal (pos-tree-test-status root) ""))
@@ -1288,33 +1207,6 @@ of the repository; each has its links made where it is."
       (should (equal (file-symlink-p
                       (expand-file-name "work/.agents/skills/trade-greet" root))
                      "../../methodologies/trade/skills/trade-greet")))))
-
-(ert-deftest pos-tree/a-skill-named-as-another-above-it-is-found ()
-  "Two skills of one name along a line of directories are found.
-A coding agent shows a session the skills of each directory above it
-in the repository.  Here work/desk has a skill tidy that is not the
-root's, and one greet that is the root's text exactly; work/shelf has
-none of either name, and a mounted child is another repository."
-  (pos-tree-test-with dir
-    (let* ((skill (lambda (prefix name text)
-                    (list (format "%s.agents/skills/%s/SKILL.md" prefix name) text)))
-           (child (apply #'pos-tree-test-repository (expand-file-name "origins/child" dir)
-                         ".clanka/config.yml" "pos: 2\n"
-                         (funcall skill "" "tidy" "The child's.\n")))
-           (root (apply #'pos-tree-test-repository
-                        (expand-file-name "root" dir)
-                        ".clanka/config.yml"
-                        (pos-tree-test-config (pos-tree-test-child "mounted" child))
-                        (append (funcall skill "" "tidy" "The root's.\n")
-                                (funcall skill "" "greet" "Hello.\n")
-                                (funcall skill "work/desk/" "tidy" "The desk's.\n")
-                                (funcall skill "work/desk/" "greet" "Hello.\n")
-                                (funcall skill "work/shelf/" "sort" "The shelf's.\n"))))
-           (plan (pos-tree-test-settle root)))
-      (should (equal (pos-tree-test-summary plan)
-                     '("name-repeated work/desk/.agents/skills/tidy")))
-      (should (equal (alist-get 'detail (aref (alist-get 'findings plan) 0))
-                     ".agents/skills/tidy")))))
 
 (ert-deftest pos-tree/two-methodologies-supplying-one-name-are-found ()
   "Where two methodologies supply one command, the first is linked.
