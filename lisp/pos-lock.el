@@ -28,9 +28,13 @@
 ;; for what the configuration declares and the file does not hold, and
 ;; lock-undeclared for what the file holds and the configuration does
 ;; not declare.  At a repository's root the image's skills are one
-;; source more, which no configuration names.
+;; source more, which no configuration names.  Each entry's
+;; computedHash is compared with the skill's directory too, so a skill
+;; edited where it is installed is found.
 ;;
 ;; - `pos-lock-file': the name of the file, in the node's directory.
+;; - `pos-lock-hash': a skill directory's hash, as the skills CLI
+;;   computes it.
 ;; - `pos-lock-image': the image's skills, as a source, at a
 ;;   repository's root.
 ;; - `pos-lock-differences': the differences at a node.
@@ -69,6 +73,66 @@ an object with a string source."
                        (mapcar (lambda (pair) (cons (symbol-name (car pair)) (cdr pair)))
                                (cdr skills)))
         :invalid))))
+
+;;;; A skill directory's hash
+
+(defconst pos-lock--order
+  " _-,;:!?.'\"()[]{}@*/\\&#%`^+<=>|~$0123456789abcdefghijklmnopqrstuvwxyz"
+  "The ASCII characters in the order the Unicode collation gives them.
+Each upper-case letter sorts with its lower-case one.")
+
+(defun pos-lock--collation-key (string)
+  "Return the sort key of STRING in the Unicode collation, as a list.
+The letters of the key, then their case: a lower-case letter sorts
+before its upper-case one only where the strings are otherwise equal.
+A character outside ASCII sorts after them all, by its code."
+  (let ((letters nil) (cases nil))
+    (dolist (char (string-to-list string))
+      (let ((at (seq-position pos-lock--order (downcase char))))
+        (push (if (and at (< char 128)) at (+ 128 char)) letters)
+        (push (if (and (>= char ?A) (<= char ?Z)) 1 0) cases)))
+    (append (nreverse letters) (list -1) (nreverse cases))))
+
+(defun pos-lock--key< (a b)
+  "Return non-nil if the key A, a list of numbers, precedes the key B."
+  (while (and a b (= (car a) (car b)))
+    (setq a (cdr a) b (cdr b)))
+  (if (and a b) (< (car a) (car b)) (and b t)))
+
+(defun pos-lock--files (dir &optional prefix)
+  "Return the files beneath DIR, as paths relative to it.
+PREFIX is the directory being looked in, with its final slash.  A
+symbolic link is no file, and a directory named .git or node_modules
+is not looked in."
+  (mapcan (lambda (name)
+            (let ((path (concat prefix name))
+                  (full (expand-file-name (concat prefix name) dir)))
+              (cond
+               ((file-symlink-p full) nil)
+               ((file-directory-p full)
+                (unless (member name '(".git" "node_modules"))
+                  (pos-lock--files dir (concat path "/"))))
+               ((file-regular-p full) (list path)))))
+          (directory-files (expand-file-name (or prefix "") dir) nil
+                           directory-files-no-dot-files-regexp)))
+
+(defun pos-lock-hash (dir)
+  "Return the hash of the skill directory DIR, as the skills CLI computes it.
+That is computedHash of a lock entry: the lower-case hex SHA-256 of
+each file's path relative to DIR, in UTF-8, followed by its bytes, the
+files in the order of their paths in the Unicode collation."
+  (let ((files (seq-sort-by #'pos-lock--collation-key #'pos-lock--key<
+                            (pos-lock--files dir))))
+    (with-temp-buffer
+      (set-buffer-multibyte nil)
+      (dolist (path files)
+        (insert (encode-coding-string path 'utf-8 t))
+        (goto-char (point-max))
+        (insert-file-contents-literally (expand-file-name path dir))
+        (goto-char (point-max)))
+      (secure-hash 'sha256 (current-buffer)))))
+
+;;;; The comparison
 
 (defconst pos-lock-slots '("capture" "start-up" "wrap-up")
   "The names of the slots, as doc/pos-slots.txt has them.")
@@ -145,8 +209,11 @@ DIR is a node's directory and CONFIG its configuration, as
 `pos-node-read-config' gives it.  IMAGE, if given, is one source more,
 as `pos-lock-image' gives it.  A list of alists, each of finding,
 lock-differs or lock-undeclared; skill, the skill's name, or nil for
-a finding of a whole source or file; and detail.  The entries come in
-the order of their names, then the sources in the order declared.
+a finding of a whole source or file; and detail.  An entry of a
+declared source at its ref differs where its skill's directory in
+.agents/skills/ is not there, or has another hash than computedHash.
+The entries come in the order of their names, then the sources in the
+order declared.
 None where CONFIG declares no sources and DIR has no skills-lock.json."
   (let* ((file (expand-file-name pos-lock-file dir))
          (sources (pos-lock--sources config image))
@@ -178,7 +245,19 @@ None where CONFIG declares no sources and DIR has no skills-lock.json."
                ((not (equal locked .ref))
                 (find "lock-differs" name
                       (format "%s: %s installed, %s declared"
-                              name (if (stringp locked) locked "no ref") .ref)))))))
+                              name (if (stringp locked) locked "no ref") .ref)))
+               (t
+                (let ((installed (expand-file-name (concat ".agents/skills/" name) dir))
+                      (hash (alist-get 'computedHash entry)))
+                  (cond
+                   ((not (file-directory-p installed))
+                    (find "lock-differs" name
+                          (format "%s: not in .agents/skills/" name)))
+                   ((and (stringp hash)
+                         (not (equal hash (pos-lock-hash installed))))
+                    (find "lock-differs" name
+                          (format "%s: changed since it was installed"
+                                  name))))))))))
         (dolist (source sources)
           (let-alist source
             (let* ((key (pos-node-source-key .source))

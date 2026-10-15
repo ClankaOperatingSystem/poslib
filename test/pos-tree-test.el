@@ -69,6 +69,11 @@ FILES is a plist of path and text.  Return DIR."
   (list (format ".agents/skills/%s/SKILL.md" name)
         (format "---\nname: %s\ndescription: A skill.\n---\n" name)))
 
+(defun pos-tree-test-skill-hash (name)
+  "Return the hash of the directory of the skill NAME.
+The directory is as `pos-tree-test-skill' makes it."
+  (secure-hash 'sha256 (concat "SKILL.md" (cadr (pos-tree-test-skill name)))))
+
 (defconst pos-tree-test-image "https://example.org/clankos.git"
   "The repository a test's source says it was built from.")
 
@@ -611,7 +616,8 @@ One that is not excluded is, as before."
 Each skill `pos-lock-image' gives is copied into .agents/skills/, in
 place of the tool's link or an earlier copy; a skill installed from the
 image before that is no longer among them is removed; skills-lock.json
-records them, at the source's commit; and the repository commits it."
+records them, at the source's commit, with each one's hash; and the
+repository commits it."
   (let* ((image (pos-lock-image source repository))
          (names (append (alist-get 'skills image) nil))
          (skills (expand-file-name ".agents/skills" repository))
@@ -632,7 +638,8 @@ records them, at the source's commit; and the repository commits it."
      repository "skills-lock.json"
      (apply #'pos-tree-test-lock
             (mapcar (lambda (name)
-                      (list name pos-tree-test-image commit pos-tree-test-image))
+                      (list name pos-tree-test-image commit pos-tree-test-image
+                            (pos-lock-hash (expand-file-name name skills))))
                     names)))
     (pos-tree-test-commit repository)))
 
@@ -1338,17 +1345,18 @@ The second is found as a name taken, named by more than one."
 
 (defun pos-tree-test-lock (&rest entries)
   "Return a skills-lock.json's text recording ENTRIES.
-Each is (NAME SOURCE REF &optional URL): REF nil for none, and URL the
-entry's sourceUrl, as the skills CLI writes it for a git source."
+Each is (NAME SOURCE REF &optional URL HASH): REF nil for none, URL
+the entry's sourceUrl, as the skills CLI writes it for a git source,
+and HASH its computedHash, 0 if nil."
   (concat "{\n  \"version\": 1,\n  \"skills\": {\n"
           (mapconcat
            (lambda (entry)
-             (pcase-let ((`(,name ,source ,ref ,url) entry))
+             (pcase-let ((`(,name ,source ,ref ,url ,hash) entry))
                (concat (format "    \"%s\": {\n      \"source\": \"%s\",\n" name source)
                        (if url (format "      \"sourceUrl\": \"%s\",\n" url) "")
                        (if ref (format "      \"ref\": \"%s\",\n" ref) "")
                        (format "      \"sourceType\": \"%s\",\n" (if url "git" "github"))
-                       "      \"computedHash\": \"0\"\n    }")))
+                       (format "      \"computedHash\": \"%s\"\n    }" (or hash "0")))))
            entries ",\n")
           "\n  }\n}\n"))
 
@@ -1362,7 +1370,8 @@ entry's sourceUrl, as the skills CLI writes it for a git source."
   "Where skills-lock.json holds what the sources declare, nothing is found.
 A GitHub source written as a URL is the lock file's shorter source."
   (pos-tree-test-with dir
-    (let ((root (pos-tree-test-repository
+    (let ((root (apply
+                 #'pos-tree-test-repository
                  (expand-file-name "root" dir)
                  ".clanka/config.yml"
                  (concat "pos: 2\nmethodologies:\n"
@@ -1371,10 +1380,16 @@ A GitHub source written as a URL is the lock file's shorter source."
                          "    skills: [share-skill]\n    kind: skills-repository\n")
                  "skills-lock.json"
                  (pos-tree-test-lock
-                  '("hello-greet" "team/hello" "v1")
-                  '("hello-part" "team/hello" "v1")
-                  '("share-skill" "git@example.org:someone/shared.git" "v2"
-                    "git@example.org:someone/shared.git")))))
+                  `("hello-greet" "team/hello" "v1" nil
+                    ,(pos-tree-test-skill-hash "hello-greet"))
+                  `("hello-part" "team/hello" "v1" nil
+                    ,(pos-tree-test-skill-hash "hello-part"))
+                  `("share-skill" "git@example.org:someone/shared.git" "v2"
+                    "git@example.org:someone/shared.git"
+                    ,(pos-tree-test-skill-hash "share-skill")))
+                 (append (pos-tree-test-skill "hello-greet")
+                         (pos-tree-test-skill "hello-part")
+                         (pos-tree-test-skill "share-skill")))))
       (should (equal (pos-tree-test-findings (pos-tree-plan root)) nil)))))
 
 (ert-deftest pos-tree/how-a-lock-file-differs-from-the-sources-is-found ()
@@ -1383,7 +1398,8 @@ An entry of another ref, a skill named and not installed, and a source
 not installed differ; an entry of a skill its source does not name,
 and one of no declared source, are undeclared."
   (pos-tree-test-with dir
-    (let ((root (pos-tree-test-repository
+    (let ((root (apply
+                 #'pos-tree-test-repository
                  (expand-file-name "root" dir)
                  ".clanka/config.yml"
                  (concat "pos: 2\nmethodologies:\n"
@@ -1394,15 +1410,62 @@ and one of no declared source, are undeclared."
                  "skills-lock.json"
                  (pos-tree-test-lock
                   '("a-x" "https://example.org/a.git" "v1" "https://example.org/a.git")
-                  '("b-one" "git@example.org:b.git" "v1" "git@example.org:b.git")
+                  `("b-one" "git@example.org:b.git" "v1" "git@example.org:b.git"
+                    ,(pos-tree-test-skill-hash "b-one"))
                   '("b-three" "git@example.org:b.git" "v1" "git@example.org:b.git")
-                  '("z-other" "someone/skills" nil)))))
+                  '("z-other" "someone/skills" nil))
+                 (pos-tree-test-skill "b-one"))))
       (should (equal (pos-tree-test-findings (pos-tree-plan root))
                      '("lock-differs skills-lock.json a-x: v1 installed, v2 declared"
                        "lock-undeclared skills-lock.json b-three: not among the skills of git@example.org:b.git"
                        "lock-undeclared skills-lock.json z-other: from someone/skills, which is not declared"
                        "lock-differs skills-lock.json b-two: not installed from git@example.org:b.git"
                        "lock-differs skills-lock.json https://example.org/c.git at v1: not installed"))))))
+
+(ert-deftest pos-tree/a-skill-directory-hashes-as-the-skills-cli-does ()
+  "A skill directory's hash is the skills CLI's computedHash for it.
+Its files are taken in the Unicode collation's order of their paths:
+case second, and punctuation before letters.  A symbolic link, .git
+and node_modules are left out.  The expected hash is the skills CLI's
+for the same directory."
+  (pos-tree-test-with dir
+    (let ((skill (expand-file-name "skill" dir)))
+      (dolist (file '(("SKILL.md" . "skill\n") ("references/b-two.md" . "b\n")
+                      ("references/b_one.md" . "a\n") ("agents/openai.yaml" . "agents\n")
+                      ("agent-brief.md" . "brief\n") (".git/HEAD" . "x\n")
+                      ("node_modules/z.js" . "y\n") ("README.md" . "R\n")
+                      ("readme.txt" . "r\n")))
+        (pos-tree-test-write skill (car file) (cdr file)))
+      (make-symbolic-link "SKILL.md" (expand-file-name "link.md" skill))
+      (should (equal (pos-lock-hash skill)
+                     "fac7b24bfc13ab26d209d5b5d59470eba12d110c0c187d51a7ee9f8d323733e6")))))
+
+(ert-deftest pos-tree/an-installed-skill-that-is-changed-or-gone-is-found ()
+  "A skill whose directory has another hash than its entry's differs.
+So does one whose entry is there and whose directory is not."
+  (pos-tree-test-with dir
+    (let ((root (apply
+                 #'pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".clanka/config.yml"
+                 "pos: 2\nmethodologies:\n  - source: https://example.org/a.git\n    ref: v1\n"
+                 "skills-lock.json"
+                 (pos-tree-test-lock
+                  `("a-edited" "https://example.org/a.git" "v1" "https://example.org/a.git"
+                    ,(pos-tree-test-skill-hash "a-edited"))
+                  `("a-gone" "https://example.org/a.git" "v1" "https://example.org/a.git"
+                    ,(pos-tree-test-skill-hash "a-gone"))
+                  `("a-kept" "https://example.org/a.git" "v1" "https://example.org/a.git"
+                    ,(pos-tree-test-skill-hash "a-kept")))
+                 (append (pos-tree-test-skill "a-edited")
+                         (pos-tree-test-skill "a-gone")
+                         (pos-tree-test-skill "a-kept")))))
+      (should (equal (pos-tree-test-findings (pos-tree-plan root)) nil))
+      (pos-tree-test-write root ".agents/skills/a-edited/SKILL.md" "edited\n")
+      (delete-directory (expand-file-name ".agents/skills/a-gone" root) t)
+      (should (equal (pos-tree-test-findings (pos-tree-plan root))
+                     '("lock-differs skills-lock.json a-edited: changed since it was installed"
+                       "lock-differs skills-lock.json a-gone: not in .agents/skills/"))))))
 
 (ert-deftest pos-tree/a-lock-file-that-is-not-one-is-found ()
   "A skills-lock.json that is not the skills CLI's object differs."
