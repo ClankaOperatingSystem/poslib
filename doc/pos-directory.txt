@@ -441,11 +441,6 @@ nothing. Where .agents or
 that repository, and that path is reported the same way; so is a part
 of the path a node names as bin.
 
-A link an earlier version of this document had the tool make, an
-untracked symbolic link in .agents/skills/ whose target is a skill's
-directory in another repository of the tree, is removed: in a product
-too, since the tool made it.
-
 A node's methodologies supply skills and commands in the same way,
 from where they lie. A methodology is a directory holding
 
@@ -704,8 +699,7 @@ The tool keeps these rules:
   - It replaces only its marked archive block and its auto/
     directories, otherwise never writes over what is there, never
     removes a working tree, and never writes outside the tree it is run
-    in. In a product it writes nothing, and removes only a link it
-    made.
+    in. In a product it writes nothing.
   - Run in a repository, it takes that repository as the root. It does
     not look for a container, and a link whose target is outside the
     tree is left as it is.

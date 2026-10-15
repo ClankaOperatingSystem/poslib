@@ -850,26 +850,6 @@ The path is found."
       (should (equal (pos-tree-test-text (expand-file-name "bin" root))
                      "a file\n")))))
 
-(ert-deftest pos-tree/a-link-an-earlier-tool-made-is-removed ()
-  "A link from one repository's skills to another's is removed.
-It is removed from a product too, since the tool made it."
-  (pos-tree-test-with dir
-    (let* ((product (pos-tree-test-repository
-                     (expand-file-name "origins/product" dir) "README" "product\n"))
-           (root (apply #'pos-tree-test-repository (expand-file-name "root" dir)
-                        ".clanka/config.yml"
-                        (pos-tree-test-config
-                         (pos-tree-test-child "products/product" product))
-                        (pos-tree-test-skill "r")))
-           (link (expand-file-name "products/product/.agents/skills/r" root)))
-      (pos-tree-test-settle root)
-      (make-directory (file-name-directory link) t)
-      (make-symbolic-link "../../../../.agents/skills/r" link)
-      (should (equal (pos-tree-test-summary (pos-tree-plan root))
-                     '("unlink products/product/.agents/skills/r")))
-      (pos-tree-test-settle root)
-      (should-not (file-symlink-p link)))))
-
 (ert-deftest pos-tree/a-link-to-a-skill-in-auto-is-removed ()
   "A link an earlier tool made from .agents/skills/ into auto/ is removed.
 The skill is then the image's to install."

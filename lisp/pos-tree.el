@@ -599,28 +599,6 @@ is removed."
             (when (and (not (member name names)) (pos-tree--own-link-p link owned))
               (pos-tree--act plan "unlink" `(path . ,(pos-tree--rel plan link))))))))))
 
-(defun pos-tree--earlier-link-p (plan dir name)
-  "Return non-nil if NAME, in the skills at DIR, is a link an earlier tool made.
-That is an untracked symbolic link whose target is a skill's directory
-in another repository of the tree PLAN is for."
-  (let* ((skills (file-name-as-directory (expand-file-name ".agents/skills" dir)))
-         (to (file-symlink-p (expand-file-name name skills)))
-         (target (and (stringp to) (expand-file-name to skills))))
-    (and target
-         (string-prefix-p (pos-tree--plan-root plan) target)
-         (string-suffix-p "/.agents/skills/" (file-name-directory target))
-         (not (equal (file-name-directory target) skills))
-         (not (pos-tree--tracked-p dir (concat ".agents/skills/" name))))))
-
-(defun pos-tree--agents-entries (dir &optional path)
-  "Return the names in PATH, .agents/skills by default, of the repository at DIR.
-None where a part of that path is not an ordinary directory."
-  (let* ((path (or path ".agents/skills"))
-         (skills (expand-file-name path dir)))
-    (and (not (pos-tree--closed dir path))
-         (file-directory-p skills)
-         (directory-files skills nil directory-files-no-dot-files-regexp))))
-
 (defun pos-tree--methodology-links (plan base config)
   "Return what the methodologies CONFIG declares at BASE supply.
 A cons (SKILLS . COMMANDS), each an alist (NAME . DIRECTORY) as
@@ -675,17 +653,10 @@ directory, replaced from the source when its version is another,
 links to the commands auto/ holds and to what its methodologies
 supply, and its skills-lock.json compared with the source's skills.  A
 node that is a directory of it has links to its own methodologies.
-One with no configuration, a product, has nothing planned in it but
-the removal of links an earlier tool made."
+One with no configuration, a product, has nothing planned in it."
   (let* ((dir (pos-tree--node-dir node))
          (config (pos-tree--node-config node))
          (auto (and config (pos-tree--auto dir))))
-    (dolist (name (pos-tree--agents-entries dir))
-      (when (pos-tree--earlier-link-p plan dir name)
-        (pos-tree--act plan "unlink"
-                       `(path . ,(pos-tree--rel plan
-                                  (expand-file-name (concat ".agents/skills/" name)
-                                                    dir))))))
     (when auto
       (let* ((source (pos-tree--plan-source plan))
              (version (and source (pos-tree--version source)))
