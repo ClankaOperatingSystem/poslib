@@ -78,7 +78,7 @@ and each responsibility has one of its own."
                      "* DONE Old review :review:\nSCHEDULED: "
                      (pos-startup-test-day 2) "\n"))
          ("projects/gamma/project.org"
-          . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n#+TITLE: Gamma\n")
+          . ":PROPERTIES:\n:STATUS:   DONE\n:END:\n#+TITLE: Gamma\n")
          ("projects/delta/project.org"
           . "#+TITLE: Delta\n* TODO Plan the delta\n:PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n")
          ;; Responsibilities at the root, each by its own
@@ -728,7 +728,7 @@ is complete.  A NEXT item in the root's intray is no project's."
         ("projects/path/notes.org" . "* NEXT Order the gravel\n")
         ("projects/pond/project.org"
          . ":PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n* TODO Dig the pond\n")
-        ("projects/well/project.org" . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n"))
+        ("projects/well/project.org" . ":PROPERTIES:\n:STATUS:   DONE\n:END:\n"))
     (let ((text (pos-startup-view root "stuck")))
       (should (string-prefix-p "Projects with no next action\n" text))
       (should (equal (pos-startup-test-lines text)
@@ -741,7 +741,7 @@ action and its OUTCOME property, on one line.  Here paint has all
 four, its outcome continued on an OUTCOME+ line, its next action in
 a second file and its later review not shown; floor, a single file,
 has a status alone and an Outcome heading, which is not read, and
-shows dashes; well is complete and is not listed."
+shows dashes; well is done and is not listed."
   (pos-test-with-files root
       `((".pos/config.yaml" . ,pos-test-child-config)
         ("projects/paint/project.org"
@@ -756,7 +756,7 @@ shows dashes; well is complete and is not listed."
         ("projects/floor.org"
          . ,(concat ":PROPERTIES:\n:STATUS:   COMMITTED\n:END:\n"
                     "* Outcome\n\nThe floor is level.\n* TODO Measure\n"))
-        ("projects/well/project.org" . ":PROPERTIES:\n:STATUS:   COMPLETE\n:END:\n"))
+        ("projects/well/project.org" . ":PROPERTIES:\n:STATUS:   DONE\n:END:\n"))
     (should (equal (concat
                     "Projects\n"
                     "  projects/floor                                         COMMITTED review -\n"
