@@ -518,6 +518,11 @@ A reader refuses (bad-value):
   - one source declared twice, two methodologies of one name, and one
     skill named by two entries.
 
+A tool that changes the sources writes methodologies afresh, one
+entry after another as above, and leaves the rest of the file as it
+was. A comment within methodologies is lost. What it writes is read
+back, and refused as a reader refuses it.
+
 harnesses is a sequence of the coding agents the skills are installed
 for, by the names the skills CLI gives them, such as codex, opencode and
 pi. A name is lower-case letters, digits and hyphens, and begins with a
