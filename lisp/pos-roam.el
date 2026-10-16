@@ -60,6 +60,7 @@
 (require 'cl-lib)
 (require 'org-roam)
 (require 'xdg)
+(require 'pos)
 (require 'pos-corpus)
 
 (defcustom pos-roam-cache-directory
@@ -120,7 +121,7 @@ tree's, and `org-roam-db-query' answers for it."
 
 (defun pos-roam-id-at (file line)
   "Return the `:ID:' of the heading at LINE of FILE, or nil."
-  (with-current-buffer (find-file-noselect file)
+  (with-current-buffer (pos-find-file file)
     (save-excursion
       (goto-char (point-min))
       (forward-line (1- line))
@@ -142,7 +143,7 @@ link begins in it."
   "Return the buffer visiting FILE, found or made.
 FILE is as the index names it, by its true path; a buffer visiting it
 by another name is the same buffer."
-  (or (find-buffer-visiting file) (find-file-noselect file)))
+  (pos-find-file file))
 
 (defun pos-roam-rewrite-link (file pos from to &optional dry-run)
   "Point the `id:' link at POS of FILE from FROM to TO.
