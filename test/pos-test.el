@@ -133,6 +133,20 @@ changed."
         (should (equal '("DONE" "CANCELLED") org-done-keywords)))
       (should (eq before org-todo-keywords)))))
 
+(ert-deftest pos/a-file-changed-on-disk-is-read-again-in-batch ()
+  "A file another program wrote since it was visited is read again.
+In batch no one can answer the question whether to read it again, so
+a buffer with no edits is read again without it."
+  (pos-test-with-files root '(("intray.org" . "* TODO first\n"))
+    (let ((file (expand-file-name "intray.org" root)))
+      (pos-visit file)
+      (set-file-times file (time-subtract nil 60))
+      (with-current-buffer (find-buffer-visiting file)
+        (set-visited-file-modtime))
+      (with-temp-file file (insert "* TODO second\n"))
+      (with-current-buffer (pos-visit file)
+        (should (equal "* TODO second\n" (buffer-string)))))))
+
 (ert-deftest pos/the-one-sequence-is-in-force-without-a-file-line ()
   "A file with no #+TODO line is read by the one sequence.
 CANCELLED is done, so an entry in that state is done and the sweep

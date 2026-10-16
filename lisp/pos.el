@@ -117,6 +117,15 @@ another repository of the tree, or of a product."
        (pos-corpus-owner pos-visit-corpus file)
        (not (pos-corpus-writable-p pos-visit-corpus file))))
 
+(defun pos-find-file (file)
+  "Return a buffer visiting FILE, as `find-file-noselect' does.
+A buffer already visiting FILE that has no edits and is older than the
+file is read again without asking when Emacs runs in batch, where no
+one can answer: another program may write a file while a command runs.
+A buffer with edits is left to `find-file-noselect' to ask about."
+  (let ((revert-without-query (if noninteractive '("") revert-without-query)))
+    (find-file-noselect file)))
+
 (defun pos-visit (file)
   "Return a buffer visiting FILE, with the one TODO sequence in force.
 Org reads `org-todo-keywords' when a buffer enters Org mode, so the
@@ -126,9 +135,9 @@ file of `pos-visit-corpus' that the root may not write is visited
 with no sequence bound: its own #+TODO line stands, and with none,
 the user's setting."
   (if (pos-visit-own-keywords-p file)
-      (find-file-noselect file)
+      (pos-find-file file)
     (let ((org-todo-keywords pos-todo-keywords))
-      (find-file-noselect file))))
+      (pos-find-file file))))
 
 ;;;; Writing a file
 
