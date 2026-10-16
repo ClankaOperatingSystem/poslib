@@ -905,6 +905,25 @@ A declared child that is not there is excluded and stays to be cloned."
       (should-not (file-exists-p (expand-file-name "projects/child" root)))
       (should (equal (pos-tree-test-status root) "")))))
 
+(ert-deftest pos-tree/installing-what-is-installed-plans-once ()
+  "A tree with nothing to install is planned once, not again.
+A command runs the install before it starts, so its cost is paid on
+every command."
+  (pos-tree-test-with dir
+    (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
+                                         "clankos-capture"))
+           (root (pos-tree-test-repository (expand-file-name "root" dir)
+                                           ".clanka/config.yml"
+                                           (pos-tree-test-config)))
+           (plans 0))
+      (pos-tree-install root source)
+      (let ((plan (symbol-function 'pos-tree-plan)))
+        (cl-letf (((symbol-function 'pos-tree-plan)
+                   (lambda (&rest args) (setq plans (1+ plans)) (apply plan args))))
+          (should (equal (pos-tree-test-summary (pos-tree-install root source))
+                         '("lock-differs skills-lock.json")))))
+      (should (= plans 1)))))
+
 (ert-deftest pos-tree/a-source-that-is-not-one-is-refused ()
   "A source that names too little, or holds a misnamed skill, is refused.
 It names its version, its repository and its commit, a full id.  A

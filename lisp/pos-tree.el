@@ -812,14 +812,18 @@ no link."
   "Apply only what is installed at ROOT from SOURCE; return the remaining plan.
 Read a fresh plan made with SOURCE.  Do its exclude, install, link and
 unlink actions.  Clone no repository and change no archive
-rule."
+rule.  When the plan has none of those actions, it is the remaining
+plan, and the tree is not planned again."
   (let ((dir (file-name-as-directory (expand-file-name root)))
-        (from (expand-file-name source)))
-    (seq-doseq (action (alist-get 'actions (pos-tree-plan root source)))
+        (from (expand-file-name source))
+        (plan (pos-tree-plan root source))
+        (done nil))
+    (seq-doseq (action (alist-get 'actions plan))
       (when (member (alist-get 'do action)
                     '("exclude" "install" "link" "unlink"))
+        (setq done t)
         (pos-tree--do dir action from)))
-    (pos-tree-plan root source)))
+    (if done (pos-tree-plan root source) plan)))
 
 (autoload 'pos-tree-batch "pos-cli")
 
