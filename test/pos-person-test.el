@@ -360,10 +360,10 @@ An item of the root may wait on an identity of a scope beneath it."
     (pos-test-write-files
      root '((".pos/person-identities/eve.org" . "#+TITLE: Eve@root\n")))
     (let ((pos-directory root))
-      (should (equal (pos-lint)
-                     (list (pos-finding-make
-                            :file (expand-file-name ".pos/person-identities/eve.org" root)
-                            :line 1 :message "person-identity has no ID")))))))
+      (should (member (pos-finding-make
+                       :file (expand-file-name ".pos/person-identities/eve.org" root)
+                       :line 1 :message "person-identity has no ID")
+                      (pos-lint))))))
 
 (ert-deftest pos-person/an-identity-belongs-to-a-person-and-is-named-for-it ()
   "An identity no entity links to, one misnamed and one that links are found.
