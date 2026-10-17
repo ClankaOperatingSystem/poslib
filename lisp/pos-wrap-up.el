@@ -116,11 +116,11 @@ that had it.  Return the new heading's line."
 (defun pos-wrap-up (root title body &optional date)
   "Keep BODY as the handover TITLE of the node at ROOT; return its citation.
 BODY is sealed in ROOT's archive as journal/DATE-SLUG.org, and a heading
-for it is added to ROOT's journal.org, made if absent, tagged the
-latest.  DATE is YYYY-MM-DD, today by default.  Refuse a TITLE that is
-not one nonempty line, an empty BODY, a DATE not of that form, a
-journal.org that cannot be written, and what the archive refuses;
-nothing is written then."
+for it is added to ROOT's journal.org, made with a file ID if absent,
+tagged the latest.  DATE is YYYY-MM-DD, today by default.  Refuse a
+TITLE that is not one nonempty line, an empty BODY, a DATE not of that
+form, a journal.org that cannot be written, and what the archive
+refuses; nothing is written then."
   (unless (pos-one-line-p title)
     (user-error "Wrap-up needs a nonempty, single-line title"))
   (let* ((root (file-name-as-directory (expand-file-name root)))
@@ -132,7 +132,10 @@ nothing is written then."
          (buffer (and had (pos-buffer-to-write root journal)))
          (citation (pos-wrap-up--seal root title bytes date)))
     (unless had
-      (pos-bytes-write journal (encode-coding-string "#+TITLE: Journal\n\n" 'utf-8))
+      (pos-bytes-write journal (encode-coding-string
+                                (concat ":PROPERTIES:\n:ID:       " (pos-new-id)
+                                        "\n:END:\n#+TITLE: Journal\n\n")
+                                'utf-8))
       (setq buffer (pos-buffer-to-write root journal)))
     (pos-wrap-up--index buffer title stamp citation)
     citation))
