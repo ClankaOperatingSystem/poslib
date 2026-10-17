@@ -136,6 +136,27 @@ skill of the repository's own, with no lock entry, has none run."
       (should (equal (pos-test-lines "decisions/0002.md:3: status not known")
                      (pos-lint-format (pos-lint) root))))))
 
+(ert-deftest pos-lint/a-checks-output-is-read-as-utf-8-in-any-locale ()
+  "What a check prints is read as UTF-8, whatever the locale's coding.
+In a container whose locale is POSIX, a check's em dash came back as
+three raw bytes."
+  (pos-test-with-files root
+      '((".clanka/config.yml"
+         . "pos: 2\nmethodologies:\n  - source: https://example.org/adr.git\n    ref: v1\n")
+        ("intray.org" . "* TODO open\n")
+        ("skills-lock.json"
+         . "{\"version\": 1, \"skills\": {\"adr-write\": {\"source\": \"https://example.org/adr.git\", \"sourceUrl\": \"https://example.org/adr.git\", \"ref\": \"v1\", \"sourceType\": \"git\", \"computedHash\": \"0\"}}}\n")
+        (".agents/skills/adr-write/SKILL.md"
+         . "---\nname: adr-write\ndescription: Write a decision.\n---\n")
+        (".agents/skills/adr-write/scripts/check-dash"
+         . "#!/bin/sh\necho 'intray.org:1: em dash: a \u2014 b'\nexit 1\n"))
+    (set-file-modes (expand-file-name ".agents/skills/adr-write/scripts/check-dash" root)
+                    #o755)
+    (let ((pos-directory root)
+          (default-process-coding-system '(binary . binary)))
+      (should (equal (pos-test-lines "intray.org:1: em dash: a \u2014 b")
+                     (pos-lint-format (pos-lint) root))))))
+
 (ert-deftest pos-lint/an-undeclared-entry-of-a-lock-file-is-a-finding ()
   "An entry of skills-lock.json of a skill its source does not name is found.
 It is found at its line.  An entry of no declared source is

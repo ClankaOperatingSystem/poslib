@@ -219,8 +219,9 @@ Each copy names the others."
 (defun pos-lint--check-output (command project)
   "Run COMMAND, a check, in PROJECT; return (STATUS OUTPUT . ERRORS).
 OUTPUT is what it printed on standard output, ERRORS on standard
-error, trimmed."
-  (let ((errors (make-temp-file "pos-lint-")))
+error, trimmed.  Both are read as UTF-8, whatever the locale."
+  (let ((errors (make-temp-file "pos-lint-"))
+        (coding-system-for-read 'utf-8))
     (unwind-protect
         (with-temp-buffer
           (let* ((default-directory project)
