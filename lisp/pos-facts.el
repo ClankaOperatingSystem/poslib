@@ -25,7 +25,9 @@
 ;; commits after it, each pushed or not, and the ledger events added
 ;; under the node, each committed or not.  Other sessions' commits and
 ;; seals of the same time are listed too; nothing here tells one
-;; session's from another's.  Reads git and the ledgers; writes nothing.
+;; session's from another's.  An archive within another repository of
+;; the tree, one with its own .git, is that repository's and is left
+;; out.  Reads git and the ledgers; writes nothing.
 ;;
 ;; - `pos-facts-commits': the commits after a commit.
 ;; - `pos-facts-events': the ledger events added after a commit.
@@ -70,26 +72,39 @@ not, and :null when HEAD has no upstream."
   (let ((scope (file-relative-name (file-name-directory (directory-file-name archive)) root)))
     (if (equal scope "./") "." (directory-file-name scope))))
 
+(defun pos-facts--anothers-p (root archive)
+  "Return non-nil if ARCHIVE lies within another repository of the tree at ROOT.
+A directory below ROOT, at or above ARCHIVE's scope, that has a .git
+is another repository, whose ledgers are its own."
+  (let ((dir (file-name-directory (directory-file-name archive)))
+        found)
+    (while (and (not found) (string-prefix-p root dir) (not (equal dir root)))
+      (setq found (file-exists-p (expand-file-name ".git" dir))
+            dir (file-name-directory (directory-file-name dir))))
+    found))
+
 (defun pos-facts-events (root since)
   "Return the ledger events under ROOT that SINCE does not have, in ledger order.
 Each is an alist: scope, the path from ROOT of the archive's scope,
 \".\" for ROOT; number, the event's; item, the path the event sealed,
 or :null; and committed, whether the repository tracks the event's
 file.  An event is after SINCE when that commit has no file at its
-path."
+path.  An archive within another repository of the tree is that
+repository's and is left out."
   (let ((root (file-name-as-directory (file-truename (expand-file-name root))))
         events)
     (dolist (archive (pos-ledger-roots root))
-      (dolist (file (pos-history-files (pos-ledger-history archive)))
-        (let ((rel (file-relative-name file root)))
-          (unless (eq 0 (car (pos-git root "cat-file" "-e" (concat since ":./" rel))))
-            (push `((scope . ,(pos-facts--scope root archive))
-                    (number . ,(string-to-number (file-name-nondirectory file)))
-                    (item . ,(or (alist-get 'item (pos-bytes-parse (pos-bytes-read file)))
-                                 :null))
-                    (committed . ,(eq 0 (car (pos-git root "ls-files" "--error-unmatch"
-                                                      "--" rel)))))
-                  events)))))
+      (unless (pos-facts--anothers-p root archive)
+        (dolist (file (pos-history-files (pos-ledger-history archive)))
+          (let ((rel (file-relative-name file root)))
+            (unless (eq 0 (car (pos-git root "cat-file" "-e" (concat since ":./" rel))))
+              (push `((scope . ,(pos-facts--scope root archive))
+                      (number . ,(string-to-number (file-name-nondirectory file)))
+                      (item . ,(or (alist-get 'item (pos-bytes-parse (pos-bytes-read file)))
+                                   :null))
+                      (committed . ,(eq 0 (car (pos-git root "ls-files" "--error-unmatch"
+                                                        "--" rel)))))
+                    events))))))
     (nreverse events)))
 
 (defun pos-facts-report (root since)

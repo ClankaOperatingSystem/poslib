@@ -78,6 +78,29 @@ pushed, and a second seal is not committed."
                        (mapcar (lambda (event) (alist-get 'number event))
                                (pos-facts-events root since))))))))
 
+(ert-deftest pos-facts/an-archive-within-another-repository-is-left-out ()
+  "The events of an archive within another repository of the tree are not listed.
+A repository at projects/inner, with a .git of its own, seals a record
+in its own archive.  The root's report lists the root's event and not
+the inner repository's, which the root's git does not track."
+  (pos-test-with-temp-dir dir
+    (let* ((root (file-name-as-directory (file-truename (expand-file-name "root" dir))))
+           (inner (file-name-as-directory (expand-file-name "projects/inner" root))))
+      (make-directory root)
+      (pos-test-git-init root)
+      (let ((since (pos-facts-test-commit root "Begin" "README" "A root.\n")))
+        (make-directory inner t)
+        (pos-test-git-init inner)
+        (pos-facts-test-seal inner "notes/inner.org" "inner\n")
+        (pos-facts-test-seal root "notes/one.org" "one\n")
+        (should (equal '(("." . 1))
+                       (mapcar (lambda (event)
+                                 (cons (alist-get 'scope event) (alist-get 'number event)))
+                               (pos-facts-events root since))))
+        (should (string-match-p
+                 "\nSealed after it\n  \\. event 1: notes/one.org (not committed)\n\\'"
+                 (pos-facts-report root since)))))))
+
 (ert-deftest pos-facts/nothing-after-the-commit-says-none ()
   "With no commit and no event after the one named, each list says (none).
 With no upstream, the report says that pushed is not known."
