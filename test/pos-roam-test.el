@@ -49,6 +49,34 @@ configuration, and a lock file by its name."
                    (mapcar (lambda (file) (file-relative-name file root))
                            (pos-roam-files root))))))
 
+(ert-deftest pos-roam/an-editor-set-up-on-a-tree-shares-the-commands-index ()
+  "An editor pointed at a tree indexes its corpus in the commands' database.
+The database is the one the commands keep for the tree, in the cache,
+and archives and underscore directories are left out of it."
+  (pos-test-with-files root '(("a.org" . ":PROPERTIES:\n:ID: file-a\n:END:\n")
+                              ("archives/x.org" . ":PROPERTIES:\n:ID: file-x\n:END:\n")
+                              ("_work/z.org" . ":PROPERTIES:\n:ID: file-z\n:END:\n"))
+    (let ((org-roam-directory nil)
+          (org-roam-db-location nil)
+          (pos-roam--set-up nil)
+          (expected (let ((org-roam-directory nil))
+                      (pos-roam-db-location
+                       (file-name-as-directory (file-truename root))))))
+      (unwind-protect
+          (progn
+            (pos-roam-setup root)
+            (should (equal expected org-roam-db-location))
+            (should (string-prefix-p (file-name-as-directory pos-roam-cache-directory)
+                                     org-roam-db-location))
+            (org-roam-db-sync)
+            (should (equal '("a.org")
+                           (mapcar (lambda (row)
+                                     (file-relative-name (car row) (file-truename root)))
+                                   (org-roam-db-query [:select file :from files]))))
+            (pos-roam-with-index root
+              (should (equal expected org-roam-db-location))))
+        (advice-remove 'org-roam-list-files #'pos-roam--list-files)))))
+
 (ert-deftest pos-roam/the-referrers-are-the-id-links-the-index-records ()
   "A link is recorded where a node holds it.
 In a file with an ID, or under a heading with one.  A link in a file

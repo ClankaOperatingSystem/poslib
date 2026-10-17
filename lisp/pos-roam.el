@@ -47,6 +47,8 @@
 ;;   to date.
 ;; - `pos-roam-sync': bring the index of ROOT up to date; return the
 ;;   database's location.
+;; - `pos-roam-setup': command; point org-roam at a tree, for an
+;;   editor, so that it and the commands share the tree's index.
 ;; - `pos-roam-id-at': the `:ID:' of the heading at LINE of FILE, or
 ;;   nil.
 ;; - `pos-roam-referrers': (FILE . POS) for each `id:' link to ID the
@@ -118,6 +120,39 @@ tree's, and `org-roam-db-query' answers for it."
   "Bring the index of ROOT up to date; return the database's location."
   (pos-roam-with-index root
     org-roam-db-location))
+
+(defvar pos-roam--set-up nil
+  "The root `pos-roam-setup' last pointed org-roam at, or nil.")
+
+(defun pos-roam--list-files (list-files)
+  "Around LIST-FILES, `org-roam-list-files': the corpus of a set-up tree.
+Where `org-roam-directory' is the root `pos-roam-setup' set, the
+files are that tree's corpus; elsewhere, what LIST-FILES returns."
+  (if (and pos-roam--set-up
+           (stringp org-roam-directory)
+           (equal (file-name-as-directory (file-truename org-roam-directory))
+                  pos-roam--set-up))
+      (pos-roam-files pos-roam--set-up)
+    (funcall list-files)))
+
+(defun pos-roam-setup (root)
+  "Point org-roam at the tree at ROOT, for an editor; return ROOT.
+The directory is ROOT, the database is the one the commands keep for
+ROOT under `pos-roam-cache-directory', and the files indexed are its
+corpus, as the commands index it.  So the editor and the commands
+share one index, and a database of the user's elsewhere is left
+alone.  A file saved outside the corpus is indexed until the next
+sync removes it."
+  (interactive "DTree: ")
+  (let* ((root (file-name-as-directory (file-truename root)))
+         (location (let ((org-roam-directory nil))
+                     (pos-roam-db-location root))))
+    (make-directory (file-name-directory location) t)
+    (setq org-roam-directory root
+          org-roam-db-location location
+          pos-roam--set-up root)
+    (advice-add 'org-roam-list-files :around #'pos-roam--list-files)
+    root))
 
 (defun pos-roam-id-at (file line)
   "Return the `:ID:' of the heading at LINE of FILE, or nil."
