@@ -359,16 +359,16 @@ as bad-value, and so is a file in which two entries name one ledger.
 
 5. The server
 
-server binds a repository to a server its owners run. It is read from
-the configuration at a repository's root. It is a
-mapping:
+server is a repository's server binding: it binds the repository to a
+server its owners run. It is read from the configuration at a
+repository's root. It is a mapping:
 
     name        what a coding agent knows the server by
     mcp         the URL of the server's MCP endpoint
 
 Absent, the repository is bound to none.
 
-A binding covers its own repository. The server is configured for
+A server binding covers its own repository. The server is configured for
 sessions started in this repository, and for none in a repository
 mounted in it or containing it.
 

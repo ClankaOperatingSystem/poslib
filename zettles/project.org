@@ -7,10 +7,10 @@ A project is a piece of work that ends when its outcome is reached.
 
 It belongs to one
 [[id:97a43a8f-e4e2-4b6f-9c08-b11a0455eac5][responsibility]]. Every project
-inherits the same basic
-[[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]], which manages
-[[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][tasks in Org mode]] in the
-style of GTD. Under it, a project has a NEXT action, and a project with
+runs on method zero, the ClankOS image's own commands and skills, which
+manage [[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][tasks in Org mode]];
+GTD is a [[id:7442c287-5543-48e2-a20a-855af70fc35e][methodology]] a
+node declares. Under it, a project has a NEXT action, and a project with
 none is stuck. A project is expected to have a scheduled review item, and
 is flagged if it has none. Its outcome is expected to be written, and it
 is flagged until it is. A project is whatever lies where its
