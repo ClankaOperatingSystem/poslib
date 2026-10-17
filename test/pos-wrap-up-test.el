@@ -50,16 +50,17 @@ handover."
 
 (ert-deftest pos-wrap-up/seals-the-handover-and-indexes-it-as-the-latest ()
   "The handover is sealed as journal/DATE-SLUG.org in the node's archive.
-Its heading leads the node's journal.org, made for it, tagged handover
-and latest, with an ID, its date as an inactive timestamp and the
-record's citation, which is what is returned."
+Its heading leads the node's journal.org, made for it with a file ID,
+tagged handover and latest, with an ID, its date as an inactive
+timestamp and the record's citation, which is what is returned."
   (pos-wrap-up-test-with-node root
     (let ((citation (pos-wrap-up root "The roof mended" "What happened.\n" "2026-10-14")))
       (should (string-match-p "\\`ipfs://bafk[a-z2-7]+\\'" citation))
       (should (equal "What happened.\n"
                      (pos-test-text root "archives/journal/2026-10-14-the-roof-mended.org")))
       (should (string-match-p
-               (concat "\\`#\\+TITLE: Journal\n\n"
+               (concat "\\`:PROPERTIES:\n:ID: +[0-9a-f-]\\{36\\}\n:END:\n"
+                       "#\\+TITLE: Journal\n\n"
                        "\\* The roof mended +:handover:latest:\n"
                        ":PROPERTIES:\n"
                        ":ID: +[0-9a-f-]\\{36\\}\n"
