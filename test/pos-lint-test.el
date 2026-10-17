@@ -60,7 +60,7 @@ is not reported."
 (ert-deftest pos-lint/a-clean-tree-lints-silent ()
   "A tree with nothing to report lints to no findings and empty text.
 Open and done tasks in the right places are the normal state."
-  (pos-test-with-files root '(("intray.org" . "* TODO open\n* DONE fine\n"))
+  (pos-test-with-files root '(("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n* DONE fine\n"))
     (let ((pos-directory root))
       (should-not (pos-lint))
       (should (equal "" (pos-lint-format nil root))))))
@@ -74,7 +74,7 @@ scripts/lib/, and a check-* that is not executable, are not run."
   (pos-test-with-files root
       '((".clanka/config.yml"
          . "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/adr\n")
-        ("intray.org" . "* TODO open\n")
+        ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n")
         ("methodologies/adr/skills/adr-write/SKILL.md"
          . "---\nname: adr-write\ndescription: Write a decision.\n---\n")
         ("methodologies/adr/skills/adr-write/scripts/check-status"
@@ -103,7 +103,7 @@ The commands it names in bin/ are not run."
   (pos-test-with-files root
       '((".clanka/config.yml"
          . "pos: 2\nmethodologies: methodologies\nchildren:\n  - path: methodologies/adr\n")
-        ("intray.org" . "* TODO open\n")
+        ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n")
         ("methodologies/adr/methodology.yaml" . "methodology: 1\nchecks:\n  - adr-check\n")
         ("methodologies/adr/bin/adr-check" . "#!/bin/sh\necho 'ran'\nexit 1\n"))
     (set-file-modes (expand-file-name "methodologies/adr/bin/adr-check" root) #o755)
@@ -120,7 +120,7 @@ skill of the repository's own, with no lock entry, has none run."
   (pos-test-with-files root
       '((".clanka/config.yml"
          . "pos: 2\nmethodologies:\n  - source: https://example.org/adr.git\n    ref: v1\n")
-        ("intray.org" . "* TODO open\n")
+        ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n")
         ("skills-lock.json"
          . "{\"version\": 1, \"skills\": {\"adr-write\": {\"source\": \"https://example.org/adr.git\", \"sourceUrl\": \"https://example.org/adr.git\", \"ref\": \"v1\", \"sourceType\": \"git\", \"computedHash\": \"0\"}}}\n")
         (".agents/skills/adr-write/SKILL.md"
@@ -143,7 +143,7 @@ three raw bytes."
   (pos-test-with-files root
       '((".clanka/config.yml"
          . "pos: 2\nmethodologies:\n  - source: https://example.org/adr.git\n    ref: v1\n")
-        ("intray.org" . "* TODO open\n")
+        ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n")
         ("skills-lock.json"
          . "{\"version\": 1, \"skills\": {\"adr-write\": {\"source\": \"https://example.org/adr.git\", \"sourceUrl\": \"https://example.org/adr.git\", \"ref\": \"v1\", \"sourceType\": \"git\", \"computedHash\": \"0\"}}}\n")
         (".agents/skills/adr-write/SKILL.md"
@@ -165,7 +165,7 @@ the image's refresh to report, and the lint says nothing of it."
   (pos-test-with-files root
       '((".clanka/config.yml"
          . "pos: 2\nmethodologies:\n  - source: https://example.org/a.git\n    ref: v1\n    skills: [a-one]\n")
-        ("intray.org" . "* TODO open\n")
+        ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n")
         ("skills-lock.json"
          . "{\n  \"version\": 1,\n  \"skills\": {\n    \"a-two\": {\n      \"source\": \"https://example.org/a.git\",\n      \"ref\": \"v1\",\n      \"sourceType\": \"git\",\n      \"computedHash\": \"0\"\n    },\n    \"grill-me\": {\n      \"source\": \"someone/skills\",\n      \"sourceType\": \"github\",\n      \"computedHash\": \"0\"\n    }\n  }\n}\n"))
     (let ((pos-directory root))
@@ -181,7 +181,7 @@ commit the image was built from, and holds the skill.  The checks of
 the installed skill are run."
   (pos-test-with-files root
       '((".clanka/config.yml" . "pos: 2\n")
-        ("intray.org" . "* TODO open\n")
+        ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n")
         (".clanka/auto/version" . "1\n")
         (".clanka/auto/repository" . "https://example.org/clankos.git\n")
         (".clanka/auto/commit" . "1111111111111111111111111111111111111111\n")
@@ -205,12 +205,12 @@ The order is by file then line, so a compilation buffer walks the
 tree in one order and a diff of two runs is meaningful."
   (pos-test-configured
     (pos-test-with-files root
-        '(("life/life-areas.org" . "* DONE other parent\n** TODO other child\n")
-          ("intray.org" . "* DONE parent\n** TODO child\n"))
+        '(("life/life-areas.org" . ":PROPERTIES:\n:ID: life-areas\n:END:\n* DONE other parent\n** TODO other child\n")
+          ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* DONE parent\n** TODO child\n"))
       (let ((pos-directory root))
         (should (equal (pos-test-lines
-                        "intray.org:1: done entry has open children"
-                        "life/life-areas.org:1: done entry has open children")
+                        "intray.org:4: done entry has open children"
+                        "life/life-areas.org:4: done entry has open children")
                        (pos-lint-format (pos-lint) root)))))))
 
 (ert-deftest pos-lint/a-heading-beginning-with-a-retired-keyword-is-a-finding ()
@@ -394,6 +394,55 @@ any other.  A plain heading, Finances, is no task and is not compared."
                           :file (expand-file-name "life/home/areas.org" root) :line 2
                           :message "duplicate task (also intray.org:1)"))
                    (pos-lint-duplicate-tasks root)))))
+
+(ert-deftest pos-lint/a-file-with-no-file-level-id-is-a-finding ()
+  "A file of the root with no file-level ID, or an empty one, is found.
+The finding is at the file's first line.  An ID in a heading's drawer,
+and a CUSTOM_ID, name a heading and not the file."
+  (pos-test-with-files root
+      '(("none.org" . "#+TITLE: None\n* TODO a task\n")
+        ("empty.org" . ":PROPERTIES:\n:ID:\n:END:\n#+TITLE: Empty\n")
+        ("heading.org" . "* Notes\n:PROPERTIES:\n:ID: notes\n:CUSTOM_ID: notes\n:END:\n")
+        ("named.org" . ":PROPERTIES:\n:ID: named\n:END:\n#+TITLE: Named\n"))
+    (dolist (name '("none.org" "empty.org" "heading.org"))
+      (let ((file (expand-file-name name root)))
+        (should (equal (list (pos-finding-make :file file :line 1 :message "no file-level ID"))
+                       (pos-lint-file-id file)))))
+    (should-not (pos-lint-file-id (expand-file-name "named.org" root)))))
+
+(ert-deftest pos-lint/files-that-share-a-file-level-id-name-each-other ()
+  "Files of the corpus that share a file-level ID each name the others.
+Each is found at its first line, and the ID is given.  A heading's ID
+that matches a file's is not shared by the file."
+  (pos-test-with-files root
+      '(("intray.org" . ":PROPERTIES:\n:ID: same\n:END:\n* Unsorted\n")
+        ("life/areas.org" . ":PROPERTIES:\n:ID: same\n:END:\n#+TITLE: Areas\n")
+        ("notes.org" . ":PROPERTIES:\n:ID: notes\n:END:\n* Notes\n:PROPERTIES:\n:ID: same\n:END:\n"))
+    (should (equal (list (pos-finding-make
+                          :file (expand-file-name "intray.org" root) :line 1
+                          :message "file ID same also in life/areas.org")
+                         (pos-finding-make
+                          :file (expand-file-name "life/areas.org" root) :line 1
+                          :message "file ID same also in intray.org"))
+                   (pos-lint-shared-file-ids root)))))
+
+(ert-deftest pos-lint/a-products-files-need-no-file-level-id ()
+  "A file the root may not write is not found for its file ID.
+It needs none, and where it shares one with a file of the root, only
+the root's file is found, naming it."
+  (pos-test-with-files root
+      '((".pos/config.yaml" . "pos: 2\nchildren:\n  - path: kit\n")
+        ("notes.org" . ":PROPERTIES:\n:ID: shared\n:END:\n#+TITLE: Notes\n")
+        ("kit/todo.org" . "#+TITLE: Kit\n")
+        ("kit/copy.org" . ":PROPERTIES:\n:ID: shared\n:END:\n#+TITLE: Copy\n"))
+    (let ((pos-directory root))
+      (should (equal (pos-test-lines "notes.org:1: file ID shared also in kit/copy.org")
+                     (pos-lint-format
+                      (seq-filter (lambda (finding)
+                                    (string-match-p "file-level ID\\|file ID"
+                                                    (pos-finding-message finding)))
+                                  (pos-lint))
+                      root))))))
 
 (provide 'pos-lint-test)
 ;;; pos-lint-test.el ends here

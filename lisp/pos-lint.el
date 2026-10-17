@@ -43,8 +43,11 @@
 ;;   FILE, an intray.org, that are not TODO.
 ;; - `pos-lint-waiting-without-who-or-when': report WAITING items in
 ;;   FILE that do not say who or what, or since when.
+;; - `pos-lint-file-id': report FILE if it has no file-level ID.
 ;; - `pos-lint-duplicate-tasks': report task headings in more than one
 ;;   file of ROOT's corpus.
+;; - `pos-lint-shared-file-ids': report files of ROOT's corpus that
+;;   share a file-level ID.
 ;; - `pos-lint-methodology-checks': run each check of each methodology
 ;;   of ROOT's projects; return findings.
 ;; - `pos-lint-skills-lock': report each entry of a skills-lock.json in
@@ -171,13 +174,35 @@ it, or in a date in its own text, a timestamp or YYYY-MM-DD."
                    file (concat "WAITING item does not say who or what it"
                                 " waits on, or since when")))))))))
 
+(defun pos-lint--own-file-p (file)
+  "Return non-nil if FILE is one the root may write.
+A file of another repository of the tree, or of a product, is not."
+  (not (pos-visit-own-keywords-p file)))
+
+(defun pos-lint--file-id (file)
+  "Return FILE's file-level ID, or nil if it has none or an empty one.
+An ID in a heading's drawer, or a CUSTOM_ID, is not the file's."
+  (with-current-buffer (pos-visit file)
+    (save-excursion
+      (goto-char (point-min))
+      (let ((id (and (org-before-first-heading-p) (org-entry-get nil "ID"))))
+        (and id (not (string-empty-p (string-trim id))) (string-trim id))))))
+
+(defun pos-lint-file-id (file)
+  "Report FILE if it has no file-level ID, at its first line.
+A file the root may not write is not reported."
+  (and (pos-lint--own-file-p file)
+       (not (pos-lint--file-id file))
+       (list (pos-finding-make :file file :line 1 :message "no file-level ID"))))
+
 (defvar pos-lint-checks
   '(pos-lint-done-with-open-children
     pos-lint-stale-keyword
     pos-lint-todo-line
     pos-lint-merged-copy
     pos-lint-clarified-in-intray
-    pos-lint-waiting-without-who-or-when)
+    pos-lint-waiting-without-who-or-when
+    pos-lint-file-id)
   "Per-file checks: file to findings.")
 
 ;;;; Checks of the tree
@@ -214,6 +239,29 @@ Each copy names the others."
                                                (file-relative-name ofile root) oline)))
                                   (remove copy copies) ", ")))
                     findings))))))
+    (nreverse findings)))
+
+(defun pos-lint-shared-file-ids (root)
+  "Report files of ROOT's corpus that share a file-level ID.
+Each file the root may write is reported, naming the others; a file
+the root may not write is named and not reported."
+  (let ((owners (make-hash-table :test 'equal)) (findings nil))
+    (dolist (file (pos-files root))
+      (let ((id (pos-lint--file-id file)))
+        (when id (push file (gethash id owners)))))
+    (maphash
+     (lambda (id files)
+       (when (cdr files)
+         (setq files (sort files #'string<))
+         (dolist (file files)
+           (when (pos-lint--own-file-p file)
+             (push (pos-finding-make
+                    :file file :line 1
+                    :message (format "file ID %s also in %s" id
+                                     (mapconcat (lambda (other) (file-relative-name other root))
+                                                (remove file files) ", ")))
+                   findings)))))
+     owners)
     (nreverse findings)))
 
 (defun pos-lint--check-output (command project)
@@ -350,6 +398,7 @@ is at the entry's line."
 
 (defvar pos-lint-repo-checks
   '(pos-lint-duplicate-tasks
+    pos-lint-shared-file-ids
     pos-lint-methodology-checks
     pos-lint-skills-lock
     pos-person-lint)
