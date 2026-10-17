@@ -26,8 +26,10 @@ skills in the directory that lists it and in each directory beneath that
 one in the same repository. So a project that is a directory of its
 responsibility's repository works with its responsibility's methodologies,
 and a project that is a repository of its own does not. Every project also
-has the basic methodology, which manages tasks as
-[[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]]. A methodology's
+has method zero, the ClankOS image's own commands and skills, which
+manage tasks as
+[[id:f8f269fe-5e28-49dc-bc73-b9bae96edead][Org matter]]; ClankOS's
+help document "words" says so. A methodology's
 own files are not part of the
 [[id:93d0542c-ef28-4af2-bff4-5f16e3f87021][corpus]] of the one that lists
 it. Its path there is a
