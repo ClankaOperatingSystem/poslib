@@ -649,9 +649,10 @@ sources too."
 (defun pos-tree--installs (plan node)
   "Add to PLAN what is installed in NODE and in the repositories beneath it.
 A repository with a configuration has auto/ in its configuration
-directory, replaced from the source when its version is another,
-links to the commands auto/ holds and to what its methodologies
-supply, and its skills-lock.json compared with the source's skills.  A
+directory, replaced from the source when its version or its commit is
+another, links to the commands auto/ holds and to what its
+methodologies supply, and its skills-lock.json compared with the
+source's skills.  A
 node that is a directory of it has links to its own methodologies.
 One with no configuration, a product, has nothing planned in it."
   (let* ((dir (pos-tree--node-dir node))
@@ -660,7 +661,10 @@ One with no configuration, a product, has nothing planned in it."
     (when auto
       (let* ((source (pos-tree--plan-source plan))
              (version (and source (pos-tree--version source)))
-             (stale (and version (not (equal version (pos-tree--version auto)))))
+             (stale (and version
+                         (not (and (equal version (pos-tree--version auto))
+                                   (equal (pos-lock--line source "commit")
+                                          (pos-lock--line auto "commit"))))))
              (from (if stale source auto))
              (at (alist-get 'methodologies config))
              (owned (if (stringp at) (list auto (expand-file-name at dir)) (list auto)))

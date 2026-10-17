@@ -775,6 +775,30 @@ it adds is not installed.  Installing brings the two into line."
       (should-not (file-exists-p (expand-file-name ".clanka/auto/scribble" root)))
       (should (equal (pos-tree-test-status root) "")))))
 
+(ert-deftest pos-tree/a-source-of-another-commit-replaces-what-was-installed ()
+  "A source of the same version and another commit replaces auto/.
+An image built from a later commit that changed neither its commands
+nor its skills has the same version.  Install records the new commit
+in skills-lock.json, so auto/ must name it too, or every skill differs."
+  (pos-tree-test-with dir
+    (let ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
+                                        "clankos-capture"))
+          (root (pos-tree-test-repository (expand-file-name "root" dir)
+                                          ".clanka/config.yml"
+                                          (pos-tree-test-config)))
+          (commit (make-string 40 ?b)))
+      (pos-tree-test-settle root source)
+      (pos-tree-test-install root source)
+      (pos-tree-test-settle root source)
+      (pos-tree-test-write source "commit" (concat commit "\n"))
+      (should (member "install .clanka/auto 1"
+                      (pos-tree-test-summary (pos-tree-plan root source))))
+      (pos-tree-test-settle root source)
+      (pos-tree-test-install root source)
+      (should (equal (pos-tree-test-summary (pos-tree-test-settle root source)) nil))
+      (should (equal (pos-lock--line (expand-file-name ".clanka/auto" root) "commit")
+                     commit)))))
+
 (ert-deftest pos-tree/a-name-taken-is-found-and-left ()
   "Where something else has a link's name, it is left and found.
 The finding says whether the repository tracks it, and the other
