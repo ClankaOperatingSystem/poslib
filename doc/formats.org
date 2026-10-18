@@ -109,6 +109,35 @@ inside the archive, in =archives/.archive-integrity/=, and checkpoints in
 =.archive-integrity-anchors/= beside the root. An archive with a ledger in
 both places is refused (=ledger=).
 
+** Layout
+
+Fixtures: =fixtures/layout/=, one case to a file, named by its row in
+the archive layout matrix and a slug. A case has:
+
+- =id=: the matrix row, such as =S01=;
+- =operation=: =select=, the directory selected at the scope; =resolve=,
+  the existing archive, ledger and checkpoint locations; =read=, the
+  same, and the head and number of events the ledger read there has;
+  =discover=, the archives found from the root; or =write-target=, where
+  a writer at the scope writes;
+- =tree=: the fixture tree, a configuration among its entries;
+- =root=: the scope, or the root of discovery, or a root named
+  =archives=, whose scope is then that archive's;
+- =selected=: the name of the directory selected;
+- =archive=, =ledger=, =checkpoints=: for =resolve= and =read=, the
+  existing locations, =null= for none; for =write-target=, the targets;
+- =head=, =events=: what the ledger read has;
+- =archives=: the archives discovery finds, in path order;
+- =coverage=: what a checkpoint written at the root covers;
+- =kept=, =ledger_id=: the keeper's URL and the ledger's id that the
+  scope's entry names, for =write-target=;
+- =error= and =paths=: a refusal, its kind and the paths it names,
+  sorted.
+
+Paths are relative to the fixture's directory. A field that is absent
+does not apply to the case. A refused case changes nothing on disk, a
+=read= writes nothing, and =discover= asks no keeper.
+
 ** Kept archives
 
 A scope's archive is on disk, beside its ledger, or kept by a keeper, a

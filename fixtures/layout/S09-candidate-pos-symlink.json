@@ -1,0 +1,20 @@
+{
+ "id": "S09",
+ "operation": "select",
+ "description": "A symbolic link at the candidate path .pos is refused.",
+ "tree": [
+  {
+   "path": "elsewhere",
+   "directory": true
+  },
+  {
+   "path": ".pos",
+   "symlink": "elsewhere"
+  }
+ ],
+ "root": ".",
+ "error": "link",
+ "paths": [
+  ".pos"
+ ]
+}

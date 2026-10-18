@@ -1,0 +1,13 @@
+{
+ "id": "S06",
+ "operation": "select",
+ "description": "With no configuration and no candidate, .clankos is selected and nothing is created.",
+ "tree": [
+  {
+   "path": "notes.org",
+   "text": "* Notes\n"
+  }
+ ],
+ "root": ".",
+ "selected": ".clankos"
+}

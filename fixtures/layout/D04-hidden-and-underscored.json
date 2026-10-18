@@ -1,0 +1,72 @@
+{
+ "id": "D04",
+ "operation": "discover",
+ "description": "Hidden and underscored trees are not walked; the fixed probes of candidate directories still find archives.",
+ "tree": [
+  {
+   "path": ".hidden/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": ".hidden/archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": "_scratch/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "_scratch/archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": ".clankos/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": ".clankos/archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/.pos/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/.pos/archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/_work/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/_work/archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/.cache/b/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "projects/a/.cache/b/archives/b.md",
+   "text": "beta",
+   "mode": 292
+  }
+ ],
+ "root": ".",
+ "archives": [
+  ".clankos/archives",
+  "projects/a/.pos/archives"
+ ]
+}

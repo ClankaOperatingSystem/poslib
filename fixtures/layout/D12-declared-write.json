@@ -1,0 +1,19 @@
+{
+ "id": "D12",
+ "operation": "write-target",
+ "description": "A scope declared kept remote with no ledger yet: the first seal targets .pos and takes the declared identity.",
+ "tree": [
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 2\narchives:\n  - scope: \".\"\n    kept: remote\n    url: https://keeper.example/d\n    ledger: 0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
+  }
+ ],
+ "root": ".",
+ "kept": "https://keeper.example/d",
+ "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
+ "selected": ".pos",
+ "archive": ".pos/archives",
+ "ledger": ".pos/archive-integrity/ledger",
+ "checkpoints": ".pos/archive-integrity/checkpoints",
+ "coverage": "tree"
+}

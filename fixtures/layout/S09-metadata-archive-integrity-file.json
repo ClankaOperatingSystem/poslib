@@ -1,0 +1,16 @@
+{
+ "id": "S09",
+ "operation": "resolve",
+ "description": "A file at .clankos/archive-integrity is refused.",
+ "tree": [
+  {
+   "path": ".clankos/archive-integrity",
+   "text": "not a directory\n"
+  }
+ ],
+ "root": ".",
+ "error": "ledger",
+ "paths": [
+  ".clankos/archive-integrity"
+ ]
+}

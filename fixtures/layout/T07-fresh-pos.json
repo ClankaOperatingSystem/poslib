@@ -1,0 +1,17 @@
+{
+ "id": "T07",
+ "operation": "write-target",
+ "description": "A fresh writer at a scope configured in .pos targets .pos and creates nothing.",
+ "tree": [
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 2\n"
+  }
+ ],
+ "root": ".",
+ "selected": ".pos",
+ "archive": ".pos/archives",
+ "ledger": ".pos/archive-integrity/ledger",
+ "checkpoints": ".pos/archive-integrity/checkpoints",
+ "coverage": "tree"
+}

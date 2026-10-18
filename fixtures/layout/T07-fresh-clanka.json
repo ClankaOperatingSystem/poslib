@@ -1,0 +1,17 @@
+{
+ "id": "T07",
+ "operation": "write-target",
+ "description": "A fresh writer at a scope configured in .clanka targets .clanka and creates nothing.",
+ "tree": [
+  {
+   "path": ".clanka/config.yaml",
+   "text": "pos: 2\n"
+  }
+ ],
+ "root": ".",
+ "selected": ".clanka",
+ "archive": ".clanka/archives",
+ "ledger": ".clanka/archive-integrity/ledger",
+ "checkpoints": ".clanka/archive-integrity/checkpoints",
+ "coverage": "tree"
+}

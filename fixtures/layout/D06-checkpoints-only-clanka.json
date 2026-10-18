@@ -1,0 +1,18 @@
+{
+ "id": "D06",
+ "operation": "write-target",
+ "description": "A root with only checkpoints, in .clanka, selects .clanka; its coverage is the tree.",
+ "tree": [
+  {
+   "path": ".clanka/archive-integrity/checkpoints/39cb38d293f29f4c99574bea45cf4b4449186f7c9023f2f69d4a6e404e70f2a7.json",
+   "text": "{\"coverage\":\"tree\",\"heads\":[\"519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2\"],\"schema\":1}\n",
+   "mode": 292
+  }
+ ],
+ "root": ".",
+ "selected": ".clanka",
+ "archive": ".clanka/archives",
+ "ledger": ".clanka/archive-integrity/ledger",
+ "checkpoints": ".clanka/archive-integrity/checkpoints",
+ "coverage": "tree"
+}

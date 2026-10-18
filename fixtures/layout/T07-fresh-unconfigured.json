@@ -1,0 +1,17 @@
+{
+ "id": "T07",
+ "operation": "write-target",
+ "description": "A fresh writer at a scope with no configuration or candidate targets .clankos and creates nothing.",
+ "tree": [
+  {
+   "path": "notes.org",
+   "text": "* Notes\n"
+  }
+ ],
+ "root": ".",
+ "selected": ".clankos",
+ "archive": ".clankos/archives",
+ "ledger": ".clankos/archive-integrity/ledger",
+ "checkpoints": ".clankos/archive-integrity/checkpoints",
+ "coverage": "tree"
+}

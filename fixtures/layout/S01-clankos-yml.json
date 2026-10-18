@@ -1,0 +1,13 @@
+{
+ "id": "S01",
+ "operation": "select",
+ "description": "A sole valid configuration, .clankos/config.yml, selects its directory.",
+ "tree": [
+  {
+   "path": ".clankos/config.yml",
+   "text": "pos: 2\n"
+  }
+ ],
+ "root": ".",
+ "selected": ".clankos"
+}

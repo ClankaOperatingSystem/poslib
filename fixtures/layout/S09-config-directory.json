@@ -1,0 +1,16 @@
+{
+ "id": "S09",
+ "operation": "select",
+ "description": "A configuration path that is a directory is refused.",
+ "tree": [
+  {
+   "path": ".pos/config.yaml",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "error": "config",
+ "paths": [
+  ".pos/config.yaml"
+ ]
+}

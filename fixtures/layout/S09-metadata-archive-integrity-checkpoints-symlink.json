@@ -1,0 +1,20 @@
+{
+ "id": "S09",
+ "operation": "resolve",
+ "description": "A symbolic link at .clankos/archive-integrity/checkpoints is refused.",
+ "tree": [
+  {
+   "path": "elsewhere",
+   "directory": true
+  },
+  {
+   "path": ".clankos/archive-integrity/checkpoints",
+   "symlink": "../../elsewhere"
+  }
+ ],
+ "root": ".",
+ "error": "link",
+ "paths": [
+  ".clankos/archive-integrity/checkpoints"
+ ]
+}

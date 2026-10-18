@@ -1,0 +1,20 @@
+{
+ "id": "S09",
+ "operation": "resolve",
+ "description": "A symbolic link at .clankos/archive-integrity/ledger is refused.",
+ "tree": [
+  {
+   "path": "elsewhere",
+   "directory": true
+  },
+  {
+   "path": ".clankos/archive-integrity/ledger",
+   "symlink": "../../elsewhere"
+  }
+ ],
+ "root": ".",
+ "error": "link",
+ "paths": [
+  ".clankos/archive-integrity/ledger"
+ ]
+}

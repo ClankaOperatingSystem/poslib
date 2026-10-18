@@ -1,0 +1,21 @@
+{
+ "id": "S03",
+ "operation": "select",
+ "description": "Both suffixes in one directory are a configuration error naming both.",
+ "tree": [
+  {
+   "path": ".clankos/config.yaml",
+   "text": "pos: 2\n"
+  },
+  {
+   "path": ".clankos/config.yml",
+   "text": "pos: 2\n"
+  }
+ ],
+ "root": ".",
+ "error": "config",
+ "paths": [
+  ".clankos/config.yaml",
+  ".clankos/config.yml"
+ ]
+}
