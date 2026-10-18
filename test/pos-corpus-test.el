@@ -134,6 +134,23 @@ text file and a symbolic link are not read either."
                                           (".#a.org" file) (".secret.org" file)
                                           ("a.org_archive" file) ("linked.org" link)))))))
 
+(ert-deftest pos-corpus/the-other-files-are-kept-with-their-scopes ()
+  "A file that is not Org is kept apart, with the scope it belongs to.
+A hidden file, a lock file, a backup and a symbolic link are not, nor
+is a file where the walk does not go."
+  (should (equal '(("a.org_archive" . ".") ("area/run.py" . "area") ("notes.txt" . "."))
+                 (mapcar (lambda (entry)
+                           (cons (file-relative-name (car entry) "/r/")
+                                 (pos-scope-path (cdr entry))))
+                         (pos-corpus-others
+                          (pos-corpus-test-walk
+                           `(("" dir :config ,(pos-test-declaring "area"))
+                             ("area" dir :config ,pos-test-child-config)
+                             ("a.org" file) ("notes.txt" file) ("area/run.py" file)
+                             (".gitignore" file) ("#notes.txt#" file) ("notes.txt~" file)
+                             ("a.org_archive" file) ("linked.txt" link)
+                             ("archives/x.txt" file))))))))
+
 ;;;; Exclusions
 
 (ert-deftest pos-corpus/the-default-exclusions-keep-the-walk-out ()

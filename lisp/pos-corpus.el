@@ -66,6 +66,8 @@
 ;;   read.
 ;; - `pos-corpus-org-file-p': non-nil if NAME names an Org file read
 ;;   into the corpus.
+;; - `pos-corpus-other-file-p': non-nil if NAME is that of a file kept
+;;   by the walk, not Org.
 ;; - `pos-corpus-projects-dir': the path, relative to the root, of
 ;;   SCOPE's projects directory, or nil.
 ;; - `pos-corpus-scopes-of-kind': the scopes of CORPUS of KIND.
@@ -94,13 +96,15 @@ configuration, or nil for the root."
   "What a walk of a tree found.
 ROOT is the root, a directory name.  SCOPES are its scopes, the root
 first, then in the order found.  ENTRIES are (FILE . SCOPE), each Org
-file read with the scope it belongs to, sorted by file.  FINDINGS are
+file read with the scope it belongs to, sorted by file.  OTHERS are
+the same for each other file the walk passed, sorted by file, as
+`pos-corpus-other-file-p' names them.  FINDINGS are
 (PATH . DETAIL) for what was found and not read: a configuration that
 was refused, and a directory with a configuration that no node
 declares.  UNWRITABLE are the paths, relative to the root, of the
 repositories and the products within the tree, beneath which a
 command may not write."
-  root scopes entries findings unwritable)
+  root scopes entries others findings unwritable)
 
 ;;;; The rules
 
@@ -111,6 +115,13 @@ Not a hidden file, nor a lock file, which begins with .#.")
 (defun pos-corpus-org-file-p (name)
   "Return non-nil if NAME names an Org file read into the corpus."
   (string-match-p pos-corpus-org-regexp name))
+
+(defun pos-corpus-other-file-p (name)
+  "Return non-nil if NAME is that of a file kept by the walk, not Org.
+Not a hidden file, nor a lock file, nor a backup."
+  (not (or (pos-corpus-org-file-p name)
+           (string-match-p "\\`[.#]" name)
+           (string-suffix-p "~" name))))
 
 (defun pos-corpus-projects-dir (scope)
   "Return the path, relative to the root, of SCOPE's projects directory, or nil.
@@ -143,7 +154,7 @@ returns a plist: :kind, one of dir, file, link or nil for nothing;
 for a directory, :repository, non-nil for a repository's root,
 :config, its configuration file's text, nil for none or the symbol
 two-configurations, and :names, the names in it, sorted."
-  (let ((files nil) (findings nil) (scopes nil) (unwritable nil))
+  (let ((files nil) (others nil) (findings nil) (scopes nil) (unwritable nil))
     (cl-labels
         ((read-config (path text)
            ;; A refused configuration is a finding; the walk returns nil
@@ -186,13 +197,16 @@ two-configurations, and :names, the names in it, sorted."
                     (info (funcall lister path)))
                (pcase (plist-get info :kind)
                  ('file
-                  (when (pos-corpus-org-file-p name)
+                  (cond
+                   ((pos-corpus-org-file-p name)
                     (push (cons (expand-file-name path root)
                                 (if projects-of
                                     (make-scope 'project (file-name-sans-extension path)
                                                 nil (nearest-node projects-of))
                                   scope))
-                          files)))
+                          files))
+                   ((pos-corpus-other-file-p name)
+                    (push (cons (expand-file-name path root) scope) others))))
                  ('dir
                   (let ((text (plist-get info :config)))
                     (cond
@@ -257,6 +271,7 @@ two-configurations, and :names, the names in it, sorted."
          :root (file-name-as-directory root)
          :scopes (nreverse scopes)
          :entries (seq-sort-by #'car #'string< files)
+         :others (seq-sort-by #'car #'string< others)
          :findings (nreverse findings)
          :unwritable (nreverse unwritable))))))
 
@@ -289,7 +304,8 @@ As `pos-corpus--walk' asks: for a path, what is there."
 (defun pos-corpus (root)
   "Walk the tree at ROOT once and return its corpus.
 ROOT is a directory.  The walk reads each configuration beneath it,
-enters what they allow and lists every Org file, with its scope."
+enters what they allow and lists every Org file, with its scope,
+and every other file."
   (let ((root (file-name-as-directory (expand-file-name root))))
     (pos-corpus--walk root (pos-corpus--list root))))
 
