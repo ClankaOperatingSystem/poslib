@@ -48,6 +48,8 @@
 ;;   file of ROOT's corpus.
 ;; - `pos-lint-shared-file-ids': report files of ROOT's corpus that
 ;;   share a file-level ID.
+;; - `pos-lint-dependency-rule': report the references by ROOT's own
+;;   files that the dependency rule forbids.
 ;; - `pos-lint-methodology-checks': run each check of each methodology
 ;;   of ROOT's projects; return findings.
 ;; - `pos-lint-skills-lock': report each entry of a skills-lock.json in
@@ -60,6 +62,7 @@
 (require 'cl-lib)
 (require 'pos)
 (require 'pos-corpus)
+(require 'pos-dependency)
 (require 'pos-lock)
 (require 'pos-node)
 
@@ -394,11 +397,17 @@ is at the entry's line."
                       findings)))))))
     (nreverse findings)))
 
+(defun pos-lint-dependency-rule (root)
+  "Report the references by ROOT's own files that the dependency rule forbids.
+As pos-dependency.el has the rule; each finding names the rule."
+  (pos-dependency-findings (pos-corpus root)))
+
 (autoload 'pos-person-lint "pos-person")
 
 (defvar pos-lint-repo-checks
   '(pos-lint-duplicate-tasks
     pos-lint-shared-file-ids
+    pos-lint-dependency-rule
     pos-lint-methodology-checks
     pos-lint-skills-lock
     pos-person-lint)

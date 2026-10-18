@@ -60,6 +60,8 @@
 ;; - `pos-person-identity-name': the name of the identity that the
 ;;   person NAME has in SCOPE.
 ;; - `pos-identity': a person-identity of a tree.
+;; - `pos-person-files': the person-entity and person-identity files of
+;;   a corpus.
 
 ;;; Code:
 
@@ -358,6 +360,22 @@ write."
        (pos-person--org-files
         (expand-file-name pos-person-identities-directory config))))
    (pos-corpus-scopes corpus)))
+
+(defun pos-person-files (corpus)
+  "Return the person-entity and person-identity files of CORPUS.
+The entities of the root, and the identities of each scope that has a
+configuration, the root's or another repository's.  They are not
+files of the corpus, for they are in configuration directories, and
+items link to them by ID."
+  (append
+   (mapcar #'cadr (pos-person-entities (pos-corpus-root corpus)))
+   (seq-mapcat
+    (lambda (scope)
+      (when-let* (((pos-scope-config scope))
+                  (config (pos-person--config-directory (pos-scope-dir scope))))
+        (pos-person--org-files
+         (expand-file-name pos-person-identities-directory config))))
+    (pos-corpus-scopes corpus))))
 
 (defun pos-person--relabel (id name)
   "Give NAME to each link to ID in the current buffer.
