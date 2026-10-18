@@ -56,8 +56,12 @@
   "Record the ledger heads of every archive under ROOT; return where.
 Refused unless the check is clean of changed, missing and new files and
 of write bits.  The checkpoint covers an archive if ROOT is one, else
-the tree; one with the same bytes already recorded is kept."
-  (let ((report (pos-ledger-check root)))
+the tree; one with the same bytes already recorded is kept.  It is
+written where `pos-ledger-targets' says a writer at ROOT's scope
+writes, which refuses before anything is checked or written."
+  (let* ((home (pos-target-checkpoints
+                (pos-ledger-targets (pos-ledger-anchor-base root))))
+         (report (pos-ledger-check root)))
     (when (seq-some (lambda (archive)
                       (let-alist archive
                         (seq-some (lambda (list) (> (length list) 0))
@@ -65,18 +69,14 @@ the tree; one with the same bytes already recorded is kept."
                     report)
       (pos-ledger-refuse 'unclean "Enrol new records and restore permissions \
 before checkpointing: %s" root))
-    (let* ((heads (sort (seq-uniq (seq-remove (lambda (h) (eq h :null))
-                                              (mapcar (lambda (a) (alist-get 'head a))
-                                                      report)))
-                        #'string<))
-           (home (pos-ledger-anchor-home (pos-ledger-anchor-base root))))
+    (let ((heads (sort (seq-uniq (seq-remove (lambda (h) (eq h :null))
+                                             (mapcar (lambda (a) (alist-get 'head a))
+                                                     report)))
+                       #'string<)))
       (when heads
-        (let* ((coverage (if (equal (file-name-nondirectory
-                                     (directory-file-name (file-truename root)))
-                                    "archives")
-                             "archive" "tree"))
-               (bytes (pos-bytes-json `((schema . 1) (heads . ,(vconcat heads))
-                                        (coverage . ,coverage))))
+        (let* ((bytes (pos-bytes-json `((schema . 1) (heads . ,(vconcat heads))
+                                        (coverage . ,(pos-ledger-coverage
+                                                      (file-truename root))))))
                (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") home)))
           (cond ((not (file-exists-p file)) (pos-ledger-write-new file bytes))
                 ((not (equal (pos-bytes-read file) bytes))

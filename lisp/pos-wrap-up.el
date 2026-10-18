@@ -73,9 +73,10 @@ Refuse what is not a date of that form."
 
 (defun pos-wrap-up--seal (root title bytes date)
   "Seal BYTES as the handover TITLE of DATE in ROOT's archive; return its citation.
-The record is journal/DATE-SLUG.org in the archive at ROOT's archives/,
-made if it is absent, so a node's first handover opens its archive."
-  (let* ((archive (expand-file-name "archives" root))
+The record is journal/DATE-SLUG.org in the archive a writer at ROOT
+writes, as `pos-ledger-targets' gives it, made if it is absent, so a
+node's first handover opens its archive."
+  (let* ((archive (pos-target-archive (pos-ledger-targets root)))
          (rel (format "journal/%s-%s.org" date (pos-wrap-up-slug title)))
          (plan (progn (make-directory archive t)
                       (pos-seal-stage bytes (expand-file-name rel archive))))

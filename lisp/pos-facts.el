@@ -69,14 +69,15 @@ not, and :null when HEAD has no upstream."
 
 (defun pos-facts--scope (root archive)
   "Return the path from ROOT of the scope ARCHIVE belongs to, \".\" for ROOT."
-  (let ((scope (file-relative-name (file-name-directory (directory-file-name archive)) root)))
+  (let ((scope (file-relative-name (file-name-as-directory (pos-path-archive-scope archive))
+                                   root)))
     (if (equal scope "./") "." (directory-file-name scope))))
 
 (defun pos-facts--anothers-p (root archive)
   "Return non-nil if ARCHIVE lies within another repository of the tree at ROOT.
 A directory below ROOT, at or above ARCHIVE's scope, that has a .git
 is another repository, whose ledgers are its own."
-  (let ((dir (file-name-directory (directory-file-name archive)))
+  (let ((dir (file-name-as-directory (pos-path-archive-scope archive)))
         found)
     (while (and (not found) (string-prefix-p root dir) (not (equal dir root)))
       (setq found (file-exists-p (expand-file-name ".git" dir))

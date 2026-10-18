@@ -164,7 +164,7 @@ capsule's links are left as written.  RUMOURS holds (DESTINATION .
 TEXT) for each rumour the links need, dated DATE.  COLLECTIONS and
 WRITTEN-AT are as `pos-seal--resolve' takes them.  Refuse `unresolved'
 a link within the item to a file it does not hold."
-  (let* ((scope (file-name-directory archive))
+  (let* ((scope (file-name-as-directory (pos-path-archive-scope archive)))
          (base (file-name-as-directory source))
          (inside (lambda (abs) (or (equal abs source) (string-prefix-p base abs))))
          (in-archive (lambda (abs) (if (equal abs source) rel
@@ -288,6 +288,19 @@ Org files of the scope's garden."
 
 ;;;; Plans
 
+(defun pos-seal--target (destination)
+  "Return (ARCHIVE . REL), where a writer seals DESTINATION.
+DESTINATION is an absolute path inside an archive, spelled in any
+place a scope's archive may be.  ARCHIVE is the archive
+`pos-ledger-targets' gives for that archive's scope, and REL the path
+within it.  Refuse `destination' for a path in no archive, and as
+`pos-ledger-targets' refuses."
+  (let ((archive (pos-links-archive-of destination)))
+    (unless archive
+      (pos-ledger-refuse 'destination "Destination is not in an archive: %s" destination))
+    (cons (pos-target-archive (pos-ledger-targets (pos-path-archive-scope archive)))
+          (file-relative-name destination archive))))
+
 (defun pos-seal--check-place (source destination rel)
   "Refuse unless SOURCE may be sealed at DESTINATION, REL in its archive.
 SOURCE must exist outside any archive (source); DESTINATION must not
@@ -378,14 +391,11 @@ entry names, else one made at random.  DATE, by default today's, dates
 any rumours the item's links need.  With AS-DESTINATION, a file's links
 are read as written from DESTINATION, not from where it lies; when it
 is a directory, they are read as written from there."
-  (let* ((source (directory-file-name (file-truename (pos-ledger-checked source))))
-         (destination (directory-file-name (expand-file-name destination)))
-         (archive (pos-links-archive-of destination)))
-    (pos-ledger-checked (file-name-directory destination))
-    (unless archive
-      (pos-ledger-refuse 'destination "Destination is not in an archive: %s" destination))
-    (let* ((rel (file-relative-name destination archive))
-           (archive (file-truename archive))
+  (pcase-let* ((source (directory-file-name (file-truename (pos-ledger-checked source))))
+               (`(,archive . ,rel) (pos-seal--target
+                                    (directory-file-name (expand-file-name destination)))))
+    (pos-ledger-checked (file-name-directory (expand-file-name rel archive)))
+    (let* ((archive (file-truename archive))
            (destination (expand-file-name rel archive)))
       (pos-seal--check-place source destination rel)
       (let ((history (pos-ledger-history archive)))
@@ -416,17 +426,16 @@ is a directory, they are read as written from there."
 
 (defun pos-seal-stage (bytes destination &optional ledger-id links-from)
   "Stage BYTES, a new record, and return the plan to seal them at DESTINATION.
-They are staged beside the archive, in _seal/, so the move is one rename,
-with DESTINATION's extension, by which their links are found; the links
-are read as written from DESTINATION, or from LINKS-FROM, a directory,
-where a program composed the record somewhere else.  The staged file is
+They are staged in _seal/ in the archive's scope, so the move is one
+rename, with DESTINATION's extension, by which their links are found;
+the links are read as written from DESTINATION as it is spelled, or
+from LINKS-FROM, a directory, where a program composed the record
+somewhere else.  The staged file is
 named for DESTINATION, so staging for it again replaces what was staged
 before.  If planning fails, nothing is left staged.
 LEDGER-ID names a new ledger, as for `pos-seal-plan'."
-  (let* ((archive (or (pos-links-archive-of (expand-file-name destination))
-                      (pos-ledger-refuse 'destination "Destination is not in an archive: %s"
-                                         destination)))
-         (stage (expand-file-name "_seal" (file-name-directory archive)))
+  (let* ((archive (car (pos-seal--target (expand-file-name destination))))
+         (stage (expand-file-name "_seal" (pos-path-archive-scope archive)))
          (links-from (and links-from
                           (let ((dir (file-truename (expand-file-name links-from))))
                             (unless (file-directory-p dir)
@@ -438,7 +447,8 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
                  (concat "new-"
                          (substring (pos-bytes-sha
                                      (encode-coding-string
-                                      (file-relative-name (expand-file-name destination) archive)
+                                      (cdr (pos-seal--target
+                                            (expand-file-name destination)))
                                       'utf-8))
                                     0 16)
                          (file-name-extension destination t))
@@ -446,7 +456,10 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
       (pos-bytes-write file bytes)
       (set-file-modes file #o644)
       (condition-case err
-          (pos-seal-plan file destination ledger-id nil (or links-from t))
+          (pos-seal-plan file destination ledger-id nil
+                         (or links-from
+                             (file-truename
+                              (file-name-directory (expand-file-name destination)))))
         (error
          (delete-file file)
          (when (directory-empty-p stage) (delete-directory stage))
@@ -611,6 +624,10 @@ Return (EVENT-FILE . ROOT)."
   (let-alist plan
     (unless (and (eql .schema 2) (equal .operation "seal"))
       (pos-ledger-refuse 'plan "Not a seal plan"))
+    (unless (equal (pos-target-archive
+                    (pos-ledger-targets (pos-path-archive-scope .archive)))
+                   .archive)
+      (pos-ledger-refuse 'plan "The archive is not where it was planned: %s" .archive))
     (unless (equal .kept (pos-ledger-kept .archive))
       (pos-ledger-refuse 'plan "The archive is not kept as planned: %s" .archive))
     (if .kept
@@ -707,7 +724,7 @@ EXPECTED, where there was a plan, the tool and the commit it is at, where
 it knows it, and of the scope's repository, where there is one and git
 reads it, the scope's path, the commit and branch it is at, whether its
 working tree is dirty, and each remote's URL less any user and password."
-  (let* ((scope (file-name-directory (alist-get 'archive plan)))
+  (let* ((scope (file-name-as-directory (pos-path-archive-scope (alist-get 'archive plan))))
          (root (locate-dominating-file scope ".git"))
          (tool-commit (pos-seal-tool-commit))
          (claims `(,@(when expected `(("plan" . ,expected))) ("tool" . "poslib")

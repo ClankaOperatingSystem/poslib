@@ -86,9 +86,9 @@
   "schema": 2,
   "operation": "seal",
   "source": "projects/a/trial",
-  "destination": "projects/a/archives/trial",
-  "archive": "projects/a/archives",
-  "ledger": "projects/a/archive-integrity/ledger",
+  "destination": "projects/a/.clankos/archives/trial",
+  "archive": "projects/a/.clankos/archives",
+  "ledger": "projects/a/.clankos/archive-integrity/ledger",
   "number": 1,
   "previous": null,
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
@@ -119,7 +119,7 @@
  },
  "report": [
   {
-   "archive": "projects/a/archives",
+   "archive": "projects/a/.clankos/archives",
    "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
    "keeper": null,
    "head": "baguqeeraujv2gqnuv6yeb45xojv5l5nuaiys6ife6quiva2vvcuxxzfhbggq",

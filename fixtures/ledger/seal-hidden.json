@@ -4,7 +4,7 @@
  "description": "An item holding a hidden file is refused.",
  "tree": [
   {
-   "path": "scope/archives",
+   "path": "scope/.clankos/archives",
    "directory": true
   },
   {

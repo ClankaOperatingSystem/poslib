@@ -39,10 +39,10 @@ their CIDs."
      (pos-test-write-bytes (expand-file-name "note.md" scope) "note")
      (dolist (item '("trial" "note.md"))
        (let ((plan (pos-seal-plan (expand-file-name item scope)
-                                  (expand-file-name (concat "archives/" item) scope))))
+                                  (expand-file-name (concat pos-test-archive "/" item) scope))))
          (pos-test-approve plan)))
-     (let ((trial-cid (pos-cid-directory (expand-file-name "archives/trial" scope)))
-           (note-cid (pos-cid-file (expand-file-name "archives/note.md" scope))))
+     (let ((trial-cid (pos-cid-directory (pos-test-archived scope "trial")))
+           (note-cid (pos-cid-file (pos-test-archived scope "note.md"))))
        (ignore trial-cid note-cid)
        ,@body)))
 
@@ -51,9 +51,9 @@ their CIDs."
 That is ipfs://ITEM-CID/PATH for a file within a sealed directory, and
 ipfs://ITS-CID for a file sealed alone."
   (pos-index-test-with-sealed
-    (should (equal (file-truename (expand-file-name "archives/trial/result.md" scope))
+    (should (equal (file-truename (pos-test-archived scope "trial/result.md"))
                    (pos-index-resolve scope (concat "ipfs://" trial-cid "/result.md"))))
-    (should (equal (file-truename (expand-file-name "archives/note.md" scope))
+    (should (equal (file-truename (pos-test-archived scope "note.md"))
                    (pos-index-resolve scope (concat "ipfs://" note-cid))))
     (should-error (pos-index-resolve scope "ipfs://bafkreiaaaa"))))
 
@@ -74,7 +74,7 @@ What a keeper keeps is not on disk to hash, so the ledger's CIDs stand
 at the paths the files would have."
   (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
     (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
-           (cids (pos-ledger-fold-cids (expand-file-name "archives" scope)))
+           (cids (pos-ledger-fold-cids (pos-test-archived scope)))
            (index (pos-index-build scope)))
       (should (equal ["archives/first/a.txt"]
                      (cdr (assoc (cdr (assoc "first/a.txt" cids)) index))))
@@ -89,7 +89,7 @@ with the bytes \"result\"."
   `(let ((fixture (pos-fixture "ledger" "report-kept-asked")))
      (pos-fixture-with fixture dir
        (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
-              (cids (pos-ledger-fold-cids (expand-file-name "archives" scope)))
+              (cids (pos-ledger-fold-cids (pos-test-archived scope)))
               (url (alist-get 'url (alist-get 'keeper fixture)))
               (asked nil)
               (pos-remote-keeper-function
@@ -224,7 +224,7 @@ bytes would read as UTF-8.  UTF-8 text is still text."
             (progn
               (goto-char (point-min))
               (org-open-at-point)
-              (should (equal (file-truename (expand-file-name "archives/trial/result.md" scope))
+              (should (equal (file-truename (pos-test-archived scope "trial/result.md"))
                              (file-truename buffer-file-name)))
               (kill-buffer))
           (kill-buffer (find-buffer-visiting canon)))))))
@@ -239,7 +239,7 @@ bytes would read as UTF-8.  UTF-8 text is still text."
             (progn
               (goto-char (point-min))
               (org-open-at-point)
-              (should (equal (file-truename (expand-file-name "archives/trial/result.md" scope))
+              (should (equal (file-truename (pos-test-archived scope "trial/result.md"))
                              (file-truename buffer-file-name)))
               (kill-buffer))
           (kill-buffer (find-buffer-visiting canon)))))))

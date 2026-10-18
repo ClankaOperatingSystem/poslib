@@ -261,14 +261,17 @@ it, a week after the week ended, and is then sealed."
 KIND is the sweep's kind and DIR the archive scope's directory.  A
 weekly sweep's files stay as they are, and nothing closes.  A sealed
 sweep seals each week beneath DIR's _sweep/ before WEEK into DIR's
-archive at sweep/ under the week's name."
+archive at sweep/ under the week's name: the archive a writer at DIR
+writes, as `pos-ledger-targets' gives it."
   (let ((staging (expand-file-name "_sweep" dir)))
     (when (and (eq kind 'sealed) (file-directory-p staging))
-      (mapcar (lambda (closed)
-                (pos-seal-plan (expand-file-name closed staging)
-                               (expand-file-name (concat "archives/sweep/" closed) dir)))
-              (seq-filter (lambda (name) (string< name week))
-                          (directory-files staging nil "\\`[0-9]\\{4\\}-W[0-9]\\{2\\}\\'"))))))
+      (let ((archive (pos-target-archive (pos-ledger-targets dir))))
+        (mapcar (lambda (closed)
+                  (pos-seal-plan (expand-file-name closed staging)
+                                 (expand-file-name (concat "sweep/" closed) archive)))
+                (seq-filter (lambda (name) (string< name week))
+                            (directory-files staging nil
+                                             "\\`[0-9]\\{4\\}-W[0-9]\\{2\\}\\'")))))))
 
 ;;;; The plan
 

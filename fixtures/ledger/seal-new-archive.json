@@ -4,7 +4,7 @@
  "description": "An item sealed into an archive with no ledger yet: a ledger starts beside it, in archive-integrity/, and the collection the item declares is listed.",
  "tree": [
   {
-   "path": "scope/archives",
+   "path": "scope/.clankos/archives",
    "directory": true
   },
   {
@@ -41,13 +41,13 @@
     "size": 4
    }
   },
-  "archive": "scope/archives",
+  "archive": "scope/.clankos/archives",
   "collections": [
    "trial"
   ],
-  "destination": "scope/archives/trial",
+  "destination": "scope/.clankos/archives/trial",
   "inventory_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
-  "ledger": "scope/archive-integrity/ledger",
+  "ledger": "scope/.clankos/archive-integrity/ledger",
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
   "links": [],
   "number": 1,
@@ -60,7 +60,7 @@
  },
  "report": [
   {
-   "archive": "scope/archives",
+   "archive": "scope/.clankos/archives",
    "kept": null,
    "keeper": null,
    "head": "baguqeerabss7d6oon3uonbszd72xry5mtgewxszcpvvxvvtxofihicduxoaq",

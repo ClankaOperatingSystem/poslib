@@ -38,8 +38,7 @@
 ;;   head recorded beside its archive, and a file's entry with its CID.
 ;; - `pos-ledger-against-disk': how an archive on disk compares with
 ;;   its ledger, a `pos-comparison'.
-;; - `pos-ledger-anchor-base', `pos-ledger-anchor-home': where a
-;;   root's checkpoints lie, and where a new one goes.
+;; - `pos-ledger-anchor-base': the scope whose checkpoints cover a root.
 ;; - `pos-ledger-refuse': signal a refusal, for this module and its callers.
 ;; - `pos-ledger-select', `pos-ledger-locations', `pos-ledger-targets':
 ;;   the directory selected at a scope for its archive and bookkeeping,
@@ -924,13 +923,6 @@ directory of its own.  A ROOT named archives is its scope's archive."
   "Return the scope whose checkpoints cover ROOT.
 ROOT itself, or its archive's scope where ROOT is named archives."
   (pos-ledger-root-scope (file-truename (pos-ledger-checked root))))
-
-(defun pos-ledger-anchor-home (base)
-  "Return the directory for new checkpoints beside BASE.
-In the integrity directory where BASE has one, else the legacy anchors."
-  (if (file-directory-p (expand-file-name pos-ledger-integrity base))
-      (expand-file-name (concat pos-ledger-integrity "/checkpoints") base)
-    (expand-file-name pos-ledger-anchors base)))
 
 (defun pos-ledger--checkpoint-home (archive)
   "Return the directory for a new checkpoint of ARCHIVE's head.

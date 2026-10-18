@@ -57,9 +57,9 @@
      (let* ((root (file-name-as-directory
                    (file-truename (expand-file-name "garden" dir))))
             (seal (progn
-                    (make-directory (expand-file-name "archives" root))
+                    (make-directory (pos-test-archived root) t)
                     (pos-seal-plan (expand-file-name "trial" root)
-                                   (expand-file-name "archives/trial" root)))))
+                                   (pos-test-archived root "trial")))))
        ,@body)))
 
 (defun pos-relink-test-approve (plan)
@@ -106,7 +106,7 @@ into the item is as it was."
     (let ((plan (pos-relink-plan root seal)))
       (pos-test-approve seal)
       (should (equal '("intray.org") (pos-relink-test-approve plan)))
-      (let ((item (pos-links-link (expand-file-name "archives/trial" root))))
+      (let ((item (pos-links-link (pos-test-archived root "trial"))))
         (should (string-prefix-p "ipfs://" item))
         (should (equal (concat
                         "* Unsorted\n"

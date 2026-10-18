@@ -42,7 +42,7 @@ Beside the scope; and recording them again is no conflict."
              (head (pos-history-head (pos-ledger-history archive)))
              (bytes (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "tree"))))
              (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") home)))
-        (should (equal home (expand-file-name "archive-integrity/checkpoints"
+        (should (equal home (expand-file-name ".clankos/archive-integrity/checkpoints"
                                               (file-truename scope))))
         (should (equal bytes (pos-bytes-read file)))
         (should (equal home (pos-checkpoint-record scope)))
@@ -53,7 +53,7 @@ Beside the scope; and recording them again is no conflict."
 With archive coverage, the same bytes, so no second file appears."
   (pos-test-with-scope
     (let* ((archive (pos-test-scope-sealed scope))
-           (home (expand-file-name "archive-integrity/checkpoints" (file-truename scope)))
+           (home (expand-file-name ".clankos/archive-integrity/checkpoints" (file-truename scope)))
            (before (directory-files home nil "\\.json\\'")))
       (should (equal home (pos-checkpoint-record archive)))
       (should (equal before (directory-files home nil "\\.json\\'"))))))
@@ -136,8 +136,11 @@ Its files are with its keeper: a checkpoint records its head, and
 repair protects its ledger's events and looks for nothing else."
   (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
     (let* ((scope (expand-file-name "projects/a" (file-truename dir)))
-           (event (car (pos-history-files (pos-ledger-history (expand-file-name "archives" scope))))))
-      (should (equal (expand-file-name "archive-integrity/checkpoints" scope)
+           (_ (progn (make-directory (expand-file-name ".clankos" scope))
+                     (rename-file (expand-file-name "archive-integrity" scope)
+                                  (expand-file-name ".clankos/archive-integrity" scope))))
+           (event (car (pos-history-files (pos-ledger-history (pos-test-archived scope))))))
+      (should (equal (expand-file-name ".clankos/archive-integrity/checkpoints" scope)
                      (pos-checkpoint-record scope)))
       (set-file-modes event #o644)
       (should (equal '((repaired . 1) (restored . 0) (unregistered . 0)) (pos-checkpoint-repair scope)))

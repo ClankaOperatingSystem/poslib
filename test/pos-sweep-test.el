@@ -684,7 +684,8 @@ stamped with the boundary too."
   "Closing seals each swept week before the given one into the scope's archive.
 With a root entry kept committed and swept sealed, a sweep for
 2026-W35 writes beneath _sweep/2026-W35; closing for 2026-W36 gives
-one seal plan, to archives/sweep/2026-W35, while closing for 2026-W35
+one seal plan, to sweep/2026-W35 in the archive in .clanka, the
+directory that holds the configuration, while closing for 2026-W35
 itself gives none.  Applying it moves the week into the archive: the
 staged directory is gone, the archive file is read-only, and the
 ledger check of the root has no finding."
@@ -693,7 +694,6 @@ ledger check of the root has no finding."
          . ,(pos-sweep-test-config (pos-sweep-test-entry "." "sweep: sealed")))
         ("intray.org" . "* DONE finished\n"))
     (pos-test-git-init root)
-    (make-directory (expand-file-name "archives" root))
     (pos-sweep-test-with-plan plan root "2026-W35"
       (should (equal '(:archived 1 :skipped nil :left 0 :stale 0)
                      (pos-sweep-apply root plan))))
@@ -701,11 +701,12 @@ ledger check of the root has no finding."
     (should-not (pos-sweep-close root "2026-W35"))
     (let ((plans (pos-sweep-close root "2026-W36")))
       (should (equal 1 (length plans)))
-      (should (equal "archives/sweep/2026-W35"
+      (should (equal ".clanka/archives/sweep/2026-W35"
                      (file-relative-name (alist-get 'destination (car plans))
                                          (file-truename root))))
       (should (equal 1 (length (pos-sweep-close-apply plans)))))
-    (let ((sealed (expand-file-name "archives/sweep/2026-W35/intray.org_archive" root)))
+    (let ((sealed (expand-file-name ".clanka/archives/sweep/2026-W35/intray.org_archive"
+                                    root)))
       (should-not (file-exists-p (expand-file-name "_sweep/2026-W35" root)))
       (should (file-exists-p sealed))
       (should (zerop (logand (file-modes sealed) #o222)))
