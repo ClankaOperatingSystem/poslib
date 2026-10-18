@@ -95,8 +95,10 @@ for those blocks and for every schema 3 event in =fixtures/ledger/=.
 * Archive ledgers
 
 Each outermost =archives/= directory has a ledger. A scope keeps its
-ledger and checkpoints beside its archive, in =archive-integrity/=:
+archive and its bookkeeping in one of its configuration directories,
+=.clanka/=, =.clankos/= or =.pos/= ([[*Layout][Layout]]): in that directory,
 
+- =archives/=: the archive;
 - =archive-integrity/ledger/=: the ledger's events;
 - =archive-integrity/checkpoints/=: checkpoints of ledger heads.
 
@@ -104,12 +106,59 @@ The archive itself then holds only archived material. When a scope
 retires into its parent's archive, its =archive-integrity/= goes with it,
 as ordinary content inside the parent's CID.
 
-The legacy layout, read until archives are migrated, keeps the ledger
-inside the archive, in =archives/.archive-integrity/=, and checkpoints in
-=.archive-integrity-anchors/= beside the root. An archive with a ledger in
-both places is refused (=ledger-location=).
+Two earlier layouts are read while a garden moves its archives, and
+are refused for writing (=relocation-required=). In the visible layout,
+=archives/= and =archive-integrity/= lie beside the scope's other files.
+In the legacy layout, the ledger is inside the archive, in
+=archives/.archive-integrity/=, and checkpoints are in
+=.archive-integrity-anchors/= beside the root. Retired scopes inside an
+archive keep the layout they were sealed with, and are read in it.
 
 ** Layout
+
+A scope's directory is selected from what is directly beneath it:
+
+1. =.clanka=, =.clankos= and =.pos= are its candidate directories. A
+   symbolic link at one is refused (=link=), and so is anything there
+   that is not a directory (=config=).
+2. Of =config.yaml= and =config.yml= in them, two files are refused
+   (=config=), in one directory or in two. One file is read as
+   =doc/pos-directory.txt= says, and one that document refuses is
+   refused (=config=), as is a symbolic link there (=link=).
+3. One file selects the directory that holds it. With no file, the one
+   candidate directory there is is selected; several are refused
+   (=directory-ambiguity=); with none, =.clankos= is selected and is
+   not made until a writer writes.
+
+Selection is local to the scope: the storage settings its entry gives
+are inherited as =doc/pos-directory.txt= says, wherever they come from.
+A configuration file is never made for bookkeeping alone.
+
+Where a scope's archive and bookkeeping are now is found by probing
+each candidate directory for =archives/= and =archive-integrity/=, and
+the scope itself for =archives/=, =archive-integrity/= and
+=.archive-integrity-anchors/=, and each archive found for the legacy
+ledger inside it. A symbolic link at any of these is refused (=link=),
+and anything else that is not a directory by its kind: =root= for an
+archive, =ledger= for an =archive-integrity/= or a ledger, =checkpoint=
+for checkpoints. A ledger directory counts even when empty. Two
+archives at one scope are refused (=archive-location=), two ledgers
+(=ledger-location=), byte-identical copies included, and two checkpoint
+directories (=checkpoint-location=). A reader reads the one ledger and
+the one checkpoint directory there are, wherever each lies.
+
+A writer at a scope writes in the selected directory, after the probe
+finds no conflict. It refuses (=relocation-required=) when an archive,
+an =archive-integrity/= or the legacy checkpoint directory lies anywhere
+else at the scope, so that bookkeeping is never split between two
+places. A fresh writer makes =archives/= and =archive-integrity/= in the
+selected directory as it needs them. The writers are sealing, with what
+seals through it, and checkpointing. Conversion, migration, keeping and
+recalling work on an archive where it lies, with its ledger: migration
+of a legacy archive comes before it is moved.
+
+A refusal names its kind, the scope, the paths in conflict, sorted, and
+the action it requires.
 
 Fixtures: =fixtures/layout/=, one case to a file, named by its row in
 the archive layout matrix and a slug. A case has:
@@ -170,16 +219,24 @@ and by planning.
 
 ** Discovery
 
-From a root: the root itself if it is named =archives=; otherwise every
-directory named =archives= beneath it, not descending into one found, nor
-into any directory whose name begins with =.= or =_=. A symlinked
-directory met on the way is refused.
+From a root: the root itself if it is named =archives=; otherwise the
+archive of each directory the walk visits, the root included. The walk
+enters no archive found and no directory whose name begins with =.= or
+=_=, and refuses a symlinked directory met on the way. At each
+directory it visits it probes the candidate directories as [[*Layout][Layout]]
+says, so an archive in =.clankos/= is found though the walk never
+enters =.clankos/=, and a directory with an archive in two places is
+refused (=archive-location=).
 
-An archive a keeper keeps is found by its ledger: for each directory met
-on that walk, the root included, that holds =archive-integrity/ledger/=
-and no =archives=, its =archives= is found if a keeper keeps it. A root
-named =archives= that does not exist is such an archive, or is refused
-(=root=).
+An archive a keeper keeps is found by its ledger: a directory the walk
+visits that has a ledger in an =archive-integrity/= and no archive has
+the =archives= beside that =archive-integrity/=, found if a keeper keeps
+it. No keeper is asked. A root named =archives= that does not exist is
+such an archive of its scope, or is refused (=root=).
+
+A root named =archives= belongs to the scope that holds it, or, where it
+lies in a candidate directory, to the scope that holds that directory.
+That scope's checkpoints and entry are the root's.
 
 ** Inventory
 
@@ -283,9 +340,9 @@ refuses a symlink or a second hard link anywhere.
 ** Checkpoints
 
 A checkpoint records ledger heads, to detect a vanished archive or a
-truncated ledger. It lives in =archive-integrity/checkpoints/= beside the
-root it covers, or in the legacy =.archive-integrity-anchors/=, named by
-the SHA-256 of its bytes, holding in canonical JSON:
+truncated ledger. It lives in the checkpoint directory of the scope of
+the root it covers ([[*Layout][Layout]]), named by the SHA-256 of its bytes,
+holding in canonical JSON:
 
 - =schema=: 1;
 - =heads=: sorted heads, each an event's hash or its CID;
@@ -299,11 +356,13 @@ names its events are enrolled under.
 
 Checkpointing a root records the distinct heads of the archives found
 under it, once the check reports nothing changed, missing, new or
-writable (else =unclean=). A new checkpoint goes to
-=archive-integrity/checkpoints/= beside the root if =archive-integrity/=
-exists there, else to the legacy folder. A checkpoint of the same bytes
-already there is kept; a different one under the same name refuses
-(=checkpoint=).
+writable (else =unclean=). It is a writer at the root's scope: a new
+checkpoint goes to =archive-integrity/checkpoints/= in the selected
+directory, and the layout's refusals come before anything is checked.
+A checkpoint of the same bytes already there is kept; a different one
+under the same name refuses (=checkpoint=). A checkpoint written with a
+seal, a conversion or a migration goes to the scope's checkpoint
+directory, or, where it has none, beside the archive's ledger.
 
 Repairing a root removes write bits from the enrolled files, ledger
 events and checkpoints under it, and from nothing else; it enrols
@@ -385,13 +444,16 @@ SHA-256 of its canonical JSON; application refuses any other.
 
 =seal SOURCE DESTINATION= plans to move SOURCE, a file or directory
 outside any archive, to DESTINATION, a path that does not yet exist inside
-an outermost =archives/=, which itself need not exist yet. =write-new
-DESTINATION= first stages new bytes in =_seal/= beside the archive, in a
-file with DESTINATION's extension, named =new-= and the first sixteen
-hexadecimal digits of the SHA-256 of DESTINATION's path from the archive,
-so that staging for DESTINATION again replaces what was staged before,
-then plans the same way, reading their
-links as written from DESTINATION, or with =--links-from DIR= as written
+an outermost =archives/=, which itself need not exist yet. Sealing is a
+writer at the archive's scope ([[*Layout][Layout]]): DESTINATION, spelled in any
+place the scope's archive may lie, beside the scope or in a candidate
+directory, is the same path in the archive of the selected directory.
+=write-new DESTINATION= first stages new bytes in =_seal/= in the
+archive's scope, in a file with DESTINATION's extension, named =new-= and
+the first sixteen hexadecimal digits of the SHA-256 of DESTINATION's path
+from the archive, so that staging for DESTINATION again replaces what was
+staged before, then plans the same way, reading their links as written
+from DESTINATION as it is spelled, or with =--links-from DIR= as written
 from DIR, where a program composed the record somewhere else, in the
 project's root say; if planning fails, the staged file is removed, and
 =_seal/= with it if left empty. A plan holds, in
@@ -432,7 +494,8 @@ the item), =differs= (enrolled evidence in the archive is missing or
 changed), =kept= (a keeper keeps the archive, and its ledger is not yet of
 schema 3 or it still has files on disk), =identity= (the ledger, or the
 id supplied for a new one, is not the one the scope's entry names), and
-for links, =unsealed=, =unresolved= and =loop=, below.
+for links, =unsealed=, =unresolved= and =loop=, below; and as [[*Layout][Layout]]
+refuses a writer.
 Hidden or unenrolled files already elsewhere in the archive do not stop a
 seal; the check reports them.
 
@@ -897,7 +960,7 @@ archive:
 - =inventory_sha256= and =final_inventory_sha256=: the archive before and
   after; =event=: the conversion event's name and text.
 
-Applying the plan rebuilds the archive in =_migrate/= beside it, refusing
+Applying the plan rebuilds the archive in =_migrate/= in its scope, refusing
 any difference from the plan, keeps the archive as it was there, swaps
 the rebuilt archive in, moves the ledger and checkpoints beside it,
 writes the conversion event, removes write bits, repairs canon and

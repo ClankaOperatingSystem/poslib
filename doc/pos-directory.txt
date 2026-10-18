@@ -310,6 +310,12 @@ id. A scope no entry names is kept remote by the keeper its node gets
 archive stays on disk and Git ignores it. In every case the
 ledger stays with the scope and is committed.
 
+A scope's archive and its ledger and checkpoints are in one of its
+configuration directories, as archives/ and archive-integrity/
+(doc/formats.org says which directory and what it holds). A
+configuration directory may hold them with no configuration file: it
+then declares nothing, and its directory is no node for it.
+
 The sweep retires the done items of a scope's Org files each week. An
 entry's sweep says how: weekly writes them into Org archive files
 beneath the scope, at path, one directory for each ISO week and
@@ -336,7 +342,10 @@ its scope: the nearest directory with a configuration.
 The tree tool maintains a marked block in each repository's
 .git/info/exclude for its uncommitted archives. It covers each declared
 node, each explicitly named archive scope (even before its directory
-exists), and other scopes found by their archives directories. It
+exists), and other scopes found by an archives directory beside them
+or in one of their configuration directories. A scope's archive is
+excluded where it lies, or, before it exists, where a writer would make
+it. It
 does not enter the directories the node's exclusions name (section 1),
 undeclared nodes, or products. A declared child reads its own policy;
 a parent's default does not override it.
