@@ -72,5 +72,23 @@ which whoever reads them refuses."
     (should (equal '(".clanka/config.yaml" ".pos/config.yml")
                    (pos-path-config-files root)))))
 
+(ert-deftest pos-path/an-archive-belongs-to-the-scope-that-holds-it ()
+  "An archive's scope is the directory holding it.
+Where that is a configuration directory, it is the directory holding
+that, so an archive in .clankos belongs to the same scope as one beside
+it."
+  (should (equal "/g/s" (pos-path-archive-scope "/g/s/archives")))
+  (should (equal "/g/s" (pos-path-archive-scope "/g/s/archives/")))
+  (dolist (directory '(".clanka" ".clankos" ".pos"))
+    (ert-info (directory)
+      (should (equal "/g/s" (pos-path-archive-scope
+                             (concat "/g/s/" directory "/archives"))))))
+  (should (equal "/g/s/.git" (pos-path-archive-scope "/g/s/.git/archives"))))
+
+(ert-deftest pos-path/a-scope-s-archive-may-lie-in-a-configuration-directory ()
+  "A scope's archive is in one of its configuration directories, or beside them."
+  (should (equal '(".clanka/archives" ".clankos/archives" ".pos/archives" "archives")
+                 (pos-path-archive-paths))))
+
 (provide 'pos-path-test)
 ;;; pos-path-test.el ends here

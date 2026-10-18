@@ -41,6 +41,14 @@
 ;; - `pos-ledger-anchor-base', `pos-ledger-anchor-home': where a
 ;;   root's checkpoints lie, and where a new one goes.
 ;; - `pos-ledger-refuse': signal a refusal, for this module and its callers.
+;; - `pos-ledger-select', `pos-ledger-locations', `pos-ledger-targets':
+;;   the directory selected at a scope for its archive and bookkeeping,
+;;   where they are now, a `pos-layout', and where a writer writes, a
+;;   `pos-target'.
+;; - `pos-ledger-refuse-at': signal a refusal at a scope, naming paths.
+;; - `pos-ledger-root-scope', `pos-ledger-coverage': the scope of a
+;;   root, and what a checkpoint of it covers.
+;; - `pos-ledger-paired-archive': the archive a ledger folder belongs to.
 ;;
 ;; JSON values are Lisp values: objects alists, arrays vectors, strings,
 ;; integers and :null.  Refusals signal `pos-ledger-refused' with a kind
@@ -551,6 +559,195 @@ ADD is an alist of path and entry; PREVIOUS a hash or nil."
                 `((schema . 1) (previous . ,(or previous :null)) (add . ,add)
                   ,@(when ledger-id `((ledger_id . ,ledger-id)))))))
     (cons (pos-ledger-event-file-name number (pos-bytes-sha bytes)) bytes)))
+
+;;;; Layout
+
+(defconst pos-ledger--actions
+  '((config . "correct the configuration")
+    (link . "replace the symbolic link with a directory")
+    (root . "make the archive path a directory")
+    (ledger . "make the ledger path a directory")
+    (checkpoint . "make the checkpoint path a directory")
+    (directory-ambiguity . "add a configuration, or relocate the bookkeeping \
+into one directory")
+    (archive-location . "keep one archive, after checking the history of each")
+    (ledger-location . "keep one ledger, after checking the history of each")
+    (checkpoint-location . "keep one checkpoint directory, after checking each")
+    (relocation-required . "relocate the archive and its bookkeeping into the \
+selected directory"))
+  "The action each refusal of a scope's layout requires.")
+
+(defun pos-ledger-refuse-at (kind scope paths format &rest args)
+  "Signal a refusal of KIND at SCOPE, naming PATHS, with FORMAT and ARGS.
+The message says the scope, the paths sorted and the action KIND
+requires.  The signal's data is KIND, the message, SCOPE and the
+paths sorted."
+  (let ((paths (sort (copy-sequence paths) #'string<)))
+    (signal 'pos-ledger-refused
+            (list kind
+                  (format "%s; scope %s; %s; %s" (apply #'format format args) scope
+                          (if paths (string-join paths ", ") "no path")
+                          (alist-get kind pos-ledger--actions))
+                  scope paths))))
+
+(defun pos-ledger--probe (scope path kind)
+  "Return PATH if it is a directory, nil if nothing is there.
+Refuse `link' for a symbolic link at PATH, and KIND for anything else
+there, as a refusal at SCOPE."
+  (cond ((file-symlink-p path)
+         (pos-ledger-refuse-at 'link scope (list path) "Symbolic link"))
+        ((file-directory-p path) path)
+        ((file-exists-p path)
+         (pos-ledger-refuse-at kind scope (list path) "Not a directory"))))
+
+(defun pos-ledger-select (scope)
+  "Return the name of the directory selected for SCOPE's archive and ledger.
+The configuration directory that holds SCOPE's one configuration file,
+else its one configuration directory, else .clankos, which need not
+exist.  Refuse `link' for a symbolic link at a configuration directory
+or file, `config' for something else there, for two configuration
+files and for one that doc/pos-directory.txt refuses, and
+`directory-ambiguity' for two configuration directories and no file."
+  (let* ((scope (directory-file-name (expand-file-name scope)))
+         (directories
+          (seq-filter (lambda (name)
+                        (pos-ledger--probe scope (expand-file-name name scope) 'config))
+                      pos-path-config-directories))
+         (files
+          (mapcan (lambda (name)
+                    (seq-filter
+                     (lambda (file)
+                       (cond ((file-symlink-p file)
+                              (pos-ledger-refuse-at 'link scope (list file)
+                                                    "Symbolic link"))
+                             ((file-regular-p file) t)
+                             ((file-exists-p file)
+                              (pos-ledger-refuse-at 'config scope (list file)
+                                                    "Not a configuration file"))))
+                     (mapcar (lambda (config) (expand-file-name config
+                                                                (expand-file-name name scope)))
+                             pos-path-config-names)))
+                  directories)))
+    (cond
+     ((cdr files)
+      (pos-ledger-refuse-at 'config scope files "Two configurations"))
+     (files
+      (condition-case err
+          (pos-node-read-config (decode-coding-string (pos-bytes-read (car files)) 'utf-8))
+        (pos-node-refused
+         (pos-ledger-refuse-at 'config scope files "Configuration refused (%s)" (cadr err))))
+      (file-name-nondirectory (directory-file-name (file-name-directory (car files)))))
+     ((cdr directories)
+      (pos-ledger-refuse-at 'directory-ambiguity scope
+                            (mapcar (lambda (name) (expand-file-name name scope)) directories)
+                            "Several configuration directories and no configuration"))
+     (directories (car directories))
+     (t ".clankos"))))
+
+(cl-defstruct (pos-layout (:constructor pos-ledger--layout-make) (:copier nil))
+  "Where a scope's archive and its bookkeeping are now.
+SCOPE is the scope's directory.  ARCHIVE, LEDGER and CHECKPOINTS are
+the one existing directory of each, or nil.  COMPONENTS are the
+archives, archive-integrity and legacy checkpoint directories there
+are at the scope, sorted."
+  scope archive ledger checkpoints components)
+
+(defun pos-ledger-locations (scope)
+  "Return where SCOPE's archive and bookkeeping are, a `pos-layout'.
+Each configuration directory and the scope itself are probed for
+archives/ and archive-integrity/, and for the legacy ledger inside
+an archive and the legacy checkpoint directory.  Nothing is written.
+Refuse `archive-location', `ledger-location' or `checkpoint-location'
+where two of one are found, and refuse a symbolic link or a file where
+a directory would be."
+  (let* ((scope (directory-file-name (expand-file-name scope)))
+         (holders (append
+                   (delq nil (mapcar (lambda (name)
+                                       (pos-ledger--probe
+                                        scope (expand-file-name name scope) 'config))
+                                     pos-path-config-directories))
+                   (list scope)))
+         archives ledgers checkpoints components)
+    (dolist (holder holders)
+      (let ((archive (pos-ledger--probe scope (expand-file-name "archives" holder) 'root))
+            (integrity (pos-ledger--probe
+                        scope (expand-file-name pos-ledger-integrity holder) 'ledger)))
+        (when archive
+          (push archive archives)
+          (push archive components)
+          (when-let* ((inside (pos-ledger--probe
+                               scope (expand-file-name pos-ledger-directory archive) 'ledger)))
+            (push inside ledgers)))
+        (when integrity
+          (push integrity components)
+          (when-let* ((ledger (pos-ledger--probe
+                               scope (expand-file-name "ledger" integrity) 'ledger)))
+            (push ledger ledgers))
+          (when-let* ((folder (pos-ledger--probe
+                               scope (expand-file-name "checkpoints" integrity) 'checkpoint)))
+            (push folder checkpoints)))))
+    (when-let* ((anchors (pos-ledger--probe
+                          scope (expand-file-name pos-ledger-anchors scope) 'checkpoint)))
+      (push anchors checkpoints)
+      (push anchors components))
+    (pcase-dolist (`(,kind ,found ,what) `((archive-location ,archives "archives")
+                                            (ledger-location ,ledgers "ledgers")
+                                            (checkpoint-location ,checkpoints
+                                                                 "checkpoint directories")))
+      (when (cdr found)
+        (pos-ledger-refuse-at kind scope found "Two %s at one scope" what)))
+    (pos-ledger--layout-make :scope scope :archive (car archives) :ledger (car ledgers)
+                             :checkpoints (car checkpoints)
+                             :components (sort components #'string<))))
+
+(defun pos-ledger-paired-archive (ledger)
+  "Return the archive the ledger folder LEDGER belongs to.
+The archives beside its archive-integrity directory, or, for a legacy
+ledger, the archive holding it."
+  (let ((parent (directory-file-name (file-name-directory ledger))))
+    (if (equal (file-name-nondirectory ledger) pos-ledger-directory)
+        parent
+      (expand-file-name "archives" (file-name-directory parent)))))
+
+(defun pos-ledger-root-scope (root)
+  "Return the scope of ROOT: ROOT, or its archive's scope if it is named archives."
+  (let ((root (directory-file-name (expand-file-name root))))
+    (if (equal (file-name-nondirectory root) "archives")
+        (pos-path-archive-scope root)
+      root)))
+
+(defun pos-ledger-coverage (root)
+  "Return what a checkpoint of ROOT covers: archive if it is named so, else tree."
+  (if (equal (file-name-nondirectory (directory-file-name root)) "archives")
+      "archive"
+    "tree"))
+
+(cl-defstruct (pos-target (:constructor pos-ledger--target-make) (:copier nil))
+  "Where a writer at a scope writes.
+SCOPE is the scope's directory and SELECTED the name of the directory
+selected in it.  ARCHIVE, LEDGER and CHECKPOINTS are the archive, the
+ledger folder and the checkpoint folder there, which need not exist."
+  scope selected archive ledger checkpoints)
+
+(defun pos-ledger-targets (scope)
+  "Return where a writer at SCOPE writes, a `pos-target'.
+In the directory `pos-ledger-select' selects, after
+`pos-ledger-locations' finds no conflict.  Nothing is created.  Refuse
+`relocation-required' where an archive, an archive-integrity directory
+or legacy checkpoints are anywhere else at the scope."
+  (let* ((scope (directory-file-name (expand-file-name scope)))
+         (selected (pos-ledger-select scope))
+         (base (expand-file-name selected scope))
+         (archive (expand-file-name "archives" base))
+         (integrity (expand-file-name pos-ledger-integrity base))
+         (outside (seq-remove (lambda (path) (member path (list archive integrity)))
+                              (pos-layout-components (pos-ledger-locations scope)))))
+    (when outside
+      (pos-ledger-refuse-at 'relocation-required scope outside
+                            "Bookkeeping lies outside %s" base))
+    (pos-ledger--target-make :scope scope :selected selected :archive archive
+                             :ledger (expand-file-name "ledger" integrity)
+                             :checkpoints (expand-file-name "checkpoints" integrity))))
 
 ;;;; Kept archives
 
