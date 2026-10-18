@@ -283,7 +283,19 @@ An archive not yet made holds nothing."
        (zerop (logand (alist-get 'mode entry) #o222))))
 
 (defun pos-ledger-folder (archive)
-  "Return ARCHIVE's ledger folder: beside it, else the legacy one inside."
+  "Return ARCHIVE's ledger folder: beside it, else the legacy one inside.
+For an archive named archives, the one ledger its scope has, wherever
+`pos-ledger-locations' finds it; with none, where it would be beside
+the archive."
+  (if (equal (file-name-nondirectory (directory-file-name archive)) "archives")
+      (or (pos-layout-ledger (pos-ledger-locations (pos-path-archive-scope archive)))
+          (expand-file-name (concat pos-ledger-integrity "/ledger")
+                            (file-name-directory (directory-file-name archive))))
+    (pos-ledger--folder-of archive)))
+
+(defun pos-ledger--folder-of (archive)
+  "Return the ledger folder of ARCHIVE, a directory not named archives.
+Beside it, else the legacy one inside."
   (let ((beside (expand-file-name (concat pos-ledger-integrity "/ledger")
                                   (file-name-directory (directory-file-name archive))))
         (inside (expand-file-name pos-ledger-directory archive)))
@@ -753,13 +765,15 @@ or legacy checkpoints are anywhere else at the scope."
 
 (defun pos-ledger--entry (archive)
   "Return the entry for ARCHIVE's scope in its node's configuration.
-ARCHIVE's scope is the directory holding it, and its node the nearest
+ARCHIVE's scope is the directory holding it, or holding the
+configuration directory that holds it, and its node the nearest
 directory at or above the scope that holds a configuration, as
 doc/pos-directory.txt names one.  The entry is the one under archives
 there whose scope is the scope's path from the node, or nil: for a
 scope it does not name, or beneath no node.  Refuse `config' for a
 configuration that is refused, and for two in one node."
-  (let* ((scope (file-name-directory (directory-file-name (expand-file-name archive))))
+  (let* ((scope (file-name-as-directory
+                 (pos-path-archive-scope (expand-file-name archive))))
          (node (locate-dominating-file scope #'pos-path-config-files))
          (files (and node (pos-path-config-files node))))
     (when (cdr files)
@@ -811,11 +825,12 @@ is not refused."
 
 (defun pos-ledger-kept-here (dir)
   "Return the archive of the scope DIR, if kept by a keeper and not here.
-DIR has a ledger beside where its archive would be, and no archives."
-  (let ((archive (expand-file-name "archives" dir)))
-    (and (not (file-exists-p archive)) (not (file-symlink-p archive))
-         (file-directory-p (expand-file-name (concat pos-ledger-integrity "/ledger")
-                                             dir))
+DIR has a ledger in an archive-integrity directory and no archives:
+the archive is the one beside that directory."
+  (let* ((layout (pos-ledger-locations dir))
+         (ledger (pos-layout-ledger layout))
+         (archive (and ledger (pos-ledger-paired-archive ledger))))
+    (and archive (not (pos-layout-archive layout))
          (pos-ledger-kept archive)
          archive)))
 
@@ -870,38 +885,45 @@ The system aliases /tmp and /var are allowed."
           ((null bs) nil)
           (t (string< (car as) (car bs))))))
 
+(defun pos-ledger--archive-at (dir)
+  "Return the archive of the scope DIR, or nil.
+The one archive `pos-ledger-locations' finds there, else the archive a
+keeper keeps that its ledger names."
+  (or (pos-layout-archive (pos-ledger-locations dir))
+      (pos-ledger-kept-here dir)))
+
 (defun pos-ledger-roots (root)
   "Return the outermost archives under ROOT, in path order.
-An archive a keeper keeps is found by its ledger, with no directory of
-its own."
+At each directory the walk visits, ROOT included, the configuration
+directories are probed for an archive, as `pos-ledger-locations' does;
+otherwise no hidden or underscored directory is entered, nor a found
+archive.  An archive a keeper keeps is found by its ledger, with no
+directory of its own.  A ROOT named archives is its scope's archive."
   (let ((root (file-truename (pos-ledger-checked root))) found)
-    (unless (or (file-directory-p root)
-                (and (equal (file-name-nondirectory root) "archives")
-                     (pos-ledger-kept-here (file-name-directory root))))
-      (pos-ledger-refuse 'root "Root must be an existing directory"))
     (if (equal (file-name-nondirectory root) "archives")
-        (list root)
+        (cond ((file-directory-p root) (list root))
+              ((pos-ledger-kept-here (pos-path-archive-scope root))
+               (list (pos-ledger-kept-here (pos-path-archive-scope root))))
+              (t (pos-ledger-refuse 'root "Root must be an existing directory")))
+      (unless (file-directory-p root)
+        (pos-ledger-refuse 'root "Root must be an existing directory"))
       (named-let walk ((dir root))
-        (when-let* ((kept (pos-ledger-kept-here dir)))
-          (push kept found))
+        (when-let* ((archive (pos-ledger--archive-at dir)))
+          (push archive found))
         (dolist (name (pos-ledger-entry-names dir))
           (let ((path (expand-file-name name dir)))
             (when (and (file-directory-p path)
-                       (not (string-match-p "\\`[._]" name)))
+                       (not (string-match-p "\\`[._]" name))
+                       (not (equal name "archives")))
               (when (file-symlink-p path)
                 (pos-ledger-refuse 'link "Symlink in discovery: %s" path))
-              (if (equal name "archives")
-                  (push path found)
-                (walk path))))))
+              (walk path)))))
       (sort found #'pos-ledger--path<))))
 
 (defun pos-ledger-anchor-base (root)
-  "Return the directory ROOT's checkpoints lie beside.
-ROOT itself, or its parent where ROOT is named archives."
-  (let ((root (file-truename (pos-ledger-checked root))))
-    (if (equal (file-name-nondirectory root) "archives")
-        (file-name-directory root)
-      root)))
+  "Return the scope whose checkpoints cover ROOT.
+ROOT itself, or its archive's scope where ROOT is named archives."
+  (pos-ledger-root-scope (file-truename (pos-ledger-checked root))))
 
 (defun pos-ledger-anchor-home (base)
   "Return the directory for new checkpoints beside BASE.
@@ -910,24 +932,36 @@ In the integrity directory where BASE has one, else the legacy anchors."
       (expand-file-name (concat pos-ledger-integrity "/checkpoints") base)
     (expand-file-name pos-ledger-anchors base)))
 
-(defun pos-ledger--anchor-homes (root)
-  "Return the checkpoint directories covering ROOT, legacy and current."
-  (let ((base (pos-ledger-anchor-base root)))
-    (list (expand-file-name pos-ledger-anchors base)
-          (expand-file-name (concat pos-ledger-integrity "/checkpoints") base))))
+(defun pos-ledger--checkpoint-home (archive)
+  "Return the directory for a new checkpoint of ARCHIVE's head.
+Its scope's one checkpoint directory, if it has one; else beside the
+ledger of ARCHIVE, in the archive-integrity directory there, or the
+legacy checkpoint directory of its scope where the ledger is legacy
+and that directory is absent."
+  (let* ((scope (pos-path-archive-scope archive))
+         (existing (pos-layout-checkpoints (pos-ledger-locations scope)))
+         (ledger (pos-ledger-folder archive))
+         (beside (directory-file-name (file-name-directory archive))))
+    (cond (existing)
+          ((not (equal (file-name-nondirectory ledger) pos-ledger-directory))
+           (expand-file-name "checkpoints" (file-name-directory ledger)))
+          ((file-directory-p (expand-file-name pos-ledger-integrity beside))
+           (expand-file-name (concat pos-ledger-integrity "/checkpoints") beside))
+          (t (expand-file-name pos-ledger-anchors scope)))))
 
 (defun pos-ledger-checkpoint-files (root archives)
-  "Return the checkpoint files covering ROOT and ARCHIVES."
+  "Return the checkpoint files covering ROOT and ARCHIVES.
+Those in the one checkpoint directory of each of their scopes."
   (let (files)
-    (dolist (folder (sort (delete-dups (mapcan #'pos-ledger--anchor-homes
-                                                (cons root archives)))
+    (dolist (folder (sort (delete-dups
+                           (delq nil (mapcar (lambda (path)
+                                               (pos-layout-checkpoints
+                                                (pos-ledger-locations
+                                                 (pos-ledger-root-scope path))))
+                                             (cons root archives))))
                           #'pos-ledger--path<))
-      (cond
-       ((not (or (file-exists-p folder) (file-symlink-p folder))))
-       ((or (file-symlink-p folder) (not (file-directory-p folder)))
-        (pos-ledger-refuse 'checkpoint "Invalid checkpoint directory"))
-       (t (setq files (append files (mapcar (lambda (n) (expand-file-name n folder))
-                                            (pos-ledger-entry-names folder)))))))
+      (setq files (append files (mapcar (lambda (n) (expand-file-name n folder))
+                                        (pos-ledger-entry-names folder)))))
     files))
 
 (defun pos-ledger--ledger-file-p (file)
@@ -1018,7 +1052,7 @@ With MODE, a recorded mode that has no write bit, the file has it."
 (defun pos-ledger-checkpoint-head (archive head)
   "Record HEAD for ARCHIVE in a checkpoint beside it."
   (let* ((bytes (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "archive"))))
-         (folder (pos-ledger-anchor-home (file-name-directory archive)))
+         (folder (pos-ledger--checkpoint-home archive))
          (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") folder)))
     (unless (file-exists-p file)
       (pos-ledger-write-new file bytes))))

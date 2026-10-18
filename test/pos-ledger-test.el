@@ -150,6 +150,22 @@ An alist of the fields the fixture records for the operation."
            `((archive . ,(funcall rel (pos-layout-archive layout)))
              (ledger . ,(funcall rel (pos-layout-ledger layout)))
              (checkpoints . ,(funcall rel (pos-layout-checkpoints layout))))))
+        ("read"
+         (let* ((layout (pos-ledger-locations (pos-ledger-root-scope root)))
+                (ledger (pos-layout-ledger layout))
+                (archive (or (pos-layout-archive layout)
+                             (and ledger (pos-ledger-paired-archive ledger)))))
+           `((archive . ,(funcall rel (pos-layout-archive layout)))
+             (ledger . ,(funcall rel (and archive (pos-ledger-folder archive))))
+             (checkpoints . ,(funcall rel (pos-layout-checkpoints layout)))
+             ,@(when archive
+                 (let ((history (pos-ledger-history archive)))
+                   `((head . ,(pos-history-head history))
+                     (events . ,(pos-history-events history))))))))
+        ("discover"
+         (let ((pos-ledger-ask-function (lambda (&rest _) (error "A keeper was asked")))
+               (pos-http-send-function (lambda (&rest _) (error "A request was sent"))))
+           `((archives . ,(vconcat (mapcar rel (pos-ledger-roots root)))))))
         ("write-target"
          (let ((target (pos-ledger-targets (pos-ledger-root-scope root))))
            `((selected . ,(pos-target-selected target))
@@ -163,10 +179,7 @@ An alist of the fields the fixture records for the operation."
 A case selects, resolves, reads, finds or targets what it records, or
 is refused with the kind and the paths it records.  None changes
 anything on disk."
-  (dolist (named (seq-filter (lambda (named)
-                               (member (alist-get 'operation (cdr named))
-                                       '("select" "resolve" "write-target")))
-                             (pos-fixtures "layout")))
+  (dolist (named (pos-fixtures "layout"))
     (ert-info ((car named))
       (pos-fixture-with (cdr named) tmp
         (let* ((dir (file-truename tmp))

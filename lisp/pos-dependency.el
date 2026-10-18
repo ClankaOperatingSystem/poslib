@@ -23,8 +23,9 @@
 ;; The dependency rule: a scope's canon refers to its own canon and
 ;; archive, and to its children's canon, and to nothing else in the
 ;; tree.  The scopes are the corpus's, pos-corpus.el.  A scope's
-;; archive is its archives/ and its attic is its attic/; the rest of
-;; what it holds is its canon.
+;; archive is its archives/, in one of its configuration directories
+;; or beside them, and its attic is its attic/; the rest of what it
+;; holds is its canon.
 ;;
 ;; A reference is an Org link by file or by ID, in the text or in a
 ;; property's value, an Org #+INCLUDE or #+SETUPFILE, a Markdown link,
@@ -102,7 +103,10 @@ project of one Org file holds that file alone."
                       ""
                     (substring (file-name-as-directory path) extent))))
         (cons best
-              (cond ((string-prefix-p "archives/" rest) 'archive)
+              (cond ((seq-some (lambda (archives)
+                                 (string-prefix-p (concat archives "/") rest))
+                               (pos-path-archive-paths))
+                     'archive)
                     ((and (string-prefix-p "attic/" rest) (not (equal rest "attic/")))
                      'attic)
                     (t 'canon)))))))
@@ -144,17 +148,18 @@ such as a tool's configuration, is inadvisable."
 (defun pos-dependency--archived (corpus target)
   "Return the same path as TARGET in its scope's archive, if a file is there.
 TARGET is a path of CORPUS's tree.  An attic keeps canon's paths, so
-attic/X is sought at archives/X."
+attic/X is sought at archives/X, in each place the scope's archive may
+be."
   (let ((place (pos-dependency-place corpus target)))
     (when (and place (memq (cdr place) '(canon attic))
                (not (pos-dependency--scope-file corpus (car place))))
       (let* ((dir (pos-scope-dir (car place)))
              (base (if (eq (cdr place) 'attic) (concat dir "attic/") dir))
-             (candidate (expand-file-name
-                         (concat "archives/"
-                                 (string-remove-prefix base (expand-file-name target)))
-                         dir)))
-        (when (file-exists-p candidate) candidate)))))
+             (rest (string-remove-prefix base (expand-file-name target))))
+        (seq-some (lambda (archives)
+                    (let ((candidate (expand-file-name (concat archives "/" rest) dir)))
+                      (and (file-exists-p candidate) candidate)))
+                  (pos-path-archive-paths))))))
 
 ;;;; References
 

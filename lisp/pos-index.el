@@ -180,13 +180,16 @@ file's name and bytes give, as visiting the file would."
 
 (defun pos-index--scopes (directory)
   "Return the scopes above DIRECTORY that have archives, nearest first.
-On disk, or kept by a keeper and known by their ledgers."
+On disk, beside a scope's configuration directories or in one, or kept
+by a keeper and known by their ledgers."
   (let (scopes (dir (file-name-as-directory (expand-file-name directory))))
     (while dir
-      (when (and (or (file-directory-p (expand-file-name "archives" dir))
-                     (pos-ledger-kept-here (directory-file-name dir)))
-                 (not (equal (file-name-nondirectory (directory-file-name dir))
-                             "archives")))
+      (when (and (not (member (file-name-nondirectory (directory-file-name dir))
+                              (cons "archives" pos-path-config-directories)))
+                 (or (seq-some (lambda (archives)
+                                 (file-directory-p (expand-file-name archives dir)))
+                               (pos-path-archive-paths))
+                     (pos-ledger-kept-here (directory-file-name dir))))
         (push dir scopes))
       (let ((parent (file-name-directory (directory-file-name dir))))
         (setq dir (unless (equal parent dir) parent))))
