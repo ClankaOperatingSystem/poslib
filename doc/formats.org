@@ -107,7 +107,7 @@ as ordinary content inside the parent's CID.
 The legacy layout, read until archives are migrated, keeps the ledger
 inside the archive, in =archives/.archive-integrity/=, and checkpoints in
 =.archive-integrity-anchors/= beside the root. An archive with a ledger in
-both places is refused (=ledger=).
+both places is refused (=ledger-location=).
 
 ** Layout
 

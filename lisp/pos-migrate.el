@@ -26,7 +26,7 @@
 ;; evidence renamed and its junk removed, its collections declared, and
 ;; its ledger moved beside it and closed by one conversion event.
 ;;
-;; Planning builds the result in _migrate/ beside the archive and
+;; Planning builds the result in _migrate/ in the archive's scope and
 ;; describes it; application replays the plan into a fresh copy, checks
 ;; it against the plan, and swaps it in.
 ;;
@@ -129,7 +129,9 @@ shape shows them, and the directories INCLUDE names."
                        (pos-ledger-capsule-p path)
                        (equal parent "capsules")
                        (member parent '("trials" "studies" "pipeline-trials"))
-                       (file-directory-p (expand-file-name "archives" path))))))
+                       (seq-some (lambda (archives)
+                                   (file-directory-p (expand-file-name archives path)))
+                                 (pos-path-archive-paths))))))
           (pos-migrate--walk stage))))
     ;; A collection holds all within it: none is declared inside another.
     (sort (seq-remove (lambda (c) (seq-some (lambda (o) (and (not (equal o c))
@@ -284,7 +286,7 @@ A path gone from ARCHIVE and from STAGE, whose counterpart at the same
 relative path beside ARCHIVE exists, as a withdrawn record's does in
 canon, or a record's archived since its link was written: the
 counterpart is meant.  RENAMES are those the stage made."
-  (let* ((scope (file-name-directory archive))
+  (let* ((scope (file-name-as-directory (pos-path-archive-scope archive)))
          (written-abs (expand-file-name path written))
          (counterpart
           (and (string-prefix-p (file-name-as-directory archive) written-abs)
@@ -305,7 +307,7 @@ it was written, in the archive as it is; one to another item of the
 archive has a target and no text yet.  RUMOURS holds (DESTINATION .
 TEXT) for each rumour the links need, dated DATE.  RENAMES and
 COLLECTIONS are as `pos-migrate--prepare' returns them."
-  (let ((scope (file-name-directory archive))
+  (let ((scope (file-name-as-directory (pos-path-archive-scope archive)))
         links rumours)
     (dolist (rel (seq-remove (lambda (rel) (pos-migrate--in-capsule-p rel collections stage))
                              files))
@@ -469,7 +471,7 @@ EXCLUDE names candidate collections that are not, INCLUDE directories
 that are though their shape does not show it; DATE, by default today's,
 dates rumours; LEDGER-ID names a ledger that has none."
   (let* ((archive (file-truename (directory-file-name (expand-file-name archive))))
-         (scope (file-name-directory archive))
+         (scope (file-name-as-directory (pos-path-archive-scope archive)))
          (root (file-truename (or root scope)))
          (date (or date (format-time-string "%Y-%m-%d")))
          (stage (expand-file-name (concat "_migrate/" (file-name-nondirectory archive) "/stage")
@@ -494,8 +496,9 @@ dates rumours; LEDGER-ID names a ledger that has none."
                                         rumours stage collections))
                  ;; The canon links that name paths the migration moves.
                  (moves (append (list (cons (concat (pos-migrate--rel archive root) "/" pos-ledger-directory)
-                                            (concat (pos-migrate--rel scope root) "/"
-                                                    pos-ledger-integrity "/ledger")))
+                                            (concat (pos-migrate--rel
+                                                     (file-name-directory archive) root)
+                                                    "/" pos-ledger-integrity "/ledger")))
                                 (mapcar (lambda (r) (cons (concat (pos-migrate--rel archive root) "/" (car r))
                                                           (concat (pos-migrate--rel archive root) "/" (cdr r))))
                                         renames)))
@@ -633,12 +636,13 @@ interrupted.  Return (EVENT-FILE . ROOT)."
   (let-alist plan
     (unless (and (eql .schema 1) (equal .operation "migrate"))
       (pos-ledger-refuse 'plan "Not a migration plan"))
-    (let* ((scope (file-name-directory .archive))
+    (let* ((scope (file-name-as-directory (pos-path-archive-scope .archive)))
+           (beside (file-name-directory .archive))
            (work (expand-file-name (concat "_migrate/" (file-name-nondirectory .archive)) scope))
            (build (expand-file-name "build" work))
            (previous (expand-file-name "previous" work))
-           (ledger (expand-file-name (concat pos-ledger-integrity "/ledger") scope))
-           (checkpoints (expand-file-name (concat pos-ledger-integrity "/checkpoints") scope))
+           (ledger (expand-file-name (concat pos-ledger-integrity "/ledger") beside))
+           (checkpoints (expand-file-name (concat pos-ledger-integrity "/checkpoints") beside))
            (event (expand-file-name .event.name ledger))
            (bytes (encode-coding-string .event.text 'utf-8)))
       ;; 1. Rebuild, then swap: previous holds the archive as it was.

@@ -367,7 +367,10 @@ Its repository's, else the outermost directory above it with an archive."
    (or (locate-dominating-file scope ".git")
        (let ((dir (file-name-as-directory (expand-file-name scope))) found)
          (while dir
-           (when (file-directory-p (expand-file-name "archives" dir)) (setq found dir))
+           (when (seq-some (lambda (archives)
+                             (file-directory-p (expand-file-name archives dir)))
+                           (pos-path-archive-paths))
+             (setq found dir))
            (let ((parent (file-name-directory (directory-file-name dir))))
              (setq dir (unless (equal parent dir) parent))))
          found)
