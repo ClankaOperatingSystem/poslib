@@ -21,7 +21,8 @@
 ;;; Commentary:
 
 ;; Run: make test.  The expectations are the shared fixtures in
-;; fixtures/json/ and fixtures/ledger/, which pyposlib meets too.
+;; fixtures/json/, fixtures/ledger/ and fixtures/layout/, which
+;; pyposlib meets too.
 
 ;;; Code:
 
@@ -118,6 +119,72 @@ and where a fixture has recorded its keeper, with what the keeper holds."
       (pos-test-writable archive)
       (delete-directory archive t)
       (pos-test-refused pos-ledger-refused "anchor" (pos-ledger-check dir)))))
+
+;;;; Layout
+
+(defun pos-ledger-test--snapshot (dir)
+  "Return every path beneath DIR with its type, size and mode, sorted."
+  (sort (mapcar (lambda (file)
+                  (let ((attributes (file-attributes file)))
+                    (list (file-relative-name file dir)
+                          (file-attribute-type attributes)
+                          (file-attribute-size attributes)
+                          (file-attribute-modes attributes))))
+                (directory-files-recursively dir "" t))
+        (lambda (a b) (string< (car a) (car b)))))
+
+(defun pos-ledger-test--relative (path dir)
+  "Return PATH relative to DIR, or :null for none."
+  (if path (file-relative-name path dir) :null))
+
+(defun pos-ledger-test--layout (fixture dir)
+  "Return what FIXTURE's operation gives in DIR, as its fields.
+An alist of the fields the fixture records for the operation."
+  (let-alist fixture
+    (let ((root (expand-file-name .root dir))
+          (rel (lambda (path) (pos-ledger-test--relative path dir))))
+      (pcase .operation
+        ("select" `((selected . ,(pos-ledger-select root))))
+        ("resolve"
+         (let ((layout (pos-ledger-locations (pos-ledger-root-scope root))))
+           `((archive . ,(funcall rel (pos-layout-archive layout)))
+             (ledger . ,(funcall rel (pos-layout-ledger layout)))
+             (checkpoints . ,(funcall rel (pos-layout-checkpoints layout))))))
+        ("write-target"
+         (let ((target (pos-ledger-targets (pos-ledger-root-scope root))))
+           `((selected . ,(pos-target-selected target))
+             (archive . ,(funcall rel (pos-target-archive target)))
+             (ledger . ,(funcall rel (pos-target-ledger target)))
+             (checkpoints . ,(funcall rel (pos-target-checkpoints target)))
+             (coverage . ,(pos-ledger-coverage root)))))))))
+
+(ert-deftest pos-ledger/each-layout-case-gives-what-its-fixture-records ()
+  "Each case in fixtures/layout/ gives what it records, or its refusal.
+A case selects, resolves, reads, finds or targets what it records, or
+is refused with the kind and the paths it records.  None changes
+anything on disk."
+  (dolist (named (seq-filter (lambda (named)
+                               (member (alist-get 'operation (cdr named))
+                                       '("select" "resolve" "write-target")))
+                             (pos-fixtures "layout")))
+    (ert-info ((car named))
+      (pos-fixture-with (cdr named) tmp
+        (let* ((dir (file-truename tmp))
+               (before (pos-ledger-test--snapshot dir)))
+          (let-alist (cdr named)
+            (if .error
+                (let ((refused (condition-case err
+                                   (progn (pos-ledger-test--layout (cdr named) dir) nil)
+                                 (pos-ledger-refused err))))
+                  (should refused)
+                  (should (equal .error (symbol-name (nth 1 refused))))
+                  (should (equal (append .paths nil)
+                                 (mapcar (lambda (path) (file-relative-name path dir))
+                                         (nth 4 refused)))))
+              (pcase-dolist (`(,field . ,value) (pos-ledger-test--layout (cdr named) dir))
+                (ert-info ((symbol-name field))
+                  (should (equal (alist-get field (cdr named)) value))))))
+          (should (equal before (pos-ledger-test--snapshot dir))))))))
 
 ;;;; Kept archives
 

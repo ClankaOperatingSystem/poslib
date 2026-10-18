@@ -31,6 +31,9 @@
 ;;   may have.
 ;; - `pos-path-config-names': the names a configuration file may have
 ;;   within its directory.
+;; - `pos-path-archive-scope': the scope an archive belongs to.
+;; - `pos-path-archive-paths': where a scope's archive may lie, relative
+;;   to the scope.
 
 ;;; Code:
 
@@ -71,6 +74,27 @@ One, as doc/pos-directory.txt allows, or none; two are refused by
 whoever reads them."
   (seq-filter (lambda (file) (file-exists-p (expand-file-name file dir)))
               (pos-path-config-paths)))
+
+;;;; Where a scope's archive is
+
+(defun pos-path-archive-paths ()
+  "Return every path a scope's archive may have, relative to the scope.
+The archive in each configuration directory, in the order of
+`pos-path-config-directories', then the visible archives of the
+legacy layout."
+  (append (mapcar (lambda (directory) (concat directory "/archives"))
+                  pos-path-config-directories)
+          '("archives")))
+
+(defun pos-path-archive-scope (archive)
+  "Return the scope ARCHIVE, a directory named archives, belongs to.
+The directory holding it, or, where that is a configuration directory,
+the directory holding that.  The value has no final slash."
+  (let ((parent (directory-file-name
+                 (file-name-directory (directory-file-name archive)))))
+    (if (member (file-name-nondirectory parent) pos-path-config-directories)
+        (directory-file-name (file-name-directory parent))
+      parent)))
 
 (provide 'pos-path)
 ;;; pos-path.el ends here
