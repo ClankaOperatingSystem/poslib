@@ -59,6 +59,7 @@
 (require 'cl-lib)
 (require 'pos-bytes)
 (require 'pos-git)
+(require 'pos-ledger)
 (require 'pos-lock)
 (require 'pos-node)
 (require 'pos-path)
@@ -217,12 +218,18 @@ anchored, directory-only Git patterns."
                                      (not (string-empty-p block))) "\n" "") block)))))
 
 (defun pos-tree--archive-scopes (dir boundaries exclusions &optional prefix)
-  "Find archive scopes below DIR, stopping at BOUNDARIES and configurations.
+  "Find archive scopes at and below DIR, up to BOUNDARIES and configurations.
 EXCLUSIONS are the node's, as `pos-node-exclusions' gives them: a
 directory they name is not looked into, though one named archives is
-a scope wherever it lies.  PREFIX is the path relative to the node,
+a scope wherever it lies, and so is a directory whose configuration
+directory holds archives.  PREFIX is the path relative to the node,
 or nil at its root."
   (let (scopes)
+    (when (seq-some (lambda (name)
+                      (let ((archive (expand-file-name (concat name "/archives") dir)))
+                        (and (file-directory-p archive) (not (file-symlink-p archive)))))
+                    pos-path-config-directories)
+      (push (if prefix (directory-file-name prefix) ".") scopes))
     (dolist (name (directory-files dir nil directory-files-no-dot-files-regexp))
       (let ((full (expand-file-name name dir)) (path (concat prefix name)))
         (unless (or (file-symlink-p full) (not (file-directory-p full))
@@ -257,15 +264,33 @@ REPO is the repository's node."
                   (when (or (pos-tree--repository-p at) (pos-path-config-files at))
                     (setq boundary t)))
                 boundary)
-        (let* ((path (expand-file-name "archives" (expand-file-name scope base)))
-               (within (file-relative-name path dir))
-               (entry (seq-find (lambda (e) (equal (alist-get 'scope e) scope)) entries)))
-          (cond
-           ((pos-tree--through-link-p dir within)
-            (pos-tree--find plan "path-taken" (pos-tree--rel plan path) "a symbolic link")
-            (setf (pos-tree--node-archive-refused repo) t))
-           ((equal (or (alist-get 'kept entry) "uncommitted") "uncommitted")
-            (push within (pos-tree--node-archive-paths repo)))))))))
+        (let ((entry (seq-find (lambda (e) (equal (alist-get 'scope e) scope)) entries)))
+          (dolist (path (pos-tree--archive-paths plan repo (expand-file-name scope base)))
+            (let ((within (file-relative-name path dir)))
+              (cond
+               ((pos-tree--through-link-p dir within)
+                (pos-tree--find plan "path-taken" (pos-tree--rel plan path) "a symbolic link")
+                (setf (pos-tree--node-archive-refused repo) t))
+               ((equal (or (alist-get 'kept entry) "uncommitted") "uncommitted")
+                (push within (pos-tree--node-archive-paths repo)))))))))))
+
+(defun pos-tree--archive-paths (plan repo scope)
+  "Return the paths of the archive of SCOPE, a directory, to exclude for PLAN.
+Each archive there is, beside SCOPE's configuration directories or in
+one; with none, the archive in the directory `pos-ledger-select'
+selects, which need not exist yet.  A selection refused is found
+config-refused, and REPO, the repository's node, is marked refused."
+  (or (seq-filter (lambda (path) (or (file-directory-p path) (file-symlink-p path)))
+                  (mapcar (lambda (rel) (expand-file-name rel scope))
+                          (pos-path-archive-paths)))
+      (condition-case err
+          (list (expand-file-name "archives"
+                                  (expand-file-name (pos-ledger-select scope) scope)))
+        (pos-ledger-refused
+         (pos-tree--find plan "config-refused" (pos-tree--rel plan scope)
+                         (format "%s: %s" (nth 1 err) (nth 2 err)))
+         (setf (pos-tree--node-archive-refused repo) t)
+         nil))))
 
 (defun pos-tree--archive-excludes (plan repo)
   "Add to PLAN the managed archive exclusions of REPO, a repository's node.
