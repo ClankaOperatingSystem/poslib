@@ -472,7 +472,9 @@ beneath it vendor is walked and attic is not, the reverse of the root."
 
 (ert-deftest pos-tree/archive-scopes-are-not-looked-for-in-excluded-directories ()
   "An archives directory beneath an excluded one is no scope of the node.
-One that is not excluded is, as before."
+One that is not excluded is, as before.  The node's own archive, which
+does not exist yet, is excluded in .clanka, where its configuration
+is and where a writer would make it."
   (pos-tree-test-with dir
     (let ((root (pos-tree-test-repository
                  (expand-file-name "root" dir)
@@ -481,7 +483,30 @@ One that is not excluded is, as before."
       (pos-tree-test-write root "kept/archives/evidence" "kept\n")
       (let ((action (seq-find (lambda (a) (equal (alist-get 'do a) "archive-excludes"))
                               (alist-get 'actions (pos-tree-plan root)))))
-        (should (equal ["archives" "kept/archives"] (alist-get 'paths action)))))))
+        (should (equal [".clanka/archives" "kept/archives"]
+                       (alist-get 'paths action)))))))
+
+(ert-deftest pos-tree/an-archive-in-a-configuration-directory-is-excluded-there ()
+  "An uncommitted archive in a scope's configuration directory is excluded there.
+The scope is found by that archive, as by one beside it; Git then
+ignores what is in the archive, and an archive beside its scope is
+still excluded where it is."
+  (pos-tree-test-with dir
+    (let ((root (pos-tree-test-repository
+                 (expand-file-name "root" dir)
+                 ".pos/config.yaml" "pos: 2\nprojects: projects/\n")))
+      (pos-tree-test-write root ".pos/archives/evidence" "root\n")
+      (pos-tree-test-write root "notes/.clankos/archives/evidence" "notes\n")
+      (pos-tree-test-write root "older/archives/evidence" "older\n")
+      (let ((action (seq-find (lambda (a) (equal (alist-get 'do a) "archive-excludes"))
+                              (alist-get 'actions (pos-tree-plan root)))))
+        (should (equal [".pos/archives" "notes/.clankos/archives" "older/archives"]
+                       (alist-get 'paths action))))
+      (pos-tree-ignore-archives root)
+      (dolist (file '(".pos/archives/evidence" "notes/.clankos/archives/evidence"
+                      "older/archives/evidence"))
+        (ert-info (file)
+          (should (eq 0 (car (pos-git root "check-ignore" "-q" file)))))))))
 
 (ert-deftest pos-tree/a-worktree-of-a-child-is-excluded-and-cloned ()
   "A declared worktree of a child is excluded and cloned on its branch."
