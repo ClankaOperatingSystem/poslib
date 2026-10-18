@@ -29,11 +29,11 @@
 (require 'pos-test-support)
 
 (defmacro pos-wrap-up-test-with-node (root &rest body)
-  "Evaluate BODY with ROOT a node with an empty archives/ and no journal."
+  "Evaluate BODY with ROOT a node with an empty archive and no journal."
   (declare (indent 1))
   `(pos-test-with-temp-dir dir
      (let ((,root (file-name-as-directory (file-truename dir))))
-       (make-directory (expand-file-name "archives" ,root))
+       (make-directory (pos-test-archived ,root) t)
        ,@body)))
 
 (defun pos-wrap-up-test-journal (root)
@@ -57,7 +57,7 @@ timestamp and the record's citation, which is what is returned."
     (let ((citation (pos-wrap-up root "The roof mended" "What happened.\n" "2026-10-14")))
       (should (string-match-p "\\`ipfs://bafk[a-z2-7]+\\'" citation))
       (should (equal "What happened.\n"
-                     (pos-test-text root "archives/journal/2026-10-14-the-roof-mended.org")))
+                     (pos-test-text root ".clankos/archives/journal/2026-10-14-the-roof-mended.org")))
       (should (string-match-p
                (concat "\\`:PROPERTIES:\n:ID: +[0-9a-f-]\\{36\\}\n:END:\n"
                        "#\\+TITLE: Journal\n\n"
@@ -82,7 +82,7 @@ The first keeps its handover tag and its other properties."
                  (string-match "The roof mended" journal)))
       (should (string-match-p ":DATE: +\\[2026-10-14 Wed\\]" journal)))
     (should (equal "Second.\n"
-                   (pos-test-text root "archives/journal/2026-10-15-the-gutter-cleared.org")))))
+                   (pos-test-text root ".clankos/archives/journal/2026-10-15-the-gutter-cleared.org")))))
 
 (ert-deftest pos-wrap-up/a-journal-that-is-there-keeps-what-it-has ()
   "The heading goes before the journal's first heading; its preamble stays."
@@ -105,7 +105,7 @@ Nothing is sealed and no journal is made."
     (should-error (pos-wrap-up root "Title" "Body.\n" "14/10/2026") :type 'user-error)
     (should-error (pos-wrap-up root "Title" "Body.\n" "2026-13-40") :type 'user-error)
     (should-not (file-exists-p (expand-file-name "journal.org" root)))
-    (should-not (file-exists-p (expand-file-name "archives/journal" root)))))
+    (should-not (file-exists-p (pos-test-archived root "journal")))))
 
 (ert-deftest pos-wrap-up/the-command-prints-the-citation-the-title-and-the-date ()
   "The command keeps the handover read from its input and prints one line.

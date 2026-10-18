@@ -234,8 +234,8 @@ no longer an id link: sealing resolved it."
     (pos-salvage root attic)
     ;; A hidden file is not sealed.
     (delete-file (expand-file-name ".draft.org" attic))
-    (make-directory (expand-file-name "archives" root))
-    (let* ((sealed (expand-file-name "archives/attic" root))
+    (make-directory (pos-test-archived root) t)
+    (let* ((sealed (pos-test-archived root "attic"))
            (seal (pos-seal-plan attic sealed))
            (relink (pos-relink-plan root seal)))
       (pos-test-approve seal)

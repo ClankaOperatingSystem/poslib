@@ -12,18 +12,18 @@
    "text": "pos: 2\nprojects: projects/\narchives:\n  - scope: projects/a\n    kept: remote\n    url: https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
   },
   {
-   "path": "projects/a/archive-integrity/checkpoints/7ed999916867a8f6352a609b2b56724cc1c4ef18791c2aa5e4ef307bc71ae64e.json",
+   "path": "projects/a/.clankos/archive-integrity/checkpoints/7ed999916867a8f6352a609b2b56724cc1c4ef18791c2aa5e4ef307bc71ae64e.json",
    "text": "{\"coverage\":\"archive\",\"heads\":[\"baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq\"],\"schema\":1}\n",
    "mode": 292
   },
   {
-   "path": "projects/a/archive-integrity/ledger/00000001-baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq.json",
+   "path": "projects/a/.clankos/archive-integrity/ledger/00000001-baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq.json",
    "text": "{\"add\":{\"trial/result.txt\":{\"cid\":\"bafkreihwuikppjp43igcz3uwmc37ykpvmspdy2fk2shcb2kqcn6jrej2na\",\"mode\":292,\"sha256\":\"f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68\",\"size\":6}},\"collections\":[],\"empty\":[],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeibzyhit5f35u5mte5ffc4befyszlijr4h7ynnsdj4ofxr6iv7b4dq\",\"schema\":3}",
    "mode": 292
   },
   {
    "path": "projects/a/report.org",
-   "text": "#+TITLE: A report\n\nIt rests on [[file:archives/trial/result.txt][the result]],\nand mentions [[file:../b/outside.txt][something outside]].\n"
+   "text": "#+TITLE: A report\n\nIt rests on [[file:.clankos/archives/trial/result.txt][the result]],\nand mentions [[file:../b/outside.txt][something outside]].\n"
   },
   {
    "path": "projects/b/outside.txt",
@@ -92,17 +92,17 @@
     "size": 230
    }
   },
-  "archive": "projects/a/archives",
+  "archive": "projects/a/.clankos/archives",
   "collections": [],
-  "destination": "projects/a/archives/report.org",
+  "destination": "projects/a/.clankos/archives/report.org",
   "inventory_sha256": "4d449e080445acdfe716641bf43d0af071ab56f8a932604fcc4974eab56c8736",
   "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
-  "ledger": "projects/a/archive-integrity/ledger",
+  "ledger": "projects/a/.clankos/archive-integrity/ledger",
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
   "links": [
    {
     "file": "report.org",
-    "from": "file:archives/trial/result.txt",
+    "from": "file:.clankos/archives/trial/result.txt",
     "kind": "cid",
     "offset": 33,
     "to": "ipfs://bafybeidqtowkno6plrwjjyfdnhczxlnsomr2vm27g2o4agx3tr4ywyv6f4/result.txt"
@@ -111,14 +111,14 @@
     "file": "report.org",
     "from": "file:../b/outside.txt",
     "kind": "rumour",
-    "offset": 94,
+    "offset": 103,
     "to": "ipfs://bafkreicqbulfhlickr6gwcidu3hjhiamf3vadgk5v2e77wm4lkik56spvm"
    }
   ],
   "number": 2,
   "operation": "seal",
   "originals": {
-   "report.org": "24923b1ca592808b9f7845e842ee726d80f430c58488562100cca742fa3aeb5d"
+   "report.org": "a00a0c911692686a0037298f209e2416a7762abb9e5b1a675bd944fff34cd839"
   },
   "previous": "baguqeeraxjrkib4cmtmy2uursvtpzdxofnbfuqxkdpezs47oouan5h5w3wqq",
   "rumours": [
@@ -137,7 +137,7 @@
  },
  "report": [
   {
-   "archive": "projects/a/archives",
+   "archive": "projects/a/.clankos/archives",
    "kept": "https://keeper.example/ledgers/0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
    "keeper": null,
    "head": "baguqeera6yskd7guq72vphrvkjeaqkywswe3dif3w4nnlseuxfvwvjivtuoq",

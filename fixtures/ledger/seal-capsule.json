@@ -7,7 +7,7 @@
  "destination": "scope/archives/cap",
  "tree": [
   {
-   "path": "scope/archives",
+   "path": "scope/.clankos/archives",
    "directory": true
   },
   {
@@ -38,13 +38,13 @@
     "size": 69
    }
   },
-  "archive": "scope/archives",
+  "archive": "scope/.clankos/archives",
   "collections": [
    "cap"
   ],
-  "destination": "scope/archives/cap",
+  "destination": "scope/.clankos/archives/cap",
   "inventory_sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
-  "ledger": "scope/archive-integrity/ledger",
+  "ledger": "scope/.clankos/archive-integrity/ledger",
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
   "links": [],
   "number": 1,
@@ -57,7 +57,7 @@
  },
  "report": [
   {
-   "archive": "scope/archives",
+   "archive": "scope/.clankos/archives",
    "kept": null,
    "keeper": null,
    "head": "baguqeeralrzqy3cfrcmdngscgx7gvccb4lvedq72xwwkfplowbtf67cvkora",

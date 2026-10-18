@@ -221,12 +221,20 @@ Return (STATUS . OUTPUT), OUTPUT the bytes the program printed."
   "Apply PLAN as a reviewer approves it: with the hash of its own bytes."
   (pos-seal-apply plan (pos-bytes-sha (pos-bytes-json plan))))
 
+(defconst pos-test-archive ".clankos/archives"
+  "Where a scope's archive is, relative to the scope, in a test's tree.")
+
+(defun pos-test-archived (scope &optional path)
+  "Return PATH in SCOPE's archive, or the archive itself, in a test's tree."
+  (expand-file-name (concat pos-test-archive (and path (concat "/" path))) scope))
+
 (defmacro pos-test-with-scope (&rest body)
-  "Evaluate BODY with `scope' a temporary scope holding archives/ and an item."
+  "Evaluate BODY with `scope' a temporary scope holding an archive and an item.
+The archive is in the scope's .clankos, where a writer there writes."
   (declare (indent 0))
   `(pos-test-with-temp-dir dir
      (let ((scope (expand-file-name "scope" dir)))
-       (make-directory (expand-file-name "archives" scope) t)
+       (make-directory (pos-test-archived scope) t)
        (pos-test-write-bytes (expand-file-name "trial/result.md" scope) "result")
        ,@body)))
 
@@ -239,7 +247,7 @@ Return (STATUS . OUTPUT), OUTPUT the bytes the program printed."
   "Seal SCOPE's trial into its archive; return the archive."
   (let ((plan (pos-test-scope-plan scope)))
     (pos-test-approve plan)
-    (file-truename (expand-file-name "archives" scope))))
+    (file-truename (pos-test-archived scope))))
 
 ;;;; Keepers
 

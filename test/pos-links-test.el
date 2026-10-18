@@ -62,11 +62,11 @@
 (defun pos-links-test-seal (scope item)
   "Seal SCOPE's ITEM, a directory under it, into SCOPE's archive.
 Return the archive's true name."
-  (make-directory (expand-file-name "archives" scope) t)
+  (make-directory (pos-test-archived scope) t)
   (let ((plan (pos-seal-plan (expand-file-name item scope)
-                             (expand-file-name (concat "archives/" item) scope))))
+                             (expand-file-name (concat pos-test-archive "/" item) scope))))
     (pos-seal-apply plan (secure-hash 'sha256 (pos-bytes-json plan)))
-    (file-truename (expand-file-name "archives" scope))))
+    (file-truename (pos-test-archived scope))))
 
 ;;;; Finding
 

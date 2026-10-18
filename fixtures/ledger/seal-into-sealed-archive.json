@@ -6,26 +6,26 @@
  "destination": "scope/archives/second.md",
  "tree": [
   {
-   "path": "scope/archive-integrity/checkpoints/eb5b929f629c1b3fe738ef1847d49f9cb0a2cbb0990d65a8ab561e9d9be89f69.json",
+   "path": "scope/.clankos/archive-integrity/checkpoints/eb5b929f629c1b3fe738ef1847d49f9cb0a2cbb0990d65a8ab561e9d9be89f69.json",
    "text": "{\"coverage\":\"archive\",\"heads\":[\"85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54\"],\"schema\":1}\n",
    "mode": 292
   },
   {
-   "path": "scope/archive-integrity/ledger/00000001-85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54.json",
+   "path": "scope/.clankos/archive-integrity/ledger/00000001-85841ac002cd03915555e749ab1a69fa55377536813e9699c39b74cc371dca54.json",
    "text": "{\"add\":{\"trial/README.org\":{\"cid\":\"bafkreifvowzdhsiwhvfdd7thpsl4iwmst4czmhgft3xkjfzufq3clhxtvy\",\"mode\":292,\"sha256\":\"b575b233c9163d4a31fe677c97c459929f05961cc59eeea497342c36259ef3ae\",\"size\":47},\"trial/sub/x.txt\":{\"cid\":\"bafkreib2n2yhsdzzvsd4stzyk2zn2lc5cehgqelaejq2tkjd2o5shloiw4\",\"mode\":292,\"sha256\":\"3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7\",\"size\":4}},\"collections\":[\"trial\"],\"item\":\"trial\",\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"root\":\"bafybeicfmyfehbtwoleqopwpan6obd4fy6gnw63egclnpdquktgtkfyerm\",\"schema\":2}\n",
    "mode": 292
   },
   {
-   "path": "scope/archives/trial/README.org",
+   "path": "scope/.clankos/archives/trial/README.org",
    "text": "#+TITLE: Trial\n#+COLLECTION: t\n\nWhat it holds.\n",
    "mode": 292
   },
   {
-   "path": "scope/archives/trial/empty",
+   "path": "scope/.clankos/archives/trial/empty",
    "directory": true
   },
   {
-   "path": "scope/archives/trial/sub/x.txt",
+   "path": "scope/.clankos/archives/trial/sub/x.txt",
    "text": "data",
    "mode": 292
   },
@@ -48,11 +48,11 @@
     "size": 11
    }
   },
-  "archive": "scope/archives",
+  "archive": "scope/.clankos/archives",
   "collections": [],
-  "destination": "scope/archives/second.md",
+  "destination": "scope/.clankos/archives/second.md",
   "inventory_sha256": "8286b878ce504dba7d6cc3483da60bcd4b3969b756df0fc33b599015b6a090f8",
-  "ledger": "scope/archive-integrity/ledger",
+  "ledger": "scope/.clankos/archive-integrity/ledger",
   "ledger_id": "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1",
   "links": [],
   "number": 2,
@@ -65,7 +65,7 @@
  },
  "report": [
   {
-   "archive": "scope/archives",
+   "archive": "scope/.clankos/archives",
    "changed": [],
    "events": 2,
    "files": 3,

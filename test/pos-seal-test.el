@@ -62,7 +62,7 @@ recording must be played out, and the item gone from where it lay."
                                     (expand-file-name .destination dir) .ledger_id
                                     (or .date "2026-09-28")))
                (result (pos-test-approve plan))
-               (scope (file-name-directory (alist-get 'archive plan))))
+               (scope (pos-path-archive-scope (alist-get 'archive plan))))
           `((plan . ,(pos-seal-test-relative-plan plan dir))
             (event . ((name . ,(file-name-nondirectory (car result)))
                       (encoded . ,(decode-coding-string (pos-bytes-read (car result))
@@ -91,7 +91,7 @@ recording must be played out, and the item gone from where it lay."
   (pos-test-with-scope
     (let* ((plan (pos-test-scope-plan scope))
            (event (car (pos-test-approve plan)))
-           (file (expand-file-name "archives/trial/result.md" scope)))
+           (file (pos-test-archived scope "trial/result.md")))
       (should (zerop (logand (file-modes file) #o222)))
       (should (equal #o444 (logand (file-modes event) #o777)))
       (should (equal (pos-cid-file file)
@@ -103,7 +103,7 @@ Root included, without reading the archive."
   (pos-test-with-scope
     (let* ((plan (pos-test-scope-plan scope))
            (root (cdr (pos-test-approve plan)))
-           (archive (expand-file-name "archives" scope))
+           (archive (pos-test-archived scope))
            (by-path (lambda (cids)
                       (sort (copy-sequence cids)
                             (lambda (a b) (string< (car a) (car b))))))
@@ -123,7 +123,7 @@ after review."
       (should-error (pos-test-approve plan)
                     :type 'pos-ledger-refused)
       (should (file-exists-p (expand-file-name "trial/result.md" scope)))
-      (should-not (file-exists-p (expand-file-name "archives/trial" scope))))))
+      (should-not (file-exists-p (pos-test-archived scope "trial"))))))
 
 (ert-deftest pos-seal/an-interrupted-seal-resumes ()
   "After the move but before the event, the same plan finishes the work;
@@ -131,28 +131,27 @@ applied twice, it adds nothing."
   (pos-test-with-scope
     (let* ((plan (pos-test-scope-plan scope))
            (hash (pos-bytes-sha (pos-bytes-json plan))))
-      (make-directory (expand-file-name "archives" scope) t)
-      (rename-file (expand-file-name "trial" scope) (expand-file-name "archives/trial" scope))
+      (make-directory (pos-test-archived scope) t)
+      (rename-file (expand-file-name "trial" scope) (pos-test-archived scope "trial"))
       (let ((first (pos-seal-apply plan hash)))
         (should (equal first (pos-seal-apply plan hash))))
-      (should (equal 1 (pos-history-events (pos-ledger-history (expand-file-name "archives" scope))))))))
+      (should (equal 1 (pos-history-events (pos-ledger-history (pos-test-archived scope))))))))
 
 (ert-deftest pos-seal/a-new-record-is-staged-then-sealed ()
   "New bytes are staged beside the archive, then sealed like any item."
   (pos-test-with-scope
-    (let* ((plan (pos-seal-stage "handover\n" (expand-file-name "archives/journal/h.md" scope)))
+    (let* ((plan (pos-seal-stage "handover\n" (pos-test-archived scope "journal/h.md")))
            (staged (alist-get 'source plan)))
       (should (string-prefix-p (file-truename (expand-file-name "_seal/" scope)) staged))
       (pos-test-approve plan)
       (should-not (file-exists-p staged))
-      (should (equal "handover\n" (pos-bytes-read (expand-file-name "archives/journal/h.md"
-                                                                    scope)))))))
+      (should (equal "handover\n" (pos-bytes-read (pos-test-archived scope "journal/h.md")))))))
 
 (ert-deftest pos-seal/a-new-record-staged-again-replaces-the-first ()
   "Staging for one destination twice leaves one staged file, the second's.
 The first plan is refused, the second seals, and _seal is gone."
   (pos-test-with-scope
-    (let* ((target (expand-file-name "archives/journal/h.md" scope))
+    (let* ((target (pos-test-archived scope "journal/h.md"))
            (first (pos-seal-stage "draft\n" target))
            (second (pos-seal-stage "handover\n" target)))
       (should (equal (alist-get 'source first) (alist-get 'source second)))
@@ -169,24 +168,25 @@ The first plan is refused, the second seals, and _seal is gone."
 (ert-deftest pos-seal/a-new-record-may-start-an-archive ()
   "A scope with no archives/ yet has an empty one; sealing makes it."
   (pos-test-with-scope
-    (delete-directory (expand-file-name "archives" scope))
-    (let ((plan (pos-seal-stage "first\n" (expand-file-name "archives/first.txt" scope))))
+    (delete-directory (pos-test-archived scope))
+    (let ((plan (pos-seal-stage "first\n" (pos-test-archived scope "first.txt"))))
       (should (equal 1 (alist-get 'number plan)))
       (pos-test-approve plan)
-      (should (equal "first\n" (pos-bytes-read (expand-file-name "archives/first.txt"
-                                                                 scope))))
-      (should (file-directory-p (expand-file-name "archive-integrity/ledger" scope))))))
+      (should (equal "first\n" (pos-bytes-read (pos-test-archived scope "first.txt"))))
+      (should (file-directory-p (expand-file-name ".clankos/archive-integrity/ledger" scope))))))
 
 (ert-deftest pos-seal/a-refused-new-record-leaves-nothing-staged ()
   "When planning fails, the staged bytes and an emptied _seal/ go."
   (pos-test-with-scope
-    (pos-test-write-bytes (expand-file-name "archives/taken.txt" scope) "taken")
-    (should-error (pos-seal-stage "new\n" (expand-file-name "archives/taken.txt" scope))
+    (pos-test-write-bytes (pos-test-archived scope "taken.txt") "taken")
+    (should-error (pos-seal-stage "new\n" (pos-test-archived scope "taken.txt"))
                   :type 'pos-ledger-refused)
     (should-not (file-exists-p (expand-file-name "_seal" scope)))))
 
 (ert-deftest pos-seal/a-new-record-s-links-are-resolved ()
-  "A new record's links are found, and read as written from its destination."
+  "A new record's links are found, and read as written from its destination.
+The destination as it is spelled: here beside the scope, where its
+archive was before it moved into the scope's configuration directory."
   (pos-test-with-scope
     (pos-test-write-bytes (expand-file-name "notes.org" scope) "#+TITLE: Notes\n")
     (let* ((plan (pos-seal-stage "See [notes](../../notes.org).\n"
@@ -207,14 +207,14 @@ A directory that is not there is refused, and nothing is left staged."
   (pos-test-with-scope
     (pos-test-write-bytes (expand-file-name "notes.org" scope) "#+TITLE: Notes\n")
     (let* ((plan (pos-seal-stage "See [notes](notes.org).\n"
-                                 (expand-file-name "archives/journal/h.md" scope)
+                                 (pos-test-archived scope "journal/h.md")
                                  nil scope))
            (links (alist-get 'links plan)))
       (should (equal "rumour" (alist-get 'kind (aref links 0))))
       (should (string-match-p "Rumour of notes.org"
                               (alist-get 'text (aref (alist-get 'rumours plan) 0)))))
     (let ((staged (directory-files (expand-file-name "_seal" scope) nil "\\`new-")))
-      (should-error (pos-seal-stage "new\n" (expand-file-name "archives/journal/i.md" scope)
+      (should-error (pos-seal-stage "new\n" (pos-test-archived scope "journal/i.md")
                                     nil (expand-file-name "nowhere" scope))
                     :type 'pos-ledger-refused)
       (should (equal staged
@@ -265,7 +265,7 @@ links."
                              " [[ipfs://" notes "::#other]]\n"
                              "[[ipfs://" rumour "][canon]] [[broken:id:absent-id][gone]]\n")
                      (decode-coding-string
-                      (pos-bytes-read (expand-file-name "archives/trial/index.org" scope))
+                      (pos-bytes-read (pos-test-archived scope "trial/index.org"))
                       'utf-8))))))
 
 (ert-deftest pos-seal/an-id-two-files-hold-is-refused ()
@@ -288,17 +288,17 @@ a rumour already sealed word for word is cited, not sealed again."
                   (pos-test-write-bytes (expand-file-name (concat name "/r.md") scope)
                                         "See [notes](../notes.org).\n")
                   (let ((plan (pos-seal-plan (expand-file-name name scope)
-                                             (expand-file-name (concat "archives/" name) scope)
+                                             (expand-file-name (concat pos-test-archive "/" name) scope)
                                              nil "2026-09-28")))
                     (pos-test-approve plan)
                     (alist-get 'destination (aref (alist-get 'rumours plan) 0))))))
       (should-not (equal (funcall seal "first") (funcall seal "second")))
-      (should (equal 4 (pos-history-events (pos-ledger-history (expand-file-name "archives" scope))))))))
+      (should (equal 4 (pos-history-events (pos-ledger-history (pos-test-archived scope))))))))
 
 (ert-deftest pos-seal/a-program-applies-its-own-plan-explicitly ()
   "The write-new command with --apply seals at once; without it, a plan."
   (pos-test-with-scope
-    (let* ((target (expand-file-name "archives/journal/h.md" scope))
+    (let* ((target (pos-test-archived scope "journal/h.md"))
            (run (lambda (&rest args)
                   (apply #'pos-test-program "handover\n" "pos-seal-batch"
                          "write-new" target args))))
@@ -314,7 +314,7 @@ a rumour already sealed word for word is cited, not sealed again."
   "The seal command with --apply moves and seals at once; without it, a plan."
   (pos-test-with-scope
     (let* ((source (expand-file-name "trial" scope))
-           (target (expand-file-name "archives/trial" scope))
+           (target (pos-test-archived scope "trial"))
            (run (lambda (&rest args)
                   (car (apply #'pos-test-program nil "pos-seal-batch"
                               "seal" source target args)))))
@@ -322,7 +322,7 @@ a rumour already sealed word for word is cited, not sealed again."
       (should-not (file-exists-p target))
       (should (equal 0 (funcall run "--apply")))
       (should (file-exists-p (expand-file-name "result.md" target)))
-      (should (equal 1 (pos-history-events (pos-ledger-history (expand-file-name "archives" scope))))))))
+      (should (equal 1 (pos-history-events (pos-ledger-history (pos-test-archived scope))))))))
 
 (ert-deftest pos-seal/a-staging-directory-left-empty-is-not-sealed ()
   "An empty _seal in an item is removed and no event records it.
@@ -347,7 +347,7 @@ a _seal that holds something else stays."
   (pos-test-with-scope
     (let ((seal (lambda (name)
                   (let ((plan (pos-seal-stage "record\n" (expand-file-name
-                                                          (concat "archives/" name) scope))))
+                                                          (concat pos-test-archive "/" name) scope))))
                     (pos-test-approve plan)))))
       (funcall seal "first.txt")
       (should-not (file-exists-p (expand-file-name "_seal" scope)))
@@ -431,9 +431,9 @@ The rumour names where it pointed; the target is not read."
       (let ((before (pos-cid-directory archive)))
         (pos-test-scope-sealed scope)
         (should (equal before (pos-cid-directory
-                               (expand-file-name "archives/trial/archives" scope))))
+                               (pos-test-archived scope "trial/archives"))))
         (should (file-directory-p
-                 (expand-file-name "archives/trial/archives/old/_seal" scope)))))))
+                 (pos-test-archived scope "trial/archives/old/_seal")))))))
 
 ;;;; Sealing to a keeper
 
@@ -566,6 +566,68 @@ may hold."
          ("remote.origin" . "https://forge.example/some/one.git")
          ("remote.mirror" . "git@forge.example:some/one.git"))
        (pos-seal-claims (funcall plan) "the hash")))))
+
+;;;; Where a writer writes
+
+(ert-deftest pos-seal/a-writer-writes-in-the-selected-directory ()
+  "A seal and a checkpoint at a scope write in the directory selected there.
+For each configuration directory, holding the scope's configuration or
+standing bare, and for none, where .clankos is made: the archive and
+its bookkeeping are made there, nothing visible beside them, and no
+configuration file is made."
+  (dolist (case '((".clanka" . "config.yaml") (".clankos" . "config.yml")
+                  (".pos" . "config.yaml") (".clanka") (".pos") (nil)))
+    (ert-info ((format "%S" case))
+      (pos-test-with-temp-dir dir
+        (let* ((scope (expand-file-name "scope" (file-truename dir)))
+               (selected (or (car case) ".clankos")))
+          (pos-test-write-bytes (expand-file-name "trial/result.md" scope) "result")
+          (cond ((cdr case)
+                 (pos-test-write-bytes (expand-file-name (concat (car case) "/" (cdr case))
+                                                         scope)
+                                       "pos: 2\n"))
+                ((car case) (make-directory (expand-file-name (car case) scope) t)))
+          (let ((plan (pos-seal-plan (expand-file-name "trial" scope)
+                                     (expand-file-name "archives/trial" scope))))
+            (should (equal (expand-file-name (concat selected "/archives") scope)
+                           (alist-get 'archive plan)))
+            (pos-test-approve plan))
+          (should (equal (expand-file-name (concat selected "/archive-integrity/checkpoints")
+                                           scope)
+                         (pos-checkpoint-record scope)))
+          (should (file-exists-p (expand-file-name (concat selected "/archives/trial/result.md")
+                                                   scope)))
+          (should (file-directory-p
+                   (expand-file-name (concat selected "/archive-integrity/ledger") scope)))
+          (should-not (file-exists-p (expand-file-name "archives" scope)))
+          (should-not (file-exists-p (expand-file-name "archive-integrity" scope)))
+          (unless (cdr case)
+            (should-not (pos-path-config-files scope))))))))
+
+(ert-deftest pos-seal/a-writer-refuses-an-archive-beside-its-scope ()
+  "A visible archives/ or archive-integrity/ at a scope refuses every writer.
+Sealing, staging a new record and checkpointing are refused as
+relocation-required, naming what lies beside the scope, and nothing
+is moved or made."
+  (dolist (beside '("archives" "archive-integrity"))
+    (ert-info (beside)
+      (pos-test-with-temp-dir dir
+        (let ((scope (expand-file-name "scope" (file-truename dir))))
+          (pos-test-write-bytes (expand-file-name "trial/result.md" scope) "result")
+          (make-directory (expand-file-name beside scope) t)
+          (dolist (write (list (lambda () (pos-seal-plan (expand-file-name "trial" scope)
+                                                         (expand-file-name "archives/trial"
+                                                                           scope)))
+                               (lambda () (pos-seal-stage "new\n"
+                                                          (expand-file-name "archives/new.md"
+                                                                            scope)))
+                               (lambda () (pos-checkpoint-record scope))))
+            (let ((refused (should-error (funcall write) :type 'pos-ledger-refused)))
+              (should (eq 'relocation-required (nth 1 refused)))
+              (should (equal (list (expand-file-name beside scope)) (nth 4 refused)))))
+          (should (equal (list beside "trial")
+                         (pos-ledger-entry-names scope)))
+          (should (file-exists-p (expand-file-name "trial/result.md" scope))))))))
 
 (provide 'pos-seal-test)
 ;;; pos-seal-test.el ends here

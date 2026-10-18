@@ -40,9 +40,9 @@ Return the commit's hash."
   (pos-test-git root "rev-parse" "HEAD"))
 
 (defun pos-facts-test-seal (root rel text)
-  "Seal TEXT as REL in the archive at ROOT's archives/."
-  (make-directory (expand-file-name "archives" root) t)
-  (pos-test-approve (pos-seal-stage text (expand-file-name rel (expand-file-name "archives" root)))))
+  "Seal TEXT as REL in the archive of ROOT."
+  (make-directory (pos-test-archived root) t)
+  (pos-test-approve (pos-seal-stage text (expand-file-name rel (pos-test-archived root)))))
 
 (ert-deftest pos-facts/commits-and-events-after-a-commit-are-listed ()
   "The report lists the commits after the one named, oldest first, then the events.

@@ -46,8 +46,8 @@
       (pos-test-write-bytes (expand-file-name (concat (car item) "/" (car file)) scope)
                             (cdr file)))
     (pos-test-approve (pos-seal-plan (expand-file-name (car item) scope)
-                                     (expand-file-name (concat "archives/" (car item)) scope))))
-  (file-truename (expand-file-name "archives" scope)))
+                                     (expand-file-name (concat pos-test-archive "/" (car item)) scope))))
+  (file-truename (pos-test-archived scope)))
 
 (defun pos-search-test-shape (hits)
   "Return HITS as (REF FIRST LAST PASSAGE) each, for comparing."
@@ -62,7 +62,7 @@ The scope holds the sealed items, and the CIDs are its fold."
   (declare (indent 0))
   `(pos-test-with-temp-dir dir
      (let* ((scope (expand-file-name "scope" dir))
-            (_ (make-directory (expand-file-name "archives" scope) t))
+            (_ (make-directory (pos-test-archived scope) t))
             (archive (pos-search-test-sealed scope))
             (cids (pos-ledger-fold-cids archive)))
        (ignore scope archive cids)
@@ -156,14 +156,14 @@ Each hit names its file by its own CID, there being no item."
 (defun pos-search-test-kept (dir)
   "Make DIR a scope with a kept archive; return the archive path.
 Its ledger lies beside where the archive would be, and nothing is on disk."
-  (make-directory (expand-file-name "archive-integrity/ledger" dir) t)
+  (make-directory (expand-file-name ".clankos/archive-integrity/ledger" dir) t)
   (make-directory (expand-file-name ".pos" dir) t)
   (pos-test-write-bytes
    (expand-file-name ".pos/config.yaml" dir)
    (concat "pos: 2\narchives:\n  - scope: \".\"\n    kept: remote\n"
            "    ledger: 0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\n"
            "    url: \"https://keeper.example/ledgers/0f1e2d3c\"\n"))
-  (expand-file-name "archives" dir))
+  (pos-test-archived dir))
 
 (ert-deftest pos-search/a-scope-s-archives-are-searched-each-by-what-reaches-it ()
   "Under one root, each archive is searched by what reaches it.
@@ -176,20 +176,20 @@ that one, and one none enrols is absent."
                   (passage . "result")))
            (keeper (make-pos-search-test-keeper :modes '("literal") :hits (list hit)))
            (pos-remote-keeper-function (lambda (_url) keeper)))
-      (make-directory (expand-file-name "archives" other) t)
+      (make-directory (pos-test-archived other) t)
       (pos-test-write-bytes (expand-file-name "note/n.txt" other) "a result\nno\nanother result\n")
       (pos-test-approve (pos-seal-plan (expand-file-name "note" other)
-                                       (expand-file-name "archives/note" other)))
-      (let* ((note (cdr (assoc "note" (pos-ledger-fold-cids (expand-file-name "archives" other)))))
+                                       (pos-test-archived other "note")))
+      (let* ((note (cdr (assoc "note" (pos-ledger-fold-cids (pos-test-archived other)))))
              (found (pos-search-scope dir "result")))
         (should (equal `((,kept ("ipfs://bafkept/result.txt" 1 1 "result"))
-                         (,(file-truename (expand-file-name "archives" other))
+                         (,(file-truename (pos-test-archived other))
                           (,(concat "ipfs://" note "/n.txt") 1 1 "a result")
                           (,(concat "ipfs://" note "/n.txt") 3 3 "another result")))
                        (mapcar (lambda (a) (cons (car a) (pos-search-test-shape (cdr a)))) found)))
         (should (equal '(1 1) (mapcar (lambda (a) (length (cdr a)))
                                       (pos-search-scope dir "result" nil 2))))
-        (should (equal (list (file-truename (expand-file-name "archives" other)))
+        (should (equal (list (file-truename (pos-test-archived other)))
                        (mapcar #'car (pos-search-scope dir "result" nil nil note))))
         (should (equal (list kept) (mapcar #'car (pos-search-scope dir "result" nil nil "bafkept"))))
         (pos-test-refused pos-ledger-refused "absent"
