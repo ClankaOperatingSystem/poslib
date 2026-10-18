@@ -1,0 +1,13 @@
+{
+ "id": "S05",
+ "operation": "select",
+ "description": "With no configuration, the sole bare candidate .clanka is reused.",
+ "tree": [
+  {
+   "path": ".clanka",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "selected": ".clanka"
+}

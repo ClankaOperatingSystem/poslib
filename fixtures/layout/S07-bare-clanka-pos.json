@@ -1,0 +1,21 @@
+{
+ "id": "S07",
+ "operation": "select",
+ "description": "Several bare candidates and no configuration are ambiguous.",
+ "tree": [
+  {
+   "path": ".clanka",
+   "directory": true
+  },
+  {
+   "path": ".pos",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "error": "directory-ambiguity",
+ "paths": [
+  ".clanka",
+  ".pos"
+ ]
+}

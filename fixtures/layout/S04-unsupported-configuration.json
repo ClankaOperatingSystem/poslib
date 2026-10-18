@@ -1,0 +1,16 @@
+{
+ "id": "S04",
+ "operation": "select",
+ "description": "A sole configuration of an unknown version is refused.",
+ "tree": [
+  {
+   "path": ".clankos/config.yml",
+   "text": "pos: 1\n"
+  }
+ ],
+ "root": ".",
+ "error": "config",
+ "paths": [
+  ".clankos/config.yml"
+ ]
+}

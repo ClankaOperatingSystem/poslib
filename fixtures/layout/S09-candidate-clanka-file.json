@@ -1,0 +1,16 @@
+{
+ "id": "S09",
+ "operation": "select",
+ "description": "A file at the candidate path .clanka is refused.",
+ "tree": [
+  {
+   "path": ".clanka",
+   "text": "not a directory\n"
+  }
+ ],
+ "root": ".",
+ "error": "config",
+ "paths": [
+  ".clanka"
+ ]
+}

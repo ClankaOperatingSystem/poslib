@@ -1,0 +1,17 @@
+{
+ "id": "D06",
+ "operation": "write-target",
+ "description": "A root with nothing selects .clankos; its coverage is the tree.",
+ "tree": [
+  {
+   "path": "notes.org",
+   "text": "* Notes\n"
+  }
+ ],
+ "root": ".",
+ "selected": ".clankos",
+ "archive": ".clankos/archives",
+ "ledger": ".clankos/archive-integrity/ledger",
+ "checkpoints": ".clankos/archive-integrity/checkpoints",
+ "coverage": "tree"
+}

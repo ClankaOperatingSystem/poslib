@@ -1,0 +1,16 @@
+{
+ "id": "S09",
+ "operation": "select",
+ "description": "A file at the candidate path .pos is refused.",
+ "tree": [
+  {
+   "path": ".pos",
+   "text": "not a directory\n"
+  }
+ ],
+ "root": ".",
+ "error": "config",
+ "paths": [
+  ".pos"
+ ]
+}

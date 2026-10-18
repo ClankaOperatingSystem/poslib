@@ -1,0 +1,20 @@
+{
+ "id": "S09",
+ "operation": "select",
+ "description": "A configuration file that is a symbolic link is refused.",
+ "tree": [
+  {
+   "path": "elsewhere.yaml",
+   "text": "pos: 2\n"
+  },
+  {
+   "path": ".pos/config.yaml",
+   "symlink": "../elsewhere.yaml"
+  }
+ ],
+ "root": ".",
+ "error": "link",
+ "paths": [
+  ".pos/config.yaml"
+ ]
+}

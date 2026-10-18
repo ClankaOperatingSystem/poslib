@@ -1,0 +1,13 @@
+{
+ "id": "S05",
+ "operation": "select",
+ "description": "With no configuration, the sole bare candidate .pos is reused.",
+ "tree": [
+  {
+   "path": ".pos",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "selected": ".pos"
+}

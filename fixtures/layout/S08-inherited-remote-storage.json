@@ -1,0 +1,22 @@
+{
+ "id": "S08",
+ "operation": "write-target",
+ "description": "An ancestor's configuration says a keeper keeps the child's archive; the child has no configuration, so its bookkeeping is selected in the child's own .clankos.",
+ "tree": [
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 2\narchives:\n  - scope: child\n    kept: remote\n    url: https://keeper.example/child\n"
+  },
+  {
+   "path": "child",
+   "directory": true
+  }
+ ],
+ "root": "child",
+ "kept": "https://keeper.example/child",
+ "selected": ".clankos",
+ "archive": "child/.clankos/archives",
+ "ledger": "child/.clankos/archive-integrity/ledger",
+ "checkpoints": "child/.clankos/archive-integrity/checkpoints",
+ "coverage": "tree"
+}

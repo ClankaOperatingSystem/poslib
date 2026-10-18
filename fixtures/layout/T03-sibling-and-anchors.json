@@ -1,0 +1,21 @@
+{
+ "id": "T03",
+ "operation": "resolve",
+ "description": "Two checkpoint locations at one scope are refused, both empty.",
+ "tree": [
+  {
+   "path": "archive-integrity/checkpoints",
+   "directory": true
+  },
+  {
+   "path": ".archive-integrity-anchors",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "error": "checkpoint-location",
+ "paths": [
+  ".archive-integrity-anchors",
+  "archive-integrity/checkpoints"
+ ]
+}

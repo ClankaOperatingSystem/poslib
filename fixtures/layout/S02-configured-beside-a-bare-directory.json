@@ -1,0 +1,17 @@
+{
+ "id": "S02",
+ "operation": "select",
+ "description": "A valid configuration in .pos selects .pos though a bare .clankos is beside it.",
+ "tree": [
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: 2\n"
+  },
+  {
+   "path": ".clankos",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "selected": ".pos"
+}

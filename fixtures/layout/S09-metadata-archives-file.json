@@ -1,0 +1,16 @@
+{
+ "id": "S09",
+ "operation": "resolve",
+ "description": "A file at .clankos/archives is refused.",
+ "tree": [
+  {
+   "path": ".clankos/archives",
+   "text": "not a directory\n"
+  }
+ ],
+ "root": ".",
+ "error": "root",
+ "paths": [
+  ".clankos/archives"
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "id": "A05",
+ "operation": "write-target",
+ "description": "A visible archives at the scope refuses a writer.",
+ "tree": [
+  {
+   "path": "archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "archives/b.md",
+   "text": "beta",
+   "mode": 292
+  }
+ ],
+ "root": ".",
+ "error": "relocation-required",
+ "paths": [
+  "archives"
+ ]
+}

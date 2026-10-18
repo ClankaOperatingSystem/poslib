@@ -1,0 +1,20 @@
+{
+ "id": "S09",
+ "operation": "select",
+ "description": "A symbolic link at the candidate path .clankos is refused.",
+ "tree": [
+  {
+   "path": "elsewhere",
+   "directory": true
+  },
+  {
+   "path": ".clankos",
+   "symlink": "elsewhere"
+  }
+ ],
+ "root": ".",
+ "error": "link",
+ "paths": [
+  ".clankos"
+ ]
+}

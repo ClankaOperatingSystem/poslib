@@ -1,0 +1,17 @@
+{
+ "id": "D07",
+ "operation": "write-target",
+ "description": "A root named archives, absent, takes its parent as its scope; its coverage is the archive.",
+ "tree": [
+  {
+   "path": "scope",
+   "directory": true
+  }
+ ],
+ "root": "scope/archives",
+ "selected": ".clankos",
+ "archive": "scope/.clankos/archives",
+ "ledger": "scope/.clankos/archive-integrity/ledger",
+ "checkpoints": "scope/.clankos/archive-integrity/checkpoints",
+ "coverage": "archive"
+}

@@ -1,0 +1,21 @@
+{
+ "id": "S03",
+ "operation": "select",
+ "description": "Configurations in two directories are a configuration error naming both.",
+ "tree": [
+  {
+   "path": ".clanka/config.yaml",
+   "text": "pos: 2\n"
+  },
+  {
+   "path": ".pos/config.yml",
+   "text": "pos: 2\n"
+  }
+ ],
+ "root": ".",
+ "error": "config",
+ "paths": [
+  ".clanka/config.yaml",
+  ".pos/config.yml"
+ ]
+}

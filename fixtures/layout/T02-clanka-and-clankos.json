@@ -1,0 +1,21 @@
+{
+ "id": "T02",
+ "operation": "resolve",
+ "description": "Two ledger locations at one scope are refused, both empty.",
+ "tree": [
+  {
+   "path": ".clanka/archive-integrity/ledger",
+   "directory": true
+  },
+  {
+   "path": ".clankos/archive-integrity/ledger",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "error": "ledger-location",
+ "paths": [
+  ".clanka/archive-integrity/ledger",
+  ".clankos/archive-integrity/ledger"
+ ]
+}

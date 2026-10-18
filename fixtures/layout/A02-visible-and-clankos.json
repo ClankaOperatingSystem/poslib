@@ -1,0 +1,33 @@
+{
+ "id": "A02",
+ "operation": "discover",
+ "description": "A visible archives and one in .clankos at one scope are refused.",
+ "tree": [
+  {
+   "path": "archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": "archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": ".clankos/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": ".clankos/archives/b.md",
+   "text": "beta",
+   "mode": 292
+  }
+ ],
+ "root": ".",
+ "error": "archive-location",
+ "paths": [
+  ".clankos/archives",
+  "archives"
+ ]
+}

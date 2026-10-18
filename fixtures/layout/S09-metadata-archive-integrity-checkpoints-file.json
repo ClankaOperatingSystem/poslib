@@ -1,0 +1,16 @@
+{
+ "id": "S09",
+ "operation": "resolve",
+ "description": "A file at .clankos/archive-integrity/checkpoints is refused.",
+ "tree": [
+  {
+   "path": ".clankos/archive-integrity/checkpoints",
+   "text": "not a directory\n"
+  }
+ ],
+ "root": ".",
+ "error": "checkpoint",
+ "paths": [
+  ".clankos/archive-integrity/checkpoints"
+ ]
+}

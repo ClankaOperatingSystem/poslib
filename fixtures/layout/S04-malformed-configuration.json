@@ -1,0 +1,20 @@
+{
+ "id": "S04",
+ "operation": "select",
+ "description": "A sole configuration that is not YAML is refused; the bare .clankos beside it is no fallback.",
+ "tree": [
+  {
+   "path": ".pos/config.yaml",
+   "text": "pos: [2\n"
+  },
+  {
+   "path": ".clankos",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "error": "config",
+ "paths": [
+  ".pos/config.yaml"
+ ]
+}

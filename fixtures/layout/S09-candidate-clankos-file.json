@@ -1,0 +1,16 @@
+{
+ "id": "S09",
+ "operation": "select",
+ "description": "A file at the candidate path .clankos is refused.",
+ "tree": [
+  {
+   "path": ".clankos",
+   "text": "not a directory\n"
+  }
+ ],
+ "root": ".",
+ "error": "config",
+ "paths": [
+  ".clankos"
+ ]
+}

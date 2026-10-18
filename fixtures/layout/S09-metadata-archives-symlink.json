@@ -1,0 +1,20 @@
+{
+ "id": "S09",
+ "operation": "resolve",
+ "description": "A symbolic link at .clankos/archives is refused.",
+ "tree": [
+  {
+   "path": "elsewhere",
+   "directory": true
+  },
+  {
+   "path": ".clankos/archives",
+   "symlink": "../elsewhere"
+  }
+ ],
+ "root": ".",
+ "error": "link",
+ "paths": [
+  ".clankos/archives"
+ ]
+}

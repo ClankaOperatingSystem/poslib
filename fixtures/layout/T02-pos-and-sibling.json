@@ -1,0 +1,21 @@
+{
+ "id": "T02",
+ "operation": "resolve",
+ "description": "Two ledger locations at one scope are refused, both empty.",
+ "tree": [
+  {
+   "path": ".pos/archive-integrity/ledger",
+   "directory": true
+  },
+  {
+   "path": "archive-integrity/ledger",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "error": "ledger-location",
+ "paths": [
+  ".pos/archive-integrity/ledger",
+  "archive-integrity/ledger"
+ ]
+}

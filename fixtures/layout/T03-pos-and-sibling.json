@@ -1,0 +1,23 @@
+{
+ "id": "T03",
+ "operation": "resolve",
+ "description": "Two checkpoint locations at one scope are refused, though their checkpoints are identical.",
+ "tree": [
+  {
+   "path": ".pos/archive-integrity/checkpoints/14c9ae274b1b76a94bbf78ae8b8f7260c3c417d11824f1ab41b2ccc059f46a46.json",
+   "text": "{\"coverage\":\"tree\",\"heads\":[],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "archive-integrity/checkpoints/14c9ae274b1b76a94bbf78ae8b8f7260c3c417d11824f1ab41b2ccc059f46a46.json",
+   "text": "{\"coverage\":\"tree\",\"heads\":[],\"schema\":1}\n",
+   "mode": 292
+  }
+ ],
+ "root": ".",
+ "error": "checkpoint-location",
+ "paths": [
+  ".pos/archive-integrity/checkpoints",
+  "archive-integrity/checkpoints"
+ ]
+}

@@ -1,0 +1,16 @@
+{
+ "id": "A05",
+ "operation": "write-target",
+ "description": "A visible archive-integrity at the scope refuses a writer.",
+ "tree": [
+  {
+   "path": "archive-integrity",
+   "directory": true
+  }
+ ],
+ "root": ".",
+ "error": "relocation-required",
+ "paths": [
+  "archive-integrity"
+ ]
+}
