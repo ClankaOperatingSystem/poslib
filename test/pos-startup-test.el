@@ -1119,6 +1119,36 @@ One line."
                      (with-output-to-string (pos-startup-batch))))
       (should-not command-line-args-left))))
 
+(ert-deftest pos-startup/the-command-prints-json-as-utf-8 ()
+  "The JSON a program prints is UTF-8, whatever the locale.
+Run as a shell would run it, in the C locale, a body holding a
+middle dot, an em dash and an accented letter is printed as their
+UTF-8 bytes, which a JSON reader takes."
+  (pos-test-with-files root
+      '((".pos/config.yaml" . "pos: 2\n")
+        ("index.org" . "* SOMEDAY Middle dot\n\nOne · two — three é\n"))
+    (let* ((process-environment (append '("LANG=C" "LC_ALL=C") process-environment))
+           (coding-system-for-read 'binary)
+           (output
+            (with-temp-buffer
+              (set-buffer-multibyte nil)
+              (should (zerop (apply #'call-process
+                                    (expand-file-name invocation-name
+                                                      invocation-directory)
+                                    nil t nil
+                                    (append
+                                     '("-Q" "--batch")
+                                     (mapcan (lambda (dir) (list "-L" dir)) load-path)
+                                     (list "-l" "pos-startup"
+                                           "--eval" (format "(setq pos-directory %S)" root)
+                                           "-f" "pos-startup-batch"
+                                           "--view" "someday" "--json")))))
+              (buffer-string)))
+           (json (json-parse-string (decode-coding-string output 'utf-8))))
+      (should (equal "One · two — three é"
+                     (gethash "body" (aref (gethash "someday" (gethash "views" json))
+                                           0)))))))
+
 (ert-deftest pos-startup/the-command-prints-the-views-of-a-weekly-review ()
   "With --weekly the views are `pos-startup-weekly-views', in that order.
 A --view beside it adds its view where it is named.  Every view of

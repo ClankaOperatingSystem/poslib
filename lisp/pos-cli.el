@@ -224,7 +224,9 @@ Exit 0 done or clean, 1 findings, 2 refused.
              "Usage: search ROOT QUERY [--mode MODE] [--limit N] [--within CID]"))
           (kill-emacs status)))
        (`("sign-in" ,url)
-        (princ (json-serialize (pos-signin url) :false-object :false))
+        (princ (decode-coding-string
+                (json-serialize (pos-signin url) :false-object :false)
+                'utf-8))
         (terpri))
        (`(,(or "help" "-h" "--help")) (princ pos-cli-seal-usage))
        (_ (pos-cli--usage pos-cli-seal-usage))))))
