@@ -936,9 +936,13 @@ refused (=hidden=), as for any item. A scope with bookkeeping anywhere
 else as well, beside it or in another candidate directory, is refused
 (=relocation-required=), and so is anything the layout refuses.
 
-The export is checked before it is planned, asking no keeper, so that
-a checkpoint it holds that names no ledger event in it is refused
-(=anchor=). If planning fails the export is removed. The child
+Before it is planned, the export is checked for what the parent's
+check reads of it once it is sealed, and no more, asking no keeper:
+each ledger within it, legacy or current, must read as a chain of
+events, and each head a checkpoint within it names must name an event
+of one of those ledgers, by its hash or its CID as a block (else
+=anchor=). No archive need be found in it, nor any entry for it, so a
+child archive a keeper keeps retires as its =archive-integrity/= alone. If planning fails the export is removed. The child
 archive's bytes, and so its CID, are those of the scope's archive; the
 export's own CID is the item's, and no equality with the live scope is
 claimed.

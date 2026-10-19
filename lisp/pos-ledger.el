@@ -33,6 +33,8 @@
 ;; - `pos-ledger-kept': the keeper an archive is kept by, if it has one.
 ;; - `pos-ledger-named': the id an archive's ledger is to have, if named.
 ;; - `pos-ledger-check': the report on every archive under a root.
+;; - `pos-ledger-check-within': refuse unless the ledgers and
+;;   checkpoints within a directory are sound, no archive needed.
 ;; - `pos-ledger-write-new', `pos-ledger-checkpoint-head',
 ;;   `pos-ledger-record-with-cid': a file published read-only, a
 ;;   head recorded beside its archive, and a file's entry with its CID.
@@ -540,8 +542,11 @@ item, collection, empty directory or entry that is not valid (entry)."
 (defun pos-ledger-history (archive)
   "Return ARCHIVE's ledger as a `pos-history': what it enrolled and recorded.
 No ledger is a history of no events, with every other field nil."
-  (let ((folder (pos-ledger-folder archive))
-        (history (pos-history--make :events 0)))
+  (pos-ledger--folder-history (pos-ledger-folder archive)))
+
+(defun pos-ledger--folder-history (folder)
+  "Return the ledger in FOLDER as a `pos-history', as `pos-ledger-history' does."
+  (let ((history (pos-history--make :events 0)))
     (cond
      ((not (or (file-exists-p folder) (file-symlink-p folder)))
       history)
@@ -995,28 +1000,67 @@ within are known by the names their events are enrolled under."
                           (match-string 2 name))))
                      (pos-history-entries (pos-ledger-history archive))))))))
 
+(defun pos-ledger--checkpoint (file)
+  "Return the checkpoint in FILE, an alist, refusing `checkpoint' if invalid.
+It must be named by the SHA-256 of its bytes, and have schema 1, a
+coverage of archive or tree, and heads that are hashes or block CIDs."
+  (pos-ledger-regular file)
+  (let* ((bytes (pos-bytes-read file))
+         (value (and (equal (file-name-nondirectory file)
+                            (concat (pos-bytes-sha bytes) ".json"))
+                     (pos-bytes-parse bytes))))
+    (unless value
+      (pos-ledger-refuse 'checkpoint "Checkpoint hash failure: %s" file))
+    (unless (and (listp value)
+                 (equal (pos-ledger--keys value) '("coverage" "heads" "schema"))
+                 (eql 1 (alist-get 'schema value))
+                 (member (alist-get 'coverage value) '("archive" "tree"))
+                 (vectorp (alist-get 'heads value))
+                 (seq-every-p (lambda (head) (or (pos-ledger--hex-p head)
+                                                 (pos-ledger-event-cid-p head)))
+                              (alist-get 'heads value)))
+      (pos-ledger-refuse 'checkpoint "Invalid checkpoint"))
+    value))
+
+(defun pos-ledger--checkpoint-file-p (file)
+  "Return non-nil if FILE is in a checkpoint folder, legacy or current."
+  (let* ((parent (directory-file-name (file-name-directory file)))
+         (grandparent (directory-file-name (file-name-directory parent))))
+    (or (equal (file-name-nondirectory parent) pos-ledger-anchors)
+        (and (equal (file-name-nondirectory parent) "checkpoints")
+             (equal (file-name-nondirectory grandparent) pos-ledger-integrity)))))
+
+(defun pos-ledger-check-within (dir)
+  "Refuse unless the ledgers and checkpoints within DIR are sound.
+What the check of an archive holding DIR reads of them, and no more:
+each ledger within DIR, legacy or current, reads as a chain of events;
+and each head a checkpoint within DIR names is an event of one of those
+ledgers, by its hash or its CID as a block, else `anchor'.  DIR need
+hold no archive, and no keeper is asked."
+  (let* ((files (directory-files-recursively dir "\\.json\\'" nil nil nil))
+         (events (seq-filter #'pos-ledger--ledger-file-p files))
+         (present (mapcan (lambda (file)
+                            (pos-ledger-regular file)
+                            (let ((bytes (pos-bytes-read file)))
+                              (list (pos-bytes-sha bytes) (pos-ledger-event-cid bytes))))
+                          events))
+         required)
+    (dolist (folder (seq-uniq (mapcar #'file-name-directory events)))
+      (pos-ledger--folder-history (directory-file-name folder)))
+    (dolist (file (seq-filter #'pos-ledger--checkpoint-file-p files))
+      (setq required (append (alist-get 'heads (pos-ledger--checkpoint file)) required)))
+    (let ((absent (sort (seq-uniq (seq-difference required present)) #'string<)))
+      (when absent
+        (pos-ledger-refuse 'anchor "Checkpointed events missing within %s: %s"
+                           dir (string-join absent ", "))))))
+
 (defun pos-ledger--check-anchors (root archives)
   "Refuse unless every head a checkpoint for ROOT names is in ARCHIVES."
   (let ((archive-root (equal (file-name-nondirectory (directory-file-name root))
                              "archives"))
         required present)
     (dolist (file (pos-ledger-checkpoint-files root archives))
-      (pos-ledger-regular file)
-      (let* ((bytes (pos-bytes-read file))
-             (value (and (equal (file-name-nondirectory file)
-                                (concat (pos-bytes-sha bytes) ".json"))
-                         (pos-bytes-parse bytes))))
-        (unless value
-          (pos-ledger-refuse 'checkpoint "Checkpoint hash failure: %s" file))
-        (unless (and (listp value)
-                     (equal (pos-ledger--keys value) '("coverage" "heads" "schema"))
-                     (eql 1 (alist-get 'schema value))
-                     (member (alist-get 'coverage value) '("archive" "tree"))
-                     (vectorp (alist-get 'heads value))
-                     (seq-every-p (lambda (head) (or (pos-ledger--hex-p head)
-                                                     (pos-ledger-event-cid-p head)))
-                                  (alist-get 'heads value)))
-          (pos-ledger-refuse 'checkpoint "Invalid checkpoint"))
+      (let ((value (pos-ledger--checkpoint file)))
         (when (or (not archive-root) (equal (alist-get 'coverage value) "archive"))
           (setq required (append (alist-get 'heads value) required)))))
     (dolist (archive archives)
