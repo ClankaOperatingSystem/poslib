@@ -1,7 +1,7 @@
 {
  "id": "S09",
  "operation": "resolve",
- "description": "A file at .clankos/archive-integrity is refused.",
+ "description": "A file at .clankos/archive-integrity is not an archive or bookkeeping, and is passed over.",
  "tree": [
   {
    "path": ".clankos/archive-integrity",
@@ -9,8 +9,7 @@
   }
  ],
  "root": ".",
- "error": "ledger",
- "paths": [
-  ".clankos/archive-integrity"
- ]
+ "archive": null,
+ "ledger": null,
+ "checkpoints": null
 }

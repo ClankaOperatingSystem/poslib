@@ -138,10 +138,12 @@ Where a scope's archive and bookkeeping are now is found by probing
 each candidate directory for =archives/= and =archive-integrity/=, and
 the scope itself for =archives/=, =archive-integrity/= and
 =.archive-integrity-anchors/=, and each archive found for the legacy
-ledger inside it. A symbolic link at any of these is refused (=link=),
-and anything else that is not a directory by its kind: =root= for an
-archive, =ledger= for an =archive-integrity/= or a ledger, =checkpoint=
-for checkpoints. A ledger directory counts even when empty. Two
+ledger inside it. A file named =archives= or =archive-integrity=, or a
+symbolic link to one, is no archive and no bookkeeping, and is passed
+over, as a link to a command of that name is. A symbolic link to a
+directory at any of these paths is refused (=link=), and anything else
+that is not a directory by its kind: =ledger= for a ledger and
+=checkpoint= for checkpoints. A ledger directory counts even when empty. Two
 archives at one scope are refused (=archive-location=), two ledgers
 (=ledger-location=), byte-identical copies included, and two checkpoint
 directories (=checkpoint-location=). A reader reads the one ledger and
@@ -971,15 +973,17 @@ directory, the plan gives:
   where the repository tracks the path and =rename= where it does not,
   as for an archive kept uncommitted; legacy checkpoints go to
   =archive-integrity/checkpoints/= in the selected directory;
+- =untracked=: the files in what moves that the repository does not
+  track, ignored ones included, sorted; an archive none of whose files
+  is tracked, kept uncommitted, is not listed. Each move takes its
+  directory whole, so these move with it and stay untracked;
 - =blockers=: each with =reason=, =paths= sorted and =message=.
 
 The blockers are: the refusals of [[*Layout][Layout]], by their kinds;
 =destination=, a destination that exists; =unclean=, a check of the
 scope's archive with findings, asking no keeper; =legacy-ledger=, a
 ledger inside the archive, which migration brings beside it first;
-=access=, a directory that cannot be written; =unversioned=, an
-=archive-integrity/= or legacy checkpoint directory with a file its
-repository does not track; and =mount=, a child with a remote that a
+=access=, a directory that cannot be written; and =mount=, a child with a remote that a
 configuration declares and whose path is not a directory, since its
 scopes cannot be reached: it is cloned or fetched, or its entry
 removed. Every blocker of every scope is reported,

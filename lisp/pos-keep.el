@@ -391,13 +391,14 @@ another repository: it is not entered, and is among REPOSITORIES."
              (or (pos-git-line repository "ls-files" "--" (file-relative-name path repository))
                  "")))))
 
-(defun pos-keep--untracked-p (repository path)
-  "Return non-nil if a file at or beneath PATH is not tracked by REPOSITORY.
-An ignored file counts, as does one Git has not been told of."
-  (not (string-empty-p
-        (or (pos-git-line repository "ls-files" "--others" "--"
-                          (file-relative-name path repository))
-            ""))))
+(defun pos-keep--untracked (repository path)
+  "Return the files at or beneath PATH that REPOSITORY does not track.
+Absolute paths, sorted; ignored files among them."
+  (let ((out (pos-git-line repository "ls-files" "--others" "--"
+                           (file-relative-name path repository))))
+    (sort (mapcar (lambda (line) (expand-file-name line repository))
+                  (and out (split-string out "\n" t)))
+          #'string<)))
 
 (defun pos-keep--blocker (reason paths format &rest args)
   "Return a blocker of REASON naming PATHS, with a message from FORMAT and ARGS."
@@ -438,11 +439,14 @@ No keeper is asked.  Nil for a scope with no archive and no ledger."
   "Return the relocation of SCOPE, an alist, or nil if it has nothing to move.
 Paths are relative to ROOT.  The alist has scope, selected, renames,
 each with from, to and move, git for Git's move of a path the
-repository tracks and rename for the file system's; and blockers,
-each with reason, paths and message."
+repository tracks and rename for the file system's; untracked, the
+files Git does not track in what moves, but an archive no file of
+which is tracked, sorted; and blockers, each with reason, paths and
+message.  Each move takes a directory whole, its untracked files with
+it, still untracked."
   (let* ((rel (lambda (path) (directory-file-name (file-relative-name path root))))
          (repository (pos-keep--repository scope))
-         blockers renames selected)
+         blockers renames selected untracked)
     (condition-case err
         (let ((layout (pos-ledger-locations scope)))
           (when (pos-layout-components layout)
@@ -458,11 +462,10 @@ each with reason, paths and message."
                                          "The directory is not writable")
                       blockers))
               (let ((tracked (pos-keep--tracked-p repository from)))
-                (when (and repository (not (equal (file-name-nondirectory from) "archives"))
-                           (or (not tracked) (pos-keep--untracked-p repository from)))
-                  (push (pos-keep--blocker 'unversioned (list (funcall rel from))
-                                           "Bookkeeping not under version control")
-                        blockers))
+                (when (and repository
+                           (or tracked (not (equal (file-name-nondirectory from) "archives"))))
+                  (setq untracked (append untracked
+                                          (mapcar rel (pos-keep--untracked repository from)))))
                 (push `((from . ,(funcall rel from)) (to . ,(funcall rel to))
                         (move . ,(if tracked "git" "rename")))
                       renames)))
@@ -492,6 +495,7 @@ each with reason, paths and message."
       `((scope . ,(funcall rel scope))
         (selected . ,(or selected :null))
         (renames . ,(vconcat (nreverse renames)))
+        (untracked . ,(vconcat (sort untracked #'string<)))
         (blockers . ,(vconcat (nreverse blockers)))))))
 
 (defun pos-keep--writable-parent (path)
@@ -536,7 +540,8 @@ relative to ROOT."
                        (vconcat (alist-get 'blockers entry) mounts))
                  entry)
           (t `((scope . ,(directory-file-name (file-relative-name scope root)))
-               (selected . :null) (renames . []) (blockers . ,(vconcat mounts)))))))
+               (selected . :null) (renames . []) (untracked . [])
+               (blockers . ,(vconcat mounts)))))))
 
 (defun pos-keep-relocate-plan (root)
   "Return the plan to move each scope's bookkeeping under ROOT into place.
