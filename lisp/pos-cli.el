@@ -125,6 +125,13 @@ would, so that `pos-seal-apply' takes it."
       move to its keeper each archive under ROOT a keeper is to keep
   recall ROOT
       bring back from its keeper each archive under ROOT a keeper keeps
+  relocate-plan ROOT
+      print the plan to move each scope's archive and bookkeeping under
+      ROOT from beside the scope into its configuration directory, with
+      every blocker; exit 1 with something to move, 2 with a blocker
+  relocate-apply ROOT
+      make the moves relocate-plan prints, by Git's move or a rename,
+      once nothing blocks them; check each scope after; commit nothing
   link PATH
       print the ipfs:// link to PATH, a sealed path in an archive
   fetch LINK
@@ -194,6 +201,14 @@ Exit 0 done or clean, 1 findings, 2 refused.
         (pos-bytes-print (pos-keep root)))
        (`("recall" ,root)
         (pos-bytes-print (pos-keep-recall root)))
+       (`("relocate-plan" ,root)
+        (let ((plan (pos-keep-relocate-plan root)))
+          (pos-bytes-print plan)
+          (kill-emacs (cond ((> (alist-get 'blocked plan) 0) 2)
+                            ((seq-empty-p (alist-get 'scopes plan)) 0)
+                            (t 1)))))
+       (`("relocate-apply" ,root)
+        (pos-bytes-print (pos-keep-relocate root)))
        (`("link" ,path)
         (princ (pos-links-link path))
         (terpri))

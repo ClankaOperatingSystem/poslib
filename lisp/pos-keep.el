@@ -34,16 +34,22 @@
 ;; - `pos-keep-convert': bring schema 2 ledgers to schema 3.
 ;; - `pos-keep': move archives on disk to their keepers.
 ;; - `pos-keep-recall': bring kept archives back to disk.
+;; - `pos-keep-relocate-plan', `pos-keep-relocate': the plan to move
+;;   each scope's archive and bookkeeping into its selected directory,
+;;   and the move, by renames and with no byte rewritten.
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'seq)
 (require 'pos-bytes)
+(require 'pos-checkpoint)
 (require 'pos-cid)
+(require 'pos-git)
 (require 'pos-ledger)
 (require 'pos-remote)
 (require 'pos-seal)
+(require 'pos-tree)
 
 ;;;; Over the archives of a root
 
@@ -348,6 +354,242 @@ and skipped, each an archive with the reason."
              ((null (pos-history-head history)) "no ledger")
              (t (list url history (pos-keep--check-recallable archive history))))))
    #'pos-keep--fetch-archive))
+
+;;;; Relocation
+
+(defun pos-keep--repository (dir)
+  "Return the top of the repository holding DIR, or nil."
+  (when-let* ((top (locate-dominating-file dir ".git")))
+    (directory-file-name (expand-file-name top))))
+
+(defun pos-keep--scopes (root)
+  "Return (SCOPES . REPOSITORIES): the active scopes and repositories under ROOT.
+SCOPES are the directories the outermost walk of discovery visits,
+ROOT included: no hidden or underscored directory, no archives
+directory, no symbolic link.  A directory below ROOT holding .git is
+another repository: it is not entered, and is among REPOSITORIES."
+  (let ((root (file-truename (pos-ledger-checked root))) scopes repositories)
+    (unless (file-directory-p root)
+      (pos-ledger-refuse 'root "Root must be an existing directory"))
+    (named-let walk ((dir root))
+      (push dir scopes)
+      (dolist (name (pos-ledger-entry-names dir))
+        (let ((path (expand-file-name name dir)))
+          (when (and (file-directory-p path) (not (file-symlink-p path))
+                     (not (string-match-p "\\`[._]" name))
+                     (not (equal name "archives")))
+            (if (file-exists-p (expand-file-name ".git" path))
+                (push path repositories)
+              (walk path))))))
+    (cons (sort scopes #'pos-ledger--path<) (sort repositories #'pos-ledger--path<))))
+
+(defun pos-keep--tracked-p (repository path)
+  "Return non-nil if the REPOSITORY tracks a file at or beneath PATH."
+  (and repository
+       (not (string-empty-p
+             (or (pos-git-line repository "ls-files" "--" (file-relative-name path repository))
+                 "")))))
+
+(defun pos-keep--untracked-p (repository path)
+  "Return non-nil if a file at or beneath PATH is not tracked by REPOSITORY.
+An ignored file counts, as does one Git has not been told of."
+  (not (string-empty-p
+        (or (pos-git-line repository "ls-files" "--others" "--"
+                          (file-relative-name path repository))
+            ""))))
+
+(defun pos-keep--blocker (reason paths format &rest args)
+  "Return a blocker of REASON naming PATHS, with a message from FORMAT and ARGS."
+  `((reason . ,(format "%s" reason))
+    (paths . ,(vconcat (sort (copy-sequence paths) #'string<)))
+    (message . ,(apply #'format format args))))
+
+(defun pos-keep--renames (scope selected layout)
+  "Return the renames that bring SCOPE's bookkeeping into SELECTED.
+SELECTED is the name of the directory selected at SCOPE.  Each rename
+is (FROM . TO): an archive, an archive-integrity directory or the
+legacy checkpoint directory of LAYOUT, a `pos-layout', that lies
+elsewhere."
+  (let* ((base (expand-file-name selected scope))
+         (archive (expand-file-name "archives" base))
+         (integrity (expand-file-name pos-ledger-integrity base)))
+    (delq nil
+          (mapcar (lambda (path)
+                    (cond ((member path (list archive integrity)) nil)
+                          ((equal (file-name-nondirectory path) "archives")
+                           (cons path archive))
+                          ((equal (file-name-nondirectory path) pos-ledger-anchors)
+                           (cons path (expand-file-name "checkpoints" integrity)))
+                          (t (cons path integrity))))
+                  (pos-layout-components layout)))))
+
+(defun pos-keep--check-scope (layout)
+  "Return the check report on the archive of LAYOUT, a `pos-layout', or nil.
+No keeper is asked.  Nil for a scope with no archive and no ledger."
+  (let ((archive (or (pos-layout-archive layout)
+                     (and (pos-layout-ledger layout)
+                          (pos-ledger-paired-archive (pos-layout-ledger layout))))))
+    (when archive
+      (let ((pos-ledger-offline t))
+        (pos-ledger-check archive)))))
+
+(defun pos-keep--plan-scope (scope root)
+  "Return the relocation of SCOPE, an alist, or nil if it has nothing to move.
+Paths are relative to ROOT.  The alist has scope, selected, renames,
+each with from, to and move, git for Git's move of a path the
+repository tracks and rename for the file system's; and blockers,
+each with reason, paths and message."
+  (let* ((rel (lambda (path) (directory-file-name (file-relative-name path root))))
+         (repository (pos-keep--repository scope))
+         blockers renames selected)
+    (condition-case err
+        (let ((layout (pos-ledger-locations scope)))
+          (when (pos-layout-components layout)
+            (setq selected (pos-ledger-select scope))
+            (pcase-dolist (`(,from . ,to) (pos-keep--renames scope selected layout))
+              (when (or (file-exists-p to) (file-symlink-p to))
+                (push (pos-keep--blocker 'destination (list (funcall rel from) (funcall rel to))
+                                         "The destination exists")
+                      blockers))
+              (unless (and (file-writable-p (file-name-directory from))
+                           (file-writable-p (pos-keep--writable-parent to)))
+                (push (pos-keep--blocker 'access (list (funcall rel from))
+                                         "The directory is not writable")
+                      blockers))
+              (let ((tracked (pos-keep--tracked-p repository from)))
+                (when (and repository (not (equal (file-name-nondirectory from) "archives"))
+                           (or (not tracked) (pos-keep--untracked-p repository from)))
+                  (push (pos-keep--blocker 'unversioned (list (funcall rel from))
+                                           "Bookkeeping not under version control")
+                        blockers))
+                (push `((from . ,(funcall rel from)) (to . ,(funcall rel to))
+                        (move . ,(if tracked "git" "rename")))
+                      renames)))
+            (let ((ledger (pos-layout-ledger layout)))
+              (if (and renames ledger
+                       (equal (file-name-nondirectory ledger) pos-ledger-directory))
+                  (push (pos-keep--blocker 'legacy-ledger (list (funcall rel ledger))
+                                           "A legacy ledger inside the archive: migrate it first")
+                        blockers)
+                (when renames
+                  (condition-case err
+                      (let ((report (pos-keep--check-scope layout)))
+                        (when (and report (pos-checkpoint-findings-p report))
+                          (push (pos-keep--blocker
+                                 'unclean (mapcar (lambda (a) (funcall rel (alist-get 'archive a)))
+                                                  report)
+                                 "The check has findings")
+                                blockers)))
+                    (pos-ledger-refused
+                     (push (pos-keep--blocker (nth 1 err) (list (funcall rel scope))
+                                              "%s" (nth 2 err))
+                           blockers))))))))
+      (pos-ledger-refused
+       (push (pos-keep--blocker (nth 1 err) (mapcar rel (nth 4 err)) "%s" (nth 2 err))
+             blockers)))
+    (when (or renames blockers)
+      `((scope . ,(funcall rel scope))
+        (selected . ,(or selected :null))
+        (renames . ,(vconcat (nreverse renames)))
+        (blockers . ,(vconcat (nreverse blockers)))))))
+
+(defun pos-keep--writable-parent (path)
+  "Return the nearest existing directory at or above PATH's parent."
+  (let ((dir (file-name-directory (directory-file-name path))))
+    (while (not (file-exists-p dir))
+      (setq dir (file-name-directory (directory-file-name dir))))
+    dir))
+
+(defun pos-keep-relocate-plan (root)
+  "Return the plan to move each scope's bookkeeping under ROOT into place.
+An alist: root; scopes, each as `pos-keep--plan-scope' gives it, in
+path order, for the scopes with something at an old location or a
+blocker; repositories, the other repositories below ROOT, each to be
+relocated by a run of its own; and blocked, the number of blockers.
+Nothing is written, and no keeper is asked."
+  (let* ((root (file-name-as-directory (file-truename (expand-file-name root))))
+         (found (pos-keep--scopes root))
+         (scopes (delq nil (mapcar (lambda (scope) (pos-keep--plan-scope scope root))
+                                   (car found)))))
+    `((root . ,(directory-file-name root))
+      (scopes . ,(vconcat scopes))
+      (repositories . ,(vconcat (mapcar (lambda (r) (directory-file-name
+                                                     (file-relative-name r root)))
+                                        (cdr found))))
+      (blocked . ,(apply #'+ (mapcar (lambda (s) (length (alist-get 'blockers s)))
+                                     scopes))))))
+
+(defun pos-keep--summary (report)
+  "Return what must not change in a relocation, of the check REPORT."
+  (mapcar (lambda (a) (let-alist a (list .head .events .files .root .recorded_root)))
+          report))
+
+(defun pos-keep-relocate (root)
+  "Move each scope's bookkeeping under ROOT into its selected directory.
+Refuse `blocked' if the plan has any blocker, before anything moves.
+Each scope in path order: each rename is Git's move where the
+repository tracks the path, else the file system's; then the scope is
+checked, asking no keeper, and must report what it reported before;
+then the managed archive exclusions of its repository, if it has
+them, are made again.  Nothing is committed.  Return an alist: scopes,
+each with scope, moved and check; and repositories, as the plan
+gives them."
+  (let* ((plan (pos-keep-relocate-plan root))
+         (root (file-name-as-directory (alist-get 'root plan)))
+         done)
+    (unless (zerop (alist-get 'blocked plan))
+      (pos-ledger-refuse
+       'blocked "Relocation blocked: %s"
+       (mapconcat (lambda (s)
+                    (mapconcat (lambda (b) (format "%s %s" (alist-get 'reason b)
+                                                   (string-join (alist-get 'paths b) " ")))
+                               (alist-get 'blockers s) "; "))
+                  (seq-filter (lambda (s) (> (length (alist-get 'blockers s)) 0))
+                              (alist-get 'scopes plan))
+                  "; ")))
+    (seq-doseq (entry (alist-get 'scopes plan))
+      (let* ((scope (expand-file-name (alist-get 'scope entry) root))
+             (repository (pos-keep--repository scope))
+             (before (pos-keep--summary (pos-keep--check-scope (pos-ledger-locations scope)))))
+        (seq-doseq (rename (alist-get 'renames entry))
+          (let-alist rename
+            (let ((from (expand-file-name .from root)) (to (expand-file-name .to root)))
+              (make-directory (file-name-directory to) t)
+              (if (equal .move "git")
+                  (let ((result (pos-git repository "mv" "--"
+                                         (file-relative-name from repository)
+                                         (file-relative-name to repository))))
+                    (unless (eq 0 (car result))
+                      (pos-ledger-refuse 'relocation "Git could not move %s: %s"
+                                         .from (cdr result))))
+                (rename-file from to)))))
+        (let* ((report (pos-keep--check-scope (pos-ledger-locations scope)))
+               (after (pos-keep--summary report)))
+          (unless (equal before after)
+            (pos-ledger-refuse 'unclean "The check differs after the move: %s" scope))
+          (let ((excludes (and repository (pos-keep--managed-excludes-p repository))))
+            (when excludes
+              (pos-tree-ignore-archives repository))
+            (push `((scope . ,(alist-get 'scope entry))
+                    (moved . ,(alist-get 'renames entry))
+                    (check . ,(vconcat (mapcar (lambda (a)
+                                                 (let-alist a
+                                                   `((archive . ,(directory-file-name
+                                                                  (file-relative-name .archive root)))
+                                                     (head . ,.head) (root . ,.root))))
+                                               report)))
+                    (excludes . ,(if excludes "regenerated" :null)))
+                  done)))))
+    `((scopes . ,(vconcat (nreverse done)))
+      (repositories . ,(alist-get 'repositories plan)))))
+
+(defun pos-keep--managed-excludes-p (repository)
+  "Return non-nil if REPOSITORY's info/exclude holds managed archive excludes."
+  (let ((file (pos-tree--exclude-file repository)))
+    (and file (file-regular-p file)
+         (with-temp-buffer
+           (insert-file-contents file)
+           (pos-tree--archive-block (buffer-string))))))
 
 (provide 'pos-keep)
 ;;; pos-keep.el ends here
