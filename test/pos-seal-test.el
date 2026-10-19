@@ -653,7 +653,8 @@ none, so that .clankos is selected.  Return the scope."
     trial))
 
 (ert-deftest pos-seal/a-retired-scope-s-hidden-archive-is-sealed-visible ()
-  "Retiring a scope seals its hidden archive and bookkeeping at the top of the item.
+  "Retiring a scope seals its hidden archive and bookkeeping visibly.
+They lie at the top of the item.
 O03 and A08: for each configuration directory, the sealed item holds
 archives/ and archive-integrity/ with their bytes and modes, and no
 configuration directory; the child archive's CID is unchanged; the
