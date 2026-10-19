@@ -37,6 +37,7 @@
 ;; - `pos-startup-view-items': one view, as data: what each line is of.
 ;; - `pos-startup-view-with-items': one view, as both, from one reading.
 ;; - `pos-startup-data': the report as data, for `json-serialize'.
+;; - `pos-startup-review-dates': the date each scope is next reviewed.
 ;; - `pos-startup-batch': shell entry; --view NAME, repeated, picks views;
 ;;   --weekly picks `pos-startup-weekly-views'; --json prints the data.
 ;;
@@ -275,6 +276,18 @@ as an alist."
                            ((string< date (cdr had)) (setcdr had date))))))))
            nil 'file))))
     (cons covered (nreverse unknown))))
+
+(defun pos-startup-review-dates (root &optional corpus)
+  "Return the date each scope of ROOT is next reviewed, an alist of (PATH . DATE).
+DATE is YYYY-MM-DD, the earliest a review covering the scope is
+scheduled on, as the reviews view finds it.  CORPUS is ROOT's corpus,
+walked already; without it the tree is walked.  A scope with no
+review is not in the list."
+  (let* ((pos-startup--root (file-name-as-directory (expand-file-name root)))
+         (pos-startup--corpus (or corpus (pos-corpus pos-startup--root)))
+         (pos-visit-corpus pos-startup--corpus)
+         (vc-handled-backends nil))
+    (car (pos-startup--reviews-of-scopes))))
 
 (defun pos-startup--responsibilities ()
   "Return the path of each responsibility of `pos-startup--corpus', sorted."
@@ -922,21 +935,22 @@ VIEWS defaults to `pos-startup-default-views'."
               (mapconcat (lambda (view) (concat "\n" (pos-startup-view root view)))
                          views "")))))
 
-(defun pos-startup-data (root &optional views)
+(defun pos-startup-data (root &optional views corpus)
   "Return VIEWS of ROOT's Org files as data, for `json-serialize'.
-VIEWS defaults to `pos-startup-default-views'.  An alist: files_read,
-the count of files; not_read, a vector with path and reason for each
-path not read, a configuration refused, one no node declares or a
-project that holds projects; views, each view's name with the vector of
-what `pos-startup-view-items' gives for it.  A view named twice is
-given once."
+VIEWS defaults to `pos-startup-default-views'.  CORPUS is ROOT's
+corpus, walked already; without it the tree is walked.  An alist:
+files_read, the count of files; not_read, a vector with path and
+reason for each path not read, a configuration refused, one no node
+declares or a project that holds projects; views, each view's name
+with the vector of what `pos-startup-view-items' gives for it.  A
+view named twice is given once."
   (let ((views (or views pos-startup-default-views)))
     (dolist (view views)
       (unless (member view pos-startup-views)
         (user-error "Unknown view: %s (one of %s)"
                     view (string-join pos-startup-views ", "))))
     (let* ((root (file-name-as-directory (expand-file-name root)))
-           (pos-startup--corpus (pos-corpus root)))
+           (pos-startup--corpus (or corpus (pos-corpus root))))
       `((files_read . ,(length (pos-corpus-files pos-startup--corpus)))
         (not_read . ,(vconcat
                       (mapcar (lambda (finding)
