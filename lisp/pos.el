@@ -401,6 +401,7 @@ The file is relative to ROOT where ROOT is given."
 (autoload 'pos-dedupe-apply-batch "pos-dedupe")
 (autoload 'pos-refile-plan-batch "pos-refile")
 (autoload 'pos-refile-apply-batch "pos-refile")
+(autoload 'pos-tree-view "pos-tree-view" nil t)
 
 (provide 'pos)
 ;;; pos.el ends here
