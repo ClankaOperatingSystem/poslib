@@ -968,8 +968,12 @@ argument."
                           (string-join pos-startup-views "|"))
                  (kill-emacs 2)))))
     (if json
-        (princ (concat (json-serialize
-                        (pos-startup-data pos-directory (nreverse views)))
+        ;; `json-serialize' gives UTF-8 bytes, which `princ' would print
+        ;; in Emacs's internal form, each byte above 127 as two.
+        (princ (concat (decode-coding-string
+                        (json-serialize
+                         (pos-startup-data pos-directory (nreverse views)))
+                        'utf-8)
                        "\n"))
       (princ (pos-startup-report pos-directory (nreverse views))))))
 
