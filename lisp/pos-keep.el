@@ -630,7 +630,7 @@ gives them."
       (repositories . ,(alist-get 'repositories plan)))))
 
 (defun pos-keep--managed-excludes-p (repository)
-  "Return non-nil if REPOSITORY's info/exclude holds managed archive excludes."
+  "Return non-nil if REPOSITORY's info/exclude has a managed archive block."
   (let ((file (pos-tree--exclude-file repository)))
     (and file (file-regular-p file)
          (with-temp-buffer
