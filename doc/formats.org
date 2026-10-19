@@ -977,9 +977,12 @@ The blockers are: the refusals of [[*Layout][Layout]], by their kinds;
 =destination=, a destination that exists; =unclean=, a check of the
 scope's archive with findings, asking no keeper; =legacy-ledger=, a
 ledger inside the archive, which migration brings beside it first;
-=access=, a directory that cannot be written; and =unversioned=, an
+=access=, a directory that cannot be written; =unversioned=, an
 =archive-integrity/= or legacy checkpoint directory with a file its
-repository does not track. Every blocker of every scope is reported,
+repository does not track; and =mount=, a child with a remote that a
+configuration declares and whose path is not a directory, since its
+scopes cannot be reached: it is cloned or fetched, or its entry
+removed. Every blocker of every scope is reported,
 and =blocked= counts them. The program exits 0 with nothing to move, 1
 with something to move and 2 with a blocker.
 
