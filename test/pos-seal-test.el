@@ -629,5 +629,119 @@ is moved or made."
                          (pos-ledger-entry-names scope)))
           (should (file-exists-p (expand-file-name "trial/result.md" scope))))))))
 
+;;;; Retirement
+
+(defun pos-seal-test--files (dir)
+  "Return each file beneath DIR by its path, with its SHA-256 and mode."
+  (sort (mapcar (lambda (file)
+                  (list (file-relative-name file dir) (pos-bytes-sha (pos-bytes-read file))
+                        (file-modes file)))
+                (directory-files-recursively dir "" nil))
+        (lambda (a b) (string< (car a) (car b)))))
+
+(defun pos-seal-test--child (garden &optional selected)
+  "Make GARDEN's scope trial, with an archive and bookkeeping in SELECTED.
+SELECTED is a bare configuration directory made first, by default
+none, so that .clankos is selected.  Return the scope."
+  (let ((trial (expand-file-name "trial" garden)))
+    (when selected (make-directory (expand-file-name selected trial) t))
+    (pos-test-write-bytes (expand-file-name "item/result.md" trial) "result")
+    (pos-test-write-bytes (expand-file-name "notes.org" trial) "* Notes\n")
+    (pos-test-approve (pos-seal-plan (expand-file-name "item" trial)
+                                     (expand-file-name "archives/item" trial)))
+    (pos-checkpoint-record trial)
+    trial))
+
+(ert-deftest pos-seal/a-retired-scope-s-hidden-archive-is-sealed-visible ()
+  "Retiring a scope seals its hidden archive and bookkeeping at the top of the item.
+O03 and A08: for each configuration directory, the sealed item holds
+archives/ and archive-integrity/ with their bytes and modes, and no
+configuration directory; the child archive's CID is unchanged; the
+parent's check, which reads the nested ledger, has no finding; the live
+scope and the staged export are gone."
+  (dolist (selected '(".clankos" ".clanka" ".pos"))
+    (ert-info (selected)
+      (pos-test-with-temp-dir dir
+        (let* ((garden (file-truename dir))
+               (trial (pos-seal-test--child garden selected))
+               (hidden (expand-file-name selected trial))
+               (child-cid (pos-cid-tree (expand-file-name "archives" hidden)))
+               (archived (pos-seal-test--files hidden))
+               (plan (pos-seal-plan trial (expand-file-name "archives/trial" garden))))
+          (should (equal trial (alist-get 'retires plan)))
+          (should (file-directory-p trial))
+          (pos-test-approve plan)
+          (let ((item (pos-test-archived garden "trial")))
+            (should-not (file-exists-p (expand-file-name selected item)))
+            (should (equal archived
+                           (seq-remove (lambda (file) (equal (car file) "notes.org"))
+                                       (pos-seal-test--files item))))
+            (should (equal (cdr (assoc "." child-cid))
+                           (cdr (assoc "." (pos-cid-tree (expand-file-name "archives" item))))))
+            (should (equal "* Notes\n" (pos-bytes-read (expand-file-name "notes.org" item)))))
+          (should-not (pos-checkpoint-findings-p (pos-ledger-check garden)))
+          (should-not (file-exists-p trial))
+          (should-not (file-exists-p (expand-file-name "_seal" garden))))))))
+
+(ert-deftest pos-seal/retirement-refuses-bookkeeping-in-two-places ()
+  "A scope with its archive hidden and an archive-integrity/ beside it is refused.
+O04: neither copy changes, and nothing is staged."
+  (pos-test-with-temp-dir dir
+    (let* ((garden (file-truename dir))
+           (trial (pos-seal-test--child garden)))
+      (pos-test-write-bytes (expand-file-name "archive-integrity/README" trial) "x\n")
+      (let ((before (pos-seal-test--files garden)))
+        (pos-test-refused pos-ledger-refused "relocation-required"
+          (pos-seal-plan trial (expand-file-name "archives/trial" garden)))
+        (should (equal before (pos-seal-test--files garden)))))))
+
+(ert-deftest pos-seal/retirement-refuses-other-hidden-files ()
+  "Other files in the configuration directory are refused as hidden.
+O05: the rule for any hidden file holds for the export, and the
+staged export is removed."
+  (pos-test-with-temp-dir dir
+    (let* ((garden (file-truename dir))
+           (trial (pos-seal-test--child garden)))
+      (pos-test-write-bytes (expand-file-name ".clankos/people.org" trial) "* People\n")
+      (let ((before (pos-seal-test--files garden)))
+        (pos-test-refused pos-ledger-refused "hidden"
+          (pos-seal-plan trial (expand-file-name "archives/trial" garden)))
+        (should (equal before (pos-seal-test--files garden)))))))
+
+(ert-deftest pos-seal/a-retirement-planned-leaves-the-scope-until-applied ()
+  "Planning a retirement stages an export and changes nothing in the scope.
+O08: planning again replaces the export; a scope changed after review
+refuses the plan, sealing nothing; the plan made afresh applies."
+  (pos-test-with-temp-dir dir
+    (let* ((garden (file-truename dir))
+           (trial (pos-seal-test--child garden))
+           (before (pos-seal-test--files trial))
+           (destination (expand-file-name "archives/trial" garden)))
+      (pos-seal-plan trial destination)
+      (let ((plan (pos-seal-plan trial destination)))
+        (should (equal before (pos-seal-test--files trial)))
+        (should (equal 1 (length (directory-files (expand-file-name "_seal" garden) nil
+                                                  "\\`export-"))))
+        (pos-test-write-bytes (expand-file-name "notes.org" trial) "* Changed\n")
+        (pos-test-refused pos-ledger-refused "plan" (pos-test-approve plan))
+        (should (file-exists-p trial))
+        (should-not (file-exists-p (pos-test-archived garden "trial"))))
+      (pos-test-approve (pos-seal-plan trial destination))
+      (should-not (file-exists-p trial))
+      (should (equal "* Changed\n"
+                     (pos-bytes-read (pos-test-archived garden "trial/notes.org")))))))
+
+(ert-deftest pos-seal/a-retirement-export-s-checkpoints-are-checked ()
+  "The export's checkpoints must name the ledger it holds, else it is refused.
+A scope whose ledger is gone and whose checkpoint remains is refused
+before anything is planned, and nothing is left staged."
+  (pos-test-with-temp-dir dir
+    (let* ((garden (file-truename dir))
+           (trial (pos-seal-test--child garden)))
+      (pos-seal--remove-tree (expand-file-name ".clankos/archive-integrity/ledger" trial))
+      (pos-test-refused pos-ledger-refused "anchor"
+        (pos-seal-plan trial (expand-file-name "archives/trial" garden)))
+      (should-not (file-exists-p (expand-file-name "_seal" garden))))))
+
 (provide 'pos-seal-test)
 ;;; pos-seal-test.el ends here
