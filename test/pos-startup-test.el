@@ -1088,6 +1088,27 @@ given once."
       (should (equal 3 (length (gethash "intray" (gethash "views" json))))))
     (should-error (pos-startup-data root '("bogus")) :type 'user-error)))
 
+(ert-deftest pos-startup/the-data-of-a-corpus-walked-already-is-the-same ()
+  "Given the corpus, the data is what a fresh walk of the tree gives."
+  (pos-startup-test-with-tree
+    (should (equal (pos-startup-data root '("next" "stuck" "projects"))
+                   (pos-startup-data root '("next" "stuck" "projects")
+                                     (pos-corpus root))))))
+
+(ert-deftest pos-startup/the-review-dates-are-the-earliest-open-review-of-each-scope ()
+  "Each scope with an open review has the date it is scheduled on.
+In the tree, alpha's review is three days late and home's is in three
+days; beta's only review is done, and garden has none."
+  (pos-startup-test-with-tree
+    (let ((dates (pos-startup-review-dates root)))
+      (should (equal (substring (pos-startup-test-day -3) 1 -1)
+                     (alist-get "projects/alpha" dates nil nil #'equal)))
+      (should (equal (substring (pos-startup-test-day 3) 1 -1)
+                     (alist-get "home" dates nil nil #'equal)))
+      (should-not (assoc "projects/beta" dates))
+      (should-not (assoc "garden" dates))
+      (should (equal dates (pos-startup-review-dates root (pos-corpus root)))))))
+
 ;;;; The command
 
 (ert-deftest pos-startup/the-command-prints-each-view-it-is-given ()
