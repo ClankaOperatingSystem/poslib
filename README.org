@@ -107,6 +107,10 @@ Emacs library for a personal OS in Org files. Package: =pos=.
 - =lisp/pos-views.el= :: the same views in a buffer, for a person at the
   keyboard: each line leads to its item, and an item's state is set
   from its line.
+- =lisp/pos-tree-data.el= :: the tree as one JSON document, for a viewer
+  of the tree: each scope's place, main file, configuration, image and
+  installed skills; each repository's remote, branch and =auto/=; where
+  each Org ID is; and the start-up views, from one walk.
 - =lisp/pos-roam.el= :: the org-roam index of a tree, brought up to date
   before a command reads it: where the =id:= links to a heading are, for
   dedupe to point them at the copy it keeps. The user's own index serves
