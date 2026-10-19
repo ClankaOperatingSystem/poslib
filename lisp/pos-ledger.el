@@ -609,8 +609,12 @@ paths sorted."
 (defun pos-ledger--probe (scope path kind)
   "Return PATH if it is a directory, nil if nothing is there.
 Refuse `link' for a symbolic link at PATH, and KIND for anything else
-there, as a refusal at SCOPE."
-  (cond ((file-symlink-p path)
+there, as a refusal at SCOPE.  With KIND nil, a file or a symbolic
+link to anything but a directory is not looked at, and is taken for
+nothing there: the name archives or archive-integrity on a file says
+nothing of an archive, as a link to a command of that name does not."
+  (cond ((and (null kind) (not (file-directory-p path))) nil)
+        ((file-symlink-p path)
          (pos-ledger-refuse-at 'link scope (list path) "Symbolic link"))
         ((file-directory-p path) path)
         ((file-exists-p path)
@@ -672,7 +676,9 @@ are at the scope, sorted."
   "Return where SCOPE's archive and bookkeeping are, a `pos-layout'.
 Each configuration directory and the scope itself are probed for
 archives/ and archive-integrity/, and for the legacy ledger inside
-an archive and the legacy checkpoint directory.  Nothing is written.
+an archive and the legacy checkpoint directory.  A file or a link to
+a file named archives or archive-integrity is passed over.  Nothing
+is written.
 Refuse `archive-location', `ledger-location' or `checkpoint-location'
 where two of one are found, and refuse a symbolic link or a file where
 a directory would be."
@@ -685,9 +691,9 @@ a directory would be."
                    (list scope)))
          archives ledgers checkpoints components)
     (dolist (holder holders)
-      (let ((archive (pos-ledger--probe scope (expand-file-name "archives" holder) 'root))
+      (let ((archive (pos-ledger--probe scope (expand-file-name "archives" holder) nil))
             (integrity (pos-ledger--probe
-                        scope (expand-file-name pos-ledger-integrity holder) 'ledger)))
+                        scope (expand-file-name pos-ledger-integrity holder) nil)))
         (when archive
           (push archive archives)
           (push archive components)

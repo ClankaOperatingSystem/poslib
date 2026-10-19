@@ -483,8 +483,8 @@ That is, in one of its configuration directories."
   (and (file-directory-p dir)
        (seq-some (lambda (name)
                    (seq-some (lambda (inner)
-                               (let ((path (expand-file-name (concat name "/" inner) dir)))
-                                 (or (file-exists-p path) (file-symlink-p path))))
+                               (file-directory-p
+                                (expand-file-name (concat name "/" inner) dir)))
                              (list "archives" pos-ledger-integrity)))
                  pos-path-config-directories)))
 

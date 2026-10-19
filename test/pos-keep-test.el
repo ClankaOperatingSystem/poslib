@@ -271,9 +271,9 @@ archive-integrity/checkpoints in the selected directory."
 
 (ert-deftest pos-keep/every-blocker-is-reported-and-nothing-moves ()
   "Each scope's blockers are reported together, and relocation refuses them.
-M03: a changed archive, unclean; an ambiguous choice of directory; a
-scope that cannot be written; and bookkeeping Git does not track,
-unversioned.  The scopes are as they were."
+M03: a changed archive, unclean; an ambiguous choice of directory; and
+a scope that cannot be written.  Bookkeeping Git does not track is no
+blocker: the plan lists its files.  The scopes are as they were."
   (pos-keep-test--with-repository root
     (let ((corrupt (pos-keep-test--old-scope root "corrupt")))
       (pos-keep-test--old-scope root "ambiguous")
@@ -295,11 +295,11 @@ unversioned.  The scopes are as they were."
                                           (mapcar (lambda (b) (alist-get 'reason b))
                                                   (alist-get 'blockers s))))
                                   (alist-get 'scopes plan))))
-            (should (equal 5 (alist-get 'blocked plan)))
+            (should (equal 4 (alist-get 'blocked plan)))
             (should (equal '("directory-ambiguity") (cdr (assoc "ambiguous" reasons))))
             (should (equal '("unclean") (cdr (assoc "corrupt" reasons))))
             (should (member "access" (cdr (assoc "locked" reasons))))
-            (should (member "unversioned" (cdr (assoc "loose" reasons))))
+            (should-not (cdr (assoc "loose" reasons)))
             (pos-test-refused pos-ledger-refused "blocked" (pos-keep-relocate root))
             (should (equal before (pos-keep-test--files root))))
         (set-file-modes (expand-file-name "locked" root) #o755)))))
@@ -444,6 +444,66 @@ mount blocker, and applying refuses with nothing moved."
       (should (equal ["mounted"] (alist-get 'paths (aref (alist-get 'blockers entry) 0))))
       (pos-test-refused pos-ledger-refused "blocked" (pos-keep-relocate root))
       (should (equal before (pos-keep-test--files root))))))
+
+(ert-deftest pos-keep/untracked-files-move-with-their-directory ()
+  "Files Git does not track are listed, and move untracked with their directory.
+A tracked archive-integrity/ holding a checkpoint not yet committed,
+and a new scope none of whose bookkeeping is tracked: the plan lists
+their files under untracked and has no blocker; after the move each
+is at its new path and still untracked, and the tracked files are
+renamed in the index."
+  (pos-keep-test--with-repository root
+    (let ((scope (pos-keep-test--old-scope root "s"))
+          (bytes (pos-bytes-json '((schema . 1) (heads . []) (coverage . "tree")))))
+      (pos-keep-test--commit root)
+      (pos-keep-test--old-scope root "new")
+      (let ((name (concat (pos-bytes-sha bytes) ".json")))
+        (pos-test-write-bytes (expand-file-name (concat "archive-integrity/checkpoints/" name)
+                                                scope)
+                              bytes #o444)
+        (let* ((plan (pos-keep-relocate-plan root))
+               (untracked (mapcar (lambda (s) (cons (alist-get 'scope s)
+                                                    (append (alist-get 'untracked s) nil)))
+                                  (alist-get 'scopes plan))))
+          (should (equal 0 (alist-get 'blocked plan)))
+          (should (equal (list (concat "s/archive-integrity/checkpoints/" name))
+                         (cdr (assoc "s" untracked))))
+          (should (cl-every (lambda (path) (string-prefix-p "new/archive-integrity/" path))
+                            (cdr (assoc "new" untracked))))
+          (should (cdr (assoc "new" untracked))))
+        (pos-keep-relocate root)
+        (should (equal bytes (pos-bytes-read
+                              (expand-file-name (concat ".clankos/archive-integrity/checkpoints/"
+                                                        name)
+                                                scope))))
+        (should (string-match-p
+                 (regexp-quote (concat "?? s/.clankos/archive-integrity/checkpoints/" name))
+                 (pos-test-git root "status" "--porcelain" "--untracked-files=all")))
+        (should (string-search "?? new/.clankos/archive-integrity/"
+                               (pos-test-git root "status" "--porcelain"
+                                             "--untracked-files=all")))
+        (should (string-match-p "^R  s/archives/"
+                                (pos-test-git root "status" "--porcelain")))))))
+
+(ert-deftest pos-keep/a-link-to-a-command-is-no-bookkeeping ()
+  "A link named archive-integrity to a command is passed over, not refused.
+Every garden links bin/archive-integrity to a script; the plan has
+nothing for bin, and a link to a directory is still refused."
+  (pos-keep-test--with-repository root
+    (pos-test-write-bytes (expand-file-name "some/script" root) "#!/bin/sh\n" #o755)
+    (make-directory (expand-file-name "bin" root))
+    (make-symbolic-link "../some/script" (expand-file-name "bin/archive-integrity" root))
+    (pos-keep-test--old-scope root "s")
+    (pos-keep-test--commit root)
+    (let ((plan (pos-keep-relocate-plan root)))
+      (should (equal 0 (alist-get 'blocked plan)))
+      (should (equal '("s") (mapcar (lambda (s) (alist-get 'scope s))
+                                    (alist-get 'scopes plan)))))
+    (delete-file (expand-file-name "bin/archive-integrity" root))
+    (make-symbolic-link "../some" (expand-file-name "bin/archive-integrity" root))
+    (let ((entry (seq-find (lambda (s) (equal "bin" (alist-get 'scope s)))
+                           (alist-get 'scopes (pos-keep-relocate-plan root)))))
+      (should (equal "link" (alist-get 'reason (aref (alist-get 'blockers entry) 0)))))))
 
 (provide 'pos-keep-test)
 ;;; pos-keep-test.el ends here

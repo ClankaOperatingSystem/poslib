@@ -280,7 +280,7 @@ Each archive there is, beside SCOPE's configuration directories or in
 one; with none, the archive in the directory `pos-ledger-select'
 selects, which need not exist yet.  A selection refused is found
 config-refused, and REPO, the repository's node, is marked refused."
-  (or (seq-filter (lambda (path) (or (file-directory-p path) (file-symlink-p path)))
+  (or (seq-filter #'file-directory-p
                   (mapcar (lambda (rel) (expand-file-name rel scope))
                           (pos-path-archive-paths)))
       (condition-case err

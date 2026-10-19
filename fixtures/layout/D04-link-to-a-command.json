@@ -1,0 +1,39 @@
+{
+ "id": "D04",
+ "operation": "discover",
+ "description": "A link named archive-integrity to a command, and a file named archives, are passed over; the archive in .clankos is found.",
+ "tree": [
+  {
+   "path": ".clankos/archives/a.md",
+   "text": "alpha",
+   "mode": 292
+  },
+  {
+   "path": ".clankos/archives/b.md",
+   "text": "beta",
+   "mode": 292
+  },
+  {
+   "path": ".clankos/archive-integrity/ledger/00000001-519af5770fd324ea45f55a5bc05c1375e4e2ca942f9e24a208808d08655f66f2.json",
+   "text": "{\"add\":{\"a.md\":{\"mode\":292,\"sha256\":\"8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8\",\"size\":5},\"b.md\":{\"mode\":292,\"sha256\":\"f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753\",\"size\":4}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "some/script",
+   "text": "#!/bin/sh\n",
+   "mode": 493
+  },
+  {
+   "path": "bin/archive-integrity",
+   "symlink": "../some/script"
+  },
+  {
+   "path": "bin/archives",
+   "text": "not an archive\n"
+  }
+ ],
+ "root": ".",
+ "archives": [
+  ".clankos/archives"
+ ]
+}
