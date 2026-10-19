@@ -743,5 +743,30 @@ before anything is planned, and nothing is left staged."
         (pos-seal-plan trial (expand-file-name "archives/trial" garden)))
       (should-not (file-exists-p (expand-file-name "_seal" garden))))))
 
+(ert-deftest pos-seal/a-scope-whose-keeper-keeps-its-archive-retires ()
+  "A scope whose archive a keeper keeps retires as its ledger and checkpoints.
+O06: its archive-integrity/, hidden in .clankos, is at the top of the
+item, there being no archives/ anywhere; no keeper is asked; and the
+parent's check after the seal, asking no keeper, has no finding."
+  (pos-fixture-with (pos-fixture "ledger" "report-kept") dir
+    (let* ((garden (file-truename dir))
+           (scope (expand-file-name "projects/a" garden))
+           (process-environment (cons "POS_ARCHIVE_OFFLINE=1" process-environment)))
+      (make-directory (expand-file-name ".clankos" scope))
+      (rename-file (expand-file-name "archive-integrity" scope)
+                   (expand-file-name ".clankos/archive-integrity" scope))
+      ;; The garden's own checkpoint names a head of a ledger the kept
+      ;; archive enrols, which its keeper holds and the retired item does not.
+      (pos-seal--remove-tree (expand-file-name "archive-integrity" garden))
+      (let* ((ledger (pos-seal-test--files (expand-file-name ".clankos" scope)))
+             (pos-ledger-ask-function (lambda (&rest _) (error "A keeper was asked")))
+             (plan (pos-seal-plan scope (expand-file-name "archives/a" garden))))
+        (pos-test-approve plan)
+        (let ((item (expand-file-name ".pos/archives/a" garden)))
+          (should (equal ledger (pos-seal-test--files item)))
+          (should-not (file-exists-p (expand-file-name "archives" item))))
+        (should-not (file-exists-p scope))
+        (should-not (pos-checkpoint-findings-p (pos-ledger-check garden)))))))
+
 (provide 'pos-seal-test)
 ;;; pos-seal-test.el ends here

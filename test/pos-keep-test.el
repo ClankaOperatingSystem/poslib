@@ -375,5 +375,54 @@ bookkeeping Git tracks moves by Git's move."
     (should (file-exists-p (expand-file-name ".clanka/archives/item/result.md" root)))
     (should (eq 0 (car (pos-git root "check-ignore" "-q" ".clanka/archives/item/result.md"))))))
 
+;;;; Retired scopes in earlier layouts
+
+(defun pos-keep-test--old-retired (archive name layout)
+  "Write in ARCHIVE the scope NAME, retired in LAYOUT, from the T04-read fixture.
+LAYOUT is sibling, internal or anchors: the ledger and checkpoints
+beside the scope's archives/, the ledger inside it, or the checkpoints
+in .archive-integrity-anchors."
+  (seq-doseq (entry (alist-get 'tree (pos-fixture "layout" "T04-read")))
+    (let-alist entry
+      (let ((path (pcase layout
+                    ('internal (replace-regexp-in-string
+                                "\\`archive-integrity/ledger/" "archives/.archive-integrity/"
+                                .path))
+                    ('anchors (replace-regexp-in-string
+                               "\\`archive-integrity/checkpoints/"
+                               ".archive-integrity-anchors/" .path))
+                    (_ .path))))
+        (unless (and (eq layout 'internal) (string-prefix-p "archive-integrity/checkpoints/" path))
+          (pos-test-write-bytes (expand-file-name (concat name "/" path) archive)
+                                (encode-coding-string .text 'utf-8) #o444))))))
+
+(ert-deftest pos-keep/scopes-retired-in-earlier-layouts-are-left-as-they-are ()
+  "Scopes retired in each earlier layout are checked clean and not moved.
+O07: inside a parent's archive, a scope with its ledger beside its
+archive, one with the legacy ledger inside it, and one with legacy
+checkpoints are reported clean; relocate-plan lists nothing; and
+relocate-apply leaves every byte, mode and path as it was."
+  (pos-keep-test--with-repository root
+    (let ((archive (pos-test-archived root)))
+      (pos-keep-test--old-retired archive "sibling" 'sibling)
+      (pos-keep-test--old-retired archive "internal" 'internal)
+      (pos-keep-test--old-retired archive "anchors" 'anchors)
+      (pos-ledger-write-new
+       (let ((event (pos-ledger-event (pos-ledger-inventory archive) nil 1
+                                      "0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1")))
+         (prog1 (expand-file-name (concat ".clankos/archive-integrity/ledger/" (car event))
+                                  root)
+           (setq archive (cons archive (cdr event)))))
+       (cdr archive))
+      (setq archive (car archive))
+      (pos-checkpoint-record root)
+      (pos-keep-test--commit root)
+      (should-not (pos-checkpoint-findings-p (pos-ledger-check root)))
+      (let ((before (pos-keep-test--files root)))
+        (should (equal [] (alist-get 'scopes (pos-keep-relocate-plan root))))
+        (should (equal [] (alist-get 'scopes (pos-keep-relocate root))))
+        (should (equal before (pos-keep-test--files root)))
+        (should-not (pos-checkpoint-findings-p (pos-ledger-check root)))))))
+
 (provide 'pos-keep-test)
 ;;; pos-keep-test.el ends here

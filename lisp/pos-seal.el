@@ -518,8 +518,9 @@ An export of DIR is staged in _seal/ in the archive's scope, where
 that directory's archives/ and archive-integrity/ are at the top, with
 their names, bytes and modes, and are not in the configuration
 directory.  Whatever else the export holds is sealed as any item is,
-a hidden file refused.  The export is checked, its nested checkpoints
-with it, asking no keeper, and is then planned as the item; the plan
+a hidden file refused.  Its ledgers and checkpoints are checked by
+`pos-ledger-check-within', asking no keeper, and it is then planned
+as the item; the plan
 also names DIR, as retires, and the SHA-256 of its inventory, so that
 applying it refuses a DIR changed since, and removes DIR once sealed.
 LEDGER-ID, DATE and AS-DESTINATION are as `pos-seal-plan' takes them."
@@ -551,8 +552,7 @@ LEDGER-ID, DATE and AS-DESTINATION are as `pos-seal-plan' takes them."
                 (rename-file path (expand-file-name name export)))))
           (when (directory-empty-p hidden)
             (delete-directory hidden))
-          (let ((pos-ledger-offline t))
-            (pos-ledger-check export))
+          (pos-ledger-check-within export)
           (append (pos-seal--plan export destination ledger-id date as-destination)
                   `((retires . ,dir) (retires_sha256 . ,sha))))
       (error
