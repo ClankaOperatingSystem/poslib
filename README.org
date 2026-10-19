@@ -111,6 +111,10 @@ Emacs library for a personal OS in Org files. Package: =pos=.
   of the tree: each scope's place, main file, configuration, image and
   installed skills; each repository's remote, branch and =auto/=; where
   each Org ID is; and the start-up views, from one walk.
+- =lisp/pos-tree-view.el= :: the same tree in buffers, for a person at the
+  keyboard: the tree of responsibilities, and each scope's page, with
+  what lies beneath it, its items, its configuration, its Org files and
+  its repository. Each scope, item and file shown leads to it.
 - =lisp/pos-org-html.el= :: Org files as HTML, for a viewer that gives
   each Org file a page: each file's body, as ox-html exports it, and
   its title, with links to other files' pages and to IDs at the
