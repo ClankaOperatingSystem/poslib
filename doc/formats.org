@@ -480,6 +480,9 @@ canonical JSON:
   =README.org= declares them, sorted;
 - =inventory_sha256=: the SHA-256 of the archive's inventory, in
   canonical JSON, as planned;
+- =retires=, =retires_sha256=: for a retirement ([[*Retirement][Retirement]]), the
+  scope retired and the SHA-256 of its inventory, in canonical JSON, as
+  planned;
 - =kept=: for an archive a keeper keeps, the keeper's URL; for one on
   disk the key is absent.
 
@@ -917,6 +920,76 @@ with its =reason=. Applied again, it finds its work done.
 
 Fixtures: =fixtures/ledger/convert*=: a tree and a root, and the events
 written, what was skipped and the report after; or the refusal.
+
+** Retirement
+
+A scope retires by being sealed, its directory the item, into its
+parent's archive. Where the scope keeps its archive or bookkeeping in
+its selected directory ([[*Layout][Layout]]), the plan seals an export of the
+scope, staged in =_seal/export-HASH/= in the archive's scope, HASH the
+first sixteen hexadecimal digits of the SHA-256 of DESTINATION's path
+from the archive. In the export, the selected directory's =archives/=
+and =archive-integrity/= are at the top of the item, with their names,
+bytes and modes, and are not in the selected directory, which is left
+out if nothing else is in it. Anything else hidden in the export is
+refused (=hidden=), as for any item. A scope with bookkeeping anywhere
+else as well, beside it or in another candidate directory, is refused
+(=relocation-required=), and so is anything the layout refuses.
+
+The export is checked before it is planned, asking no keeper, so that
+a checkpoint it holds that names no ledger event in it is refused
+(=anchor=). If planning fails the export is removed. The child
+archive's bytes, and so its CID, are those of the scope's archive; the
+export's own CID is the item's, and no equality with the live scope is
+claimed.
+
+The plan names the scope, as =retires=, with the SHA-256 of its
+inventory. The scope is unchanged until the plan is applied: applying
+refuses a scope that has changed since (=plan=), seals the export as
+any item, and only then removes the scope and the emptied staging.
+Applied again after an interruption, it finds the export sealed and
+removes what is left of the scope. Scopes retired before, in any
+layout, are read as they were sealed.
+
+** Relocation
+
+Relocation is poslib's command alone; pyposlib reads both layouts and
+does not move them. =relocate-plan ROOT= walks the active scopes under
+ROOT as discovery does, not entering an archive, so scopes retired into
+one are left as they are, and not entering a directory that holds
+=.git=, each such being listed under =repositories= to be relocated by
+a run of its own. For each scope with an archive, an
+=archive-integrity/= or legacy checkpoints outside its selected
+directory, the plan gives:
+
+- =scope=, relative to ROOT, and =selected=, the directory selected;
+- =renames=: each =from= and =to=, relative to ROOT, and =move=, =git=
+  where the repository tracks the path and =rename= where it does not,
+  as for an archive kept uncommitted; legacy checkpoints go to
+  =archive-integrity/checkpoints/= in the selected directory;
+- =blockers=: each with =reason=, =paths= sorted and =message=.
+
+The blockers are: the refusals of [[*Layout][Layout]], by their kinds;
+=destination=, a destination that exists; =unclean=, a check of the
+scope's archive with findings, asking no keeper; =legacy-ledger=, a
+ledger inside the archive, which migration brings beside it first;
+=access=, a directory that cannot be written; and =unversioned=, an
+=archive-integrity/= or legacy checkpoint directory with a file its
+repository does not track. Every blocker of every scope is reported,
+and =blocked= counts them. The program exits 0 with nothing to move, 1
+with something to move and 2 with a blocker.
+
+=relocate-apply ROOT= makes the plan again and refuses (=blocked=) if
+it has any blocker, before anything moves. Then each scope, in path
+order: each rename is Git's move or the file system's, and no file is
+copied, rewritten or appended to; the scope's archive is checked again,
+asking no keeper, and its heads, events, files and root CIDs must be
+what they were (else =unclean=); and the repository's managed archive
+exclusions, if it has them, are made again, so that an uncommitted
+archive is excluded where it now lies. Nothing is committed. A run
+stopped between scopes is resumed by running it again: a scope moved
+has nothing left outside its selected directory, and a run with
+nothing to move changes nothing.
 
 * Migration
 
