@@ -424,5 +424,26 @@ relocate-apply leaves every byte, mode and path as it was."
         (should (equal before (pos-keep-test--files root)))
         (should-not (pos-checkpoint-findings-p (pos-ledger-check root)))))))
 
+(ert-deftest pos-keep/a-declared-repository-that-is-missing-blocks-relocation ()
+  "A child repository a configuration declares and that is not there blocks.
+D11: the walk cannot reach its scopes, so the plan reports it as a
+mount blocker, and applying refuses with nothing moved."
+  (pos-keep-test--with-repository root
+    (pos-test-write-bytes (expand-file-name ".clanka/config.yml" root)
+                          (concat "pos: 2\nchildren:\n"
+                                  "  - path: mounted\n"
+                                  "    remote: git@example.org:mounted.git\n"))
+    (pos-keep-test--old-scope root "s")
+    (pos-keep-test--commit root)
+    (let* ((before (pos-keep-test--files root))
+           (plan (pos-keep-relocate-plan root))
+           (entry (seq-find (lambda (s) (equal "." (alist-get 'scope s)))
+                            (alist-get 'scopes plan))))
+      (should (equal 1 (alist-get 'blocked plan)))
+      (should (equal "mount" (alist-get 'reason (aref (alist-get 'blockers entry) 0))))
+      (should (equal ["mounted"] (alist-get 'paths (aref (alist-get 'blockers entry) 0))))
+      (pos-test-refused pos-ledger-refused "blocked" (pos-keep-relocate root))
+      (should (equal before (pos-keep-test--files root))))))
+
 (provide 'pos-keep-test)
 ;;; pos-keep-test.el ends here

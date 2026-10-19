@@ -47,6 +47,7 @@
 (require 'pos-cid)
 (require 'pos-git)
 (require 'pos-ledger)
+(require 'pos-node)
 (require 'pos-remote)
 (require 'pos-seal)
 (require 'pos-tree)
@@ -500,16 +501,56 @@ each with reason, paths and message."
       (setq dir (file-name-directory (directory-file-name dir))))
     dir))
 
+(defun pos-keep--mount-blockers (scope root)
+  "Return a blocker for each repository SCOPE declares that is not there.
+SCOPE's configuration declares children; each with a remote is a
+repository mounted at its path, and one whose path is not a directory
+blocks relocation (mount), since the walk cannot reach its scopes.
+Paths are relative to ROOT.  A configuration that cannot be read
+declares nothing here."
+  (let ((file (ignore-errors (pos-node-config-file scope))))
+    (when file
+      (let ((config (ignore-errors
+                      (pos-node-read-config
+                       (decode-coding-string
+                        (pos-bytes-read (expand-file-name file scope)) 'utf-8)))))
+        (delq nil
+              (mapcar (lambda (child)
+                        (let ((path (expand-file-name (alist-get 'path child) scope)))
+                          (when (and (stringp (alist-get 'remote child))
+                                     (or (file-symlink-p path)
+                                         (not (file-directory-p path))))
+                            (pos-keep--blocker
+                             'mount (list (directory-file-name (file-relative-name path root)))
+                             "A declared repository is not there: clone or fetch it, \
+or remove its entry"))))
+                      (alist-get 'children config)))))))
+
+(defun pos-keep--with-mounts (entry scope root)
+  "Return ENTRY, the relocation of SCOPE, with its mount blockers added.
+ENTRY may be nil; with mount blockers, an entry is made.  Paths are
+relative to ROOT."
+  (let ((mounts (pos-keep--mount-blockers scope root)))
+    (cond ((null mounts) entry)
+          (entry (setf (alist-get 'blockers entry)
+                       (vconcat (alist-get 'blockers entry) mounts))
+                 entry)
+          (t `((scope . ,(directory-file-name (file-relative-name scope root)))
+               (selected . :null) (renames . []) (blockers . ,(vconcat mounts)))))))
+
 (defun pos-keep-relocate-plan (root)
   "Return the plan to move each scope's bookkeeping under ROOT into place.
 An alist: root; scopes, each as `pos-keep--plan-scope' gives it, in
 path order, for the scopes with something at an old location or a
-blocker; repositories, the other repositories below ROOT, each to be
-relocated by a run of its own; and blocked, the number of blockers.
+blocker, a declared repository that is not there among them;
+repositories, the other repositories below ROOT, each to be relocated
+by a run of its own; and blocked, the number of blockers.
 Nothing is written, and no keeper is asked."
   (let* ((root (file-name-as-directory (file-truename (expand-file-name root))))
          (found (pos-keep--scopes root))
-         (scopes (delq nil (mapcar (lambda (scope) (pos-keep--plan-scope scope root))
+         (scopes (delq nil (mapcar (lambda (scope)
+                                     (pos-keep--with-mounts
+                                      (pos-keep--plan-scope scope root) scope root))
                                    (car found)))))
     `((root . ,(directory-file-name root))
       (scopes . ,(vconcat scopes))
