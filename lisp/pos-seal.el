@@ -390,7 +390,17 @@ LEDGER-ID names a new ledger; by default it takes the id its scope's
 entry names, else one made at random.  DATE, by default today's, dates
 any rumours the item's links need.  With AS-DESTINATION, a file's links
 are read as written from DESTINATION, not from where it lies; when it
-is a directory, they are read as written from there."
+is a directory, they are read as written from there.  A SOURCE that is
+a scope with its archive or bookkeeping in a configuration directory
+is retired from an export, as `pos-seal--plan-retirement' plans it."
+  (let ((dir (directory-file-name (file-truename (pos-ledger-checked source)))))
+    (if (pos-seal--retiring-p dir)
+        (pos-seal--plan-retirement dir destination ledger-id date as-destination)
+      (pos-seal--plan source destination ledger-id date as-destination))))
+
+(defun pos-seal--plan (source destination ledger-id date as-destination)
+  "Return the plan to seal SOURCE at DESTINATION, as `pos-seal-plan' does.
+LEDGER-ID, DATE and AS-DESTINATION are as it takes them."
   (pcase-let* ((source (directory-file-name (file-truename (pos-ledger-checked source))))
                (`(,archive . ,rel) (pos-seal--target
                                     (directory-file-name (expand-file-name destination)))))
@@ -464,6 +474,107 @@ LEDGER-ID names a new ledger, as for `pos-seal-plan'."
          (delete-file file)
          (when (directory-empty-p stage) (delete-directory stage))
          (signal (car err) (cdr err)))))))
+
+;;;; Retirement
+
+(defun pos-seal--retiring-p (dir)
+  "Return non-nil if DIR is a scope with an archive or bookkeeping hidden.
+That is, in one of its configuration directories."
+  (and (file-directory-p dir)
+       (seq-some (lambda (name)
+                   (seq-some (lambda (inner)
+                               (let ((path (expand-file-name (concat name "/" inner) dir)))
+                                 (or (file-exists-p path) (file-symlink-p path))))
+                             (list "archives" pos-ledger-integrity)))
+                 pos-path-config-directories)))
+
+(defun pos-seal--remove-tree (dir)
+  "Remove DIR and everything beneath it, read-only files included."
+  (when (or (file-exists-p dir) (file-symlink-p dir))
+    (unless (file-symlink-p dir)
+      (dolist (file (cons dir (directory-files-recursively dir "" t)))
+        (unless (file-symlink-p file)
+          (set-file-modes file (logior (file-modes file 'nofollow) #o200) 'nofollow))))
+    (if (and (file-directory-p dir) (not (file-symlink-p dir)))
+        (delete-directory dir t)
+      (delete-file dir))))
+
+(defun pos-seal--drop-empty (&rest dirs)
+  "Remove each of DIRS, in order, that is an empty directory."
+  (dolist (dir dirs)
+    (when (and (file-directory-p dir) (not (file-symlink-p dir)) (directory-empty-p dir))
+      (delete-directory dir))))
+
+(defun pos-seal--inventory-sha (dir)
+  "Return the SHA-256 of the inventory of DIR, hidden files included."
+  (pos-bytes-sha (pos-bytes-json (pos-ledger-inventory dir))))
+
+(defun pos-seal--plan-retirement (dir destination ledger-id date as-destination)
+  "Return the plan to retire the scope DIR into the archive at DESTINATION.
+DIR keeps its archive or bookkeeping in its selected configuration
+directory, which `pos-ledger-targets' must find with nothing elsewhere,
+else it refuses, an archive or archive-integrity/ beside DIR included.
+An export of DIR is staged in _seal/ in the archive's scope, where
+that directory's archives/ and archive-integrity/ are at the top, with
+their names, bytes and modes, and are not in the configuration
+directory.  Whatever else the export holds is sealed as any item is,
+a hidden file refused.  The export is checked, its nested checkpoints
+with it, asking no keeper, and is then planned as the item; the plan
+also names DIR, as retires, and the SHA-256 of its inventory, so that
+applying it refuses a DIR changed since, and removes DIR once sealed.
+LEDGER-ID, DATE and AS-DESTINATION are as `pos-seal-plan' takes them."
+  (let* ((selected (pos-target-selected (pos-ledger-targets dir)))
+         (archive (car (pos-seal--target (directory-file-name
+                                          (expand-file-name destination)))))
+         (stage (expand-file-name "_seal" (pos-path-archive-scope archive)))
+         (base (expand-file-name
+                (concat "export-"
+                        (substring (pos-bytes-sha
+                                    (encode-coding-string
+                                     (cdr (pos-seal--target
+                                           (directory-file-name
+                                            (expand-file-name destination))))
+                                     'utf-8))
+                                   0 16))
+                stage))
+         (export (expand-file-name (file-name-nondirectory dir) base))
+         (hidden (expand-file-name selected export))
+         (sha (pos-seal--inventory-sha dir)))
+    (pos-seal--remove-tree base)
+    (condition-case err
+        (progn
+          (make-directory base t)
+          (copy-directory dir export t nil nil)
+          (dolist (name (list "archives" pos-ledger-integrity))
+            (let ((path (expand-file-name name hidden)))
+              (when (file-exists-p path)
+                (rename-file path (expand-file-name name export)))))
+          (when (directory-empty-p hidden)
+            (delete-directory hidden))
+          (let ((pos-ledger-offline t))
+            (pos-ledger-check export))
+          (append (pos-seal--plan export destination ledger-id date as-destination)
+                  `((retires . ,dir) (retires_sha256 . ,sha))))
+      (error
+       (pos-seal--remove-tree base)
+       (pos-seal--drop-empty stage)
+       (signal (car err) (cdr err))))))
+
+(defun pos-seal--check-retired (plan)
+  "Refuse `plan' if the scope PLAN retires has changed since it was planned.
+A scope no longer there has been removed by an earlier application."
+  (let-alist plan
+    (when (and .retires (file-exists-p .retires)
+               (not (equal (pos-seal--inventory-sha .retires) .retires_sha256)))
+      (pos-ledger-refuse 'plan "The retired scope changed since review: %s" .retires))))
+
+(defun pos-seal--finish-retirement (plan)
+  "Remove the scope PLAN retires, and its export's staging, once it is sealed."
+  (let-alist plan
+    (when .retires
+      (pos-seal--remove-tree .retires)
+      (let ((base (directory-file-name (file-name-directory .source))))
+        (pos-seal--drop-empty base (directory-file-name (file-name-directory base)))))))
 
 ;;;; Application
 
@@ -630,9 +741,11 @@ Return (EVENT-FILE . ROOT)."
       (pos-ledger-refuse 'plan "The archive is not where it was planned: %s" .archive))
     (unless (equal .kept (pos-ledger-kept .archive))
       (pos-ledger-refuse 'plan "The archive is not kept as planned: %s" .archive))
-    (if .kept
-        (pos-seal--apply-kept plan expected)
-      (pos-seal--apply-on-disk plan))))
+    (pos-seal--check-retired plan)
+    (prog1 (if .kept
+               (pos-seal--apply-kept plan expected)
+             (pos-seal--apply-on-disk plan))
+      (pos-seal--finish-retirement plan))))
 
 (defun pos-seal--apply-on-disk (plan)
   "Apply PLAN, already checked, to an archive on disk.
