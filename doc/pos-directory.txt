@@ -553,7 +553,9 @@ source more, the image's:
 
 Given no source, the tool takes the image's from what auto/ holds;
 where auto/ names no repository or commit, the node has no source
-more. A node beneath the root in the same repository has none: a
+more. Where the node's configuration declares the source's repository
+under methodologies, the node has no source more either: the declared
+source says which of its skills are installed, and at what ref. A node beneath the root in the same repository has none: a
 coding agent shows a session there the skills of the root.
 
 The tool does not install a source: that needs the network, which a

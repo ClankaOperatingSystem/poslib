@@ -194,10 +194,19 @@ Nil where SOURCE names no repository or commit, or holds no skill."
           `((source . ,repository) (ref . ,commit) (skills . ,(vconcat names))))))))
 
 (defun pos-lock--sources (config image)
-  "Return the sources CONFIG declares, and IMAGE after them if given."
-  (let ((declared (alist-get 'methodologies config)))
-    (append (and (vectorp declared) (append declared nil))
-            (and image (list image)))))
+  "Return the sources CONFIG declares, and IMAGE after them if given.
+IMAGE is left out where CONFIG declares its repository: the declared
+source then says which of the image's skills are installed, and at
+what ref."
+  (let* ((declared (alist-get 'methodologies config))
+         (sources (and (vectorp declared) (append declared nil)))
+         (key (and image (pos-node-source-key (alist-get 'source image)))))
+    (append sources
+            (and image
+                 (not (seq-find (lambda (source)
+                                  (equal (pos-node-source-key (alist-get 'source source)) key))
+                                sources))
+                 (list image)))))
 
 (defun pos-lock--key (entry)
   "Return the source of ENTRY, a lock entry, as it is compared.
@@ -209,9 +218,10 @@ Its sourceUrl where it has one, else its source."
   "Return how the skills-lock.json at DIR differs from CONFIG's sources.
 DIR is a node's directory and CONFIG its configuration, as
 `pos-node-read-config' gives it.  IMAGE, if given, is one source more,
-as `pos-lock-image' gives it.  A list of alists, each of finding,
-lock-differs, lock-undeclared or wild-caught; skill, the skill's name,
-or nil for a finding of a whole source or file; and detail.  An entry of a
+as `pos-lock-image' gives it, unless CONFIG declares its repository.
+A list of alists, each of finding, lock-differs, lock-undeclared or
+wild-caught; skill, the skill's name, or nil for a finding of a whole
+source or file; and detail.  An entry of a
 declared source at its ref differs where its skill's directory in
 .agents/skills/ is not there, or has another hash than computedHash.
 The entries come in the order of their names, then the sources in the
@@ -279,7 +289,8 @@ None where CONFIG declares no sources and DIR has no skills-lock.json."
 
 (defun pos-lock-installed (dir config &optional image)
   "Return the names of the skills at DIR installed from CONFIG's sources.
-IMAGE, if given, is one source more, as `pos-lock-image' gives it.
+IMAGE, if given, is one source more, as `pos-lock-image' gives it,
+unless CONFIG declares its repository.
 Each has an entry in DIR's skills-lock.json of a source CONFIG
 declares, or of IMAGE, of a skill that source's entry names if it
 names any.  By name."
