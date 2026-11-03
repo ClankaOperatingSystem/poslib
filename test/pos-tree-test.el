@@ -1306,6 +1306,41 @@ and HASH its computedHash, 0 if nil."
             (let-alist finding (format "%s %s %s" .finding .path .detail)))
           (alist-get 'findings plan)))
 
+(ert-deftest pos-tree/a-declared-image-repository-takes-the-images-place ()
+  "Where the root declares the image's repository, the image is no source more.
+The image holds two skills and the root declares one of them, at the
+image's commit.  With that one installed, nothing is found: the other
+is not reported as not installed.  The installed skill is not
+wild-caught, and the declared ref is the one compared."
+  (pos-tree-test-with dir
+    (let* ((source (pos-tree-test-source (expand-file-name "source" dir) "1"
+                                         "clankos-one" "clankos-two"))
+           (commit (pos-tree-test-commit-of "1"))
+           (declare (lambda (ref)
+                      (concat (pos-tree-test-config)
+                              "methodologies:\n"
+                              "  - source: " pos-tree-test-image "\n"
+                              "    ref: " ref "\n"
+                              "    kind: skills-repository\n"
+                              "    skills: [clankos-one]\n")))
+           (root (pos-tree-test-repository
+                  (expand-file-name "root" dir)
+                  ".clanka/config.yml" (funcall declare commit)
+                  ".agents/skills/clankos-one/SKILL.md"
+                  "---\nname: clankos-one\ndescription: A skill.\n---\n")))
+      (pos-tree-test-write
+       root "skills-lock.json"
+       (pos-tree-test-lock
+        (list "clankos-one" pos-tree-test-image commit pos-tree-test-image
+              (pos-lock-hash (expand-file-name ".agents/skills/clankos-one" root)))))
+      (pos-tree-test-commit root)
+      (should (equal (pos-tree-test-findings (pos-tree-test-settle root source)) nil))
+      (pos-tree-test-write root ".clanka/config.yml" (funcall declare "v2"))
+      (pos-tree-test-commit root)
+      (should (equal (pos-tree-test-findings (pos-tree-plan root source))
+                     (list (format "lock-differs skills-lock.json clankos-one: %s installed, v2 declared"
+                                   commit)))))))
+
 (ert-deftest pos-tree/a-lock-file-that-holds-the-sources-is-not-found ()
   "Where skills-lock.json holds what the sources declare, nothing is found.
 A GitHub source written as a URL is the lock file's shorter source."
