@@ -188,6 +188,11 @@ configuration, which declares nothing. So a project is known by its
 place, and what its configuration holds, if it has one, does not say
 that it is one.
 
+A responsibility is known by its configuration wherever it lies: in a
+repository of its own, or as a directory of its parent's repository.
+A declared directory with no configuration is a product, even when it
+shares its parent's repository.
+
 A responsibility is a branch of the tree: it declares children of its
 own, each node naming only what is directly beneath it. A project is a
 leaf: it holds no responsibility or project. Its children are its
