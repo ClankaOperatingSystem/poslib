@@ -50,6 +50,8 @@
 ;;   share a file-level ID.
 ;; - `pos-lint-unignored-children': report each declared child with a
 ;;   remote, and each declared worktree, that Git does not ignore.
+;; - `pos-lint-tracked-ephemera': report each file Git tracks in an
+;;   underscore directory of ROOT's tree.
 ;; - `pos-lint-dependency-rule': report the references by ROOT's own
 ;;   files that the dependency rule forbids.
 ;; - `pos-lint-methodology-checks': run each check of each methodology
@@ -400,6 +402,38 @@ is at the entry's line."
                       findings)))))))
     (nreverse findings)))
 
+(defun pos-lint-tracked-ephemera (root)
+  "Report each file that Git tracks in an underscore directory of ROOT's tree.
+An underscore directory holds renderings and a working bolus, and a
+root's .gitignore ignores it with \"_*/\"; ignoring a path does not
+untrack a file Git already tracks, which is then committed as if it
+were canon.  Each repository of the tree is asked, from the root and
+from each scope at the top of a repository of its own.  A submodule
+is a repository, not a file, and is not reported.  The finding is at
+the file, its path from ROOT."
+  (let ((root (file-name-as-directory (expand-file-name root)))
+        dirs findings)
+    (dolist (scope (pos-corpus-scopes (pos-corpus root)))
+      (let ((dir (file-name-as-directory (expand-file-name (pos-scope-dir scope)))))
+        (when (or (equal dir root)
+                  (file-exists-p (expand-file-name ".git" dir)))
+          (cl-pushnew dir dirs :test #'equal))))
+    (dolist (dir (sort dirs #'string<))
+      (pcase-let ((`(,status . ,output) (pos-git dir "ls-files" "-s" "-z")))
+        (when (eq status 0)
+          (dolist (entry (split-string output "\0" t))
+            (let ((path (cadr (split-string entry "\t"))))
+              (when (and (not (string-prefix-p "160000 " entry))
+                         (seq-some (lambda (name) (string-prefix-p "_" name))
+                                   (butlast (split-string path "/"))))
+                (let ((file (expand-file-name path dir)))
+                  (push (pos-finding-make
+                         :file file :line 1
+                         :message (format "tracked-ephemera: %s"
+                                          (file-relative-name file root)))
+                        findings))))))))
+    (nreverse findings)))
+
 (defun pos-lint--not-ignored-p (dir path)
   "Return non-nil if the repository at DIR does not ignore PATH.
 PATH is relative to DIR.  A rule in .gitignore or in info/exclude, as
@@ -459,6 +493,7 @@ As pos-dependency.el has the rule; each finding names the rule."
     pos-lint-methodology-checks
     pos-lint-skills-lock
     pos-lint-unignored-children
+    pos-lint-tracked-ephemera
     pos-person-lint)
   "Whole-tree checks: root to findings.")
 
