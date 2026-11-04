@@ -175,11 +175,12 @@ the image's refresh to report, and the lint says nothing of it."
                      (pos-lint-format (pos-lint) root))))))
 
 (ert-deftest pos-lint/a-declared-child-that-git-tracks-is-a-finding ()
-  "A declared child with a remote, or a worktree, that Git does not ignore is found.
-It is found at its entry's line.  A line in .gitignore ignores a
-child, and so does the line the tree command writes to info/exclude;
-neither child is found.  A child with no remote is a directory of the
-same repository, which Git tracks, and is not found."
+  "A declared child or worktree that Git does not ignore is found.
+A child with a remote, or a worktree, is found at its entry's line.
+A line in .gitignore ignores a child, and so does the line the tree
+command writes to info/exclude; neither child is found.  A child with
+no remote is a directory of the same repository, which Git tracks,
+and is not found."
   (pos-test-with-files root
       '((".clanka/config.yml"
          . "pos: 2\nchildren:\n  - path: lib\n    remote: https://example.org/lib.git\n  - path: kept\n    remote: https://example.org/kept.git\n  - path: excluded\n    remote: https://example.org/excluded.git\n  - path: area\nworktrees:\n  - path: _worktrees/feature\n    of: lib\n    branch: feature\n")
