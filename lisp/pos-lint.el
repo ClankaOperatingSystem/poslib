@@ -44,6 +44,8 @@
 ;; - `pos-lint-waiting-without-who-or-when': report WAITING items in
 ;;   FILE that do not say who or what, or since when.
 ;; - `pos-lint-file-id': report FILE if it has no file-level ID.
+;; - `pos-lint-project-status': report FILE's STATUS if it is not one of
+;;   `pos-project-statuses'.
 ;; - `pos-lint-duplicate-tasks': report task headings in more than one
 ;;   file of ROOT's corpus.
 ;; - `pos-lint-shared-file-ids': report files of ROOT's corpus that
@@ -70,6 +72,7 @@
 (require 'pos-git)
 (require 'pos-lock)
 (require 'pos-node)
+(require 'pos-project)
 
 ;;;; Checks of a file
 
@@ -203,6 +206,30 @@ A file the root may not write is not reported."
        (not (pos-lint--file-id file))
        (list (pos-finding-make :file file :line 1 :message "no file-level ID"))))
 
+(defun pos-lint-project-status (file)
+  "Report FILE's STATUS if it is not one of `pos-project-statuses'.
+The STATUS is the property before the first heading that marks a
+project's file.  A status written by hand is reported at its line; one
+`pos-project-set-status' wrote is one of them.  A file the root may not
+write is not reported."
+  (and (pos-lint--own-file-p file)
+       (with-current-buffer (pos-visit file)
+         (org-with-wide-buffer
+          (goto-char (point-min))
+          (and (re-search-forward
+                pos-project-status-line
+                (save-excursion
+                  (or (re-search-forward "^\\*+ " nil t) (point-max)))
+                t)
+               (not (assoc (match-string-no-properties 1) pos-project-statuses))
+               (list (pos-finding-make
+                      :file file :line (line-number-at-pos)
+                      :message (format "STATUS %s is not one of %s"
+                                       (match-string-no-properties 1)
+                                       (string-join
+                                        (mapcar #'car pos-project-statuses)
+                                        ", ")))))))))
+
 (defvar pos-lint-checks
   '(pos-lint-done-with-open-children
     pos-lint-stale-keyword
@@ -210,7 +237,8 @@ A file the root may not write is not reported."
     pos-lint-merged-copy
     pos-lint-clarified-in-intray
     pos-lint-waiting-without-who-or-when
-    pos-lint-file-id)
+    pos-lint-file-id
+    pos-lint-project-status)
   "Per-file checks: file to findings.")
 
 ;;;; Checks of the tree
