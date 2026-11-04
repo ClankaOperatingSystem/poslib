@@ -247,6 +247,14 @@ records an unexcluded child as an embedded repository. The line written
 for a path is the path from the repository's root with a slash before
 it, which anchors it there.
 
+.git/info/exclude belongs to one clone and is not pushed, so a fresh
+clone has no rule for a child until the tree command has run there,
+and a child put in place by hand has none in any clone. The tool does
+not write .gitignore, which the repository tracks. The lint reports a
+declared child with a remote, and a declared worktree, whose path Git
+does not ignore, as unignored-child at its entry; a line in .gitignore
+ignores it in every clone, and so does the tree command's line.
+
 A child with no remote is a directory of the same repository, tracked
 and committed with it. It has no branch, and an entry that gives it
 one is refused (bad-value). Nothing is excluded or cloned for it. What

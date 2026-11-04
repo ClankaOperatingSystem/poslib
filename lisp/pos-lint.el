@@ -48,6 +48,8 @@
 ;;   file of ROOT's corpus.
 ;; - `pos-lint-shared-file-ids': report files of ROOT's corpus that
 ;;   share a file-level ID.
+;; - `pos-lint-unignored-children': report each declared child with a
+;;   remote, and each declared worktree, that Git does not ignore.
 ;; - `pos-lint-dependency-rule': report the references by ROOT's own
 ;;   files that the dependency rule forbids.
 ;; - `pos-lint-methodology-checks': run each check of each methodology
@@ -63,6 +65,7 @@
 (require 'pos)
 (require 'pos-corpus)
 (require 'pos-dependency)
+(require 'pos-git)
 (require 'pos-lock)
 (require 'pos-node)
 
@@ -397,6 +400,51 @@ is at the entry's line."
                       findings)))))))
     (nreverse findings)))
 
+(defun pos-lint--not-ignored-p (dir path)
+  "Return non-nil if the repository at DIR does not ignore PATH.
+PATH is relative to DIR.  A rule in .gitignore or in info/exclude, as
+a file or as a directory, ignores it.  Nil where DIR is not in a
+repository: git check-ignore exits 1 only for a path it does not
+ignore."
+  (and (eq 1 (car (pos-git dir "check-ignore" "-q" "--" path)))
+       (eq 1 (car (pos-git dir "check-ignore" "-q" "--" (concat path "/"))))))
+
+(defun pos-lint-unignored-children (root)
+  "Report each declared child of ROOT's tree that its repository's Git tracks.
+A child with a remote is a repository of its own, and so is a declared
+worktree; the repository that holds the declaring node must ignore
+its path, or staging everything there records it as an embedded
+repository.  The tree command writes the path to info/exclude, which
+is not committed, so a fresh clone has no rule until it runs; a line
+in .gitignore holds in every clone.  The finding is at the entry's
+line in the declaring configuration."
+  (let (findings)
+    (dolist (scope (pos-corpus-scopes (pos-corpus root)))
+      (when-let* ((config (pos-scope-config scope))
+                  (dir (pos-scope-dir scope))
+                  (name (pos-node-config-file dir)))
+        (let ((file (expand-file-name name dir)))
+          (dolist (entry (append (seq-filter (lambda (child)
+                                               (stringp (alist-get 'remote child)))
+                                             (alist-get 'children config))
+                                 (alist-get 'worktrees config)
+                                 nil))
+            (let ((path (alist-get 'path entry)))
+              (when (pos-lint--not-ignored-p dir path)
+                (push (pos-finding-make
+                       :file file
+                       :line (with-temp-buffer
+                               (insert-file-contents file)
+                               (if (re-search-forward
+                                    (concat "path: *[\"']?" (regexp-quote path) "[\"']? *$")
+                                    nil t)
+                                   (line-number-at-pos)
+                                 1))
+                       :message (format "unignored-child: %s: Git does not ignore it; run the tree command, or add it to .gitignore"
+                                        path))
+                      findings)))))))
+    (nreverse findings)))
+
 (defun pos-lint-dependency-rule (root)
   "Report the references by ROOT's own files that the dependency rule forbids.
 As pos-dependency.el has the rule; each finding names the rule."
@@ -410,6 +458,7 @@ As pos-dependency.el has the rule; each finding names the rule."
     pos-lint-dependency-rule
     pos-lint-methodology-checks
     pos-lint-skills-lock
+    pos-lint-unignored-children
     pos-person-lint)
   "Whole-tree checks: root to findings.")
 

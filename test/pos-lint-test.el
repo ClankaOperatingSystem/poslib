@@ -174,6 +174,31 @@ the image's refresh to report, and the lint says nothing of it."
                               "not among the skills of https://example.org/a.git"))
                      (pos-lint-format (pos-lint) root))))))
 
+(ert-deftest pos-lint/a-declared-child-that-git-tracks-is-a-finding ()
+  "A declared child with a remote, or a worktree, that Git does not ignore is found.
+It is found at its entry's line.  A line in .gitignore ignores a
+child, and so does the line the tree command writes to info/exclude;
+neither child is found.  A child with no remote is a directory of the
+same repository, which Git tracks, and is not found."
+  (pos-test-with-files root
+      '((".clanka/config.yml"
+         . "pos: 2\nchildren:\n  - path: lib\n    remote: https://example.org/lib.git\n  - path: kept\n    remote: https://example.org/kept.git\n  - path: excluded\n    remote: https://example.org/excluded.git\n  - path: area\nworktrees:\n  - path: _worktrees/feature\n    of: lib\n    branch: feature\n")
+        (".gitignore" . "/kept\n")
+        ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n")
+        ("area/.clanka/config.yml" . "pos: 2\n")
+        ("area/intray.org" . ":PROPERTIES:\n:ID: area\n:END:\n* TODO mend\n"))
+    (pos-test-git-init root)
+    (with-temp-file (expand-file-name ".git/info/exclude" root)
+      (insert "/excluded\n"))
+    (let ((pos-directory root))
+      (should (equal (pos-test-lines
+                      (concat ".clanka/config.yml:3: unignored-child: lib: Git does not "
+                              "ignore it; run the tree command, or add it to .gitignore")
+                      (concat ".clanka/config.yml:11: unignored-child: _worktrees/feature: "
+                              "Git does not ignore it; run the tree command, or add it to "
+                              ".gitignore"))
+                     (pos-lint-format (pos-lint) root))))))
+
 (ert-deftest pos-lint/an-entry-of-the-images-skills-is-declared ()
   "An entry of the image's repository in a root's skills-lock.json is declared.
 auto/ in the configuration directory names the repository and the
