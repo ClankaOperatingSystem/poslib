@@ -200,6 +200,28 @@ and is not found."
                               ".gitignore"))
                      (pos-lint-format (pos-lint) root))))))
 
+(ert-deftest pos-lint/a-tracked-file-in-an-underscore-directory-is-a-finding ()
+  "A file Git tracks in an underscore directory is found, at the file.
+A file Git does not track there is not found, nor a file whose own
+name, and not a directory's, begins with an underscore, nor a
+submodule in an underscore directory."
+  (pos-test-with-files root
+      '((".clanka/config.yml" . "pos: 2\n")
+        ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n")
+        ("_site/index.html" . "<p>rendered</p>\n")
+        ("notes/_bolus/draft.org" . "draft\n")
+        ("notes/_kept.org" . ":PROPERTIES:\n:ID: kept\n:END:\nkept\n")
+        ("_scratch/loose.org" . "loose\n"))
+    (pos-test-git-init root)
+    (pos-test-git root "add" "-f" ".clanka" "intray.org" "_site" "notes")
+    (pos-test-git root "update-index" "--add" "--cacheinfo"
+                  (concat "160000," (make-string 40 ?1) ",_deps/lib"))
+    (let ((pos-directory root))
+      (should (equal (pos-test-lines
+                      "_site/index.html:1: tracked-ephemera: _site/index.html"
+                      "notes/_bolus/draft.org:1: tracked-ephemera: notes/_bolus/draft.org")
+                     (pos-lint-format (pos-lint) root))))))
+
 (ert-deftest pos-lint/an-entry-of-the-images-skills-is-declared ()
   "An entry of the image's repository in a root's skills-lock.json is declared.
 auto/ in the configuration directory names the repository and the

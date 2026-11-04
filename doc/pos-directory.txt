@@ -112,7 +112,11 @@ glob beginning with * is quoted, as YAML asks. What exclude governs is
 reading: a tool that walks a node for its files, its undeclared
 repositories or its archive scopes does not enter an excluded
 directory. A directory named archives is an archive scope wherever it
-lies, whether or not the walk enters it. A repository mounted in the
+lies, whether or not the walk enters it. Exclusion does not reach Git:
+a root's .gitignore ignores underscore directories with "_*/", but a
+file Git already tracks stays tracked, and the lint reports each file
+that Git tracks in an underscore directory as tracked-ephemera at the
+file. A repository mounted in the
 tree is read by its own configuration: the exclusions of the
 repository it is mounted in do not reach into it, and one that
 declares none has the default.
