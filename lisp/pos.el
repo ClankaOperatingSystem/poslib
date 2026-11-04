@@ -33,6 +33,7 @@
 ;;   one change to it, locked, saved or undone; and how Emacs writes
 ;;   for a command.
 ;; - `pos-one-line-p': whether a title or a note is one line.
+;; - `pos-refusal-exits-1': a shell entry whose refusal exits 1.
 ;; - `pos-normalise-keywords': remove #+TODO lines from the files.
 ;; - `pos-map-headings', `pos-marker-at', `pos-open-descendant-p': the
 ;;   headings of a file, one of them by its line, and whether one has
@@ -200,6 +201,20 @@ Return what BODY returns."
                (prog1 (org-with-wide-buffer ,@body)
                  (save-buffer))))
          (unlock-buffer)))))
+
+;;;; Shell entries
+
+(defmacro pos-refusal-exits-1 (&rest body)
+  "Evaluate BODY, a command's shell entry, so that a refusal exits 1.
+A refusal is a `user-error' or a `pos-node-refused'.  Its message is
+printed and Emacs exits 1; an error left to escape batch Emacs would
+exit 255."
+  (declare (indent 0) (debug t))
+  `(condition-case err
+       (progn ,@body)
+     ((user-error pos-node-refused)
+      (message "%s" (error-message-string err))
+      (kill-emacs 1))))
 
 ;;;; The root and its settings
 

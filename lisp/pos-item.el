@@ -149,33 +149,34 @@ own tags afterwards.  Refuse what `pos-set-state' refuses."
   deadline TARGET DATE
   tag TARGET SPEC...
 as `pos-set-date' and `pos-set-tags' take them.  Exit 2 on any other
-arguments."
-  (pcase command-line-args-left
-    (`(,(and command (or "schedule" "deadline")) ,target ,date)
-     (setq command-line-args-left nil)
-     (let* ((item (pos-set-date
-                   pos-directory target
-                   (if (equal command "schedule") "scheduled" "deadline")
-                   date))
-            (stamp (pos-item-planning item)))
-       (princ (format "%s%s\n" (pos-item-format item)
-                      (if stamp
-                          (format " %s %s" (if (equal command "schedule")
-                                               org-scheduled-string
-                                             org-deadline-string)
-                                  stamp)
-                        "")))))
-    (`("tag" ,target . ,(and specs (guard specs)))
-     (setq command-line-args-left nil)
-     (let* ((item (pos-set-tags pos-directory target specs))
-            (tags (pos-item-tags item)))
-       (princ (format "%s%s\n" (pos-item-format item)
-                      (if tags (format " :%s:" (string-join tags ":")) "")))))
-    (_
-     (message (concat "Usage: schedule TARGET DATE|none\n"
-                      "       deadline TARGET DATE|none\n"
-                      "       tag TARGET +TAG|-TAG ..."))
-     (kill-emacs 2))))
+arguments, and 1 on a refusal."
+  (pos-refusal-exits-1
+    (pcase command-line-args-left
+      (`(,(and command (or "schedule" "deadline")) ,target ,date)
+       (setq command-line-args-left nil)
+       (let* ((item (pos-set-date
+                     pos-directory target
+                     (if (equal command "schedule") "scheduled" "deadline")
+                     date))
+              (stamp (pos-item-planning item)))
+         (princ (format "%s%s\n" (pos-item-format item)
+                        (if stamp
+                            (format " %s %s" (if (equal command "schedule")
+                                                 org-scheduled-string
+                                               org-deadline-string)
+                                    stamp)
+                          "")))))
+      (`("tag" ,target . ,(and specs (guard specs)))
+       (setq command-line-args-left nil)
+       (let* ((item (pos-set-tags pos-directory target specs))
+              (tags (pos-item-tags item)))
+         (princ (format "%s%s\n" (pos-item-format item)
+                        (if tags (format " :%s:" (string-join tags ":")) "")))))
+      (_
+       (message (concat "Usage: schedule TARGET DATE|none\n"
+                        "       deadline TARGET DATE|none\n"
+                        "       tag TARGET +TAG|-TAG ..."))
+       (kill-emacs 2)))))
 
 (provide 'pos-item)
 ;;; pos-item.el ends here

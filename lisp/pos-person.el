@@ -697,43 +697,44 @@ file, then \"Links renamed: FILE: COUNT\" for each file changed.
 wait TARGET PERSON [NOTE], as `pos-person-wait-on' takes them, and
 arrived TARGET [STATE [NOTE]], as `pos-person-arrived' takes them,
 print \"FILE:LINE: STATE TITLE\" for the item as it is afterwards.
-Exit 2 on any other arguments."
+Exit 2 on any other arguments, and 1 on a refusal."
   (let ((root (file-name-as-directory (expand-file-name pos-directory)))
         (arguments (prog1 command-line-args-left
                      (setq command-line-args-left nil))))
-    (pcase arguments
-      (`("add" ,name)
-       (princ (format "%s\n"
-                      (file-relative-name (pos-person-add root name) root))))
-      (`("identity" ,person ,scope)
-       (pcase-let ((`(,file ,id ,name ,made)
-                    (pos-person-identity root person scope)))
-         (princ (format "%s: %s %s, %s\n" (file-relative-name file root)
-                        name id (if made "made" "there already")))))
-      (`("rename" ,id ,name)
-       (pcase-let ((`(,file . ,changed)
-                    (pos-person-identity-rename root id name)))
-         (princ (format "%s\n" (file-relative-name file root)))
-         (pcase-dolist (`(,renamed . ,count) changed)
-           (princ (format "Links renamed: %s: %d\n"
-                          (file-relative-name renamed root) count)))))
-      ((and `(,(and command (or "wait" "arrived")) . ,rest)
-            (guard (memq (length rest)
-                         (if (equal command "wait") '(2 3) '(1 2 3)))))
-       (princ (concat (pos-item-format
-                       (apply (if (equal command "wait")
-                                  #'pos-person-wait-on
-                                #'pos-person-arrived)
-                              root rest)
-                       root)
-                      "\n")))
-      (_ (message "%s\n%s\n%s\n%s\n%s"
-                  "Usage: add NAME"
-                  "       identity PERSON SCOPE"
-                  "       rename ID NAME"
-                  "       wait TARGET PERSON [NOTE]"
-                  "       arrived TARGET [STATE [NOTE]]")
-         (kill-emacs 2)))))
+    (pos-refusal-exits-1
+      (pcase arguments
+        (`("add" ,name)
+         (princ (format "%s\n"
+                        (file-relative-name (pos-person-add root name) root))))
+        (`("identity" ,person ,scope)
+         (pcase-let ((`(,file ,id ,name ,made)
+                      (pos-person-identity root person scope)))
+           (princ (format "%s: %s %s, %s\n" (file-relative-name file root)
+                          name id (if made "made" "there already")))))
+        (`("rename" ,id ,name)
+         (pcase-let ((`(,file . ,changed)
+                      (pos-person-identity-rename root id name)))
+           (princ (format "%s\n" (file-relative-name file root)))
+           (pcase-dolist (`(,renamed . ,count) changed)
+             (princ (format "Links renamed: %s: %d\n"
+                            (file-relative-name renamed root) count)))))
+        ((and `(,(and command (or "wait" "arrived")) . ,rest)
+              (guard (memq (length rest)
+                           (if (equal command "wait") '(2 3) '(1 2 3)))))
+         (princ (concat (pos-item-format
+                         (apply (if (equal command "wait")
+                                    #'pos-person-wait-on
+                                  #'pos-person-arrived)
+                                root rest)
+                         root)
+                        "\n")))
+        (_ (message "%s\n%s\n%s\n%s\n%s"
+                    "Usage: add NAME"
+                    "       identity PERSON SCOPE"
+                    "       rename ID NAME"
+                    "       wait TARGET PERSON [NOTE]"
+                    "       arrived TARGET [STATE [NOTE]]")
+           (kill-emacs 2))))))
 
 (provide 'pos-person)
 ;;; pos-person.el ends here

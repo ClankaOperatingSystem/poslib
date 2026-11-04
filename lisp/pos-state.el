@@ -160,14 +160,15 @@ symlinks, unsaved or stale buffers and foreign locks."
 (defun pos-state-batch ()
   "Set the state of an item of `pos-directory' and print the item.
 `command-line-args-left' is TARGET STATE [NOTE], as `pos-set-state'
-takes them.  Exit 2 on any other arguments."
+takes them.  Exit 2 on any other arguments, and 1 on a refusal."
   (unless (memq (length command-line-args-left) '(2 3))
     (message "Usage: TARGET %s [NOTE]" (string-join (pos-state-states) "|"))
     (kill-emacs 2))
-  (pcase-let* ((`(,target ,state ,note) command-line-args-left)
-               (item (pos-set-state pos-directory target state note)))
-    (setq command-line-args-left nil)
-    (princ (concat (pos-item-format item) "\n"))))
+  (pos-refusal-exits-1
+    (pcase-let* ((`(,target ,state ,note) command-line-args-left)
+                 (item (pos-set-state pos-directory target state note)))
+      (setq command-line-args-left nil)
+      (princ (concat (pos-item-format item) "\n")))))
 
 (provide 'pos-state)
 ;;; pos-state.el ends here

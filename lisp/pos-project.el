@@ -307,32 +307,34 @@ the root.  status PROJECT STATUS [NOTE], as `pos-project-set-status'
 takes them, prints the file, the status it had and the one it has.
 promote PROJECT, as `pos-project-promote' takes it, prints the new
 file, then \"Links rewritten: FILE: COUNT\" for each file changed.
-Exit 2 on any other arguments."
+Exit 2 on any other arguments, and 1 on a refusal."
   (let ((root (file-name-as-directory (expand-file-name pos-directory)))
         (arguments (prog1 command-line-args-left
                      (setq command-line-args-left nil))))
-    (pcase arguments
-      ((and `("create" . ,rest) (guard (memq (length rest) '(5 6))))
-       (princ (format "%s\n"
-                      (file-relative-name
-                       (apply #'pos-project-create root rest) root))))
-      ((and `("status" . ,rest) (guard (memq (length rest) '(2 3))))
-       (pcase-let ((`(,file ,previous ,status)
-                    (apply #'pos-project-set-status root rest)))
-         (princ (format "%s: STATUS %s, was %s\n"
-                        (file-relative-name file root) status previous))))
-      (`("promote" ,project)
-       (pcase-let ((`(,file . ,rewritten) (pos-project-promote root project)))
-         (princ (format "%s\n" (file-relative-name file root)))
-         (pcase-dolist (`(,changed . ,count) rewritten)
-           (princ (format "Links rewritten: %s: %d\n"
-                          (file-relative-name changed root) count)))))
-      (_ (message "%s\n%s\n%s"
-                  "Usage: create WITHIN NAME TITLE OUTCOME REVIEW [NEXT]"
-                  (format "       status PROJECT %s [NOTE]"
-                          (string-join (mapcar #'car pos-project-statuses) "|"))
-                  "       promote PROJECT")
-         (kill-emacs 2)))))
+    (pos-refusal-exits-1
+      (pcase arguments
+        ((and `("create" . ,rest) (guard (memq (length rest) '(5 6))))
+         (princ (format "%s\n"
+                        (file-relative-name
+                         (apply #'pos-project-create root rest) root))))
+        ((and `("status" . ,rest) (guard (memq (length rest) '(2 3))))
+         (pcase-let ((`(,file ,previous ,status)
+                      (apply #'pos-project-set-status root rest)))
+           (princ (format "%s: STATUS %s, was %s\n"
+                          (file-relative-name file root) status previous))))
+        (`("promote" ,project)
+         (pcase-let ((`(,file . ,rewritten) (pos-project-promote root project)))
+           (princ (format "%s\n" (file-relative-name file root)))
+           (pcase-dolist (`(,changed . ,count) rewritten)
+             (princ (format "Links rewritten: %s: %d\n"
+                            (file-relative-name changed root) count)))))
+        (_ (message "%s\n%s\n%s"
+                    "Usage: create WITHIN NAME TITLE OUTCOME REVIEW [NEXT]"
+                    (format "       status PROJECT %s [NOTE]"
+                            (string-join
+                             (mapcar #'car pos-project-statuses) "|"))
+                    "       promote PROJECT")
+           (kill-emacs 2))))))
 
 (provide 'pos-project)
 ;;; pos-project.el ends here
