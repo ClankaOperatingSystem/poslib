@@ -70,6 +70,7 @@
 (require 'org-agenda)
 (require 'seq)
 (require 'pos)
+(require 'pos-blocker)
 (require 'pos-corpus)
 (require 'pos-person)
 (require 'pos-project)
@@ -118,7 +119,7 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
   "The questions a session opens with.")
 
 (defconst pos-startup-views
-  '("handover" "next" "waiting" "someday" "scheduled" "deadlines" "reviews"
+  '("handover" "next" "waiting" "blocked" "someday" "scheduled" "deadlines" "reviews"
     "reviews-to-schedule" "stuck" "no-outcome" "projects" "intray" "finished"
     "all")
   "The names of the views, in the order they are printed.")
@@ -129,7 +130,7 @@ Trust: Treat the views below as a bounded view of saved files, not a complete re
   "The views `pos-startup-report' prints when none is named.")
 
 (defconst pos-startup-weekly-views
-  '("intray" "next" "waiting" "scheduled" "deadlines" "reviews" "stuck"
+  '("intray" "next" "waiting" "blocked" "scheduled" "deadlines" "reviews" "stuck"
     "no-outcome" "reviews-to-schedule" "someday" "finished")
   "The views of a weekly review, in the order the review reads them.
 What is to be placed; what is next, waited for, dated and to be
@@ -472,6 +473,33 @@ WAITING items."
                     (lambda () (not (funcall owner))))))
      "\n")))
 
+(defun pos-startup--blocked ()
+  "Return the blocked view of `pos-startup--corpus'.
+Each open event, as pos-blocker.el has it, with the open items it
+blocks under it, indented.  While `pos-startup--gathering', each event
+gathered gains blocked_by :null, and each item it blocks blocked_by,
+the event's ID."
+  (let (lines)
+    (pcase-dolist (`(,event . ,items) (pos-blocker-events pos-startup--corpus))
+      (let ((id (pos-blocker-heading-id event)))
+        (dolist (heading (cons event items))
+          (with-current-buffer (pos-visit (pos-blocker-heading-file heading))
+            (org-with-wide-buffer
+             (goto-char (point-min))
+             (forward-line (1- (pos-blocker-heading-line heading)))
+             (when pos-startup--gathering
+               (push (append (pos-startup--item-at-point)
+                             `((blocked_by . ,(if (eq heading event) :null id))))
+                     pos-startup--items))
+             (push (format "%s%-54s %s %s"
+                           (if (eq heading event) "" "  ")
+                           (pos-startup--label)
+                           (pos-blocker-heading-state heading)
+                           (org-link-display-format
+                            (pos-blocker-heading-title heading)))
+                   lines))))))
+    (pos-startup--list "Events, each with the items it blocks" (nreverse lines))))
+
 (defun pos-startup--reviews ()
   "Return the reviews view of `pos-startup--corpus'.
 Headings tagged `pos-startup-review-tag' that are late or scheduled
@@ -809,6 +837,7 @@ A view of more than one list has a title for each."
     (pcase view
       ("next" (pos-startup--next))
       ("waiting" (pos-startup--waiting))
+      ("blocked" (pos-startup--blocked))
       ("someday"
        ;; Not committed to; read when a review asks what might be taken up.
        (let ((org-agenda-overriding-header "SOMEDAY items"))
@@ -856,11 +885,13 @@ A view of more than one list has a title for each."
 A list with an element for each line `pos-startup-view' prints, in
 its order.  In a view of items each is an alist as
 `pos-startup--item-at-point' gives it; in waiting, each has
-waiting_on too, the person's name or :null.  In reviews-to-schedule,
-stuck, no-outcome and projects, which list scopes, each has scope, scope_kind
-and status; in projects, review, next and outcome too.  A line of
-reviews-to-schedule for a path that is no scope's has the scope of
-the review's file, and covers, file, line and title."
+waiting_on too, the person's name or :null; in blocked, each has
+blocked_by, the ID of the event that blocks it, or :null for an
+event.  In reviews-to-schedule, stuck, no-outcome and projects, which
+list scopes, each has scope, scope_kind and status; in projects,
+review, next and outcome too.  A line of reviews-to-schedule for a
+path that is no scope's has the scope of the review's file, and
+covers, file, line and title."
   (cdr (pos-startup-view-with-items root view)))
 
 (defun pos-startup-view-with-items (root view)

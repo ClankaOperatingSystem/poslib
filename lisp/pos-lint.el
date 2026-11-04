@@ -516,6 +516,7 @@ As pos-dependency.el has the rule; each finding names the rule."
   (pos-dependency-findings (pos-corpus root)))
 
 (autoload 'pos-person-lint "pos-person")
+(autoload 'pos-blocker-lint "pos-blocker")
 
 (defvar pos-lint-repo-checks
   '(pos-lint-duplicate-tasks
@@ -525,7 +526,8 @@ As pos-dependency.el has the rule; each finding names the rule."
     pos-lint-skills-lock
     pos-lint-unignored-children
     pos-lint-tracked-ephemera
-    pos-person-lint)
+    pos-person-lint
+    pos-blocker-lint)
   "Whole-tree checks: root to findings.")
 
 ;;;; The lint

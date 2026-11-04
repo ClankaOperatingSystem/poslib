@@ -434,6 +434,32 @@ listed as waiting on no person.  As data, each item names the person."
                      ("Hear from the council" . :null)
                      ("Hear from a stranger" . :null))))))
 
+(ert-deftest pos-startup/the-blocked-view-lists-each-event-with-what-it-blocks ()
+  "The blocked view lists each open event, with the open items it blocks.
+An item names its events in BLOCKER.  Each item is under its event,
+indented; a done item, and a done event with what it blocked, are left
+out.  As data, each item names the event that blocks it."
+  (pos-test-with-files root
+      `((".pos/config.yaml" . "projects: projects/\n")
+        ("projects/glasshouse.org"
+         . ,(concat "* WAITING The boiler is repaired\n:PROPERTIES:\n:ID: boiler\n:END:\n"
+                    "* TODO Sow the seed\n:PROPERTIES:\n"
+                    ":BLOCKER: [[id:boiler][The boiler is repaired]]\n:END:\n"
+                    "* DONE Order the seed\n:PROPERTIES:\n"
+                    ":BLOCKER: [[id:boiler][The boiler is repaired]]\n:END:\n"
+                    "* DONE The frost has passed\n:PROPERTIES:\n:ID: frost\n:END:\n"
+                    "* TODO Plant out\n:PROPERTIES:\n"
+                    ":BLOCKER: [[id:frost][The frost has passed]]\n:END:\n")))
+    (should (equal (concat "Events, each with the items it blocks\n"
+                           (format "  %-54s WAITING The boiler is repaired\n" "glasshouse")
+                           (format "    %-54s TODO Sow the seed\n" "glasshouse"))
+                   (pos-startup-view root "blocked")))
+    (should (equal (mapcar (lambda (item)
+                             (cons (alist-get 'title item) (alist-get 'blocked_by item)))
+                           (pos-startup-view-items root "blocked"))
+                   '(("The boiler is repaired" . :null)
+                     ("Sow the seed" . "boiler"))))))
+
 (ert-deftest pos-startup/a-person-with-nothing-waiting-leaves-one-waiting-list ()
   "With people recorded and no item waiting on one, the one list is as before.
 Every person waited on being named, the last list says there are none."
