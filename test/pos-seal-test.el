@@ -175,6 +175,19 @@ The first plan is refused, the second seals, and _seal is gone."
       (should (equal "first\n" (pos-bytes-read (pos-test-archived scope "first.txt"))))
       (should (file-directory-p (expand-file-name ".clankos/archive-integrity/ledger" scope))))))
 
+(ert-deftest pos-seal/a-ledger-event-leaves-the-archive-s-root-cid ()
+  "A ledger event that adds nothing to an archive leaves its root CID as it was.
+Here a checkpoint writes into archive-integrity/ beside the archive,
+which the archive's CID does not cover."
+  (pos-test-with-scope
+    (let* ((archive (pos-test-scope-sealed scope))
+           (integrity (expand-file-name ".clankos/archive-integrity" (file-truename scope)))
+           (root (pos-cid-directory archive))
+           (before (directory-files-recursively integrity "")))
+      (pos-checkpoint-record scope)
+      (should-not (equal before (directory-files-recursively integrity "")))
+      (should (equal root (pos-cid-directory archive))))))
+
 (ert-deftest pos-seal/a-refused-new-record-leaves-nothing-staged ()
   "When planning fails, the staged bytes and an emptied _seal/ go."
   (pos-test-with-scope
