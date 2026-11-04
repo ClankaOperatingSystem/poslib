@@ -450,8 +450,10 @@ worktree; the repository that holds the declaring node must ignore
 its path, or staging everything there records it as an embedded
 repository.  The tree command writes the path to info/exclude, which
 is not committed, so a fresh clone has no rule until it runs; a line
-in .gitignore holds in every clone.  The finding is at the entry's
-line in the declaring configuration."
+in .gitignore holds in every clone.  A child or worktree not on disk
+cannot be staged, and is not reported, so a fresh clone that has not
+cloned its children is silent.  The finding is at the entry's line in
+the declaring configuration."
   (let (findings)
     (dolist (scope (pos-corpus-scopes (pos-corpus root)))
       (when-let* ((config (pos-scope-config scope))
@@ -464,7 +466,8 @@ line in the declaring configuration."
                                  (alist-get 'worktrees config)
                                  nil))
             (let ((path (alist-get 'path entry)))
-              (when (pos-lint--not-ignored-p dir path)
+              (when (and (file-directory-p (expand-file-name path dir))
+                         (pos-lint--not-ignored-p dir path))
                 (push (pos-finding-make
                        :file file
                        :line (with-temp-buffer

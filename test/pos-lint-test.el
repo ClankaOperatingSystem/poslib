@@ -178,13 +178,18 @@ the image's refresh to report, and the lint says nothing of it."
   "A declared child or worktree that Git does not ignore is found.
 A child with a remote, or a worktree, is found at its entry's line.
 A line in .gitignore ignores a child, and so does the line the tree
-command writes to info/exclude; neither child is found.  A child with
-no remote is a directory of the same repository, which Git tracks,
-and is not found."
+command writes to info/exclude; neither child is found.  A child not
+on disk, as in a fresh clone, cannot be staged and is not found.  A
+child with no remote is a directory of the same repository, which Git
+tracks, and is not found."
   (pos-test-with-files root
       '((".clanka/config.yml"
-         . "pos: 2\nchildren:\n  - path: lib\n    remote: https://example.org/lib.git\n  - path: kept\n    remote: https://example.org/kept.git\n  - path: excluded\n    remote: https://example.org/excluded.git\n  - path: area\nworktrees:\n  - path: _worktrees/feature\n    of: lib\n    branch: feature\n")
+         . "pos: 2\nchildren:\n  - path: lib\n    remote: https://example.org/lib.git\n  - path: kept\n    remote: https://example.org/kept.git\n  - path: excluded\n    remote: https://example.org/excluded.git\n  - path: area\n  - path: absent\n    remote: https://example.org/absent.git\nworktrees:\n  - path: _worktrees/feature\n    of: lib\n    branch: feature\n")
         (".gitignore" . "/kept\n")
+        ("lib/README" . "lib\n")
+        ("kept/README" . "kept\n")
+        ("excluded/README" . "excluded\n")
+        ("_worktrees/feature/README" . "feature\n")
         ("intray.org" . ":PROPERTIES:\n:ID: intray\n:END:\n* TODO open\n")
         ("area/.clanka/config.yml" . "pos: 2\n")
         ("area/intray.org" . ":PROPERTIES:\n:ID: area\n:END:\n* TODO mend\n"))
@@ -195,7 +200,7 @@ and is not found."
       (should (equal (pos-test-lines
                       (concat ".clanka/config.yml:3: unignored-child: lib: Git does not "
                               "ignore it; run the tree command, or add it to .gitignore")
-                      (concat ".clanka/config.yml:11: unignored-child: _worktrees/feature: "
+                      (concat ".clanka/config.yml:13: unignored-child: _worktrees/feature: "
                               "Git does not ignore it; run the tree command, or add it to "
                               ".gitignore"))
                      (pos-lint-format (pos-lint) root))))))
