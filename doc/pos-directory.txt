@@ -293,6 +293,18 @@ pushed. Its path is written to .git/info/exclude as a child's is. The
 commits of a git worktree are in its child's clone, so it is that clone
 whose unpushed branches matter.
 
+The two kinds differ in what they tie together. A git worktree shares
+its child's clone: its objects are kept there, and it cannot outlive
+that clone, nor be moved without it. That suits a working tree whose
+scope is removed whole with the child, such as a project's branch of
+the repository the project belongs to. A clone of its own is tied to
+nothing in the tree, and suits a working tree whose scope has another
+owner than the child's, such as an organisation's repository worked
+on from a person's: when one party leaves, the other's working tree
+is unaffected. One repository may be mounted as several children of a
+tree, so an entry does not assume that a repository has one working
+copy; with of, it names the child whose clone it uses.
+
 
 4. Archives
 
