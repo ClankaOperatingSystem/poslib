@@ -279,6 +279,28 @@ ID held twice elsewhere is no matter of the seal's."
     (pos-test-write-bytes (expand-file-name "trial/index.org" scope) "[[id:twin]]\n")
     (pos-test-refused pos-ledger-refused 'unresolved (pos-test-scope-plan scope))))
 
+(ert-deftest pos-seal/a-refused-link-within-the-item-names-the-remedy ()
+  "A refusal of links within the item says what the plan would accept.
+Files that link to one another in a loop are refused (loop), and the
+refusal says that a collection keeps the links among its files as
+written.  A link to a directory of the item is refused (unresolved),
+and the refusal says that a link within an item leads to a file."
+  (pos-test-with-scope
+    (pos-test-write-bytes (expand-file-name "trial/a.org" scope) "[[file:b.org]]\n")
+    (pos-test-write-bytes (expand-file-name "trial/b.org" scope) "[[file:a.org]]\n")
+    (let ((refused (condition-case err (pos-test-scope-plan scope)
+                     (pos-ledger-refused (cdr err)))))
+      (should (eq 'loop (car refused)))
+      (should (string-search "#+COLLECTION: t" (cadr refused))))
+    (delete-file (expand-file-name "trial/b.org" scope))
+    (make-directory (expand-file-name "trial/sub" scope))
+    (pos-test-write-bytes (expand-file-name "trial/sub/c.md" scope) "c")
+    (pos-test-write-bytes (expand-file-name "trial/a.org" scope) "[[file:sub/]]\n")
+    (let ((refused (condition-case err (pos-test-scope-plan scope)
+                     (pos-ledger-refused (cdr err)))))
+      (should (eq 'unresolved (car refused)))
+      (should (string-search "leads to a file" (cadr refused))))))
+
 (ert-deftest pos-seal/two-items-may-rumour-one-target-on-one-day ()
   "Each item's rumour of a target names that item, so is its own record;
 a rumour already sealed word for word is cited, not sealed again."
