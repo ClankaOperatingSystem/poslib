@@ -196,7 +196,10 @@ a link within the item to a file it does not hold."
                     ((assoc target files)
                      (pos-resolution-create :file (car pair) :link link
                                             :kind "cid" :target target :suffix suffix))
-                    (t (pos-ledger-refuse 'unresolved "Link within the item to %s" abs))))
+                    (t (pos-ledger-refuse
+                        'unresolved
+                        "Link within the item to %s; a link within an item leads to a file it holds"
+                        abs))))
                (pcase (pos-links-resolve abs scope)
                  (`(cid . ,to)
                   (pos-resolution-create :file (car pair) :link link
@@ -235,8 +238,12 @@ file is written.  Refuse `loop' if files cite one another in a loop."
                                             (cdr plan)))
                              plans)))
         (unless ready
-          (pos-ledger-refuse 'loop "Links loop within the item: %s"
-                             (mapconcat #'car plans ", ")))
+          (pos-ledger-refuse
+           'loop
+           (concat "Links loop within the item: %s; sealed as a collection,"
+                   " a directory whose README.org holds #+COLLECTION: t keeps"
+                   " the links among its files as written")
+           (mapconcat #'car plans ", ")))
         (setq plans (delq ready plans))
         (dolist (r (cdr ready))
           (pcase-let (((cl-struct pos-resolution to target rumour suffix) r))
