@@ -255,9 +255,11 @@ it, which anchors it there.
 clone has no rule for a child until the tree command has run there,
 and a child put in place by hand has none in any clone. The tool does
 not write .gitignore, which the repository tracks. The lint reports a
-declared child with a remote, and a declared worktree, whose path Git
-does not ignore, as unignored-child at its entry; a line in .gitignore
-ignores it in every clone, and so does the tree command's line.
+declared child with a remote, and a declared worktree, that is on disk
+and whose path Git does not ignore, as unignored-child at its entry; a
+line in .gitignore ignores it in every clone, and so does the tree
+command's line. A child not on disk cannot be staged, so a fresh clone
+that has not cloned its children has no finding.
 
 A child with no remote is a directory of the same repository, tracked
 and committed with it. It has no branch, and an entry that gives it
