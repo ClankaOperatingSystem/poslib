@@ -463,6 +463,22 @@ and a CUSTOM_ID, name a heading and not the file."
                        (pos-lint-file-id file)))))
     (should-not (pos-lint-file-id (expand-file-name "named.org" root)))))
 
+(ert-deftest pos-lint/a-project-status-the-tree-does-not-know-is-a-finding ()
+  "A project file's STATUS not in `pos-project-statuses' is found at its line.
+A known STATUS is not found, nor a STATUS in a heading's drawer, which
+does not mark a project's file."
+  (pos-test-with-files root
+      '(("typo.org" . ":PROPERTIES:\n:ID: typo\n:STATUS:   ACTIVE\n:END:\n#+TITLE: Typo\n")
+        ("known.org" . ":PROPERTIES:\n:ID: known\n:STATUS:   WIP\n:END:\n#+TITLE: Known\n")
+        ("heading.org" . ":PROPERTIES:\n:ID: heading\n:END:\n* Notes\n:PROPERTIES:\n:STATUS: ACTIVE\n:END:\n"))
+    (let ((file (expand-file-name "typo.org" root)))
+      (should (equal (list (pos-finding-make
+                            :file file :line 3
+                            :message "STATUS ACTIVE is not one of COMMITTED, WIP, DONE"))
+                     (pos-lint-project-status file))))
+    (should-not (pos-lint-project-status (expand-file-name "known.org" root)))
+    (should-not (pos-lint-project-status (expand-file-name "heading.org" root)))))
+
 (ert-deftest pos-lint/files-that-share-a-file-level-id-name-each-other ()
   "Files of the corpus that share a file-level ID each name the others.
 Each is found at its first line, and the ID is given.  A heading's ID
