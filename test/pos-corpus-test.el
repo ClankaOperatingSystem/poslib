@@ -389,7 +389,7 @@ It is reported and not entered; the rest of the tree is read."
 (ert-deftest pos-corpus/a-refused-root-reads-nothing ()
   "When the root's own configuration is refused, no file is read.
 The finding names the root."
-  (let ((corpus (pos-corpus-test-walk '(("" dir :config "pos: 3\n") ("a.org" file)))))
+  (let ((corpus (pos-corpus-test-walk '(("" dir :config "projects: [a]\n") ("a.org" file)))))
     (should-not (pos-corpus-files corpus))
     (should (equal '(".") (mapcar #'car (pos-corpus-findings corpus))))))
 

@@ -1,6 +1,6 @@
 {
- "about": "A file that declares nothing.",
- "yaml": "pos: 2\n",
+ "about": "A key pos is ignored whatever its value, an earlier version among them.",
+ "yaml": "pos: 1\n",
  "config": {
   "projects": null,
   "methodologies": null,

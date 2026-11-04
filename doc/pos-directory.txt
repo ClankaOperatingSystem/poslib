@@ -14,8 +14,9 @@ It names no server. poslib and pyposlib read the configuration, and a
 server a node names is whichever its owners run. Everything here but
 section 5 works with no server at all.
 
-Version 1 of this document is not read: a file that says pos: 1 is
-refused, and is rewritten to this version.
+Earlier versions of this document required a key pos, naming the
+version. A reader ignores it, whatever its value, and a tool does not
+write it.
 
 
 1. The file
@@ -46,7 +47,6 @@ refused.
 
 The top level is a mapping:
 
-    pos             2, the version of this document; required
     projects        where this node's projects belong: a path beneath
                     it, usually projects/. What lies directly there is
                     a project (section 2)

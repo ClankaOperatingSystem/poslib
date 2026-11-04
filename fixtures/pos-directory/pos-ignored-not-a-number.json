@@ -1,0 +1,17 @@
+{
+ "about": "A key pos is ignored whatever its value, one not a number among them.",
+ "yaml": "pos: one\n",
+ "config": {
+  "projects": null,
+  "methodologies": null,
+  "harnesses": null,
+  "image": null,
+  "bin": null,
+  "exclude": null,
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null,
+  "warnings": []
+ }
+}
