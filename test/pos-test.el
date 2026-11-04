@@ -42,6 +42,11 @@
 (require 'cl-lib)
 (require 'pos)
 (require 'pos-test-support)
+(require 'pos-item)
+(require 'pos-person)
+(require 'pos-place)
+(require 'pos-project)
+(require 'pos-state)
 
 ;;;; Files and paths
 
@@ -278,6 +283,28 @@ a heading."
     (pos-goto-unsorted-end)
     (insert "** TODO new\n")
     (should (equal "* Sorted\n* Unsorted\n** TODO new\n" (buffer-string)))))
+
+(ert-deftest pos/each-shell-entry-exits-1-on-a-refusal ()
+  "A refusal of a shell entry prints its reason and exits 1, not 255.
+Each entry here is refused an item, a project or a name it cannot take."
+  (pos-test-with-files root '(("tasks.org" . "* Tasks\n** TODO Call the roofer\n"))
+    (let ((pos-directory root))
+      (dolist (run '((pos-state-batch "Write the letter" "DONE")
+                     (pos-item-batch "schedule" "Write the letter" "2026-11-05")
+                     (pos-place-batch "Write the letter" "tasks.org" "Tasks")
+                     (pos-project-batch "status" "projects/none" "WIP")
+                     (pos-person-batch "add" "  ")))
+        (let ((command-line-args-left (cdr run))
+              (status nil))
+          (cl-letf (((symbol-function 'kill-emacs)
+                     (lambda (&optional code) (throw 'pos-test-exit code))))
+            (should (equal "" (with-output-to-string
+                                (setq status (catch 'pos-test-exit
+                                               (funcall (car run))
+                                               :returned))))))
+          (should (equal (list (car run) 1) (list (car run) status))))))
+    (should (equal "* Tasks\n** TODO Call the roofer\n"
+                   (pos-test-file-string (expand-file-name "tasks.org" root))))))
 
 (provide 'pos-test)
 ;;; pos-test.el ends here

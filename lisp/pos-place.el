@@ -196,26 +196,30 @@ refuses of either file."
 takes them.  The first line printed is FILE:LINE: STATE TITLE for the
 item where it now is.  Each line after it is \"Link to the old place:
 FILE:LINE\", one for each of `pos-place-stale-links', where the link
-is after the move.  Exit 2 on any other arguments."
+is after the move.  Exit 2 on any other arguments, and 1 on a
+refusal."
   (unless (memq (length command-line-args-left) '(3 4))
     (message "Usage: TARGET FILE UNDER [%s]"
              (string-join (pos-state-states) "|"))
     (kill-emacs 2))
-  (pcase-let* ((`(,target ,to ,under ,state) command-line-args-left)
-               (root (file-name-as-directory (expand-file-name pos-directory)))
-               (old (pos-state-locate root (pos-corpus root) target))
-               (title (with-current-buffer (pos-visit (car old))
-                        (org-with-wide-buffer
-                         (goto-char (point-min))
-                         (forward-line (1- (cdr old)))
-                         (and (org-at-heading-p)
-                              (substring-no-properties
-                               (org-get-heading t t t t))))))
-               (placed (pos-place root target to under state)))
-    (setq command-line-args-left nil)
-    (princ (concat (pos-item-format placed) "\n"))
-    (dolist (link (and title (pos-place-stale-links root (car old) title)))
-      (princ (format "Link to the old place: %s:%d\n" (car link) (cdr link))))))
+  (pos-refusal-exits-1
+    (pcase-let*
+        ((`(,target ,to ,under ,state) command-line-args-left)
+         (root (file-name-as-directory (expand-file-name pos-directory)))
+         (old (pos-state-locate root (pos-corpus root) target))
+         (title (with-current-buffer (pos-visit (car old))
+                  (org-with-wide-buffer
+                   (goto-char (point-min))
+                   (forward-line (1- (cdr old)))
+                   (and (org-at-heading-p)
+                        (substring-no-properties
+                         (org-get-heading t t t t))))))
+         (placed (pos-place root target to under state)))
+      (setq command-line-args-left nil)
+      (princ (concat (pos-item-format placed) "\n"))
+      (dolist (link (and title (pos-place-stale-links root (car old) title)))
+        (princ (format "Link to the old place: %s:%d\n"
+                       (car link) (cdr link)))))))
 
 (provide 'pos-place)
 ;;; pos-place.el ends here
