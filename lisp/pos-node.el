@@ -358,10 +358,11 @@ for another."
                    name)))
               exclusions)))
 
-(defun pos-node--parsed (text what key version)
+(defun pos-node--parsed (text what &optional key version)
   "Return TEXT, a WHAT's YAML, parsed and checked to be a mapping at VERSION.
-KEY is the key that names its version.  Refuse `not-yaml', then
-`not-a-mapping', then `unknown-version'."
+KEY is the key that names its version; with none, no version is
+checked.  Refuse `not-yaml', then `not-a-mapping', then
+`unknown-version'."
   (let ((parsed (condition-case nil
                     (yaml-parse-string text :object-type 'alist
                                        :object-key-type 'string
@@ -370,7 +371,7 @@ KEY is the key that names its version.  Refuse `not-yaml', then
                   (error (pos-node-refuse 'not-yaml "Not readable as YAML")))))
     (unless (pos-node--mapping-p parsed)
       (pos-node-refuse 'not-a-mapping "%s is not a mapping" what))
-    (let ((found (car (pos-node--typed (cdr (assoc key parsed)) 'integer))))
+    (let ((found (and key (car (pos-node--typed (cdr (assoc key parsed)) 'integer)))))
       (when (and found (/= found version))
         (pos-node-refuse 'unknown-version "Not a version this reader knows: %s"
                          found)))
@@ -389,12 +390,13 @@ what its node is: where the node lies does, as doc/pos-directory.txt
 section 2 has it.  Every scalar is read as the text written, and the
 keys' types decide what it is.  Signal `pos-node-refused', with the
 refusal's kind and a message, for a file doc/pos-directory.txt does
-not allow."
+not allow.  A key pos, which earlier versions of the document
+required, is ignored, whatever its value."
   (let ((reading (pos-node--reading-make))
-        (parsed (pos-node--parsed text "The file" "pos" 2)))
+        (parsed (assoc-delete-all "pos" (pos-node--parsed text "The file"))))
     (let* ((top (pos-node--mapping reading
                  parsed "The file"
-                 '(("pos" integer t) ("projects" string nil)
+                 '(("projects" string nil)
                    ("methodologies" path-or-sequence nil) ("harnesses" sequence nil)
                    ("image" string nil)
                    ("bin" string nil) ("exclude" sequence nil) ("children" sequence nil)

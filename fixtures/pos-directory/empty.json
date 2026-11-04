@@ -1,0 +1,17 @@
+{
+ "about": "An empty file declares nothing.",
+ "yaml": "",
+ "config": {
+  "projects": null,
+  "methodologies": null,
+  "harnesses": null,
+  "image": null,
+  "bin": null,
+  "exclude": null,
+  "children": [],
+  "worktrees": [],
+  "archives": [],
+  "server": null,
+  "warnings": []
+ }
+}
