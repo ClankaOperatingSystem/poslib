@@ -55,12 +55,16 @@
 (defun pos-checkpoint-record (root)
   "Record the ledger heads of every archive under ROOT; return where.
 Refused unless the check is clean of changed, missing and new files and
-of write bits.  The checkpoint covers an archive if ROOT is one, else
-the tree; one with the same bytes already recorded is kept.  It is
-written where `pos-ledger-targets' says a writer at ROOT's scope
-writes, which refuses before anything is checked or written."
-  (let* ((home (pos-target-checkpoints
-                (pos-ledger-targets (pos-ledger-anchor-base root))))
+of write bits.  The checkpoint covers an archive if ROOT is one, and is
+then of schema 1.  Else it covers the tree and is of schema 2: it
+records each head by its archive's path from ROOT's scope, and
+supersedes every schema 1 checkpoint of the tree there that none
+supersedes yet, the check having found every head they name.  One with
+the same bytes already recorded is kept.  It is written where
+`pos-ledger-targets' says a writer at ROOT's scope writes, which refuses
+before anything is checked or written."
+  (let* ((base (pos-ledger-anchor-base root))
+         (home (pos-target-checkpoints (pos-ledger-targets base)))
          (report (pos-ledger-check root)))
     (when (seq-some (lambda (archive)
                       (let-alist archive
@@ -69,14 +73,25 @@ writes, which refuses before anything is checked or written."
                     report)
       (pos-ledger-refuse 'unclean "Enrol new records and restore permissions \
 before checkpointing: %s" root))
-    (let ((heads (sort (seq-uniq (seq-remove (lambda (h) (eq h :null))
-                                             (mapcar (lambda (a) (alist-get 'head a))
-                                                     report)))
-                       #'string<)))
+    (let ((heads (seq-remove (lambda (pair) (eq (cdr pair) :null))
+                             (mapcar (lambda (a)
+                                       (cons (alist-get 'archive a) (alist-get 'head a)))
+                                     report))))
       (when heads
-        (let* ((bytes (pos-bytes-json `((schema . 1) (heads . ,(vconcat heads))
-                                        (coverage . ,(pos-ledger-coverage
-                                                      (file-truename root))))))
+        (let* ((bytes
+                (pos-bytes-json
+                 (if (equal (pos-ledger-coverage (file-truename root)) "archive")
+                     `((schema . 1)
+                       (heads . ,(vconcat (sort (seq-uniq (mapcar #'cdr heads))
+                                                #'string<)))
+                       (coverage . "archive"))
+                   `((schema . 2)
+                     (archives . ,(mapcar (lambda (pair)
+                                            (cons (file-relative-name (car pair) base)
+                                                  (cdr pair)))
+                                          heads))
+                     (supersedes . ,(vconcat (pos-ledger-unsuperseded home)))
+                     (coverage . "tree")))))
                (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") home)))
           (cond ((not (file-exists-p file)) (pos-ledger-write-new file bytes))
                 ((not (equal (pos-bytes-read file) bytes))

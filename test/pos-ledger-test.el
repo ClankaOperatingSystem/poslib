@@ -100,7 +100,9 @@ Archives found outside hidden and underscored directories, checkpoints
 honoured, and every changed, missing, new, writable and hidden file named;
 the archive's CID beside the one recorded; collections no longer declared.
 An archive a keeper keeps is found by its ledger and reported from it,
-and where a fixture has recorded its keeper, with what the keeper holds."
+and where a fixture has recorded its keeper, with what the keeper holds.
+The children a fixture says are not present are those declared and not
+on disk."
   (dolist (named (pos-fixtures "ledger"))
     (let-alist (cdr named)
       (when (equal .kind "report")
@@ -110,7 +112,11 @@ and where a fixture has recorded its keeper, with what the keeper holds."
               (if .error
                   (pos-test-refused pos-ledger-refused .error (pos-ledger-check dir))
                 (pos-test-same-json
-                 .report (pos-test-report-relative (pos-ledger-check dir) dir))))))))))
+                 .report (pos-test-report-relative (pos-ledger-check dir) dir))
+                (should (equal (append .not_present nil)
+                               (mapcar (lambda (child)
+                                         (file-relative-name child (file-truename dir)))
+                                       (pos-ledger-not-present dir))))))))))))
 
 (ert-deftest pos-ledger/a-vanished-archive-is-detected ()
   "A checkpoint names ledger heads; removing an archive leaves one unmatched."

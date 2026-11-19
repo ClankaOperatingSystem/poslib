@@ -1,0 +1,56 @@
+{
+ "kind": "report",
+ "description": "A repository the configuration mounts at projects/B by its remote is not cloned. The schema 2 checkpoint records the head of its archive by the archive's path, so that head is set aside and the child is named as not present; the schema 1 checkpoint that names the same head is superseded and passed over. The archive that is there is checked.",
+ "tree": [
+  {
+   "path": ".pos/archive-integrity/checkpoints/72e035fe3f48e59552bef6976f5a231ece146876f2725d03810f4aa7b0e05125.json",
+   "text": "{\"archives\":{\"projects/A/archives\":\"da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae\",\"projects/B/archives\":\"18291d954397177cf19d1b5fee4aff209fa05babae41ccd1afea2ef8717a9068\"},\"coverage\":\"tree\",\"schema\":2,\"supersedes\":[\"f7d8246f4aa02ad1ed5c44034c9bfe6987e62c7225ce5da24685a847e3707b10\"]}\n",
+   "mode": 292
+  },
+  {
+   "path": ".pos/archive-integrity/checkpoints/f7d8246f4aa02ad1ed5c44034c9bfe6987e62c7225ce5da24685a847e3707b10.json",
+   "text": "{\"coverage\":\"tree\",\"heads\":[\"18291d954397177cf19d1b5fee4aff209fa05babae41ccd1afea2ef8717a9068\",\"da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae\"],\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "children:\n  - path: projects/B\n    remote: https://git.example/b.git\n"
+  },
+  {
+   "path": "projects/A/archives/.archive-integrity/00000001-da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae.json",
+   "text": "{\"add\":{\"evidence.md\":{\"mode\":292,\"sha256\":\"559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd\",\"size\":1},\"run.sh\":{\"mode\":365,\"sha256\":\"a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf\",\"size\":10}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/A/archives/evidence.md",
+   "text": "A",
+   "mode": 292
+  },
+  {
+   "path": "projects/A/archives/run.sh",
+   "text": "#!/bin/sh\n",
+   "mode": 365
+  }
+ ],
+ "report": [
+  {
+   "archive": "projects/A/archives",
+   "changed": [],
+   "events": 1,
+   "files": 2,
+   "head": "da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae",
+   "hidden": [],
+   "kept": null,
+   "keeper": null,
+   "missing": [],
+   "new": [],
+   "recorded_root": null,
+   "root": "bafybeigbeyjgwlj2hur5zxdmf5x6o7y6ogzlvitkbimep3o4iy4eijpb64",
+   "undeclared": [],
+   "writable": []
+  }
+ ],
+ "not_present": [
+  "projects/B"
+ ]
+}

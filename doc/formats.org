@@ -344,11 +344,26 @@ refuses a symlink or a second hard link anywhere.
 A checkpoint records ledger heads, to detect a vanished archive or a
 truncated ledger. It lives in the checkpoint directory of the scope of
 the root it covers ([[*Layout][Layout]]), named by the SHA-256 of its bytes,
-holding in canonical JSON:
+holding canonical JSON. One that covers an archive has schema 1:
 
 - =schema=: 1;
 - =heads=: sorted heads, each an event's hash or its CID;
-- =coverage=: =archive= for a root named =archives=, else =tree=.
+- =coverage=: =archive=, for a root named =archives=.
+
+One that covers a tree has schema 2:
+
+- =schema=: 2;
+- =archives=: the head of each archive found, by the archive's path
+  from the scope, =/=-separated;
+- =supersedes=: the names of the schema 1 checkpoints of the tree that
+  it replaces, the SHA-256 each is named by, sorted, each once;
+  possibly none;
+- =coverage=: =tree=.
+
+A schema 1 checkpoint may also have the coverage =tree=, as trees were
+checkpointed before schema 2. Its heads do not say which archive each
+belongs to. It is passed over where a schema 2 checkpoint that is read
+with it names it in =supersedes=, and is otherwise held to as any other.
 
 Every head a checkpoint names must name some event file of the archives
 found, or of a ledger within them, legacy or current, as retired scopes
@@ -356,9 +371,36 @@ carry, by its hash or by its CID as a block; otherwise the check refuses
 (=anchor=). A ledger within an archive a keeper keeps is known by the
 names its events are enrolled under.
 
-Checkpointing a root records the distinct heads of the archives found
-under it, once the check reports nothing changed, missing, new or
-writable (else =unclean=). It is a writer at the root's scope: a new
+A schema 2 checkpoint says which archive each head belongs to, so the
+check can tell an archive that a clone need not hold from one removed.
+There are two, and each is not present:
+
+- A child that is not cloned. The nearest configuration at or above its
+  place declares it with a =remote= (=doc/pos-directory.txt=, section
+  2), and nothing is at its path: a repository mounted there, as a
+  fresh clone of the tree's repository lacks it, or a Git worktree of
+  it. The heads recorded for the archives in it are set aside, there
+  being no ledger to hold them to.
+- An archive kept out of Git. Nothing is at its path; its scope is a
+  directory at or beneath a node, and the scope's entry, if it has one,
+  keeps the archive =uncommitted= (=doc/pos-directory.txt=, section 4);
+  and the scope has its ledger, which is committed. The head recorded
+  for it must name an event of that ledger, read as a chain of events,
+  else the check refuses (=anchor=).
+
+Every other archive is checked. A head recorded for an archive in a
+child that is there is refused as any other, and so is one for an
+archive that an entry keeps =committed=, one at a path that no
+configuration declares or declares with no remote, and one beneath no
+node.
+
+Checkpointing a root records the heads of the archives found under it,
+once the check reports nothing changed, missing, new or writable (else
+=unclean=). A checkpoint of a tree supersedes every schema 1 checkpoint
+of the tree in its directory that no checkpoint there supersedes yet:
+the check has found every head they name, since it refuses otherwise.
+A tree checkpointed with a child or an archive not present records the
+archives that are there. Checkpointing is a writer at the root's scope: a new
 checkpoint goes to =archive-integrity/checkpoints/= in the selected
 directory, and the layout's refusals come before anything is checked.
 A checkpoint of the same bytes already there is kept; a different one
@@ -411,6 +453,11 @@ a report:
 - =undeclared=: collections the ledger lists whose =README.org= no longer
   declares them, sorted.
 
+A child or an archive that is not present ([[*Checkpoints][Checkpoints]]) has no
+report, there being no archive to find. The command names each on
+standard error, one to a line, as =not present: PATH=, and it is not a
+finding.
+
 A root differing from the recorded root shows a change since sealing
 that no file shows, such as an added directory. For a schema 3 ledger
 the recorded root is the fold of what it enrols, so the two agree when
@@ -434,7 +481,9 @@ Fixtures: =fixtures/ledger/=: inventories with their first event,
 ledgers valid and refused, in both layouts and all three schemas, and
 reports, of archives on disk and kept by a keeper. A report fixture
 with =keeper= is checked asking that recording, as a seal's is sent to
-one ([[*To a keeper][To a keeper]]); every other is checked asking no keeper.
+one ([[*To a keeper][To a keeper]]); every other is checked asking no keeper. One
+with =not_present= lists the children and archives not present, by
+their paths from the root; any other has none.
 
 * Sealing
 

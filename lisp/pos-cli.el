@@ -114,7 +114,9 @@ would, so that `pos-seal-apply' takes it."
       as seal, write-new or relink printed it, and HASH is the SHA-256
       of that file's bytes in lower-case hex, as sha256sum PLAN prints it
   check ROOT
-      report every archive under ROOT, as JSON
+      report every archive under ROOT, as JSON; a mounted repository
+      that is not cloned, or an archive kept out of Git that is not on
+      disk, is named on standard error, as not present
   checkpoint ROOT
       record the ledger heads under ROOT, once the check is clean
   repair ROOT
@@ -189,6 +191,8 @@ Exit 0 done or clean, 1 findings, 2 refused.
               (pos-bytes-print `((event . ,(car result)) (root . ,(cdr result))))))))
        (`("check" ,root)
         (let ((report (vconcat (pos-ledger-check root))))
+          (dolist (child (pos-ledger-not-present root))
+            (message "not present: %s" child))
           (pos-bytes-print report)
           (kill-emacs (if (pos-checkpoint-findings-p report) 1 0))))
        (`("checkpoint" ,root)

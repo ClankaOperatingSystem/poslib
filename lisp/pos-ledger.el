@@ -35,6 +35,10 @@
 ;; - `pos-ledger-check': the report on every archive under a root.
 ;; - `pos-ledger-check-within': refuse unless the ledgers and
 ;;   checkpoints within a directory are sound, no archive needed.
+;; - `pos-ledger-unsuperseded': the schema 1 tree checkpoints in a
+;;   folder that a new schema 2 checkpoint supersedes.
+;; - `pos-ledger-not-present': what a root's checkpoints record that a
+;;   clone need not hold: children not cloned, archives kept out of Git.
 ;; - `pos-ledger-write-new', `pos-ledger-checkpoint-head',
 ;;   `pos-ledger-record-with-cid': a file published read-only, a
 ;;   head recorded beside its archive, and a file's entry with its CID.
@@ -773,6 +777,27 @@ or legacy checkpoints are anywhere else at the scope."
 
 ;;;; Kept archives
 
+(defun pos-ledger--node (dir)
+  "Return the node at or above DIR with its configuration, a pair, or nil.
+The node is the nearest directory at or above DIR that holds a
+configuration, as doc/pos-directory.txt names one.  Refuse `config'
+for a configuration that is refused, and for two in one node."
+  (let* ((node (locate-dominating-file (file-name-as-directory dir)
+                                       #'pos-path-config-files))
+         (files (and node (pos-path-config-files node))))
+    (when (cdr files)
+      (pos-ledger-refuse 'config "Configuration refused (two-configurations): %s"
+                         node))
+    (when files
+      (let ((file (expand-file-name (car files) node)))
+        (cons (expand-file-name node)
+              (condition-case err
+                  (pos-node-read-config
+                   (decode-coding-string (pos-bytes-read file) 'utf-8))
+                (pos-node-refused
+                 (pos-ledger-refuse 'config "Configuration refused (%s): %s"
+                                    (cadr err) file))))))))
+
 (defun pos-ledger--entry (archive)
   "Return the entry for ARCHIVE's scope in its node's configuration.
 ARCHIVE's scope is the directory holding it, or holding the
@@ -782,26 +807,48 @@ doc/pos-directory.txt names one.  The entry is the one under archives
 there whose scope is the scope's path from the node, or nil: for a
 scope it does not name, or beneath no node.  Refuse `config' for a
 configuration that is refused, and for two in one node."
-  (let* ((scope (file-name-as-directory
-                 (pos-path-archive-scope (expand-file-name archive))))
-         (node (locate-dominating-file scope #'pos-path-config-files))
-         (files (and node (pos-path-config-files node))))
-    (when (cdr files)
-      (pos-ledger-refuse 'config "Configuration refused (two-configurations): %s"
-                         node))
-    (when files
-      (let* ((file (expand-file-name (car files) node))
-             (config
-              (condition-case err
-                  (pos-node-read-config
-                   (decode-coding-string (pos-bytes-read file) 'utf-8))
-                (pos-node-refused
-                 (pos-ledger-refuse 'config "Configuration refused (%s): %s"
-                                    (cadr err) file))))
-             (path (directory-file-name
-                    (file-relative-name scope (expand-file-name node)))))
-        (seq-find (lambda (a) (equal (alist-get 'scope a) path))
-                  (alist-get 'archives config))))))
+  (let ((scope (file-name-as-directory
+                (pos-path-archive-scope (expand-file-name archive)))))
+    (pcase (pos-ledger--node scope)
+      (`(,node . ,config)
+       (let ((path (directory-file-name (file-relative-name scope node))))
+         (seq-find (lambda (a) (equal (alist-get 'scope a) path))
+                   (alist-get 'archives config)))))))
+
+(defun pos-ledger--absent-child (path)
+  "Return the child holding PATH that is declared and not on disk, or nil.
+PATH is absolute.  The child is one with a remote, declared by the
+nearest configuration at or above the nearest directory on disk at or
+above PATH, with nothing at its own path, which is PATH or above it: a
+repository mounted there and not cloned."
+  (let ((dir (directory-file-name path)))
+    (while (not (file-directory-p dir))
+      (setq dir (directory-file-name (file-name-directory dir))))
+    (pcase (pos-ledger--node dir)
+      (`(,node . ,config)
+       (seq-some (lambda (child)
+                   (let ((at (expand-file-name (alist-get 'path child) node)))
+                     (and (stringp (alist-get 'remote child))
+                          (pos-path-within-p path at)
+                          (not (file-attributes at))
+                          at)))
+                 (alist-get 'children config))))))
+
+(defun pos-ledger--uncommitted-absent-p (archive)
+  "Return non-nil if ARCHIVE is kept out of Git and is not on disk.
+ARCHIVE is absolute.  Nothing is at its path; its scope is a directory
+at or beneath a node, whose entry for it, if there is one, keeps it
+uncommitted; and the scope has its ledger.  Such an archive is on disk
+where it was sealed and nowhere else, while its ledger is committed: a
+clone or a worktree has the ledger alone."
+  (let ((scope (pos-path-archive-scope archive)))
+    (and (equal (file-name-nondirectory archive) "archives")
+         (not (file-attributes archive))
+         (file-directory-p scope)
+         (pos-ledger--node scope)
+         (member (alist-get 'kept (pos-ledger--entry archive)) '(nil "uncommitted"))
+         (pos-layout-ledger (pos-ledger-locations scope))
+         t)))
 
 (defun pos-ledger-kept (archive)
   "Return the base URL of ARCHIVE's keeper, or nil if it is kept on disk.
@@ -952,20 +999,26 @@ and that directory is absent."
            (expand-file-name (concat pos-ledger-integrity "/checkpoints") beside))
           (t (expand-file-name pos-ledger-anchors scope)))))
 
+(defun pos-ledger--checkpoint-folders (root archives)
+  "Return the checkpoint directories covering ROOT and ARCHIVES, in path order.
+The one checkpoint directory of each of their scopes, each a pair of
+the directory and its scope, with every link in the scope's path
+resolved, as discovery gives an archive's."
+  (let (folders)
+    (dolist (path (cons root archives))
+      (let* ((scope (pos-ledger-root-scope (file-truename path)))
+             (folder (pos-layout-checkpoints (pos-ledger-locations scope))))
+        (when (and folder (not (assoc folder folders)))
+          (push (cons folder scope) folders))))
+    (sort folders (lambda (a b) (pos-ledger--path< (car a) (car b))))))
+
 (defun pos-ledger-checkpoint-files (root archives)
   "Return the checkpoint files covering ROOT and ARCHIVES.
 Those in the one checkpoint directory of each of their scopes."
-  (let (files)
-    (dolist (folder (sort (delete-dups
-                           (delq nil (mapcar (lambda (path)
-                                               (pos-layout-checkpoints
-                                                (pos-ledger-locations
-                                                 (pos-ledger-root-scope path))))
-                                             (cons root archives))))
-                          #'pos-ledger--path<))
-      (setq files (append files (mapcar (lambda (n) (expand-file-name n folder))
-                                        (pos-ledger-entry-names folder)))))
-    files))
+  (mapcan (lambda (pair)
+            (mapcar (lambda (name) (expand-file-name name (car pair)))
+                    (pos-ledger-entry-names (car pair))))
+          (pos-ledger--checkpoint-folders root archives)))
 
 (defun pos-ledger--ledger-file-p (file)
   "Return non-nil if FILE is in a ledger folder, legacy or current."
@@ -1008,23 +1061,40 @@ within are known by the names their events are enrolled under."
 
 (defun pos-ledger--checkpoint (file)
   "Return the checkpoint in FILE, an alist, refusing `checkpoint' if invalid.
-It must be named by the SHA-256 of its bytes, and have schema 1, a
-coverage of archive or tree, and heads that are hashes or block CIDs."
+It must be named by the SHA-256 of its bytes.  Of schema 1, it has a
+coverage of archive or tree, and heads that are hashes or block CIDs.
+Of schema 2, it has a coverage of tree; archives, a head for the path
+of each archive; and supersedes, the names of schema 1 checkpoints,
+sorted, each once."
   (pos-ledger-regular file)
   (let* ((bytes (pos-bytes-read file))
          (value (and (equal (file-name-nondirectory file)
                             (concat (pos-bytes-sha bytes) ".json"))
-                     (pos-bytes-parse bytes))))
+                     (pos-bytes-parse bytes)))
+         (head-p (lambda (head) (or (pos-ledger--hex-p head)
+                                    (pos-ledger-event-cid-p head)))))
     (unless value
       (pos-ledger-refuse 'checkpoint "Checkpoint hash failure: %s" file))
     (unless (and (listp value)
-                 (equal (pos-ledger--keys value) '("coverage" "heads" "schema"))
-                 (eql 1 (alist-get 'schema value))
-                 (member (alist-get 'coverage value) '("archive" "tree"))
-                 (vectorp (alist-get 'heads value))
-                 (seq-every-p (lambda (head) (or (pos-ledger--hex-p head)
-                                                 (pos-ledger-event-cid-p head)))
-                              (alist-get 'heads value)))
+                 (pcase (alist-get 'schema value)
+                   (1 (and (equal (pos-ledger--keys value) '("coverage" "heads" "schema"))
+                           (member (alist-get 'coverage value) '("archive" "tree"))
+                           (vectorp (alist-get 'heads value))
+                           (seq-every-p head-p (alist-get 'heads value))))
+                   (2 (let ((archives (alist-get 'archives value))
+                            (supersedes (alist-get 'supersedes value)))
+                        (and (equal (pos-ledger--keys value)
+                                    '("archives" "coverage" "schema" "supersedes"))
+                             (equal (alist-get 'coverage value) "tree")
+                             (listp archives)
+                             (seq-every-p (lambda (pair)
+                                            (and (pos-path-safe-p (pos-bytes-key (car pair)))
+                                                 (funcall head-p (cdr pair))))
+                                          archives)
+                             (vectorp supersedes)
+                             (seq-every-p #'pos-ledger--hex-p supersedes)
+                             (equal (append supersedes nil)
+                                    (sort (seq-uniq supersedes) #'string<)))))))
       (pos-ledger-refuse 'checkpoint "Invalid checkpoint"))
     value))
 
@@ -1036,46 +1106,158 @@ coverage of archive or tree, and heads that are hashes or block CIDs."
         (and (equal (file-name-nondirectory parent) "checkpoints")
              (equal (file-name-nondirectory grandparent) pos-ledger-integrity)))))
 
+(defun pos-ledger--anchored (checkpoints)
+  "Return the heads CHECKPOINTS anchor, each a pair of a head and its archive.
+CHECKPOINTS are lists of a checkpoint's file, its value and the scope
+its paths are from, or nil.  A schema 1 checkpoint gives its heads, each
+with no archive, unless a schema 2 checkpoint among them supersedes it;
+a schema 2 checkpoint gives the head of each archive with the archive's
+path, absolute where there is a scope."
+  (let ((superseded (mapcan (lambda (checkpoint)
+                              (append (alist-get 'supersedes (cadr checkpoint)) nil))
+                            checkpoints)))
+    (mapcan (pcase-lambda (`(,file ,value ,scope))
+              (cond ((eql 2 (alist-get 'schema value))
+                     (mapcar (lambda (pair)
+                               (cons (cdr pair)
+                                     (if scope
+                                         (expand-file-name (pos-bytes-key (car pair)) scope)
+                                       (pos-bytes-key (car pair)))))
+                             (alist-get 'archives value)))
+                    ((member (file-name-base file) superseded) nil)
+                    (t (mapcar #'list (alist-get 'heads value)))))
+            checkpoints)))
+
+(defun pos-ledger-unsuperseded (folder)
+  "Return the names of the schema 1 tree checkpoints in FOLDER to supersede.
+Those no schema 2 checkpoint there supersedes yet, sorted; none where
+FOLDER is not yet made."
+  (let (names superseded)
+    (when (file-directory-p folder)
+      (dolist (name (pos-ledger-entry-names folder))
+        (let-alist (pos-ledger--checkpoint (expand-file-name name folder))
+          (cond ((eql .schema 2)
+                 (setq superseded (append .supersedes superseded)))
+                ((equal .coverage "tree")
+                 (push (file-name-base name) names))))))
+    (sort (seq-difference names superseded) #'string<)))
+
+(defun pos-ledger--unanchored (anchored present)
+  "Return the heads of ANCHORED that are not in PRESENT, sorted, each once.
+ANCHORED is as `pos-ledger--anchored' returns, and PRESENT a list of
+what names the events there are."
+  (let ((known (make-hash-table :test #'equal)))
+    (dolist (name present) (puthash name t known))
+    (sort (seq-uniq (seq-remove (lambda (head) (gethash head known))
+                                (mapcar #'car anchored)))
+          #'string<)))
+
 (defun pos-ledger-check-within (dir)
   "Refuse unless the ledgers and checkpoints within DIR are sound.
 What the check of an archive holding DIR reads of them, and no more:
 each ledger within DIR, legacy or current, reads as a chain of events;
 and each head a checkpoint within DIR names is an event of one of those
-ledgers, by its hash or its CID as a block, else `anchor'.  DIR need
-hold no archive, and no keeper is asked."
+ledgers, by its hash or its CID as a block, else `anchor'.  A schema 1
+checkpoint that a schema 2 checkpoint within DIR supersedes is passed
+over.  DIR need hold no archive, and no keeper is asked."
   (let* ((files (directory-files-recursively dir "\\.json\\'" nil nil nil))
          (events (seq-filter #'pos-ledger--ledger-file-p files))
          (present (mapcan (lambda (file)
                             (pos-ledger-regular file)
                             (let ((bytes (pos-bytes-read file)))
                               (list (pos-bytes-sha bytes) (pos-ledger-event-cid bytes))))
-                          events))
-         required)
+                          events)))
     (dolist (folder (seq-uniq (mapcar #'file-name-directory events)))
       (pos-ledger--folder-history (directory-file-name folder)))
-    (dolist (file (seq-filter #'pos-ledger--checkpoint-file-p files))
-      (setq required (append (alist-get 'heads (pos-ledger--checkpoint file)) required)))
-    (let ((absent (sort (seq-uniq (seq-difference required present)) #'string<)))
+    (let ((absent (pos-ledger--unanchored
+                   (pos-ledger--anchored
+                    (mapcar (lambda (file) (list file (pos-ledger--checkpoint file) nil))
+                            (seq-filter #'pos-ledger--checkpoint-file-p files)))
+                   present)))
       (when absent
         (pos-ledger-refuse 'anchor "Checkpointed events missing within %s: %s"
                            dir (string-join absent ", "))))))
 
-(defun pos-ledger--check-anchors (root archives)
-  "Refuse unless every head a checkpoint for ROOT names is in ARCHIVES."
+(defun pos-ledger--anchors (root archives)
+  "Return the heads the checkpoints for ROOT anchor, as `pos-ledger--anchored'.
+Of the checkpoints covering ROOT and ARCHIVES; for a ROOT named
+archives, of those that cover an archive."
   (let ((archive-root (equal (file-name-nondirectory (directory-file-name root))
-                             "archives"))
-        required present)
-    (dolist (file (pos-ledger-checkpoint-files root archives))
-      (let ((value (pos-ledger--checkpoint file)))
-        (when (or (not archive-root) (equal (alist-get 'coverage value) "archive"))
-          (setq required (append (alist-get 'heads value) required)))))
-    (dolist (archive archives)
-      (setq present (append (pos-ledger--ledger-hashes archive) present)))
-    (let ((absent (sort (seq-uniq (seq-difference required present)) #'string<)))
-      (when absent
-        (pos-ledger-refuse
-         'anchor "Missing anchored ledger (archive removed or history truncated): %s"
-         (string-join absent ", "))))))
+                             "archives")))
+    (pos-ledger--anchored
+     (mapcan (lambda (pair)
+               (mapcan (lambda (name)
+                         (let* ((file (expand-file-name name (car pair)))
+                                (value (pos-ledger--checkpoint file)))
+                           (when (or (not archive-root)
+                                     (equal (alist-get 'coverage value) "archive"))
+                             (list (list file value (cdr pair))))))
+                       (pos-ledger-entry-names (car pair))))
+             (pos-ledger--checkpoint-folders root archives)))))
+
+(defun pos-ledger--set-aside (anchored)
+  "Return ANCHORED split by what of each archive is on disk.
+A list of three.  First, the heads to hold to, as `pos-ledger--anchored'
+returns them: all but those recorded for an archive in a child that is
+declared and not on disk, as `pos-ledger--absent-child' finds it, which
+are set aside.  Second, what is not present, sorted, each once: each
+such child, and each archive that is kept out of Git and not on disk,
+as `pos-ledger--uncommitted-absent-p' has it.  Third, those archives,
+whose heads are held to their ledgers."
+  (let ((found (make-hash-table :test #'equal)) kept absent ledgers)
+    (dolist (pair anchored)
+      (let ((what (and (cdr pair)
+                       (let ((known (gethash (cdr pair) found 'unknown)))
+                         (if (eq known 'unknown)
+                             (puthash (cdr pair)
+                                      (or (pos-ledger--absent-child (cdr pair))
+                                          (and (pos-ledger--uncommitted-absent-p (cdr pair))
+                                               'ledger))
+                                      found)
+                           known)))))
+        (cond ((eq what 'ledger)
+               (push (cdr pair) ledgers)
+               (push pair kept))
+              (what (push what absent))
+              (t (push pair kept)))))
+    (let ((ledgers (sort (seq-uniq ledgers) #'pos-ledger--path<)))
+      (list (nreverse kept)
+            (sort (seq-uniq (append absent ledgers)) #'pos-ledger--path<)
+            ledgers))))
+
+(defun pos-ledger-not-present (root)
+  "Return what a checkpoint for ROOT records that a clone need not hold.
+Absolute paths, sorted.  Each is a child that is declared and not on
+disk: a repository that a configuration mounts by its remote, with
+nothing at its path, in which a checkpoint records an archive.  Or it
+is an archive a checkpoint records that is kept out of Git and not on
+disk, its ledger being there.  The check sets the heads recorded for
+such a child aside, having no ledger to hold them to, and holds the
+head of such an archive to its ledger."
+  (cadr (pos-ledger--set-aside (pos-ledger--anchors root (pos-ledger-roots root)))))
+
+(defun pos-ledger--check-anchors (root archives)
+  "Refuse unless every head a checkpoint for ROOT names is in ARCHIVES.
+A head a schema 2 checkpoint records for an archive in a child that is
+declared and not on disk is set aside, and one it records for an
+archive kept out of Git and not on disk is held to that archive's
+ledger, read as a chain of events, as `pos-ledger-not-present' has
+them: neither is a truncated history."
+  (pcase-let* ((`(,anchored ,_ ,ledgers)
+                (pos-ledger--set-aside (pos-ledger--anchors root archives)))
+               (absent (pos-ledger--unanchored
+                        anchored
+                        (apply #'append
+                               (append
+                                (mapcar (lambda (archive)
+                                          (pos-ledger-history archive)
+                                          (pos-ledger--ledger-hashes archive))
+                                        ledgers)
+                                (mapcar #'pos-ledger--ledger-hashes archives))))))
+    (when absent
+      (pos-ledger-refuse
+       'anchor "Missing anchored ledger (archive removed or history truncated): %s"
+       (string-join absent ", ")))))
 
 ;;;; Writing beside an archive
 
