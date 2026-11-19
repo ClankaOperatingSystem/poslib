@@ -1,0 +1,31 @@
+{
+ "kind": "report",
+ "description": "A schema 2 checkpoint records a head for an archive in projects/B, which the configuration declares with no remote: a directory of the same repository, which a clone holds. It is gone, so the check refuses.",
+ "tree": [
+  {
+   "path": ".pos/archive-integrity/checkpoints/6664a562c31f61d5cb8f1c98804460657d135a951c58864dbd3caab19f697d6f.json",
+   "text": "{\"archives\":{\"projects/A/archives\":\"da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae\",\"projects/B/archives\":\"18291d954397177cf19d1b5fee4aff209fa05babae41ccd1afea2ef8717a9068\"},\"coverage\":\"tree\",\"schema\":2,\"supersedes\":[]}\n",
+   "mode": 292
+  },
+  {
+   "path": ".pos/config.yaml",
+   "text": "children:\n  - path: projects/B\n"
+  },
+  {
+   "path": "projects/A/archives/.archive-integrity/00000001-da99ceea43cc5066987715e83adc2b2e2da5d075f98dde233b581812ea04c1ae.json",
+   "text": "{\"add\":{\"evidence.md\":{\"mode\":292,\"sha256\":\"559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd\",\"size\":1},\"run.sh\":{\"mode\":365,\"sha256\":\"a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf\",\"size\":10}},\"ledger_id\":\"0f1e2d3c-4b5a-4968-8778-a6b5c4d3e2f1\",\"previous\":null,\"schema\":1}\n",
+   "mode": 292
+  },
+  {
+   "path": "projects/A/archives/evidence.md",
+   "text": "A",
+   "mode": 292
+  },
+  {
+   "path": "projects/A/archives/run.sh",
+   "text": "#!/bin/sh\n",
+   "mode": 365
+  }
+ ],
+ "error": "anchor"
+}

@@ -40,7 +40,9 @@ Beside the scope; and recording them again is no conflict."
       (delete-file (expand-file-name "stray.txt" archive))
       (let* ((home (pos-checkpoint-record scope))
              (head (pos-history-head (pos-ledger-history archive)))
-             (bytes (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "tree"))))
+             (bytes (pos-bytes-json `((schema . 2) (coverage . "tree")
+                                      (archives . ((.clankos/archives . ,head)))
+                                      (supersedes . []))))
              (file (expand-file-name (concat (pos-bytes-sha bytes) ".json") home)))
         (should (equal home (expand-file-name ".clankos/archive-integrity/checkpoints"
                                               (file-truename scope))))
@@ -57,6 +59,86 @@ With archive coverage, the same bytes, so no second file appears."
            (before (directory-files home nil "\\.json\\'")))
       (should (equal home (pos-checkpoint-record archive)))
       (should (equal before (directory-files home nil "\\.json\\'"))))))
+
+(defun pos-checkpoint-test--tree-checkpoints (home)
+  "Return the schema 2 checkpoints in HOME, as parsed, oldest first."
+  (seq-filter (lambda (value) (eql 2 (alist-get 'schema value)))
+              (mapcar (lambda (file) (pos-bytes-parse (pos-bytes-read file)))
+                      (sort (directory-files home t "\\.json\\'")
+                            #'file-newer-than-file-p))))
+
+(ert-deftest pos-seal/a-tree-s-checkpoint-supersedes-those-of-schema-1 ()
+  "A tree's checkpoint names the schema 1 checkpoints of the tree it replaces.
+Once, by their hashes: the next names none, and one that covers an
+archive is never named."
+  (pos-test-with-scope
+    (let* ((archive (pos-test-scope-sealed scope))
+           (head (pos-history-head (pos-ledger-history archive)))
+           (home (expand-file-name ".clankos/archive-integrity/checkpoints"
+                                   (file-truename scope)))
+           (old (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "tree"))))
+           (name (pos-bytes-sha old)))
+      (pos-test-write-bytes (expand-file-name (concat name ".json") home) old #o444)
+      (pos-checkpoint-record scope)
+      (should (equal (list (vector name))
+                     (mapcar (lambda (value) (alist-get 'supersedes value))
+                             (pos-checkpoint-test--tree-checkpoints home))))
+      (pos-checkpoint-record scope)
+      (should (equal (list [] (vector name))
+                     (sort (mapcar (lambda (value) (alist-get 'supersedes value))
+                                   (pos-checkpoint-test--tree-checkpoints home))
+                           (lambda (a b) (< (length a) (length b)))))))))
+
+(ert-deftest pos-seal/a-child-not-cloned-is-not-a-truncated-history ()
+  "A checkpoint of a tree is honoured where a mounted child is not cloned.
+The tree mounts the scope by its remote.  With the scope gone, as in a
+fresh clone or a worktree, the check passes and names the child as not
+present.  A scope that is there without its archive is refused, and so
+is a head that a schema 1 checkpoint names, which no schema 2
+checkpoint supersedes."
+  (pos-test-with-scope
+    (let* ((root (file-truename dir))
+           (archive (pos-test-scope-sealed scope))
+           (head (pos-history-head (pos-ledger-history archive)))
+           (away (expand-file-name "_away" root)))
+      (pos-test-write-bytes (expand-file-name ".pos/config.yaml" root)
+                            "children:\n  - path: scope\n    remote: https://git.example/scope.git\n")
+      (let ((home (pos-checkpoint-record root)))
+        (should (equal home (expand-file-name ".pos/archive-integrity/checkpoints" root)))
+        (should-not (pos-ledger-not-present root))
+        (rename-file scope away)
+        (should-not (pos-ledger-check root))
+        (should (equal (list (expand-file-name "scope" root))
+                       (pos-ledger-not-present root)))
+        (make-directory scope)
+        (pos-test-refused pos-ledger-refused "anchor" (pos-ledger-check root))
+        (delete-directory scope)
+        (let ((old (pos-bytes-json `((schema . 1) (heads . [,head]) (coverage . "tree")))))
+          (pos-test-write-bytes (expand-file-name (concat (pos-bytes-sha old) ".json") home)
+                                old #o444))
+        (pos-test-refused pos-ledger-refused "anchor" (pos-ledger-check root))
+        (rename-file away scope)
+        (should-not (pos-checkpoint-findings-p (pos-ledger-check root)))))))
+
+(ert-deftest pos-seal/an-archive-kept-out-of-git-is-held-to-its-ledger ()
+  "A checkpoint of a tree is honoured where an uncommitted archive is not there.
+The scope is beneath a node and no entry keeps its archive otherwise.
+With the archive gone and its ledger left, as a clone or a worktree has
+them, the check passes and names the archive as not present.  With an
+entry that keeps the archive committed, it is refused."
+  (pos-test-with-scope
+    (let* ((root (file-truename dir))
+           (archive (pos-test-scope-sealed scope))
+           (config (expand-file-name ".pos/config.yaml" root)))
+      (pos-test-write-bytes config "projects: projects/\n")
+      (pos-checkpoint-record root)
+      (should-not (pos-ledger-not-present root))
+      (pos-test-writable archive)
+      (delete-directory archive t)
+      (should-not (pos-ledger-check root))
+      (should (equal (list archive) (pos-ledger-not-present root)))
+      (pos-test-write-bytes config "archives:\n  - scope: scope\n    kept: committed\n")
+      (pos-test-refused pos-ledger-refused "anchor" (pos-ledger-check root)))))
 
 (ert-deftest pos-seal/repair-protects-only-verified-evidence ()
   "Repair removes a restored write bit, and refuses changed bytes.
