@@ -176,6 +176,55 @@ entry."
                        (cadr (should-error (pos-index-bytes (concat "ipfs://" file-cid) scope)
                                            :type 'pos-ledger-refused))))))))
 
+(ert-deftest pos-index/a-link-is-read-from-a-keeper-the-caller-names ()
+  "A link no scope enrols is read from the keeper the caller names.
+The keeper's ledger is fetched and folded to find the file's CID, and
+the file is asked for by it.  Bytes that are not that CID's are
+refused as entry; a CID the keeper's ledger does not enrol, as absent."
+  (pos-index-test-with-kept
+    (let* ((ledger (pos-ledger-folder (pos-test-archived scope)))
+           (names (pos-ledger-entry-names ledger))
+           (file-cid (cdr (assoc "trial/result.txt" cids)))
+           (link (concat "ipfs://" (cdr (assoc "trial" cids)) "/result.txt"))
+           (elsewhere (make-temp-file "pos-elsewhere" t))
+           (answer "result")
+           (pos-http-send-function
+            (lambda (method url headers _body)
+              (push (list method url (cdr (assoc "Authorization" headers))) asked)
+              (let ((path (string-remove-prefix "https://keeper.example" url)))
+                (cond ((equal path "/")
+                       (cons 200 (pos-bytes-json `((events . ,(length names))))))
+                      ((string-match "\\`/events/\\([0-9]+\\)\\'" path)
+                       (cons 200 (pos-bytes-read
+                                  (expand-file-name
+                                   (nth (1- (string-to-number (match-string 1 path))) names)
+                                   ledger))))
+                      (t (cons 200 answer)))))))
+      (unwind-protect
+          (let ((default-directory (file-name-as-directory elsewhere)))
+            (should (equal 'absent (cadr (should-error (pos-index-bytes link)
+                                                       :type 'pos-ledger-refused))))
+            (setq asked nil)
+            (should (equal "result" (pos-index-keeper-bytes link "https://keeper.example")))
+            (should (equal (list "GET" (concat "https://keeper.example/ipfs/" file-cid)
+                                 "Bearer a-token")
+                           (car asked)))
+            (should (equal "result" (pos-index-keeper-bytes (concat "ipfs://" file-cid)
+                                                            "https://keeper.example")))
+            (dolist (uri (list (concat "ipfs://" (cdr (assoc "trial" cids)))
+                               (concat "ipfs://" (cdr (assoc "trial" cids)) "/other.txt")
+                               "ipfs://bafkreiaaaa" "result.txt"))
+              (should (equal 'absent
+                             (cadr (should-error
+                                    (pos-index-keeper-bytes uri "https://keeper.example")
+                                    :type 'pos-ledger-refused)))))
+            (setq answer "another")
+            (should (equal 'entry
+                           (cadr (should-error
+                                  (pos-index-keeper-bytes link "https://keeper.example")
+                                  :type 'pos-ledger-refused)))))
+        (delete-directory elsewhere t)))))
+
 (ert-deftest pos-index/a-program-prints-a-link-s-bytes ()
   "The fetch command prints a link's bytes as they are.
 Whatever they are; a link to no archived file exits 2 and prints
