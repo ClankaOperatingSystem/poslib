@@ -136,9 +136,10 @@ would, so that `pos-seal-apply' takes it."
       once nothing blocks them; check each scope after; commit nothing
   link PATH
       print the ipfs:// link to PATH, a sealed path in an archive
-  fetch LINK
+  fetch LINK [--keeper URL]
       print the bytes of the archived file LINK names, an ipfs:// link,
-      from a scope above the current directory: on disk or its keeper's
+      from a scope above the current directory: on disk or its keeper's;
+      with --keeper, from the keeper at URL, for a link no scope enrols
   links-into ROOT PATH
       print each link in the Org files of the tree at ROOT that leads
       to PATH or into it, by file or by ID, as FILE:LINE: LINK -> FILE
@@ -219,6 +220,8 @@ Exit 0 done or clean, 1 findings, 2 refused.
        (`("fetch" ,link)
         ;; The file's bytes as they are: `princ' would encode them.
         (send-string-to-terminal (pos-index-bytes link)))
+       (`("fetch" ,link "--keeper" ,url)
+        (send-string-to-terminal (pos-index-keeper-bytes link url)))
        (`("links-into" ,root ,path)
         (pos-referrers-print (file-name-as-directory (expand-file-name root)) path))
        (`("search" ,root ,query . ,options)

@@ -617,6 +617,15 @@ bytes that are not that CID's are refused (=entry=); what the keeper
 refuses is refused by its kind. A directory, a CID no such archive
 holds, and text that is no link are refused (=absent=).
 
+=fetch LINK --keeper URL= reads LINK from the keeper at URL, for a reader
+under no scope that enrols it. The keeper's ledger is read from it
+whole, each event held to its name and to the event before it as a
+ledger on disk is, and folded: the file is the one at PATH beneath
+whatever that ledger enrols under CID, or that itself, and the keeper's
+bytes are refused unless they are the CID the ledger enrols the file
+under (=entry=). A CID the keeper's ledger does not enrol, a directory,
+and text that is no link are refused (=absent=).
+
 A rumour lies at =rumours/DATE-HASH.org= in the archive, HASH the first 12
 hex digits of the SHA-256 of its text, DATE the plan's; one rumour serves
 every link to its target from the item, and rumours of one target that

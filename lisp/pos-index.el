@@ -29,6 +29,8 @@
 ;; - `pos-index-resolve': where the file an ipfs:// link names is.
 ;; - `pos-index-fetch': a buffer of a file fetched from its keeper.
 ;; - `pos-index-bytes': the bytes of the file a link names, wherever it is.
+;; - `pos-index-keeper-bytes': the bytes of the file a link names, from
+;;   a keeper the caller names.
 ;; - Org follows ipfs: links through it.
 ;; - `pos-index-file': where a scope keeps its index, relative to the
 ;;   scope.
@@ -239,6 +241,56 @@ directory is not a file."
                        bytes)))
                   scopes)
         (pos-ledger-refuse 'absent "No archived file for %s" uri))))
+
+;;;; A keeper named by the caller
+
+(defun pos-index-keeper-bytes (uri base)
+  "Return the bytes of the file URI names, from the keeper at BASE.
+For a reader under no scope that enrols URI.  The keeper's ledger is
+read from it whole, each event checked against its name and the event
+before it, and folded as a ledger on disk is; the file URI names is
+found in what it enrols, and the keeper's bytes must have the CID the
+ledger enrols the file under, else `entry'.  Refuse `absent' if URI is
+no ipfs:// link or the keeper's ledger enrols no such file; a directory
+is not a file."
+  (unless (string-match-p "\\`ipfs://[^/?#:]" uri)
+    (pos-ledger-refuse 'absent "Not an ipfs:// link: %s" uri))
+  (pcase-let* ((`(,cid . ,path) (pos-index--parse uri))
+               (keeper (funcall pos-remote-keeper-function base))
+               (events (alist-get 'events (pos-remote-describe keeper)))
+               (folder (make-temp-file "pos-keeper-ledger" t)))
+    (unwind-protect
+        (progn
+          (dotimes (i events)
+            (let ((bytes (pos-remote-event keeper (1+ i))))
+              (pos-ledger-write-new
+               (expand-file-name
+                (pos-ledger-event-file-name (1+ i) (pos-ledger-event-cid bytes))
+                folder)
+               bytes)))
+          (let* ((history (if (zerop events)
+                              (pos-ledger-refuse 'absent "The keeper at %s keeps nothing" base)
+                            (pos-ledger--folder-history folder)))
+                 (entries (pos-history-entries history))
+                 (file-cid
+                  (seq-some
+                   (lambda (pair)
+                     (when (equal (cdr pair) cid)
+                       (let ((entry (assoc (cond ((member path '(nil "")) (car pair))
+                                                 ((equal (car pair) ".") path)
+                                                 (t (concat (car pair) "/" path)))
+                                           entries)))
+                         (and entry (alist-get 'cid (cdr entry))))))
+                   (pos-ledger-fold entries (pos-history-empty history)))))
+            (unless file-cid
+              (pos-ledger-refuse 'absent "The keeper at %s has no archived file for %s"
+                                 base uri))
+            (let ((bytes (pos-remote-read keeper file-cid)))
+              (unless (equal file-cid (pos-cid-bytes bytes))
+                (pos-ledger-refuse
+                 'entry "The keeper's bytes are not those of %s" file-cid))
+              bytes)))
+      (delete-directory folder t))))
 
 (org-link-set-parameters "ipfs" :follow #'pos-index-follow)
 
